@@ -23,7 +23,7 @@ cp .env.example .env
 # Start everything
 docker compose up -d
 
-# API is now at http://localhost:8080
+# API is now at http://localhost:19833
 ```
 
 ### Local Development
@@ -36,7 +36,7 @@ npm install
 
 # Start Postgres (or use docker compose up postgres -d)
 # Run migrations
-DATABASE_URL=postgresql://kery:kery@localhost:5432/kery npm run migrate
+DATABASE_URL=postgresql://kery:kery@localhost:19832/kery npm run migrate
 
 # Start the API
 npm run dev:api
@@ -46,10 +46,10 @@ npm run dev:api
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://kery:kery@localhost:5432/kery` | PostgreSQL connection string |
+| `DATABASE_URL` | `postgresql://kery:kery@localhost:19832/kery` | PostgreSQL connection string |
 | `OPENROUTER_API_KEY` | | OpenRouter API key (recommended — routes to all models) |
 | `OPENAI_API_KEY` | | Direct OpenAI API key (fallback) |
-| `AGENT_MODEL` | `openai/gpt-4o-mini` | Model for browser automation decisions |
+| `AGENT_MODEL` | `openai/gpt-4.1-mini` | Model for browser automation decisions |
 | `SUMMARY_MODEL` | `gemini-2.5-flash-lite` | Model for run summaries |
 | `REVIEW_AGENT_MODEL` | `anthropic/claude-sonnet-4.6` | Model for screenshot review |
 | `STAGEHAND_ENABLED` | `true` | Enable Stagehand for smart element finding |

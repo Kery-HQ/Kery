@@ -24,3 +24,9 @@ export function getConfig(): EngineConfig {
   if (!_config) throw new Error("Engine config not initialized — call initEngineConfig() first");
   return _config;
 }
+
+/** Merge partial overrides into the running config (e.g. from DB settings). */
+export function updateEngineConfig(overrides: Partial<EngineConfig>): void {
+  if (!_config) throw new Error("Engine config not initialized — call initEngineConfig() first");
+  _config = { ..._config, ...overrides };
+}
