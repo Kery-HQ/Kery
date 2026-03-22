@@ -1,0 +1,17 @@
+{
+  "name": "kery-oss",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "migrate": "npm run migrate --workspace=packages/db"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

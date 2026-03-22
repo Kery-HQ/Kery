@@ -1,0 +1,22 @@
+{
+  "name": "@kery/db",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "migrate": "node --loader ts-node/esm src/migrate.ts"
+  },
+  "dependencies": {
+    "pg": "^8.13.0",
+    "@kery/engine": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "ts-node": "^10.9.0"
+  }
+}
