@@ -1,0 +1,120 @@
+# Kery Web — Design Language
+
+## Aesthetic
+
+Linear-style dark-first developer tool. Dense, keyboard-first, subtle animations. Mango/amber accent on blue-gray backgrounds.
+
+## Imports
+
+Always use `@/` path aliases: `@/components/ui/button`, `@/lib/utils`, `@/pages/Overview`, etc.
+
+## Colors
+
+OKLCH-based with blue-gray tint in dark mode. Never use raw hex/rgb — use CSS variables or Tailwind tokens.
+
+- **Accent**: mango/amber gold (`--primary`). Used for active states, focus rings, primary buttons.
+- **Status**: semantic only — `status-pass` (green), `status-fail` (red), `status-running` (blue), `status-warn` (yellow). Available as `bg-status-pass`, `text-status-pass`, etc.
+- **Elevation**: brightness stepping, not box-shadows. Each layer is 2-3% lighter in OKLCH.
+
+## Typography
+
+| Role | Size | Weight | Class |
+|------|------|--------|-------|
+| Page title | 20px | 600 | `text-xl font-semibold` |
+| Section heading | 14px | 500 | `text-[14px] font-medium` |
+| Body text | 13px | 400 | `text-[13px]` |
+| Labels / captions | 11px | 500 | `text-[11px] font-medium` |
+| Uppercase labels | 11px | 500 | `text-[11px] font-medium uppercase tracking-wider` |
+| Code / IDs / durations / URLs / costs | 12-13px | 400 | `font-mono text-[13px]` |
+
+- **UI font**: Inter (loaded via Google Fonts)
+- **Monospace**: JetBrains Mono (loaded via Google Fonts) → SF Mono → system fallback
+- Dark mode bumps body weight to 450 automatically
+
+## Component Library
+
+All in `@/components/ui/`. Radix-backed where noted.
+
+| Component | Import | Key props |
+|-----------|--------|-----------|
+| `Button` | `@/components/ui/button` | `variant`: default/secondary/outline/ghost/destructive/link. `size`: sm/md/lg/icon/icon-sm. `loading`, `asChild`. |
+| `Badge` | `@/components/ui/badge` | `variant`: default/secondary/destructive/outline/success/warning/neutral/running. `dot` for status dot. |
+| `Input` | `@/components/ui/input` | h-8, transparent bg. |
+| `Textarea` | `@/components/ui/textarea` | min-h-[72px], transparent bg. |
+| `Select` | `@/components/ui/select` | Native `<select>` wrapper with chevron. h-8. |
+| `Card` | `@/components/ui/card` | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`. p-4 padding. |
+| `Tabs` | `@/components/ui/tabs` | Radix. `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`. Use `value`/`onValueChange`. Underline style. |
+| `Dialog` | `@/components/ui/dialog` | Radix. `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter`, `DialogClose`. |
+| `DropdownMenu` | `@/components/ui/dropdown-menu` | Radix. `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuLabel`. |
+| `Tooltip` | `@/components/ui/tooltip` | Radix. `Tooltip`, `TooltipTrigger`, `TooltipContent`. Wrap app in `TooltipProvider`. |
+| `ScrollArea` | `@/components/ui/scroll-area` | Radix. Custom thin scrollbar. |
+| `Separator` | `@/components/ui/separator` | Radix. `h-px` horizontal or `w-px` vertical. |
+| `Switch` | `@/components/ui/switch` | Radix. Use `checked`/`onCheckedChange`. |
+| `Skeleton` | `@/components/ui/skeleton` | Shimmer loading. Size via className. |
+| `Kbd` | `@/components/ui/kbd` | Keyboard shortcut display. |
+| `Table` | `@/components/ui/table` | `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`. h-8 headers, 11px uppercase. |
+| `Toaster` | `@/components/ui/sonner` | Mount once in main.tsx. Use `toast()` from `sonner` to trigger. |
+
+## Shared Components
+
+| Component | Import | Props |
+|-----------|--------|-------|
+| `PageHeader` | `@/components/page-header` | `icon`, `title`, `description?`, `children` (action buttons in header). h-12 bar with border-b. |
+| `StatusDot` | `@/components/status-dot` | `status` string (passed/failed/running/clean/issues/stale). Auto-pulses for running/queued. |
+| `KpiCard` | `@/components/kpi-card` | `label`, `value`, `suffix?`, `icon?`. Use in grid rows. |
+| `EmptyState` | `@/components/empty-state` | `icon?`, `title`, `description?`, `action?` ({label, onClick}). Centered py-16. |
+| `CommandPalette` | `@/components/command-palette` | `open`, `onOpenChange`. Mounted in AppShell, triggered by Cmd+K. |
+
+## Shared Utilities
+
+| Function | Import | Returns |
+|----------|--------|---------|
+| `cn()` | `@/lib/utils` | Merged Tailwind classes |
+| `statusVariant()` | `@/lib/formatters` | Badge variant for run status |
+| `duration()` | `@/lib/formatters` | "2m 30s" from start/end ISO |
+| `relativeTime()` | `@/lib/formatters` | "5m ago" from ISO |
+| `formatCost()` | `@/lib/formatters` | "$0.0042" or "$1.23" |
+| `formatMs()` | `@/lib/formatters` | "142ms" or "1.2s" |
+| `formatReportedAt()` | `@/lib/formatters` | Smart date ("5m ago", "yesterday", "Mar 15") |
+| `useHotkey()` | `@/lib/hooks` | Register keyboard shortcut. Ignores when in inputs. |
+| `useProject()` | `@/lib/projectContext` | `{ projects, currentProjectId, currentProject, setCurrentProjectId, refreshProjects }` |
+
+## Animation Rules
+
+- Micro-interactions: 100-150ms, `ease-out`
+- Layout shifts: 200ms, `ease-out`
+- Never exceed 300ms
+- Use `animate-fade-in` on page content areas
+- Use `stagger-item` class on list items for staggered entrance
+- Use `dot-pulse` on running status dots
+- Always respect `prefers-reduced-motion`
+
+## Page Structure Pattern
+
+```tsx
+export function MyPage() {
+  return (
+    <div className="flex flex-col min-h-full">
+      <PageHeader icon={<Icon className="h-4 w-4" />} title="Page Name">
+        {/* action buttons */}
+      </PageHeader>
+      <div className="p-6 animate-fade-in space-y-6">
+        {/* content */}
+      </div>
+    </div>
+  );
+}
+```
+
+## Do / Don't
+
+- **Do** use `font-mono` for IDs, timestamps, durations, costs, URLs, routes
+- **Do** use `StatusDot` for any run/health status indicator
+- **Do** use `Dialog` for create/edit/delete confirmations (not `window.confirm`)
+- **Do** use `Skeleton` for loading states (not spinners)
+- **Do** use `EmptyState` when a list has no data
+- **Don't** use raw hex/rgb colors — always CSS variables or Tailwind tokens
+- **Don't** use box-shadows for elevation in dark mode — use brightness stepping
+- **Don't** use emojis in the UI
+- **Don't** add animations longer than 300ms
+- **Don't** import from relative paths — always use `@/` aliases
