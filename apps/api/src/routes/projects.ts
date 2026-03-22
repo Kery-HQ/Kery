@@ -30,7 +30,7 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
 
   app.post("/api/projects", async (req, reply) => {
     const parsed = ProjectSchema.safeParse(req.body);
-    if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
+    if (!parsed.success) { reply.code(400).send({ error: "invalid payload", details: parsed.error.issues }); return; }
     const { rows } = await pool.query(
       "INSERT INTO projects (name, domain) VALUES ($1, $2) RETURNING *",
       [parsed.data.name, parsed.data.domain],

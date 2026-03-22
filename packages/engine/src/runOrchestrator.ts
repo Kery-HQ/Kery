@@ -128,20 +128,19 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (config.stagehandEnabled) {
       try {
         shSession = await initStagehandSession();
-        browser = shSession.browser;
       } catch (err) {
         logger.warn({ err: String(err).slice(0, 200) }, "Stagehand session init failed — falling back to plain Playwright");
         shSession = undefined;
       }
     }
 
-    if (!browser) {
+    let page;
+    if (shSession) {
+      page = shSession.page;
+    } else {
       browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+      page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     }
-
-    const page = shSession
-      ? shSession.page
-      : await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     await page.setDefaultTimeout(10000);
 
     // Try regression replay
@@ -158,7 +157,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
     if (regressionPlan && regressionPlan.length > 0) {
       try {
-        const regResult = await executeRegressionPlan(page, regressionPlan, shSession?.stagehand);
+        const regResult = await executeRegressionPlan(page, regressionPlan, shSession?.page);
         if (regResult.status !== "stale") {
           if (regressionSource) {
             const current = await storage.getRegressionPlan(regressionSource.table, regressionSource.id);
@@ -183,7 +182,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           }));
 
           if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-          else await browser.close();
+          else await browser?.close();
 
           return {
             status: regResult.status === "passed" ? "passed" : "failed",
@@ -245,7 +244,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (job.destinationId && proposed.length > 0) await savePageMemoryEntries(storage, job.destinationId, proposed);
 
     if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-    else await browser.close();
+    else await browser?.close();
 
     let finalStatus = agentResult.status;
     const okSteps = agentResult.stepsDetail.filter(s => s.status === "ok" && !["done", "auth", "bug"].includes(s.action));

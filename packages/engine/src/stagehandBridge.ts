@@ -1,8 +1,7 @@
 /**
  * Stagehand Bridge — thin wrapper around Stagehand's observe/act/extract APIs.
  */
-import { Stagehand, type Action, type ActResult } from "@browserbasehq/stagehand";
-import { chromium, type Page, type Browser } from "playwright";
+import { Stagehand, type ObserveResult, type ActResult, type Page as StagehandPage } from "@browserbasehq/stagehand";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
 
@@ -24,8 +23,7 @@ export type StagehandActResult = {
 
 export type StagehandSession = {
   stagehand: InstanceType<typeof Stagehand>;
-  browser: Browser;
-  page: Page;
+  page: StagehandPage;
 };
 
 // ─── Circuit Breaker ────────────────────────────────────────────────────────
@@ -65,14 +63,12 @@ export async function initStagehandSession(): Promise<StagehandSession> {
 
   const stagehand = new Stagehand({
     env: "LOCAL",
-    model,
+    modelName: model,
     verbose: 0,
     selfHeal: true,
-    domSettleTimeout: 2000,
-    actTimeoutMs: 10000,
+    domSettleTimeoutMs: 2000,
     localBrowserLaunchOptions: {
       headless: true,
-      viewport: { width: 1920, height: 1080 },
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
     logger: (line) => {
@@ -80,35 +76,18 @@ export async function initStagehandSession(): Promise<StagehandSession> {
       else if (line.level === 1) logger.info({ sh: true, cat: line.category }, String(line.message));
       else logger.warn({ sh: true, cat: line.category }, String(line.message));
     },
-    disableAPI: true,
   });
 
   await stagehand.init();
 
-  const cdpUrl = stagehand.connectURL();
-  logger.info({ cdpUrl: cdpUrl.slice(0, 60) }, "Connecting Playwright to Stagehand browser");
-  const browser = await chromium.connectOverCDP(cdpUrl);
-
-  const contexts = browser.contexts();
-  const ctx = contexts[0];
-  let page: Page;
-  if (ctx && ctx.pages().length > 0) {
-    page = ctx.pages()[0];
-  } else {
-    const newCtx = ctx || await browser.newContext({ viewport: { width: 1920, height: 1080 } });
-    page = await newCtx.newPage();
-  }
-  await page.setDefaultTimeout(10000);
+  const page = stagehand.page;
 
   resetCircuitBreaker();
-  logger.info("Stagehand session ready (shared browser)");
-  return { stagehand, browser, page };
+  logger.info("Stagehand session ready");
+  return { stagehand, page };
 }
 
 export async function destroyStagehandSession(session: StagehandSession): Promise<void> {
-  try {
-    await session.browser.close().catch(() => {});
-  } catch {}
   try {
     await session.stagehand.close();
   } catch (err) {
@@ -120,22 +99,22 @@ export async function destroyStagehandSession(session: StagehandSession): Promis
 // ─── Observe ────────────────────────────────────────────────────────────────
 
 export async function stagehandObserve(
-  stagehand: InstanceType<typeof Stagehand>,
+  page: StagehandPage,
 ): Promise<ObservedElement[]> {
   if (_circuitOpen) return [];
 
   try {
-    const actions: Action[] = await stagehand.observe(
+    const results: ObserveResult[] = await page.observe(
       "List all interactive elements on the page: buttons, links, text inputs, checkboxes, radio buttons, select dropdowns, tabs, and any other clickable or fillable elements. Include their current state (disabled, checked, expanded, selected) and current values for form fields.",
     );
 
     recordObserveSuccess();
-    return actions.map((action, i) => ({
+    return results.map((result, i) => ({
       id: i + 1,
-      selector: action.selector,
-      description: action.description,
-      method: action.method,
-      arguments: action.arguments,
+      selector: result.selector,
+      description: result.description,
+      method: result.method,
+      arguments: result.arguments,
     }));
   } catch (err) {
     recordObserveFailure();
@@ -157,20 +136,20 @@ export function hasSufficientObserve(elements: ObservedElement[]): boolean {
 // ─── Act ────────────────────────────────────────────────────────────────────
 
 export async function stagehandAct(
-  stagehand: InstanceType<typeof Stagehand>,
+  page: StagehandPage,
   instruction: string,
 ): Promise<StagehandActResult> {
   logger.info({ instruction: instruction.slice(0, 100) }, "Stagehand act");
 
-  const result: ActResult = await stagehand.act(instruction, {
-    timeout: 10000,
+  const result: ActResult = await page.act({
+    action: instruction,
+    timeoutMs: 10000,
   });
 
   logger.info({
     success: result.success,
     message: result.message?.slice(0, 80),
-    description: result.actionDescription?.slice(0, 80),
-    cacheStatus: result.cacheStatus,
+    action: result.action?.slice(0, 80),
   }, "Stagehand act result");
 
   if (!result.success) {
@@ -180,7 +159,7 @@ export async function stagehandAct(
   return {
     success: result.success,
     message: result.message,
-    description: result.actionDescription,
+    description: result.action,
   };
 }
 

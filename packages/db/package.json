@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "migrate": "node --loader ts-node/esm src/migrate.ts"
+    "migrate": "tsx src/migrate.ts"
   },
   "dependencies": {
     "pg": "^8.13.0",
@@ -17,6 +17,6 @@
     "typescript": "^5.7.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
-    "ts-node": "^10.9.0"
+    "tsx": "^4.19.0"
   }
 }

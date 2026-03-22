@@ -919,7 +919,7 @@ export async function runAgent(
   const runTimeoutMs = config.runTimeoutMinutes * 60 * 1000;
   const runDeadline = Date.now() + runTimeoutMs;
 
-  const stagehand = stagehandSession?.stagehand ?? null;
+  const stagehandPage = stagehandSession?.page ?? null;
 
   try {
     const authed = await handleAuth(page, auth, context);
@@ -1003,7 +1003,7 @@ export async function runAgent(
         return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: `Run timed out` };
       }
 
-      const snapshot = await takeStableSnapshot(page, stagehand);
+      const snapshot = await takeStableSnapshot(page, stagehandPage);
       const { screenshot, dom, url, title, pageText } = snapshot;
       currentElements = snapshot.a11yElements;
       currentObserved = snapshot.observedElements;
@@ -1126,11 +1126,11 @@ export async function runAgent(
 
       try {
         // Stagehand execution path
-        const shInstruction = (stagehand && currentObserved)
+        const shInstruction = (stagehandPage && currentObserved)
           ? actionToInstruction(action, currentObserved) : null;
 
-        if (shInstruction && stagehand) {
-          await stagehandAct(stagehand, shInstruction);
+        if (shInstruction && stagehandPage) {
+          await stagehandAct(stagehandPage, shInstruction);
           await waitForPageStable(page, 4000);
           prevResult = { action, status: "ok" };
 
