@@ -2,14 +2,16 @@ export type EngineConfig = {
   openaiApiKey: string;
   openrouterApiKey: string;
   geminiApiKey: string;
-  geminiAgentModel: string;
-  geminiSummaryModel: string;
-  geminiReviewModel: string;
+  agentModel: string;
+  summaryModel: string;
+  reviewModel: string;
   reviewAgentModel: string;
-  geminiScriptModel: string;
+  scriptModel: string;
   stagehandEnabled: boolean;
   stagehandModel: string;
   runTimeoutMinutes: number;
+  llmTimeoutMs: number;
+  reviewTimeoutMs: number;
 };
 
 let _config: EngineConfig | null = null;

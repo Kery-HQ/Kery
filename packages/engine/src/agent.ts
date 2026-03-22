@@ -15,7 +15,7 @@ import { logger } from "./logger.js";
 import type { AuthConfig } from "./types.js";
 import type { MemoryEntry } from "./agentMemory.js";
 import { formatMemoryForPrompt } from "./agentMemory.js";
-import { geminiAgentChat, calcCostUsd } from "./gemini.js";
+import { llmAgentChat, calcCostUsd } from "./llmClient.js";
 import { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText, type A11yElement, type A11yTextNode } from "./a11yTree.js";
 import { PlanTracker } from "./planTracker.js";
 import {
@@ -547,7 +547,7 @@ async function decideNextAction(params: {
     if (attempt === 2) await new Promise(r => setTimeout(r, 2000));
 
     const t0 = Date.now();
-    const { content: raw, usage } = await geminiAgentChat(callMessages);
+    const { content: raw, usage } = await llmAgentChat(callMessages);
     const durationMs = Date.now() - t0;
     const hasVision = attempt === 0;
 
@@ -560,14 +560,14 @@ async function decideNextAction(params: {
     params.onLLMCall({
       seq: params.llmCallSeq.current,
       stepIndex: params.stepIndex,
-      model: getConfig().geminiAgentModel,
+      model: getConfig().agentModel,
       hasVision,
       attempt: attempt + 1,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       durationMs,
-      costUsd: calcCostUsd(getConfig().geminiAgentModel, usage.inputTokens, usage.outputTokens),
+      costUsd: calcCostUsd(getConfig().agentModel, usage.inputTokens, usage.outputTokens),
       query: queryText.slice(0, 2000),
       imageBase64: hasVision && params.saveScreenshots ? params.screenshotBase64 : undefined,
       response: raw,

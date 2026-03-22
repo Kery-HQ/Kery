@@ -1,6 +1,7 @@
 import type { ReviewBug } from "./types.js";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
+import { llmChat } from "./llmClient.js";
 import type { LLMCallRecord } from "./agent.js";
 
 export type ReviewRequest = {
@@ -121,54 +122,15 @@ function isLikelyUnstable(req: ReviewRequest): boolean {
 
 async function callReviewLLM(messages: any[]): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   const config = getConfig();
-  const apiKey = config.openrouterApiKey || config.openaiApiKey;
-  if (!apiKey) throw new Error("No API key for review agent (OPENROUTER_API_KEY or OPENAI_API_KEY)");
-
-  const baseUrl = config.openrouterApiKey
-    ? "https://openrouter.ai/api/v1"
-    : "https://api.openai.com/v1";
-
-  const model = config.reviewAgentModel;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        ...(config.openrouterApiKey ? { "HTTP-Referer": "https://kery.so", "X-Title": "Kery Review Agent" } : {}),
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: 1024,
-        temperature: 0.1,
-      }),
-      signal: controller.signal,
-    });
-  } catch (err: any) {
-    if (err?.name === "AbortError") throw new Error("Review LLM timed out after 30s");
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Review LLM call failed: ${res.status} ${text.slice(0, 200)}`);
-  }
-
-  const data: any = await res.json();
-  const content = data.choices?.[0]?.message?.content ?? "";
-  const usage = data.usage ?? {};
+  const { content, usage } = await llmChat(messages, config.reviewAgentModel, {
+    maxTokens: 1024,
+    temperature: 0.1,
+    timeoutMs: config.reviewTimeoutMs,
+  });
   return {
     content,
-    inputTokens: usage.prompt_tokens ?? 0,
-    outputTokens: usage.completion_tokens ?? 0,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
   };
 }
 

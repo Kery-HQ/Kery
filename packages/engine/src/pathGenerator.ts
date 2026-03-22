@@ -1,6 +1,6 @@
 import { loadProjectMemory, loadPageMemory, formatMemoryForPrompt } from "./agentMemory.js";
-import { geminiPathPlan } from "./gemini.js";
-import type { GeminiUsage } from "./gemini.js";
+import { llmPathPlan } from "./llmClient.js";
+import type { LLMUsage } from "./llmClient.js";
 import { logger } from "./logger.js";
 import type { TestPlan, PathStep, AppTreeDestination } from "./types.js";
 import type { MemoryEntry } from "./agentMemory.js";
@@ -16,7 +16,7 @@ export type PathGeneratorInput = {
   intent?: string;
 };
 
-export type GenerateTestPlanResult = { plan: TestPlan; usage?: GeminiUsage };
+export type GenerateTestPlanResult = { plan: TestPlan; usage?: LLMUsage };
 
 /**
  * Loads memory, past run results, and open bugs for the destination,
@@ -56,7 +56,7 @@ Generate a JSON object with exactly these keys:
 Use human-readable targets (e.g. "Submit button", "Email field"). The Navigator will resolve them to coordinates. Include brief reasoning for each step. For fill steps, suggest concrete test values where relevant (e.g. invalid email "not-an-email").
 Keep each path to at most 5 steps. Keep each reasoning to one short sentence. This ensures the response completes in one go.`;
 
-  const { content, usage } = await geminiPathPlan(prompt);
+  const { content, usage } = await llmPathPlan(prompt);
   return { plan: parseTestPlan(content), usage };
 }
 

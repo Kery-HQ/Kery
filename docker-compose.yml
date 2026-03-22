@@ -30,17 +30,26 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_AGENT_MODEL: ${GEMINI_AGENT_MODEL:-openai/gpt-4o-mini}
-      GEMINI_SUMMARY_MODEL: ${GEMINI_SUMMARY_MODEL:-gemini-2.5-flash-lite}
-      GEMINI_REVIEW_MODEL: ${GEMINI_REVIEW_MODEL:-gemini-2.5-flash-lite}
+      AGENT_MODEL: ${AGENT_MODEL:-openai/gpt-4o-mini}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-gemini-2.5-flash-lite}
+      REVIEW_MODEL: ${REVIEW_MODEL:-gemini-2.5-flash-lite}
       REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-4.6}
-      GEMINI_SCRIPT_MODEL: ${GEMINI_SCRIPT_MODEL:-gemini-2.5-flash}
+      SCRIPT_MODEL: ${SCRIPT_MODEL:-gemini-2.5-flash}
       STAGEHAND_ENABLED: ${STAGEHAND_ENABLED:-true}
       STAGEHAND_MODEL: ${STAGEHAND_MODEL:-google/gemini-2.0-flash}
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-15}
     depends_on:
       postgres:
         condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
 
 volumes:
   pgdata:

@@ -1,4 +1,4 @@
-import { geminiSummarize } from "./gemini.js";
+import { llmSummarize } from "./llmClient.js";
 
 export async function summarizeRun(intent: string, status: string, steps: string[], videoUrl?: string) {
   const stepList = steps.length > 0
@@ -17,7 +17,7 @@ ${stepList}
 Focus on what the agent did, what succeeded, and what failed if applicable.`;
 
   try {
-    return await geminiSummarize(prompt);
+    return await llmSummarize(prompt);
   } catch {
     return status === "passed" ? "All steps passed." : "Test failed. Review video/logs.";
   }

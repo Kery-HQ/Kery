@@ -141,7 +141,7 @@ export const Settings: React.FC = () => {
                 <div>
                   <p className="text-[13px] font-medium text-foreground">Use local Playwright</p>
                   <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-                    Run tests with a local Chromium instance instead of BrowserStack. No cloud credentials required.
+                    Run tests with a local Chromium instance. No cloud credentials required.
                   </p>
                 </div>
                 <button

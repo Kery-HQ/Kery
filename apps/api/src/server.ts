@@ -15,14 +15,16 @@ initEngineConfig({
   openaiApiKey: config.openaiApiKey,
   openrouterApiKey: config.openrouterApiKey,
   geminiApiKey: config.geminiApiKey,
-  geminiAgentModel: config.geminiAgentModel,
-  geminiSummaryModel: config.geminiSummaryModel,
-  geminiReviewModel: config.geminiReviewModel,
+  agentModel: config.agentModel,
+  summaryModel: config.summaryModel,
+  reviewModel: config.reviewModel,
   reviewAgentModel: config.reviewAgentModel,
-  geminiScriptModel: config.geminiScriptModel,
+  scriptModel: config.scriptModel,
   stagehandEnabled: config.stagehandEnabled,
   stagehandModel: config.stagehandModel,
   runTimeoutMinutes: config.runTimeoutMinutes,
+  llmTimeoutMs: config.llmTimeoutMs,
+  reviewTimeoutMs: config.reviewTimeoutMs,
 });
 
 // Initialize database

@@ -12,7 +12,7 @@ import { waitForPageStable } from "./agent.js";
 import type { AuthConfig } from "./types.js";
 import { createReviewProcessor, type ReviewRequest } from "./reviewAgent.js";
 import { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
-import { calcCostUsd } from "./gemini.js";
+import { calcCostUsd } from "./llmClient.js";
 import { summarizeRun } from "./summarizer.js";
 import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, generateRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
@@ -76,7 +76,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         const planContext = formatTestPlanForNavigator(plan);
         if (planContext) context = context ? `${context}\n\n${planContext}` : planContext;
         if (usage) {
-          const model = config.geminiReviewModel ?? "gemini-2.5-flash-lite";
+          const model = config.reviewModel ?? "gemini-2.5-flash-lite";
           pathGenCalls.push({
             seq: 0, stepIndex: 0, model, hasVision: false, attempt: 1,
             inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,

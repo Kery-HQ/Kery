@@ -1,8 +1,10 @@
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
 
+const REFERER_URL = "https://kery.so";
+
 // We route all LLM traffic through OpenRouter (if configured) or fall back to OpenAI.
-function getLLMBase(): string {
+export function getLLMBase(): string {
   const config = getConfig();
   return config.openrouterApiKey
     ? "https://openrouter.ai/api/v1"
@@ -72,7 +74,7 @@ function getAgentSchema(model: string) {
 
 // ─── Usage / pricing ─────────────────────────────────────────────────────────
 
-export type GeminiUsage = {
+export type LLMUsage = {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
@@ -103,11 +105,11 @@ export function calcCostUsd(model: string, inputTokens: number, outputTokens: nu
 
 // ─── Low-level chat ───────────────────────────────────────────────────────────
 
-export async function geminiChat(
+export async function llmChat(
   messages: any[],
   model: string,
-  opts: { maxTokens?: number; temperature?: number; responseFormat?: any } = {}
-): Promise<{ content: string; usage: GeminiUsage }> {
+  opts: { maxTokens?: number; temperature?: number; responseFormat?: any; timeoutMs?: number } = {}
+): Promise<{ content: string; usage: LLMUsage }> {
   const config = getConfig();
   const apiKey = config.openrouterApiKey || config.openaiApiKey;
   if (!apiKey) throw new Error("No LLM API key configured (OPENROUTER_API_KEY or OPENAI_API_KEY).");
@@ -136,8 +138,9 @@ export async function geminiChat(
     };
   }
 
+  const timeoutMs = opts.timeoutMs ?? config.llmTimeoutMs;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${getLLMBase()}/chat/completions`, {
@@ -145,13 +148,13 @@ export async function geminiChat(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        ...(config.openrouterApiKey ? { "HTTP-Referer": "https://kery.so", "X-Title": "Kery Agent" } : {}),
+        ...(config.openrouterApiKey ? { "HTTP-Referer": REFERER_URL, "X-Title": "Kery Agent" } : {}),
       },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (err: any) {
-    if (err?.name === "AbortError") throw new Error("LLM call timed out after 45s");
+    if (err?.name === "AbortError") throw new Error(`LLM call timed out after ${timeoutMs}ms`);
     throw err;
   } finally {
     clearTimeout(timeoutId);
@@ -159,26 +162,26 @@ export async function geminiChat(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Gemini ${res.status}: ${text}`);
+    throw new Error(`LLM ${res.status}: ${text}`);
   }
 
   const data: any = await res.json();
   const choice = data.choices?.[0];
 
   if (!choice) {
-    throw new Error(`Gemini returned no choices: ${JSON.stringify(data).slice(0, 200)}`);
+    throw new Error(`LLM returned no choices: ${JSON.stringify(data).slice(0, 200)}`);
   }
 
   if (choice.finish_reason === "SAFETY") {
-    logger.warn("Gemini SAFETY filter triggered");
+    logger.warn("LLM SAFETY filter triggered");
     return { content: "", usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
   }
 
   if (choice.finish_reason && choice.finish_reason !== "stop") {
-    logger.warn({ finish_reason: choice.finish_reason, model }, "Gemini non-stop finish reason");
+    logger.warn({ finish_reason: choice.finish_reason, model }, "LLM non-stop finish reason");
   }
 
-  const usage: GeminiUsage = {
+  const usage: LLMUsage = {
     inputTokens:  data.usage?.prompt_tokens     ?? 0,
     outputTokens: data.usage?.completion_tokens ?? 0,
     totalTokens:  data.usage?.total_tokens      ?? 0,
@@ -189,9 +192,9 @@ export async function geminiChat(
 
 // ─── Agent decisions (vision + text) ─────────────────────────────────────────
 
-export async function geminiAgentChat(messages: any[]): Promise<{ content: string; usage: GeminiUsage }> {
-  const model = getConfig().geminiAgentModel;
-  return geminiChat(messages, model, {
+export async function llmAgentChat(messages: any[]): Promise<{ content: string; usage: LLMUsage }> {
+  const model = getConfig().agentModel;
+  return llmChat(messages, model, {
     maxTokens: MAX_OUTPUT_TOKENS,
     temperature: 0.5,
     responseFormat: getAgentSchema(model),
@@ -200,10 +203,10 @@ export async function geminiAgentChat(messages: any[]): Promise<{ content: strin
 
 // ─── Summarization (text only) ────────────────────────────────────────────────
 
-export async function geminiSummarize(prompt: string): Promise<string> {
-  const { content } = await geminiChat(
+export async function llmSummarize(prompt: string): Promise<string> {
+  const { content } = await llmChat(
     [{ role: "user", content: prompt }],
-    getConfig().geminiSummaryModel,
+    getConfig().summaryModel,
     { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 }
   );
   return content;
@@ -245,9 +248,9 @@ const REVIEW_BUG_SCHEMA = {
   },
 };
 
-export async function geminiReviewAnalysis(messages: any[]): Promise<{ content: string; usage: GeminiUsage }> {
-  const model = getConfig().geminiReviewModel ?? "gemini-2.5-flash-lite";
-  return geminiChat(messages, model, {
+export async function llmReviewAnalysis(messages: any[]): Promise<{ content: string; usage: LLMUsage }> {
+  const model = getConfig().reviewModel ?? "gemini-2.5-flash-lite";
+  return llmChat(messages, model, {
     maxTokens: MAX_OUTPUT_TOKENS,
     temperature: 0.2,
     responseFormat: REVIEW_BUG_SCHEMA,
@@ -289,9 +292,9 @@ const TEST_PLAN_SCHEMA = {
   },
 };
 
-export async function geminiPathPlan(prompt: string): Promise<{ content: string; usage: GeminiUsage }> {
-  const model = getConfig().geminiReviewModel ?? "gemini-2.5-flash-lite";
-  return geminiChat(
+export async function llmPathPlan(prompt: string): Promise<{ content: string; usage: LLMUsage }> {
+  const model = getConfig().reviewModel ?? "gemini-2.5-flash-lite";
+  return llmChat(
     [{ role: "user", content: prompt }],
     model,
     { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3, responseFormat: TEST_PLAN_SCHEMA }
