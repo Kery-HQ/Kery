@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kery
+      POSTGRES_PASSWORD: kery
+      POSTGRES_DB: kery
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kery"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
+      PORT: 8080
+      APP_URL: http://localhost:5173
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_AGENT_MODEL: ${GEMINI_AGENT_MODEL:-openai/gpt-4o-mini}
+      GEMINI_SUMMARY_MODEL: ${GEMINI_SUMMARY_MODEL:-gemini-2.5-flash-lite}
+      GEMINI_REVIEW_MODEL: ${GEMINI_REVIEW_MODEL:-gemini-2.5-flash-lite}
+      REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-4.6}
+      GEMINI_SCRIPT_MODEL: ${GEMINI_SCRIPT_MODEL:-gemini-2.5-flash}
+      STAGEHAND_ENABLED: ${STAGEHAND_ENABLED:-true}
+      STAGEHAND_MODEL: ${STAGEHAND_MODEL:-google/gemini-2.0-flash}
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-15}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

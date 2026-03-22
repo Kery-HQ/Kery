@@ -1,0 +1,25 @@
+{
+  "name": "@kery/api",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@kery/engine": "*",
+    "@kery/db": "*",
+    "fastify": "^5.2.0",
+    "@fastify/cors": "^10.0.0",
+    "dotenv": "^16.4.0",
+    "zod": "^3.23.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0"
+  }
+}
