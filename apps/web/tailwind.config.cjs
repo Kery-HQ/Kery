@@ -13,8 +13,8 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
+        sans: ['var(--font-sans)'],
+        mono: ['var(--font-mono)'],
       },
       colors: {
         background:  'var(--background)',
@@ -50,6 +50,12 @@ module.exports = {
           DEFAULT:    'var(--card)',
           foreground: 'var(--card-foreground)',
         },
+        status: {
+          pass:    'var(--status-pass)',
+          fail:    'var(--status-fail)',
+          running: 'var(--status-running)',
+          warn:    'var(--status-warn)',
+        },
         sidebar: {
           DEFAULT:    'var(--sidebar)',
           foreground: 'var(--sidebar-foreground)',
@@ -64,28 +70,12 @@ module.exports = {
             foreground: 'var(--sidebar-accent-foreground)',
           },
         },
-        chart: {
-          1: 'var(--chart-1)',
-          2: 'var(--chart-2)',
-          3: 'var(--chart-3)',
-          4: 'var(--chart-4)',
-          5: 'var(--chart-5)',
-        },
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
         xl: 'calc(var(--radius) + 4px)',
-      },
-      boxShadow: {
-        '2xs': 'var(--shadow-2xs)',
-        'xs':  'var(--shadow-xs)',
-        'sm':  'var(--shadow-sm)',
-        'md':  'var(--shadow-md)',
-        'lg':  'var(--shadow-lg)',
-        'xl':  'var(--shadow-xl)',
-        '2xl': 'var(--shadow-2xl)',
       },
       keyframes: {
         'fade-in': {
@@ -96,10 +86,25 @@ module.exports = {
           from: { opacity: 0, transform: 'translateY(8px)' },
           to:   { opacity: 1, transform: 'translateY(0)' },
         },
+        'scale-in': {
+          from: { opacity: 0, transform: 'scale(0.96)' },
+          to:   { opacity: 1, transform: 'scale(1)' },
+        },
+        'accordion-down': {
+          from: { height: '0' },
+          to:   { height: 'var(--radix-accordion-content-height)' },
+        },
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to:   { height: '0' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.15s ease-out',
         'slide-up': 'slide-up 0.2s ease-out',
+        'scale-in': 'scale-in 0.15s ease-out',
+        'accordion-down': 'accordion-down 0.15s ease-out',
+        'accordion-up': 'accordion-up 0.15s ease-out',
       },
     },
   },

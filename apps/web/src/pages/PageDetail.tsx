@@ -1,24 +1,20 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Layers, CheckCircle2, AlertTriangle, HelpCircle,
-  FileText, MousePointerClick, Layout, Link2, Brain, Play, Clock, Loader2, Trash2,
-  Repeat,
+  ArrowLeft, Play, Loader2, Trash2,
+  FileText, MousePointerClick, Layout, Link2, Brain, Clock, Repeat,
 } from "lucide-react";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { cn } from "../lib/utils";
-import { useProject } from "../lib/projectContext";
-import { fetchPageDetail, fetchPageMemory, fetchEnvironments, runDestination, resetPageData } from "../projectApi";
-import type { MemoryEntry } from "../projectApi";
-import { RegressionPlanView } from "./TestsPlans";
-
-const HEALTH_ICONS: Record<string, React.ReactNode> = {
-  clean: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-  issues: <AlertTriangle className="h-4 w-4 text-amber-500" />,
-  stale: <AlertTriangle className="h-4 w-4 text-orange-400" />,
-  untested: <HelpCircle className="h-4 w-4 text-muted-foreground/50" />,
-};
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusDot } from "@/components/status-dot";
+import { cn } from "@/lib/utils";
+import { relativeTime, duration, statusVariant } from "@/lib/formatters";
+import { useProject } from "@/lib/projectContext";
+import { fetchPageDetail, fetchPageMemory, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
+import type { MemoryEntry } from "@/projectApi";
+import { RegressionPlanView } from "@/pages/TestsPlans";
 
 type PageData = {
   page: {
@@ -48,22 +44,17 @@ type PageData = {
   }>;
 };
 
-function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/30">
-        {icon}
-        <span className="text-sm font-semibold text-foreground">{title}</span>
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
-}
+const HEALTH_VARIANT: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
+  clean: "success",
+  issues: "warning",
+  stale: "warning",
+  untested: "neutral",
+};
 
 export function PageDetail() {
   const { destinationId } = useParams<{ destinationId: string }>();
   const navigate = useNavigate();
-  const { currentProjectId, currentProject } = useProject();
+  const { currentProjectId } = useProject();
   const [data, setData] = React.useState<PageData | null>(null);
   const [memory, setMemory] = React.useState<MemoryEntry[]>([]);
   const [environments, setEnvironments] = React.useState<any[]>([]);
@@ -124,9 +115,15 @@ export function PageDetail() {
   if (loading) {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-2 px-8 py-4 border-b border-border">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Loading page...</span>
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-card/50">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <div className="px-6 py-5 max-w-4xl mx-auto w-full space-y-4 animate-fade-in">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-6 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
         </div>
       </div>
     );
@@ -135,15 +132,15 @@ export function PageDetail() {
   if (error || !data) {
     return (
       <div className="flex flex-col h-full">
-        <div className="px-8 py-6 max-w-2xl mx-auto space-y-4">
+        <div className="px-6 py-6 max-w-4xl mx-auto space-y-4">
           <button
             onClick={() => navigate("/pages")}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Pages
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Pages
           </button>
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-foreground">
             {error || "Page not found"}
           </div>
         </div>
@@ -161,241 +158,307 @@ export function PageDetail() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-border bg-card px-8 py-4">
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex-shrink-0 border-b border-border bg-card/50 px-6 py-3">
+        <div className="max-w-4xl mx-auto space-y-2">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <button
               onClick={() => navigate("/pages")}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+              className="hover:text-foreground transition-colors flex items-center gap-1"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back
+              <ArrowLeft className="h-3 w-3" />
+              Pages
             </button>
-            {HEALTH_ICONS[page.health_status] || HEALTH_ICONS.untested}
-            <div>
-              <h1 className="font-mono text-base font-semibold text-foreground">{page.normalized_route}</h1>
-              {page.title && (
-                <p className="text-xs text-muted-foreground mt-0.5">{page.title}</p>
+            <span>/</span>
+            <span className="font-mono text-foreground truncate">{page.normalized_route}</span>
+          </div>
+
+          {/* Title row */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <StatusDot status={page.health_status} />
+              <h1 className="font-mono text-[14px] font-semibold text-foreground truncate">
+                {page.normalized_route}
+              </h1>
+              <Badge variant={HEALTH_VARIANT[page.health_status] ?? "neutral"} className="capitalize">
+                {page.health_status}
+              </Badge>
+              {page.issues_count > 0 && (
+                <Badge variant="warning">
+                  {page.issues_count} issue{page.issues_count !== 1 ? "s" : ""}
+                </Badge>
               )}
             </div>
-            {page.issues_count > 0 && (
-              <Badge variant="warning" className="text-[10px]">
-                {page.issues_count} issue{page.issues_count !== 1 ? "s" : ""}
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {confirmReset ? (
-              <div className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5">
-                <span className="text-[12px] text-destructive">Delete all page data?</span>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={handleReset}
-                  disabled={resetting}
-                  className="h-7 gap-1 text-[11px]"
-                >
-                  {resetting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                  Yes, reset
-                </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {confirmReset ? (
+                <div className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5">
+                  <span className="text-[11px] text-destructive">Delete all page data?</span>
+                  <Button size="sm" variant="destructive" onClick={handleReset} loading={resetting} className="h-7 text-[11px]">
+                    Yes, reset
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)} className="h-7 text-[11px]">
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setConfirmReset(false)}
-                  className="h-7 text-[11px]"
+                  onClick={() => setConfirmReset(true)}
+                  className="text-destructive hover:text-destructive"
                 >
-                  Cancel
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              </div>
-            ) : (
+              )}
               <Button
                 size="sm"
-                variant="outline"
-                onClick={() => setConfirmReset(true)}
-                className="gap-1.5 text-destructive hover:text-destructive"
+                onClick={handleRun}
+                disabled={!page.enabled || !defaultEnvId}
+                loading={running}
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                Reset data
+                {!running && <Play className="h-3.5 w-3.5" />}
+                Run this page
               </Button>
-            )}
-            <Button
-              size="sm"
-              onClick={handleRun}
-              disabled={running || !page.enabled || !defaultEnvId}
-              className="gap-1.5"
-            >
-              {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-              Run this page
-            </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-5xl mx-auto space-y-6">
-          {/* Forms */}
-          {forms.length > 0 && (
-            <Section
-              icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-              title={`Forms (${forms.length})`}
-            >
-              <ul className="space-y-3">
-                {forms.map((f, i) => (
-                  <li key={i} className="rounded border border-border bg-muted/20 p-3 text-sm">
-                    <div className="font-medium text-foreground mb-1">
-                      {f.submitText ? `Submit: "${f.submitText}"` : `Form ${i + 1}`}
-                    </div>
-                    {f.fields && f.fields.length > 0 && (
-                      <ul className="text-muted-foreground text-xs space-y-0.5 mt-1">
-                        {f.fields.map((field: any, j: number) => (
-                          <li key={j}>
-                            {field.label || field.name} {field.required ? "(required)" : ""}
-                            {field.type ? ` \u00b7 ${field.type}` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
+      {/* Tabbed content */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="max-w-4xl mx-auto animate-fade-in">
+          <Tabs defaultValue="overview">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="forms">Forms & Interactions</TabsTrigger>
+              <TabsTrigger value="memory">Memory</TabsTrigger>
+              <TabsTrigger value="runs">Runs</TabsTrigger>
+            </TabsList>
 
-          {/* Buttons */}
-          {buttons.length > 0 && (
-            <Section
-              icon={<MousePointerClick className="h-4 w-4 text-muted-foreground" />}
-              title={`Buttons (${buttons.length})`}
-            >
-              <ul className="flex flex-wrap gap-2">
-                {buttons.map((b, i) => (
-                  <li key={i}>
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      {b.text}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {/* Interactions */}
-          {interactions.length > 0 && (
-            <Section
-              icon={<Layout className="h-4 w-4 text-muted-foreground" />}
-              title={`Interactions (${interactions.length})`}
-            >
-              <ul className="space-y-2 text-sm">
-                {interactions.map((ix, i) => (
-                  <li key={i} className="flex items-center gap-2 text-muted-foreground">
-                    <span className="font-medium text-foreground">{ix.trigger}</span>
-                    <span>\u2192</span>
-                    <span>{ix.revealed}</span>
-                    {ix.heading && <span className="text-xs">({ix.heading})</span>}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {/* Nav links */}
-          {navLinks.length > 0 && (
-            <Section
-              icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
-              title={`Nav links (${navLinks.length})`}
-            >
-              <ul className="flex flex-wrap gap-2">
-                {navLinks.map((link, i) => (
-                  <li key={i}>
-                    <span className="font-mono text-xs text-muted-foreground">{link}</span>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-
-          {/* Regression Script */}
-          {hasRegressionPlan && (
-            <Section
-              icon={<Repeat className="h-4 w-4 text-muted-foreground" />}
-              title="Regression script"
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  {page.plan_status === "ready" ? (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                      Active
-                    </span>
-                  ) : page.plan_status === "stale" ? (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
-                      Stale
-                    </span>
-                  ) : null}
-                  {(page.plan_success_count ?? 0) > 0 && (
-                    <span className="text-[10px] text-muted-foreground/50 ml-auto">
-                      {page.plan_success_count} successful replay{page.plan_success_count !== 1 ? "s" : ""}
-                    </span>
-                  )}
+            {/* Overview */}
+            <TabsContent value="overview">
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border bg-card overflow-hidden">
+                  <table className="w-full text-[13px]">
+                    <tbody className="divide-y divide-border">
+                      <tr>
+                        <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-32">Route</td>
+                        <td className="px-4 py-2 font-mono text-foreground">{page.normalized_route}</td>
+                      </tr>
+                      {page.title && (
+                        <tr>
+                          <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Title</td>
+                          <td className="px-4 py-2 text-foreground">{page.title}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Health</td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <StatusDot status={page.health_status} />
+                            <span className="text-foreground capitalize">{page.health_status}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Last inspected</td>
+                        <td className="px-4 py-2 font-mono text-muted-foreground">
+                          {page.last_inspected_at ? relativeTime(page.last_inspected_at) : "Never"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Elements</td>
+                        <td className="px-4 py-2 font-mono text-muted-foreground">
+                          {forms.length} forms, {buttons.length} buttons, {interactions.length} interactions, {navLinks.length} links
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-                <RegressionPlanView steps={page.regression_plan!} />
+
+                {/* Regression plan */}
+                {hasRegressionPlan && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-[13px] font-medium text-foreground">Regression script</span>
+                      {page.plan_status === "ready" && <Badge variant="success">Active</Badge>}
+                      {page.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
+                      {(page.plan_success_count ?? 0) > 0 && (
+                        <span className="text-[11px] text-muted-foreground/50 ml-auto font-mono">
+                          {page.plan_success_count} successful replay{page.plan_success_count !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <RegressionPlanView steps={page.regression_plan!} />
+                  </div>
+                )}
               </div>
-            </Section>
-          )}
+            </TabsContent>
 
-          {/* Memory */}
-          <Section
-            icon={<Brain className="h-4 w-4 text-muted-foreground" />}
-            title={`Page memory (${memory.length})`}
-          >
-            {memory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No memory entries for this page yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {memory.map((e) => (
-                  <li key={e.id} className="rounded border border-border bg-muted/20 px-3 py-2 text-sm">
-                    <span className="font-medium text-foreground">{e.type}</span>
-                    {e.summary && <span className="text-muted-foreground ml-2">-- {e.summary}</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
+            {/* Forms & Interactions */}
+            <TabsContent value="forms">
+              <div className="space-y-5">
+                {/* Forms */}
+                {forms.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <FileText className="h-3.5 w-3.5" />
+                      Forms ({forms.length})
+                    </div>
+                    <div className="space-y-2">
+                      {forms.map((f, i) => (
+                        <div key={i} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                          <div className="text-[13px] font-medium text-foreground">
+                            {f.submitText ? `Submit: "${f.submitText}"` : `Form ${i + 1}`}
+                          </div>
+                          {f.fields && f.fields.length > 0 && (
+                            <div className="space-y-1">
+                              {f.fields.map((field: any, j: number) => (
+                                <div key={j} className="flex items-center gap-2 text-[12px]">
+                                  <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                    {field.type || "text"}
+                                  </span>
+                                  <span className="text-foreground">{field.label || field.name}</span>
+                                  {field.required && (
+                                    <span className="text-[10px] text-destructive">required</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-          {/* Recent runs */}
-          <Section
-            icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-            title={`Recent runs (${recentRuns.length})`}
-          >
-            {recentRuns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No runs for this page yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {recentRuns.map((run) => (
-                  <li key={run.id}>
+                {/* Buttons */}
+                {buttons.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <MousePointerClick className="h-3.5 w-3.5" />
+                      Buttons ({buttons.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {buttons.map((b, i) => (
+                        <span key={i} className="font-mono text-[11px] px-2 py-1 rounded border border-border bg-card text-foreground">
+                          {b.text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Interactions */}
+                {interactions.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <Layout className="h-3.5 w-3.5" />
+                      Interactions ({interactions.length})
+                    </div>
+                    <div className="rounded-lg border border-border bg-card divide-y divide-border overflow-hidden">
+                      {interactions.map((ix, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-2 text-[13px]">
+                          <span className="font-medium text-foreground">{ix.trigger}</span>
+                          <span className="text-muted-foreground/40">&rarr;</span>
+                          <span className="text-muted-foreground">{ix.revealed}</span>
+                          {ix.heading && (
+                            <span className="text-[11px] text-muted-foreground/50 ml-auto font-mono">
+                              {ix.heading}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Nav links */}
+                {navLinks.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <Link2 className="h-3.5 w-3.5" />
+                      Navigation links ({navLinks.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {navLinks.map((link, i) => (
+                        <span key={i} className="font-mono text-[11px] px-2 py-1 rounded border border-border bg-card text-muted-foreground">
+                          {link}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {forms.length === 0 && buttons.length === 0 && interactions.length === 0 && navLinks.length === 0 && (
+                  <div className="text-center py-12 text-[13px] text-muted-foreground">
+                    No forms or interactions discovered on this page.
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Memory */}
+            <TabsContent value="memory">
+              {memory.length === 0 ? (
+                <div className="text-center py-12 text-[13px] text-muted-foreground">
+                  No memory entries for this page yet.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {memory.map((e) => (
+                    <div key={e.id} className="rounded-lg border border-border bg-card px-3 py-2 flex items-start gap-2">
+                      <Brain className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-[13px] font-medium text-foreground">{e.type}</span>
+                        {e.summary && (
+                          <p className="text-[12px] text-muted-foreground mt-0.5">{e.summary}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Runs */}
+            <TabsContent value="runs">
+              {recentRuns.length === 0 ? (
+                <div className="text-center py-12 text-[13px] text-muted-foreground">
+                  No runs for this page yet.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border bg-card divide-y divide-border overflow-hidden">
+                  {recentRuns.map((run) => (
                     <button
+                      key={run.id}
                       onClick={() => navigate(`/runs/${run.id}`)}
-                      className="flex items-center gap-2 text-sm text-left w-full rounded border border-border bg-muted/20 px-3 py-2 hover:bg-accent/30 transition-colors"
+                      className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-accent/40 transition-colors"
                     >
-                      <span className={cn(
-                        run.status === "passed" && "text-green-600 dark:text-green-400",
-                        run.status === "failed" && "text-red-600 dark:text-red-400",
-                        run.status === "running" && "text-amber-600 dark:text-amber-400",
-                      )}>
+                      <StatusDot status={run.status} />
+                      <Badge variant={statusVariant(run.status)} className="capitalize text-[11px]">
                         {run.status}
+                      </Badge>
+                      <span className="text-[13px] text-muted-foreground truncate flex-1">
+                        {run.summary || run.id?.slice(0, 8)}
                       </span>
-                      <span className="text-muted-foreground truncate flex-1">
-                        {run.started_at ? new Date(run.started_at).toLocaleString() : run.id?.slice(0, 8)}
-                      </span>
-                      {run.summary && (
-                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">{run.summary}</span>
+                      {run.started_at && (
+                        <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
+                          {relativeTime(run.started_at)}
+                        </span>
+                      )}
+                      {run.started_at && (
+                        <span className="text-[11px] font-mono text-muted-foreground/40 flex-shrink-0">
+                          {duration(run.started_at, run.completed_at ?? undefined)}
+                        </span>
                       )}
                     </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

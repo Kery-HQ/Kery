@@ -1,262 +1,373 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Activity, ChevronRight, AlertCircle, ExternalLink } from "lucide-react";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader } from "../components/ui/card";
-import { cn } from "../lib/utils";
-import { useProject } from "../lib/projectContext";
-import { fetchProjectRuns, fetchProjectBugs } from "../projectApi";
+import {
+  LayoutDashboard, Activity, AlertCircle, CheckCircle2, Loader2,
+  ChevronRight, Globe, Scan, FlaskConical, Play, Circle, Check,
+} from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { KpiCard } from "@/components/kpi-card";
+import { StatusDot } from "@/components/status-dot";
+import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { statusVariant, duration, relativeTime } from "@/lib/formatters";
+import { useProject } from "@/lib/projectContext";
+import {
+  fetchProjectOverview, fetchProjectRuns, fetchProjectBugs,
+  fetchEnvironments, fetchPages, fetchTests,
+} from "@/projectApi";
 
-type BugRecord = {
-  runId: string;
-  runSummary?: string;
-  runDate?: string;
-  name?: string;
-  description?: string;
-  category?: string;
-  severity?: string;
-  url?: string;
-};
+// ─── Setup steps ──────────────────────────────────────────────────────────────
 
-function statusVariant(status: string): "success" | "destructive" | "warning" | "neutral" {
-  if (status === "passed")  return "success";
-  if (status === "failed")  return "destructive";
-  if (status === "running") return "warning";
-  return "neutral";
+type StepStatus = "complete" | "current" | "upcoming";
+
+interface SetupStep {
+  key: string;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  href: string;
+  buttonLabel: string;
 }
 
-function duration(started?: string, completed?: string): string {
-  if (!started || !completed) return "";
-  const ms = new Date(completed).getTime() - new Date(started).getTime();
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m ${s % 60}s`;
+const SETUP_STEPS: SetupStep[] = [
+  {
+    key: "environment",
+    label: "Add an environment",
+    description: "Set the base URL of the app you want to test.",
+    icon: Globe,
+    href: "/environments",
+    buttonLabel: "Add environment",
+  },
+  {
+    key: "scan",
+    label: "Scan your app",
+    description: "Discover all pages, forms, and interactions automatically.",
+    icon: Scan,
+    href: "/pages",
+    buttonLabel: "Scan pages",
+  },
+  {
+    key: "flow",
+    label: "Create a test flow",
+    description: "Define what to test — or let the agent explore on its own.",
+    icon: FlaskConical,
+    href: "/tests",
+    buttonLabel: "Create flow",
+  },
+  {
+    key: "run",
+    label: "Run your first test",
+    description: "The AI agent will execute your test in a real browser.",
+    icon: Play,
+    href: "/tests",
+    buttonLabel: "Run test",
+  },
+];
+
+function SetupChecklist({
+  completedSteps,
+  navigate,
+}: {
+  completedSteps: Set<string>;
+  navigate: (path: string) => void;
+}) {
+  let foundCurrent = false;
+
+  return (
+    <div className="max-w-lg mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-xl font-semibold text-foreground">Get started with Kery</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">
+          Complete these steps to start testing your app.
+        </p>
+      </div>
+
+      {/* Stepper — fixed-width left column for dots + lines */}
+      <div className="relative">
+        {SETUP_STEPS.map((step, i) => {
+          const done = completedSteps.has(step.key);
+          let status: StepStatus = "upcoming";
+          if (done) {
+            status = "complete";
+          } else if (!foundCurrent) {
+            status = "current";
+            foundCurrent = true;
+          }
+
+          const isLast = i === SETUP_STEPS.length - 1;
+
+          return (
+            <div key={step.key} className="flex gap-4">
+              {/* Left column: dot + line */}
+              <div className="flex flex-col items-center w-6 flex-shrink-0">
+                {/* Dot */}
+                {done ? (
+                  <div className="h-6 w-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                    <Check className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                ) : status === "current" ? (
+                  <div className="h-6 w-6 rounded-full border-2 border-primary flex items-center justify-center flex-shrink-0">
+                    <Circle className="h-2 w-2 fill-primary text-primary" />
+                  </div>
+                ) : (
+                  <div className="h-6 w-6 rounded-full border-2 border-border flex-shrink-0" />
+                )}
+                {/* Connecting line */}
+                {!isLast && (
+                  <div className={cn("w-px flex-1 min-h-[16px]", done ? "bg-primary/30" : "bg-border")} />
+                )}
+              </div>
+
+              {/* Right column: content */}
+              <div className={cn(
+                "flex-1 pb-6 min-w-0",
+                isLast && "pb-0",
+              )}>
+                <div className={cn(
+                  "rounded-lg transition-colors",
+                  status === "current" && "bg-card border border-border p-4 -mt-1",
+                  status === "upcoming" && "opacity-40",
+                )}>
+                  <div className="flex items-center gap-2">
+                    <step.icon className={cn(
+                      "h-4 w-4 flex-shrink-0",
+                      done ? "text-primary/60" : status === "current" ? "text-foreground" : "text-muted-foreground",
+                    )} />
+                    <span className={cn(
+                      "text-[13px] font-medium",
+                      done ? "text-muted-foreground line-through" : "text-foreground",
+                    )}>
+                      {step.label}
+                    </span>
+                  </div>
+                  <p className={cn(
+                    "text-[12px] text-muted-foreground mt-1 ml-6",
+                    status === "current" && "mt-1",
+                  )}>
+                    {step.description}
+                  </p>
+                  {status === "current" && (
+                    <div className="ml-6 mt-3">
+                      <Button size="sm" onClick={() => navigate(step.href)}>
+                        {step.buttonLabel}
+                        <ChevronRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Progress */}
+      <div className="mt-8 flex items-center gap-3">
+        <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500"
+            style={{ width: `${(completedSteps.size / SETUP_STEPS.length) * 100}%` }}
+          />
+        </div>
+        <span className="text-[11px] font-mono text-muted-foreground">
+          {completedSteps.size}/{SETUP_STEPS.length}
+        </span>
+      </div>
+    </div>
+  );
 }
 
-function formatRelativeTime(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString();
-}
-
-const SEVERITY_BORDER: Record<string, string> = {
-  high:   "border-l-red-500",
-  medium: "border-l-orange-400",
-  low:    "border-l-amber-400",
-};
+// ─── Dashboard (shown after setup complete) ──────────────────────────────────
 
 const SEVERITY_DOT: Record<string, string> = {
-  high:   "bg-red-500",
-  medium: "bg-orange-400",
-  low:    "bg-amber-400",
+  high: "bg-status-fail",
+  medium: "bg-status-warn",
+  low: "bg-muted-foreground/40",
 };
+
+function Dashboard({
+  overview,
+  runs,
+  bugs,
+  navigate,
+}: {
+  overview: any;
+  runs: any[];
+  bugs: any[];
+  navigate: (path: string) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Activity className="h-4 w-4" />} />
+        <KpiCard label="Pass Rate" value={overview?.passRate ?? 0} suffix="%" icon={<CheckCircle2 className="h-4 w-4" />} />
+        <KpiCard label="Open Issues" value={bugs.length} icon={<AlertCircle className="h-4 w-4" />} />
+        <KpiCard label="Running" value={overview?.running ?? 0} icon={<Loader2 className="h-4 w-4" />} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Runs */}
+        <Card>
+          <div className="flex items-center justify-between p-4 pb-2">
+            <span className="text-[14px] font-medium">Recent Runs</span>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/runs")} className="h-7 text-[12px] gap-1">
+              View all <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+          <CardContent className="pt-0">
+            {runs.length === 0 ? (
+              <EmptyState icon={<Activity className="h-5 w-5" />} title="No runs yet" className="py-8" />
+            ) : (
+              <div className="divide-y divide-border">
+                {runs.map((r: any) => (
+                  <button
+                    key={r.id}
+                    onClick={() => navigate(`/runs/${r.id}`)}
+                    className="group w-full flex items-center gap-3 px-2 py-2 text-left hover:bg-accent/40 transition-colors rounded"
+                  >
+                    <StatusDot status={r.status} />
+                    <span className="flex-1 text-[13px] text-foreground truncate">
+                      {r.summary?.split("\n")[0] ?? r.source_label ?? "--"}
+                    </span>
+                    <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
+                      {r.status}
+                    </Badge>
+                    <span className="text-[11px] font-mono text-muted-foreground flex-shrink-0">
+                      {duration(r.started_at, r.completed_at)}
+                    </span>
+                    <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
+                      {relativeTime(r.completed_at ?? r.started_at)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Issues */}
+        <Card>
+          <div className="flex items-center justify-between p-4 pb-2">
+            <span className="text-[14px] font-medium">Recent Issues</span>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/bugs")} className="h-7 text-[12px] gap-1">
+              View all <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+          <CardContent className="pt-0">
+            {bugs.length === 0 ? (
+              <EmptyState icon={<AlertCircle className="h-5 w-5" />} title="No issues found" className="py-8" />
+            ) : (
+              <div className="divide-y divide-border">
+                {bugs.map((bug: any, i: number) => (
+                  <button
+                    key={bug.id ?? i}
+                    onClick={() => bug.run_id && navigate(`/runs/${bug.run_id}`)}
+                    className="group w-full flex items-center gap-3 px-2 py-2 text-left hover:bg-accent/40 transition-colors rounded"
+                  >
+                    <span className={cn("h-2 w-2 rounded-full flex-shrink-0", SEVERITY_DOT[bug.severity] ?? "bg-muted-foreground/40")} />
+                    <span className="flex-1 text-[13px] text-foreground truncate">{bug.name || "Issue"}</span>
+                    {bug.category && <Badge variant="outline" className="text-[10px]">{bug.category}</Badge>}
+                    <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
+                      {relativeTime(bug.reported_at)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export const Overview: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProjectId, currentProject } = useProject();
+  const { currentProjectId } = useProject();
 
-  const [recentRuns, setRecentRuns] = React.useState<any[]>([]);
-  const [recentBugs, setRecentBugs] = React.useState<BugRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [overview, setOverview] = React.useState<any>(null);
+  const [runs, setRuns] = React.useState<any[]>([]);
+  const [bugs, setBugs] = React.useState<any[]>([]);
+  const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
+  const [setupDone, setSetupDone] = React.useState(false);
 
   React.useEffect(() => {
     if (!currentProjectId) return;
     setLoading(true);
+
     Promise.all([
-      fetchProjectRuns(currentProjectId),
-      fetchProjectBugs(currentProjectId),
-    ])
-      .then(([runsRes, bugsRes]) => {
-        setRecentRuns((runsRes.runs ?? []).slice(0, 20));
-        const bugs = (bugsRes.bugs ?? []).slice(0, 10).map((b: any) => ({
-          runId: b.runId,
-          runDate: b.reportedAt,
-          name: b.name,
-          description: b.description,
-          category: b.category,
-          severity: b.severity,
-          url: b.url,
-        }));
-        setRecentBugs(bugs);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      fetchEnvironments(currentProjectId).catch(() => ({ environments: [] })),
+      fetchPages(currentProjectId).catch(() => ({ pages: [] })),
+      fetchTests(currentProjectId).catch(() => ({ tests: [] })),
+      fetchProjectRuns(currentProjectId).catch(() => ({ runs: [] })),
+      fetchProjectOverview(currentProjectId).catch(() => null),
+      fetchProjectBugs(currentProjectId).catch(() => ({ bugs: [] })),
+    ]).then(([envRes, pagesRes, testsRes, runsRes, ov, bugsRes]) => {
+      const envs = envRes.environments ?? [];
+      const pages = pagesRes.pages ?? [];
+      const tests = testsRes.tests ?? [];
+      const allRuns = runsRes.runs ?? [];
+      const allBugs = bugsRes.bugs ?? [];
+
+      const steps = new Set<string>();
+      if (envs.length > 0) steps.add("environment");
+      if (pages.length > 0) steps.add("scan");
+      if (tests.length > 0) steps.add("flow");
+      if (allRuns.length > 0) steps.add("run");
+
+      setCompletedSteps(steps);
+      setSetupDone(steps.size === 4);
+      setOverview(ov);
+      setRuns(allRuns.slice(0, 10));
+      setBugs(allBugs.slice(0, 10));
+      setLoading(false);
+    });
   }, [currentProjectId]);
 
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader title="Overview" />
-        <div className="flex flex-col items-center justify-center flex-1 py-24 text-center">
-          <LayoutDashboard className="h-8 w-8 text-muted-foreground/30 mb-3" />
-          <p className="text-[13px] text-muted-foreground">Create or select a project to get started.</p>
-        </div>
+        <PageHeader icon={<LayoutDashboard className="h-4 w-4" />} title="Overview" />
+        <EmptyState
+          icon={<LayoutDashboard className="h-6 w-6" />}
+          title="No project selected"
+          description="Create or select a project to get started."
+        />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader title={currentProject?.name ?? "Overview"} />
+      <PageHeader icon={<LayoutDashboard className="h-4 w-4" />} title="Overview" />
 
-      <div className="px-4 sm:px-6 lg:px-8 py-6 animate-fade-in w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-6xl mx-auto">
-          {/* Recent Issues */}
-          <Card className="min-w-0">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Recent Issues
-              </p>
-              {recentBugs.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => navigate("/bugs")} className="h-7 text-[12px]">
-                  View all <ChevronRight className="h-3 w-3 ml-1" />
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {loading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 rounded-lg border border-border bg-muted/30 animate-pulse" />
-                ))}
+      <div className="p-6 animate-fade-in">
+        {loading ? (
+          <div className="max-w-lg mx-auto space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-4 p-4">
+                <Skeleton className="h-6 w-6 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-60" />
+                </div>
               </div>
-            ) : recentBugs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center rounded-lg border border-dashed border-border">
-                <AlertCircle className="h-6 w-6 text-muted-foreground/20 mb-3" />
-                <p className="text-[13px] text-muted-foreground">No issues found yet</p>
-                <p className="text-[12px] text-muted-foreground/60 mt-1">
-                  Issues are reported when the agent finds problems during test runs.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {recentBugs.map((bug, i) => (
-                  <button
-                    key={`${bug.runId}-${i}`}
-                    onClick={() => navigate(`/runs/${bug.runId}`)}
-                    className={cn(
-                      "group w-full flex items-start gap-3 px-4 py-2.5 rounded-lg border border-border border-l-[3px] bg-card text-left",
-                      "hover:bg-accent/40 transition-colors",
-                      SEVERITY_BORDER[bug.severity ?? "low"] ?? "border-l-muted-foreground/30",
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-foreground line-clamp-1">
-                        {bug.name || bug.description || "Issue identified"}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {bug.severity && (
-                          <span className="flex items-center gap-1">
-                            <span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_DOT[bug.severity] ?? "bg-muted-foreground/30")} />
-                            <span className="text-[11px] text-muted-foreground capitalize">{bug.severity}</span>
-                          </span>
-                        )}
-                        {bug.category && (
-                          <span className="text-[11px] text-muted-foreground/70">{bug.category}</span>
-                        )}
-                        <span className="text-[11px] text-muted-foreground/50 ml-auto">
-                          {formatRelativeTime(bug.runDate)}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground flex-shrink-0 mt-1" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-          </Card>
-
-          {/* Recent runs */}
-          <Card className="min-w-0">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Recent runs
-              </p>
-              <Button size="sm" variant="ghost" onClick={() => navigate("/runs")} className="h-7 text-[12px]">
-                View all <ChevronRight className="h-3 w-3 ml-1" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {loading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-12 rounded-lg border border-border bg-muted/30 animate-pulse" />
-                ))}
-              </div>
-            ) : recentRuns.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 rounded-lg border border-dashed border-border text-center">
-                <Activity className="h-6 w-6 text-muted-foreground/20 mb-3" />
-                <p className="text-[13px] text-muted-foreground">No runs yet</p>
-                <p className="text-[12px] text-muted-foreground/60 mt-1">
-                  Go to Flows to run your first test flow.
-                </p>
-                <Button size="sm" className="mt-4 gap-1.5" onClick={() => navigate("/tests")}>
-                  Go to Flows
-                </Button>
-              </div>
-            ) : (
-              <div className="divide-y divide-border -mx-1">
-                {recentRuns.slice(0, 10).map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => navigate(`/runs/${r.id}`)}
-                    className="group w-full flex items-center gap-3 px-4 py-2.5 -mx-1 rounded text-left hover:bg-accent/40 transition-colors"
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full flex-shrink-0",
-                        r.status === "passed" ? "bg-emerald-500" :
-                        r.status === "failed" ? "bg-destructive" :
-                        r.status === "running" ? "bg-amber-400 animate-pulse" : "bg-muted-foreground/30",
-                      )}
-                    />
-                    <Badge variant={statusVariant(r.status)} className="flex-shrink-0 text-[10px]">
-                      {r.status}
-                    </Badge>
-                    <span className="flex-1 text-[12px] text-muted-foreground truncate min-w-0">
-                      {r.summary?.split("\n")[0] ?? "--"}
-                    </span>
-                    {r.bugs_json?.length > 0 && (
-                      <span className="text-[11px] text-orange-500 flex-shrink-0 font-medium">
-                        {r.bugs_json.length} issue{r.bugs_json.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                    <span className="text-[11px] text-muted-foreground/50 flex-shrink-0">
-                      {duration(r.started_at, r.completed_at) || formatRelativeTime(r.completed_at ?? r.started_at)}
-                    </span>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-muted-foreground flex-shrink-0" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-          </Card>
-        </div>
+            ))}
+          </div>
+        ) : setupDone ? (
+          <Dashboard overview={overview} runs={runs} bugs={bugs} navigate={navigate} />
+        ) : (
+          <SetupChecklist completedSteps={completedSteps} navigate={navigate} />
+        )}
       </div>
     </div>
   );
 };
-
-function PageHeader({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2.5 px-4 sm:px-6 lg:px-8 h-14 border-b border-border flex-shrink-0">
-      <LayoutDashboard className="h-4 w-4 text-muted-foreground/60" />
-      <span className="text-[14px] font-semibold text-foreground tracking-tight">{title}</span>
-    </div>
-  );
-}

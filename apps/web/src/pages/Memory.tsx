@@ -1,34 +1,65 @@
 import React from "react";
 import {
-  Brain, Trash2, RefreshCw, Plus, Pencil, Check, X,
+  Brain, Trash2, Plus, Pencil,
   Route, EyeOff, ShieldAlert, Bug, Lightbulb,
 } from "lucide-react";
-import { Button } from "../components/ui/button";
-import { cn } from "../lib/utils";
-import { useProject } from "../lib/projectContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter, DialogClose,
+} from "@/components/ui/dialog";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+import { cn } from "@/lib/utils";
+import { useProject } from "@/lib/projectContext";
 import {
   fetchMemory, createMemoryEntry, updateMemoryEntry, deleteMemoryEntry, clearMemory,
   type MemoryEntry, type MemoryEntryType,
-} from "../projectApi";
+} from "@/projectApi";
 
-const TYPES: { value: MemoryEntryType; label: string; icon: React.ReactNode; color: string }[] = [
-  { value: "learned_path",  label: "Learned Path",  icon: <Route className="h-3.5 w-3.5" />,       color: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/30" },
-  { value: "tip",           label: "Tip",            icon: <Lightbulb className="h-3.5 w-3.5" />,   color: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/30" },
-  { value: "ignore_region", label: "Ignore Region",  icon: <EyeOff className="h-3.5 w-3.5" />,      color: "text-gray-600 bg-gray-50 border-gray-200 dark:bg-gray-950/20 dark:border-gray-800/30" },
-  { value: "avoid_region",  label: "Avoid Region",   icon: <ShieldAlert className="h-3.5 w-3.5" />, color: "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-900/30" },
-  { value: "bug_pattern",   label: "Bug Pattern",    icon: <Bug className="h-3.5 w-3.5" />,         color: "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/30" },
+const TYPES: { value: MemoryEntryType; label: string; icon: React.ReactNode; badge: "success" | "default" | "neutral" | "warning" | "destructive" }[] = [
+  { value: "learned_path",  label: "Learned Path",  icon: <Route className="h-3 w-3" />,       badge: "success" },
+  { value: "tip",           label: "Tip",            icon: <Lightbulb className="h-3 w-3" />,   badge: "default" },
+  { value: "ignore_region", label: "Ignore Region",  icon: <EyeOff className="h-3 w-3" />,      badge: "neutral" },
+  { value: "avoid_region",  label: "Avoid Region",   icon: <ShieldAlert className="h-3 w-3" />, badge: "warning" },
+  { value: "bug_pattern",   label: "Bug Pattern",    icon: <Bug className="h-3 w-3" />,         badge: "destructive" },
 ];
 
 function typeInfo(type: MemoryEntryType) {
   return TYPES.find((t) => t.value === type) ?? TYPES[0];
 }
 
+type FilterType = MemoryEntryType | "all";
+
 export const Memory: React.FC = () => {
   const { currentProjectId } = useProject();
   const [entries, setEntries] = React.useState<MemoryEntry[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [filter, setFilter] = React.useState<FilterType>("all");
+
+  // Add dialog
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [addType, setAddType] = React.useState<MemoryEntryType>("tip");
+  const [addSummary, setAddSummary] = React.useState("");
+  const [addContent, setAddContent] = React.useState("");
+  const [addSaving, setAddSaving] = React.useState(false);
+
+  // Edit dialog
+  const [editEntry, setEditEntry] = React.useState<MemoryEntry | null>(null);
+  const [editType, setEditType] = React.useState<MemoryEntryType>("tip");
+  const [editSummary, setEditSummary] = React.useState("");
+  const [editContent, setEditContent] = React.useState("");
+  const [editSaving, setEditSaving] = React.useState(false);
+
+  // Clear all dialog
+  const [clearOpen, setClearOpen] = React.useState(false);
   const [clearing, setClearing] = React.useState(false);
-  const [showAdd, setShowAdd] = React.useState(false);
 
   async function load() {
     if (!currentProjectId) return;
@@ -41,11 +72,12 @@ export const Memory: React.FC = () => {
   React.useEffect(() => { load(); }, [currentProjectId]);
 
   async function handleClear() {
-    if (!currentProjectId || !confirm("Clear all project memory? This cannot be undone.")) return;
+    if (!currentProjectId) return;
     setClearing(true);
     await clearMemory(currentProjectId);
     setEntries([]);
     setClearing(false);
+    setClearOpen(false);
   }
 
   async function handleDelete(id: string) {
@@ -54,118 +86,312 @@ export const Memory: React.FC = () => {
     setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
-  async function handleAdd(entry: { type: MemoryEntryType; summary: string; content: string }) {
-    if (!currentProjectId) return;
-    const res = await createMemoryEntry(currentProjectId, entry);
-    if (res.entry) {
-      setEntries((prev) => [res.entry, ...prev]);
-      setShowAdd(false);
+  async function handleAdd() {
+    if (!currentProjectId || !addSummary.trim() || !addContent.trim()) return;
+    setAddSaving(true);
+    try {
+      const res = await createMemoryEntry(currentProjectId, {
+        type: addType,
+        summary: addSummary.trim(),
+        content: addContent.trim(),
+      });
+      if (res.entry) {
+        setEntries((prev) => [res.entry, ...prev]);
+        setAddOpen(false);
+        setAddSummary("");
+        setAddContent("");
+        setAddType("tip");
+      }
+    } finally {
+      setAddSaving(false);
     }
   }
 
-  async function handleUpdate(id: string, patch: Partial<Pick<MemoryEntry, "summary" | "content" | "type" | "confidence">>) {
-    if (!currentProjectId) return;
-    const res = await updateMemoryEntry(currentProjectId, id, patch);
-    if (res.entry) {
-      setEntries((prev) => prev.map((e) => (e.id === id ? res.entry : e)));
+  function openEdit(entry: MemoryEntry) {
+    setEditEntry(entry);
+    setEditType(entry.type);
+    setEditSummary(entry.summary);
+    setEditContent(entry.content);
+  }
+
+  async function handleEdit() {
+    if (!currentProjectId || !editEntry) return;
+    setEditSaving(true);
+    try {
+      const res = await updateMemoryEntry(currentProjectId, editEntry.id, {
+        type: editType,
+        summary: editSummary.trim(),
+        content: editContent.trim(),
+      });
+      if (res.entry) {
+        setEntries((prev) => prev.map((e) => (e.id === editEntry.id ? res.entry : e)));
+        setEditEntry(null);
+      }
+    } finally {
+      setEditSaving(false);
     }
   }
 
-  const grouped = React.useMemo(() => {
-    const map = new Map<MemoryEntryType, MemoryEntry[]>();
-    for (const e of entries) {
-      const arr = map.get(e.type) ?? [];
-      arr.push(e);
-      map.set(e.type, arr);
-    }
-    return map;
-  }, [entries]);
+  const filtered = React.useMemo(() => {
+    if (filter === "all") return entries;
+    return entries.filter((e) => e.type === filter);
+  }, [entries, filter]);
+
+  if (!currentProjectId) {
+    return (
+      <div className="flex flex-col min-h-full">
+        <PageHeader icon={<Brain className="h-4 w-4" />} title="Memory" />
+        <EmptyState
+          icon={<Brain className="h-8 w-8" />}
+          title="No project selected"
+          description="Select a project to view memory."
+          className="flex-1"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 h-14 border-b border-border bg-card flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Brain className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground">Memory</span>
-          {entries.length > 0 && (
-            <span className="text-[11px] font-mono text-muted-foreground ml-1">{entries.length} entries</span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowAdd(true)} className="gap-1.5 h-8">
-            <Plus className="h-3.5 w-3.5" />
-            Add
-          </Button>
-          <Button size="sm" variant="outline" onClick={load} className="gap-1.5 h-8">
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
-          </Button>
-          {entries.length > 0 && (
-            <Button
-              size="sm" variant="ghost"
-              onClick={handleClear}
-              disabled={clearing}
-              className="gap-1.5 h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Clear all
+      <PageHeader
+        icon={<Brain className="h-4 w-4" />}
+        title="Memory"
+        description={entries.length > 0 ? `${entries.length} entries` : undefined}
+      >
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Add Entry
             </Button>
-          )}
-        </div>
-      </div>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Memory Entry</DialogTitle>
+              <DialogDescription>Manually add a memory entry for the agent.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Type</label>
+                <Select value={addType} onChange={(e) => setAddType(e.target.value as MemoryEntryType)}>
+                  {TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Summary</label>
+                <Input
+                  placeholder="Short title for this entry"
+                  value={addSummary}
+                  onChange={(e) => setAddSummary(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Content</label>
+                <Textarea
+                  placeholder="Detailed description, path steps, region info..."
+                  value={addContent}
+                  onChange={(e) => setAddContent(e.target.value)}
+                  rows={4}
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="ghost" size="sm">Cancel</Button>
+              </DialogClose>
+              <Button
+                size="sm"
+                onClick={handleAdd}
+                loading={addSaving}
+                disabled={!addSummary.trim() || !addContent.trim()}
+              >
+                Add Entry
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <div className="px-8 py-6 animate-fade-in max-w-4xl w-full mx-auto">
-
-        {showAdd && (
-          <AddEntryForm onSave={handleAdd} onCancel={() => setShowAdd(false)} />
+        {entries.length > 0 && (
+          <Dialog open={clearOpen} onOpenChange={setClearOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="ghost" className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear All
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clear All Memory</DialogTitle>
+                <DialogDescription>
+                  This will permanently delete all {entries.length} memory entries. This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="ghost" size="sm">Cancel</Button>
+                </DialogClose>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClear}
+                  loading={clearing}
+                >
+                  Clear All
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
+      </PageHeader>
 
-        {!currentProjectId ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Brain className="h-7 w-7 text-muted-foreground/30 mb-3" />
-            <p className="text-[13px] text-muted-foreground">Select a project to view memory.</p>
+      {/* Edit dialog */}
+      <Dialog open={!!editEntry} onOpenChange={(open) => !open && setEditEntry(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Entry</DialogTitle>
+            <DialogDescription>Update this memory entry.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Type</label>
+              <Select value={editType} onChange={(e) => setEditType(e.target.value as MemoryEntryType)}>
+                {TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Summary</label>
+              <Input
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Content</label>
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={4}
+                className="min-h-[80px]"
+              />
+            </div>
           </div>
-        ) : loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg border border-border animate-pulse" />)}
-          </div>
-        ) : entries.length === 0 && !showAdd ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center rounded-lg border border-dashed border-border">
-            <Brain className="h-8 w-8 text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-semibold text-foreground">No memory yet</p>
-            <p className="text-[13px] text-muted-foreground mt-1 max-w-sm">
-              The agent learns paths, tips, and patterns as it runs tests. You can also add entries manually.
-            </p>
-            <Button size="sm" variant="outline" className="mt-4 gap-1.5" onClick={() => setShowAdd(true)}>
-              <Plus className="h-3.5 w-3.5" /> Add memory
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm">Cancel</Button>
+            </DialogClose>
+            <Button
+              size="sm"
+              onClick={handleEdit}
+              loading={editSaving}
+              disabled={!editSummary.trim() || !editContent.trim()}
+            >
+              Save Changes
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="px-6 py-5 animate-fade-in max-w-3xl w-full mx-auto">
+        {/* Type filter chips */}
+        <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+          <button
+            onClick={() => setFilter("all")}
+            className={cn(
+              "text-[11px] font-medium px-2.5 py-1 rounded-md border transition-colors",
+              filter === "all"
+                ? "bg-accent border-border text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50",
+            )}
+          >
+            All
+          </button>
+          {TYPES.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setFilter(t.value)}
+              className={cn(
+                "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border transition-colors",
+                filter === t.value
+                  ? "bg-accent border-border text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50",
+              )}
+            >
+              {t.icon}
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
           </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<Brain className="h-8 w-8" />}
+            title={filter === "all" ? "No memory yet" : `No ${typeInfo(filter as MemoryEntryType).label.toLowerCase()} entries`}
+            description={
+              filter === "all"
+                ? "The agent learns paths, tips, and patterns as it runs tests. You can also add entries manually."
+                : "No entries match this filter."
+            }
+            action={filter === "all" ? { label: "Add entry", onClick: () => setAddOpen(true) } : undefined}
+            className="py-20 rounded-lg border border-dashed border-border"
+          />
         ) : (
-          <div className="space-y-6">
-            {TYPES.map((t) => {
-              const items = grouped.get(t.value);
-              if (!items || items.length === 0) return null;
+          <div className="space-y-2">
+            {filtered.map((entry) => {
+              const info = typeInfo(entry.type);
               return (
-                <div key={t.value}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={cn("flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded border", t.color)}>
-                      {t.icon}
-                      {t.label}
-                    </span>
-                    <span className="text-[11px] font-mono text-muted-foreground/50">{items.length}</span>
-                  </div>
-                  <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden divide-y divide-border">
-                    {items.map((entry) => (
-                      <EntryRow
-                        key={entry.id}
-                        entry={entry}
-                        onDelete={() => handleDelete(entry.id)}
-                        onUpdate={(patch) => handleUpdate(entry.id, patch)}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <Card key={entry.id} className="group hover:border-border/80 transition-colors">
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant={info.badge} className="gap-1">
+                            {info.icon}
+                            {info.label}
+                          </Badge>
+                          <Badge variant={entry.source === "agent" ? "outline" : "neutral"}>
+                            {entry.source}
+                          </Badge>
+                          <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums">
+                            {entry.confidence}%
+                          </span>
+                        </div>
+                        <p className="text-[13px] font-medium text-foreground">{entry.summary}</p>
+                        <p className="text-[12px] text-muted-foreground mt-0.5 whitespace-pre-wrap line-clamp-3">{entry.content}</p>
+                        {entry.region?.description && (
+                          <p className="text-[11px] text-muted-foreground/50 mt-1 italic">Region: {entry.region.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
+                        <button
+                          onClick={() => openEdit(entry)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent text-muted-foreground/50 hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(entry.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -174,152 +400,3 @@ export const Memory: React.FC = () => {
     </div>
   );
 };
-
-function EntryRow({
-  entry,
-  onDelete,
-  onUpdate,
-}: {
-  entry: MemoryEntry;
-  onDelete: () => void;
-  onUpdate: (patch: Partial<Pick<MemoryEntry, "summary" | "content">>) => void;
-}) {
-  const [editing, setEditing] = React.useState(false);
-  const [summary, setSummary] = React.useState(entry.summary);
-  const [content, setContent] = React.useState(entry.content);
-
-  function save() {
-    onUpdate({ summary, content });
-    setEditing(false);
-  }
-
-  function cancel() {
-    setSummary(entry.summary);
-    setContent(entry.content);
-    setEditing(false);
-  }
-
-  return (
-    <div className="px-4 py-3 group hover:bg-accent/30 transition-colors">
-      {editing ? (
-        <div className="space-y-2">
-          <input
-            className="w-full text-[13px] font-medium bg-transparent border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            autoFocus
-          />
-          <textarea
-            className="w-full text-[12px] bg-transparent border border-border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary min-h-[60px]"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-          <div className="flex gap-1.5">
-            <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={save}>
-              <Check className="h-3 w-3" /> Save
-            </Button>
-            <Button size="sm" variant="ghost" className="h-7 gap-1 text-[11px]" onClick={cancel}>
-              <X className="h-3 w-3" /> Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-foreground">{entry.summary}</p>
-            <p className="text-[12px] text-muted-foreground mt-0.5 whitespace-pre-wrap">{entry.content}</p>
-            {entry.region?.description && (
-              <p className="text-[11px] text-muted-foreground/60 mt-1 italic">Region: {entry.region.description}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className={cn(
-              "text-[10px] font-medium px-1.5 py-0.5 rounded border",
-              entry.source === "agent"
-                ? "text-violet-600 bg-violet-50 border-violet-200 dark:bg-violet-950/20 dark:border-violet-900/30"
-                : "text-sky-600 bg-sky-50 border-sky-200 dark:bg-sky-950/20 dark:border-sky-900/30",
-            )}>
-              {entry.source}
-            </span>
-            <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums w-8 text-right">
-              {entry.confidence}%
-            </span>
-            <button
-              onClick={() => setEditing(true)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/40 hover:text-foreground"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={onDelete}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/40 hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AddEntryForm({
-  onSave,
-  onCancel,
-}: {
-  onSave: (entry: { type: MemoryEntryType; summary: string; content: string }) => void;
-  onCancel: () => void;
-}) {
-  const [type, setType] = React.useState<MemoryEntryType>("tip");
-  const [summary, setSummary] = React.useState("");
-  const [content, setContent] = React.useState("");
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!summary.trim() || !content.trim()) return;
-    onSave({ type, summary: summary.trim(), content: content.trim() });
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-primary/30 bg-card p-4 mb-6 space-y-3 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Add memory entry</p>
-      <div className="flex gap-2 flex-wrap">
-        {TYPES.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setType(t.value)}
-            className={cn(
-              "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded border transition-colors",
-              type === t.value ? t.color : "text-muted-foreground border-border hover:bg-accent/40",
-            )}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <input
-        className="w-full text-[13px] font-medium bg-transparent border border-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
-        placeholder="Summary (short title)"
-        value={summary}
-        onChange={(e) => setSummary(e.target.value)}
-        autoFocus
-      />
-      <textarea
-        className="w-full text-[12px] bg-transparent border border-border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary min-h-[80px]"
-        placeholder="Content (detailed description, path steps, region info...)"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-      />
-      <div className="flex gap-2">
-        <Button size="sm" type="submit" className="h-8 gap-1.5">
-          <Plus className="h-3.5 w-3.5" /> Add
-        </Button>
-        <Button size="sm" variant="ghost" type="button" className="h-8" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}

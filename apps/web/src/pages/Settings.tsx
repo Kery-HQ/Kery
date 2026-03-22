@@ -1,11 +1,25 @@
 import React from "react";
-import { Settings as SettingsIcon, Trash2, Check, RotateCcw, ChevronDown } from "lucide-react";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { useProject } from "../lib/projectContext";
-import { updateProject, deleteProject, fetchRunSettings, saveRunSettings, fetchModelSettings, saveModelSettings, resetModelSettings } from "../projectApi";
+import { Settings as SettingsIcon, Trash2, RotateCcw, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter, DialogClose,
+} from "@/components/ui/dialog";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+import { useProject } from "@/lib/projectContext";
+import {
+  updateProject, deleteProject, fetchRunSettings, saveRunSettings,
+  fetchModelSettings, saveModelSettings, resetModelSettings,
+} from "@/projectApi";
 import { useNavigate } from "react-router-dom";
-import { cn } from "../lib/utils";
+import { cn } from "@/lib/utils";
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +31,7 @@ export const Settings: React.FC = () => {
 
   const [deleteConfirm, setDeleteConfirm] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   const [useLocalPlaywright, setUseLocalPlaywright] = React.useState(false);
   const [runSettingsSaving, setRunSettingsSaving] = React.useState(false);
@@ -24,6 +39,8 @@ export const Settings: React.FC = () => {
   const [modelSettings, setModelSettings] = React.useState<Record<string, { current: string; default: string; customized: boolean }>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
+
+  const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
     setProjectName(currentProject?.name ?? "");
@@ -61,7 +78,6 @@ export const Settings: React.FC = () => {
     setModelSaving(key);
     setModelStatus("");
     try {
-      // Empty string resets to default
       await saveModelSettings({ [key]: value });
       const r = await fetchModelSettings();
       setModelSettings(r.models);
@@ -114,32 +130,42 @@ export const Settings: React.FC = () => {
     navigate("/overview");
   }
 
+  function copyProjectId() {
+    if (!currentProjectId) return;
+    navigator.clipboard.writeText(currentProjectId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   if (!currentProjectId || !currentProject) {
     return (
       <div className="flex flex-col min-h-full">
-        <Header />
-        <div className="flex items-center justify-center flex-1 text-[13px] text-muted-foreground">
-          Select a project to view settings.
-        </div>
+        <PageHeader icon={<SettingsIcon className="h-4 w-4" />} title="Settings" />
+        <EmptyState
+          icon={<SettingsIcon className="h-8 w-8" />}
+          title="No project selected"
+          description="Select a project to view settings."
+          className="flex-1"
+        />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col min-h-full">
-      <Header />
+      <PageHeader icon={<SettingsIcon className="h-4 w-4" />} title="Settings" />
 
-      <div className="px-8 py-8 animate-fade-in max-w-xl space-y-8 mx-auto w-full">
+      <div className="px-6 py-5 animate-fade-in max-w-xl space-y-6 mx-auto w-full">
 
-        {/* Project name */}
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3 px-0.5">
+        {/* General */}
+        <section>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
             General
           </p>
-          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-            <div className="px-5 py-4 space-y-3">
+          <Card>
+            <CardContent className="pt-4 space-y-4">
               <div>
-                <label className="text-[12px] font-medium text-foreground/80 mb-1.5 block">Project name</label>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Project name</label>
                 <div className="flex gap-2">
                   <Input
                     value={projectName}
@@ -150,34 +176,49 @@ export const Settings: React.FC = () => {
                   <Button
                     size="sm"
                     onClick={handleRename}
-                    disabled={nameSaving || !projectName.trim() || projectName.trim() === currentProject.name}
-                    className="gap-1.5"
+                    loading={nameSaving}
+                    disabled={!projectName.trim() || projectName.trim() === currentProject.name}
                   >
-                    <Check className="h-3 w-3" />
-                    {nameSaving ? "Saving…" : "Rename"}
+                    Rename
                   </Button>
                 </div>
                 {nameStatus && (
-                  <p className="text-[12px] text-muted-foreground mt-2">{nameStatus}</p>
+                  <p className={cn(
+                    "text-[12px] mt-1.5",
+                    nameStatus.includes("Failed") ? "text-destructive" : "text-status-pass",
+                  )}>
+                    {nameStatus}
+                  </p>
                 )}
               </div>
+              <Separator />
               <div>
-                <label className="text-[12px] font-medium text-foreground/80 mb-1 block">Project ID</label>
-                <p className="text-[12px] font-mono text-muted-foreground bg-muted/50 rounded-md px-3 py-2 border border-border select-all">
-                  {currentProjectId}
-                </p>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Project ID</label>
+                <div className="flex items-center gap-2">
+                  <p className="text-[12px] font-mono text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5 border border-border flex-1 select-all">
+                    {currentProjectId}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={copyProjectId}
+                    className="h-7 w-7 flex-shrink-0"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-status-pass" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        </section>
 
-        {/* Test runs */}
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3 px-0.5">
+        {/* Test Runs */}
+        <section>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
             Test runs
           </p>
-          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-            <div className="px-5 py-4">
+          <Card>
+            <CardContent className="pt-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-[13px] font-medium text-foreground">Use local Playwright</p>
@@ -185,32 +226,19 @@ export const Settings: React.FC = () => {
                     Run tests with a local Chromium instance. No cloud credentials required.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={useLocalPlaywright}
+                <Switch
+                  checked={useLocalPlaywright}
+                  onCheckedChange={handleRunSettingChange}
                   disabled={runSettingsSaving}
-                  onClick={() => handleRunSettingChange(!useLocalPlaywright)}
-                  className={cn(
-                    "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50",
-                    useLocalPlaywright ? "bg-primary" : "bg-muted",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200",
-                      useLocalPlaywright ? "translate-x-4" : "translate-x-0",
-                    )}
-                  />
-                </button>
+                />
               </div>
-            </div>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        </section>
 
         {/* Models */}
-        <div>
-          <div className="flex items-center justify-between mb-3 px-0.5">
+        <section>
+          <div className="flex items-center justify-between mb-3">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
               Models
             </p>
@@ -225,84 +253,100 @@ export const Settings: React.FC = () => {
               </button>
             )}
           </div>
-          <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-            <div className="px-5 py-4 space-y-4">
-              {MODEL_CONFIG.map(({ key, label, description, options }) => {
+          <Card>
+            <CardContent className="pt-4 space-y-4">
+              {MODEL_CONFIG.map(({ key, label, description, options }, idx) => {
                 const setting = modelSettings[key];
                 if (!setting) return null;
                 return (
-                  <ModelSelect
-                    key={key}
-                    modelKey={key}
-                    label={label}
-                    description={description}
-                    options={options}
-                    current={setting.current}
-                    defaultValue={setting.default}
-                    customized={setting.customized}
-                    saving={modelSaving === key || modelSaving === "__all__"}
-                    onChange={handleModelChange}
-                  />
+                  <React.Fragment key={key}>
+                    {idx > 0 && <Separator />}
+                    <ModelSelect
+                      modelKey={key}
+                      label={label}
+                      description={description}
+                      options={options}
+                      current={setting.current}
+                      defaultValue={setting.default}
+                      customized={setting.customized}
+                      saving={modelSaving === key || modelSaving === "__all__"}
+                      onChange={handleModelChange}
+                    />
+                  </React.Fragment>
                 );
               })}
               {modelStatus && (
-                <p className="text-[12px] text-muted-foreground">{modelStatus}</p>
+                <p className={cn(
+                  "text-[12px]",
+                  modelStatus.includes("Failed") ? "text-destructive" : "text-status-pass",
+                )}>
+                  {modelStatus}
+                </p>
               )}
-            </div>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        </section>
 
         {/* Danger zone */}
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive/60 mb-3 px-0.5">
+        <section>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive/60 mb-3">
             Danger zone
           </p>
-          <div className="rounded-lg border border-destructive/30 bg-card shadow-sm overflow-hidden">
-            <div className="px-5 py-4 space-y-3">
-              <div>
-                <p className="text-[13px] font-semibold text-foreground">Delete project</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">
-                  This permanently deletes the project and all its environments, tests, runs, and memory. This action cannot be undone.
-                </p>
-                <label className="text-[12px] font-medium text-foreground/80 mb-1.5 block">
-                  Type <span className="font-mono font-semibold text-foreground">"{currentProject.name}"</span> to confirm
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    value={deleteConfirm}
-                    onChange={(e) => setDeleteConfirm(e.target.value)}
-                    placeholder={currentProject.name}
-                    className="flex-1 border-destructive/30 focus:ring-destructive/30"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={deleting || deleteConfirm !== currentProject.name}
-                    className="gap-1.5"
-                  >
+          <Card className="border-destructive/30">
+            <CardContent className="pt-4">
+              <p className="text-[13px] font-semibold text-foreground">Delete project</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">
+                This permanently deletes the project and all its environments, tests, runs, and memory. This cannot be undone.
+              </p>
+              <Dialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) setDeleteConfirm(""); }}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="gap-1.5">
                     <Trash2 className="h-3 w-3" />
-                    {deleting ? "Deleting…" : "Delete"}
+                    Delete project
                   </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Project</DialogTitle>
+                    <DialogDescription>
+                      This will permanently delete <span className="font-semibold text-foreground">"{currentProject.name}"</span> and all associated data.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                      Type <span className="font-mono font-semibold text-foreground">"{currentProject.name}"</span> to confirm
+                    </label>
+                    <Input
+                      value={deleteConfirm}
+                      onChange={(e) => setDeleteConfirm(e.target.value)}
+                      placeholder={currentProject.name}
+                      className="border-destructive/30"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="ghost" size="sm">Cancel</Button>
+                    </DialogClose>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDelete}
+                      loading={deleting}
+                      disabled={deleteConfirm !== currentProject.name}
+                    >
+                      Delete project
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardContent>
+          </Card>
+        </section>
 
       </div>
     </div>
   );
 };
-
-function Header() {
-  return (
-    <div className="flex items-center gap-2 px-8 h-14 border-b border-border bg-card flex-shrink-0">
-      <SettingsIcon className="h-4 w-4 text-muted-foreground" />
-      <span className="text-sm font-semibold text-foreground">Settings</span>
-    </div>
-  );
-}
 
 // ─── Model configuration ────────────────────────────────────────────────────
 
@@ -362,25 +406,25 @@ const MODEL_CONFIG: { key: string; label: string; description: string; options: 
   {
     key: "agentModel",
     label: "Agent Model",
-    description: "Browser automation decisions — needs fast tool calling",
+    description: "Browser automation decisions -- needs fast tool calling",
     options: AGENT_OPTIONS,
   },
   {
     key: "summaryModel",
     label: "Summary Model",
-    description: "Run summaries — cheap, text-only",
+    description: "Run summaries -- cheap, text-only",
     options: TEXT_OPTIONS,
   },
   {
     key: "reviewModel",
     label: "Review Model",
-    description: "Screenshot review — needs vision, cost-efficient",
+    description: "Screenshot review -- needs vision, cost-efficient",
     options: VISION_OPTIONS,
   },
   {
     key: "reviewAgentModel",
     label: "Review Agent Model",
-    description: "Deep visual analysis — needs strong vision + reasoning",
+    description: "Deep visual analysis -- needs strong vision + reasoning",
     options: REASONING_VISION_OPTIONS,
   },
   {
@@ -418,15 +462,21 @@ function ModelSelect({
   saving: boolean;
   onChange: (key: string, value: string) => void;
 }) {
-  // Ensure current value is in the options list
   const allOptions = options.some((o) => o.value === current)
     ? options
     : [{ value: current, label: current }, ...options];
 
+  const currentOption = allOptions.find((o) => o.value === current);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-[12px] font-medium text-foreground/80">{label}</label>
+        <div className="flex items-center gap-2">
+          <label className="text-[12px] font-medium text-foreground/80">{label}</label>
+          {customized && (
+            <Badge variant="warning" className="text-[9px] px-1.5 py-0">customized</Badge>
+          )}
+        </div>
         {customized && (
           <button
             onClick={() => onChange(modelKey, "")}
@@ -438,26 +488,18 @@ function ModelSelect({
           </button>
         )}
       </div>
-      <div className="relative">
-        <select
-          value={current}
-          onChange={(e) => onChange(modelKey, e.target.value)}
-          disabled={saving}
-          className={cn(
-            "w-full h-9 rounded-md border border-border bg-background px-3 pr-8 text-[12px] text-foreground appearance-none",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            customized && "border-primary/40",
-          )}
-        >
-          {allOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}{opt.price ? ` — ${opt.price}` : ""}{opt.value === defaultValue ? " (default)" : ""}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-      </div>
+      <Select
+        value={current}
+        onChange={(e) => onChange(modelKey, e.target.value)}
+        disabled={saving}
+        className={cn(customized && "border-primary/40")}
+      >
+        {allOptions.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}{opt.price ? ` -- ${opt.price}` : ""}{opt.value === defaultValue ? " (default)" : ""}
+          </option>
+        ))}
+      </Select>
       <p className="text-[11px] text-muted-foreground/60 mt-1">{description}</p>
     </div>
   );

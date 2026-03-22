@@ -1,22 +1,35 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FlaskConical, Plus, ChevronRight, Play, Pencil, Trash2, Check, X,
+  FlaskConical, Plus, Play, Pencil, Trash2,
   Brain, Keyboard, MousePointerClick, Navigation, Globe,
-  Repeat, AlertTriangle, CheckCircle2,
+  Repeat, AlertTriangle, CheckCircle2, ChevronDown,
 } from "lucide-react";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Textarea } from "../components/ui/textarea";
-import { Select } from "../components/ui/select";
-import { Card, CardContent, CardHeader } from "../components/ui/card";
-import { RunList } from "../components/RunList";
-import { cn } from "../lib/utils";
-import { useProject } from "../lib/projectContext";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter, DialogClose,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+import { RunList } from "@/components/RunList";
+import { cn } from "@/lib/utils";
+import { statusVariant, relativeTime } from "@/lib/formatters";
+import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
   runProjectTest, fetchProjectRuns, fetchTestMemory,
-} from "../projectApi";
+} from "@/projectApi";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type RegressionStep = {
   action: string;
@@ -45,6 +58,8 @@ type SavedTest = {
 
 type MemoryFact = { selector: string; purpose: string; action: string; hits: number };
 
+// ─── Main Page ──────────────────────────────────────────────────────────────
+
 export const TestsPlans: React.FC = () => {
   const navigate = useNavigate();
   const { currentProjectId } = useProject();
@@ -54,11 +69,9 @@ export const TestsPlans: React.FC = () => {
 
   const [tests, setTests] = React.useState<SavedTest[]>([]);
   const [selectedTest, setSelectedTest] = React.useState<SavedTest | null>(null);
-  const [adhocActive, setAdhocActive] = React.useState(false);
-  const [testTab, setTestTab] = React.useState<"runs" | "script" | "memory" | "details">("runs");
 
-  // Create / edit form
-  const [showForm, setShowForm] = React.useState(false);
+  // Create / edit dialog
+  const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<SavedTest | null>(null);
   const [formName, setFormName] = React.useState("");
   const [formIntent, setFormIntent] = React.useState("");
@@ -67,17 +80,27 @@ export const TestsPlans: React.FC = () => {
   const [formMaxSteps, setFormMaxSteps] = React.useState<string>("");
   const [formSaving, setFormSaving] = React.useState(false);
 
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = React.useState<SavedTest | null>(null);
+
   // Adhoc
-  const [adhocIntent, setAdhocIntent] = React.useState("test login then create a new order");
+  const [adhocIntent, setAdhocIntent] = React.useState("");
   const [adhocRunning, setAdhocRunning] = React.useState(false);
+
+  // Detail tabs
+  const [testTab, setTestTab] = React.useState<string>("runs");
 
   // Memory
   const [testMemory, setTestMemory] = React.useState<MemoryFact[]>([]);
   const [memoryLoading, setMemoryLoading] = React.useState(false);
 
+  // Runs for detail
+  const [flowRuns, setFlowRuns] = React.useState<any[]>([]);
+  const [runsLoading, setRunsLoading] = React.useState(false);
+
   const [running, setRunning] = React.useState<string | null>(null);
 
-  // ─── Init ────────────────────────────────────────────────────────────────
+  // ─── Init ───────────────────────────────────────────────────────────────
 
   React.useEffect(() => {
     if (!currentProjectId) return;
@@ -88,7 +111,7 @@ export const TestsPlans: React.FC = () => {
     });
     loadTests();
     setSelectedTest(null);
-    setShowForm(false);
+    setDialogOpen(false);
   }, [currentProjectId]);
 
   async function loadTests() {
@@ -97,7 +120,25 @@ export const TestsPlans: React.FC = () => {
     setTests((res.tests || []).filter(Boolean));
   }
 
-  // ─── Test memory ──────────────────────────────────────────────────────────
+  // ─── Load runs for selected test ─────────────────────────────────────────
+
+  React.useEffect(() => {
+    if (testTab !== "runs" || !currentProjectId || !selectedTest) return;
+    setRunsLoading(true);
+    fetchProjectRuns(currentProjectId)
+      .then((res) => {
+        const runs = (res.runs ?? []).filter((r: any) => r.test_id === selectedTest.id);
+        setFlowRuns(runs);
+      })
+      .finally(() => setRunsLoading(false));
+  }, [testTab, currentProjectId, selectedTest?.id]);
+
+  // ─── Test memory ────────────────────────────────────────────────────────
+
+  React.useEffect(() => {
+    if (testTab !== "memory" || !selectedTest) return;
+    loadTestMemoryFn(selectedTest);
+  }, [testTab, selectedTest?.id]);
 
   async function loadTestMemoryFn(test: SavedTest) {
     setMemoryLoading(true);
@@ -115,43 +156,27 @@ export const TestsPlans: React.FC = () => {
     }
   }
 
-  async function handleClearTestMemory() {
-    setTestMemory([]);
-  }
-
-  async function handleDeleteTestMemoryFact(_selector: string, _action: string) {
-    // No-op: test memory is now project-level
-  }
-
-  // ─── Select / tab ──────────────────────────────────────────────────────────
+  // ─── Select ─────────────────────────────────────────────────────────────
 
   function selectTest(test: SavedTest) {
+    if (selectedTest?.id === test.id) {
+      setSelectedTest(null);
+      return;
+    }
     setSelectedTest(test);
-    setAdhocActive(false);
     setTestTab("runs");
-    setShowForm(false);
-    setEditing(null);
   }
 
-  function openAdhoc() {
-    setAdhocActive(true);
-    setSelectedTest(null);
-    setShowForm(false);
-  }
-
-  function handleSelectTestTab(newTab: "runs" | "script" | "memory" | "details") {
-    setTestTab(newTab);
-    if (newTab === "memory" && selectedTest) loadTestMemoryFn(selectedTest);
-  }
-
-  // ─── Create / Edit ────────────────────────────────────────────────────────
+  // ─── Create / Edit ──────────────────────────────────────────────────────
 
   function openCreate() {
     setEditing(null);
-    setFormName(""); setFormIntent(""); setFormContext(""); setFormSaveScreenshots(false); setFormMaxSteps("");
-    setShowForm(true);
-    setSelectedTest(null);
-    setAdhocActive(false);
+    setFormName("");
+    setFormIntent("");
+    setFormContext("");
+    setFormSaveScreenshots(false);
+    setFormMaxSteps("");
+    setDialogOpen(true);
   }
 
   function openEdit(test: SavedTest) {
@@ -161,7 +186,7 @@ export const TestsPlans: React.FC = () => {
     setFormContext(test.context ?? "");
     setFormSaveScreenshots(test.save_screenshots ?? false);
     setFormMaxSteps(test.max_steps != null ? String(test.max_steps) : "");
-    setShowForm(true);
+    setDialogOpen(true);
   }
 
   async function handleSaveForm() {
@@ -190,20 +215,20 @@ export const TestsPlans: React.FC = () => {
         setTests((prev) => [res.test, ...prev]);
         setSelectedTest(res.test);
       }
-      setShowForm(false);
+      setDialogOpen(false);
     } finally {
       setFormSaving(false);
     }
   }
 
   async function handleDelete(test: SavedTest) {
-    if (!confirm(`Delete test flow "${test.name}"?`)) return;
     await deleteTest(test.project_id, test.id);
     setTests((prev) => prev.filter((t) => t.id !== test.id));
     if (selectedTest?.id === test.id) setSelectedTest(null);
+    setDeleteTarget(null);
   }
 
-  // ─── Run ──────────────────────────────────────────────────────────────────
+  // ─── Run ────────────────────────────────────────────────────────────────
 
   async function handleRunSaved(test: SavedTest) {
     if (!selectedEnvId) return;
@@ -227,548 +252,326 @@ export const TestsPlans: React.FC = () => {
     }
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ─── Plan status badge helper ────────────────────────────────────────────
+
+  function planBadge(test: SavedTest) {
+    if (test.plan_status === "ready") return <Badge variant="success" dot>Script</Badge>;
+    if (test.plan_status === "stale") return <Badge variant="warning" dot>Stale</Badge>;
+    return null;
+  }
+
+  const canSave = formName.trim().length > 0 && formIntent.trim().length > 0;
+
+  // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 h-14 border-b border-border bg-card flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <FlaskConical className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground">Flows</span>
-          {tests.length > 0 && (
-            <span className="text-[11px] font-mono text-muted-foreground ml-1">{tests.length}</span>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        icon={<FlaskConical className="h-4 w-4" />}
+        title="Flows"
+        description={tests.length > 0 ? `${tests.length} flow${tests.length !== 1 ? "s" : ""}` : undefined}
+      >
+        <Button size="sm" onClick={openCreate} disabled={!currentProjectId} className="gap-1.5 h-7 text-[12px]">
+          <Plus className="h-3.5 w-3.5" />
+          New Flow
+        </Button>
+      </PageHeader>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: saved test flows + Run ad hoc */}
-        <div className="w-72 flex-shrink-0 border-r border-border flex flex-col">
-          <div className="p-4 border-b border-border">
-            <Button size="sm" onClick={openCreate} className="w-full gap-1.5" disabled={!currentProjectId}>
-              <Plus className="h-3.5 w-3.5" />
-              New test flow
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {!currentProjectId ? (
-              <div className="px-4 py-8 text-center">
-                <p className="text-[13px] text-muted-foreground">Select a project first</p>
-              </div>
-            ) : tests.length === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <FlaskConical className="h-5 w-5 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-[13px] text-muted-foreground">No saved test flows yet</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {tests.map((test) => (
+      <div className="p-6 animate-fade-in space-y-6">
+        {/* ── Ad-hoc runner ──────────────────────────────────────────── */}
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">
+              Ad-hoc run
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                value={adhocIntent}
+                onChange={(e) => setAdhocIntent(e.target.value)}
+                placeholder="Describe what the agent should do..."
+                className="h-8 text-[13px] flex-1"
+                onKeyDown={(e) => { if (e.key === "Enter") handleAdhocRun(); }}
+              />
+              {environments.length > 0 && (
+                <Select
+                  value={selectedEnvId ?? ""}
+                  onChange={(e) => setSelectedEnvId(e.target.value)}
+                  className="w-[160px] h-8 text-[12px]"
+                >
+                  {environments.map((env) => (
+                    <option key={env.id} value={env.id}>{env.name}</option>
+                  ))}
+                </Select>
+              )}
+              <Button
+                size="sm"
+                onClick={handleAdhocRun}
+                disabled={adhocRunning || !adhocIntent.trim() || !selectedEnvId || !currentProjectId}
+                loading={adhocRunning}
+                className="gap-1.5 h-8"
+              >
+                <Play className="h-3 w-3" />
+                Run
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Flows list ─────────────────────────────────────────────── */}
+        {!currentProjectId ? (
+          <EmptyState title="Select a project" className="py-12" />
+        ) : tests.length === 0 ? (
+          <EmptyState
+            icon={<FlaskConical className="h-5 w-5" />}
+            title="No flows yet"
+            description="Create a test flow to get started."
+            className="py-12"
+          />
+        ) : (
+          <div className="space-y-3">
+            {tests.map((test) => {
+              const isExpanded = selectedTest?.id === test.id;
+              return (
+                <Card key={test.id} className="overflow-hidden">
+                  {/* Card header row */}
                   <button
-                    key={test.id}
                     onClick={() => selectTest(test)}
                     className={cn(
-                      "group w-full flex flex-col items-stretch gap-1 px-4 py-3 text-left transition-all duration-150",
-                      selectedTest?.id === test.id && !adhocActive ? "bg-accent" : "hover:bg-accent/50",
+                      "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                      isExpanded ? "bg-accent/50" : "hover:bg-accent/30",
                     )}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={cn(
-                        "h-1.5 w-1.5 rounded-full flex-shrink-0 transition-colors",
-                        selectedTest?.id === test.id && !adhocActive ? "bg-primary" : "bg-muted-foreground/30",
-                      )} />
-                      <span className="flex-1 text-[13px] font-medium text-foreground truncate">{test.name}</span>
-                      {test.plan_status === "ready" && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 flex-shrink-0" title={`Regression script ready (${test.plan_success_count ?? 0} runs)`}>
-                          Script
-                        </span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 transition-transform duration-150",
+                        isExpanded ? "rotate-0" : "-rotate-90",
                       )}
-                      {test.plan_status === "stale" && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 flex-shrink-0" title="Regression script needs refresh">
-                          Stale
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-medium text-foreground truncate">
+                          {test.name}
                         </span>
+                        {planBadge(test)}
+                        {test.run_count != null && test.run_count > 0 && (
+                          <span className="text-[10px] font-mono text-muted-foreground/50">
+                            {test.run_count} run{test.run_count !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono text-muted-foreground/40">
+                          {relativeTime(test.created_at)}
+                        </span>
+                      </div>
+                      {test.intent && (
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {test.intent.trim().replace(/\s+/g, " ").slice(0, 100)}
+                          {test.intent.trim().replace(/\s+/g, " ").length > 100 ? "..." : ""}
+                        </p>
                       )}
-                      <ChevronRight className={cn(
-                        "h-3.5 w-3.5 flex-shrink-0 transition-all",
-                        selectedTest?.id === test.id && !adhocActive ? "text-muted-foreground" : "text-muted-foreground/20 group-hover:text-muted-foreground/40",
-                      )} />
                     </div>
-                    {test.intent && (
-                      <p className="text-[11px] text-muted-foreground truncate pl-4 pr-1" title={test.intent}>
-                        {test.intent.trim().replace(/\s+/g, " ").slice(0, 48)}
-                        {(test.intent.trim().replace(/\s+/g, " ").length > 48) ? "…" : ""}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="border-t border-border p-3">
-            <button
-              type="button"
-              onClick={openAdhoc}
-              className={cn(
-                "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-[12px] font-medium transition-colors",
-                adhocActive ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-              )}
-            >
-              <Play className="h-3.5 w-3.5" />
-              Run ad hoc
-            </button>
-          </div>
-        </div>
 
-        {/* Right: form / flow detail / ad hoc / empty */}
-        <div className="flex-1 overflow-y-auto flex flex-col">
-          {showForm ? (
-            <TestForm
-              editing={editing}
-              name={formName} intent={formIntent} context={formContext}
-              saveScreenshots={formSaveScreenshots} maxSteps={formMaxSteps}
-              onName={setFormName} onIntent={setFormIntent} onContext={setFormContext}
-              onSaveScreenshots={setFormSaveScreenshots} onMaxSteps={setFormMaxSteps}
-              onSave={handleSaveForm} onCancel={() => { setShowForm(false); setEditing(null); }}
-              saving={formSaving}
-            />
-          ) : adhocActive ? (
-            <AdhocView
-              intent={adhocIntent}
-              onIntent={setAdhocIntent}
-              environments={environments}
-              selectedEnvId={selectedEnvId}
-              onEnvChange={setSelectedEnvId}
-              onRun={handleAdhocRun}
-              running={adhocRunning}
-              currentProjectId={currentProjectId}
-            />
-          ) : selectedTest ? (
-            <TestDetail
-              test={selectedTest}
-              tab={testTab}
-              onTab={handleSelectTestTab}
-              memory={testMemory}
-              memoryLoading={memoryLoading}
-              running={running === selectedTest.id}
-              environments={environments}
-              selectedEnvId={selectedEnvId}
-              onEnvChange={setSelectedEnvId}
-              onRun={() => handleRunSaved(selectedTest)}
-              onEdit={() => openEdit(selectedTest)}
-              onDelete={() => handleDelete(selectedTest)}
-              onClearMemory={handleClearTestMemory}
-              onDeleteFact={handleDeleteTestMemoryFact}
-              currentProjectId={currentProjectId}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center flex-1 py-24 text-center">
-              <FlaskConical className="h-8 w-8 text-muted-foreground/20 mb-3" />
-              <p className="text-[13px] text-muted-foreground">Select a test flow or create a new one</p>
-              <p className="text-[12px] text-muted-foreground/70 mt-1">Or use Run ad hoc to execute a one-off intent</p>
-            </div>
-          )}
-        </div>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRunSaved(test)}
+                        disabled={running === test.id || !selectedEnvId}
+                        className="h-7 gap-1.5 text-[11px]"
+                      >
+                        <Play className="h-3 w-3" />
+                        {running === test.id ? "Starting..." : "Run"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(test)} className="h-7 w-7 p-0">
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteTarget(test)}
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </button>
+
+                  {/* Expanded detail tabs */}
+                  {isExpanded && (
+                    <div className="border-t border-border animate-fade-in">
+                      <Tabs value={testTab} onValueChange={setTestTab} className="flex flex-col">
+                        <TabsList className="px-4 flex-shrink-0">
+                          <TabsTrigger value="runs">Runs</TabsTrigger>
+                          <TabsTrigger value="script" className="gap-1.5">
+                            Script
+                            {test.plan_status === "ready" && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            )}
+                          </TabsTrigger>
+                          <TabsTrigger value="memory">Memory</TabsTrigger>
+                          <TabsTrigger value="details">Details</TabsTrigger>
+                        </TabsList>
+
+                        <div className="max-h-[500px] overflow-y-auto">
+                          <TabsContent value="runs" className="px-4 pb-4">
+                            <RunList
+                              runs={flowRuns}
+                              title="Recent runs"
+                              loading={runsLoading}
+                              emptyMessage="No runs yet. Hit Run to execute this flow."
+                            />
+                          </TabsContent>
+
+                          <TabsContent value="script" className="px-4 pb-4">
+                            <ScriptTab
+                              plan={test.regression_plan}
+                              planStatus={test.plan_status}
+                              successCount={test.plan_success_count}
+                            />
+                          </TabsContent>
+
+                          <TabsContent value="memory" className="px-4 pb-4">
+                            <MemoryTab memory={testMemory} loading={memoryLoading} />
+                          </TabsContent>
+
+                          <TabsContent value="details" className="px-4 pb-4">
+                            <DetailsTab test={test} />
+                          </TabsContent>
+                        </div>
+                      </Tabs>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* ── Create / Edit Dialog ──────────────────────────────────────── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit flow" : "New flow"}</DialogTitle>
+            <DialogDescription>
+              {editing ? "Update this test flow configuration." : "Define a new test flow for the agent to execute."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Name</label>
+              <Input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="e.g. Checkout flow"
+                autoFocus
+                className="h-8 text-[13px]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Intent</label>
+              <Textarea
+                value={formIntent}
+                onChange={(e) => setFormIntent(e.target.value)}
+                rows={3}
+                placeholder="Describe what the agent should do..."
+                className="text-[13px] resize-y"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                Context <span className="text-muted-foreground/50 normal-case font-normal">optional</span>
+              </label>
+              <Textarea
+                value={formContext}
+                onChange={(e) => setFormContext(e.target.value)}
+                rows={2}
+                placeholder="Expected behaviors, known issues..."
+                className="text-[13px] resize-y"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[13px] font-medium text-foreground">Save screenshots</p>
+                <p className="text-[11px] text-muted-foreground/60">Store browser screenshot per LLM call</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formSaveScreenshots}
+                onClick={() => setFormSaveScreenshots(!formSaveScreenshots)}
+                className={cn(
+                  "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                  formSaveScreenshots ? "bg-primary" : "bg-muted",
+                )}
+              >
+                <span className={cn(
+                  "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
+                  formSaveScreenshots ? "translate-x-4" : "translate-x-0",
+                )} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[13px] font-medium text-foreground">Max steps</p>
+                <p className="text-[11px] text-muted-foreground/60">Override default 50-step limit (max 250)</p>
+              </div>
+              <Input
+                type="number"
+                min={1}
+                max={250}
+                value={formMaxSteps}
+                onChange={(e) => setFormMaxSteps(e.target.value)}
+                placeholder="50"
+                className="w-20 h-7 text-[12px] text-right"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm">Cancel</Button>
+            </DialogClose>
+            <Button size="sm" onClick={handleSaveForm} disabled={formSaving || !canSave} loading={formSaving}>
+              {editing ? "Save changes" : "Create flow"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ────────────────────────────────── */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete flow</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteTarget?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm">Cancel</Button>
+            </DialogClose>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-// ─── AdhocView ───────────────────────────────────────────────────────────────
-
-function AdhocView({
-  intent, onIntent, environments, selectedEnvId, onEnvChange, onRun, running, currentProjectId,
-}: {
-  intent: string; onIntent: (v: string) => void;
-  environments: any[]; selectedEnvId: string | null; onEnvChange: (id: string) => void;
-  onRun: () => void; running: boolean; currentProjectId: string | null;
-}) {
-  return (
-    <div className="px-8 py-6 animate-fade-in max-w-2xl">
-      <h2 className="text-[15px] font-semibold text-foreground mb-2">Ad hoc run</h2>
-      <p className="text-[12px] text-muted-foreground mb-6">
-        Run a one-off test without saving it. The agent will execute your intent and you can view results in the run history.
-      </p>
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="adhoc-intent" className="text-[12px] font-medium text-foreground/80 mb-1.5 block">Intent</label>
-              <Textarea
-                id="adhoc-intent"
-                value={intent}
-                onChange={(e) => onIntent(e.target.value)}
-                rows={5}
-                placeholder="Describe what the agent should do…"
-                className="min-h-[120px] resize-y"
-              />
-            </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              {environments.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[12px] text-muted-foreground font-medium">Environment</span>
-                  <Select
-                    value={selectedEnvId ?? ""}
-                    onChange={(e) => onEnvChange(e.target.value)}
-                    className="w-[180px] h-8 text-[12px] py-1"
-                  >
-                    {environments.map((env) => (
-                      <option key={env.id} value={env.id}>{env.name}</option>
-                    ))}
-                  </Select>
-                </div>
-              )}
-              <Button
-                onClick={onRun}
-                disabled={running || !intent.trim() || !selectedEnvId || !currentProjectId}
-                className="gap-2"
-              >
-                <Play className="h-3.5 w-3.5" />
-                {running ? "Starting…" : "Run now"}
-              </Button>
-            </div>
-            {environments.length === 0 && (
-              <p className="text-[12px] text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
-                <Globe className="h-3.5 w-3.5" />
-                Add an environment in the Environments page to enable running.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ─── TestForm ─────────────────────────────────────────────────────────────────
-
-function TestForm({ editing, name, intent, context, saveScreenshots, maxSteps, onName, onIntent, onContext, onSaveScreenshots, onMaxSteps, onSave, onCancel, saving }: {
-  editing: SavedTest | null;
-  name: string; intent: string; context: string; saveScreenshots: boolean; maxSteps: string;
-  onName: (v: string) => void; onIntent: (v: string) => void; onContext: (v: string) => void;
-  onSaveScreenshots: (v: boolean) => void; onMaxSteps: (v: string) => void;
-  onSave: () => void; onCancel: () => void; saving: boolean;
-}) {
-  const canSave = name.trim().length > 0 && intent.trim().length > 0;
-  return (
-    <div className="px-8 py-6 animate-fade-in max-w-2xl">
-      <h2 className="text-[15px] font-semibold text-foreground mb-6">
-        {editing ? "Edit test flow" : "Create new test flow"}
-      </h2>
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Basic info</p>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          <div>
-            <label htmlFor="test-name" className="text-[12px] font-medium text-foreground/80 mb-1.5 block">Name</label>
-            <Input
-              id="test-name"
-              value={name}
-              onChange={(e) => onName(e.target.value)}
-              placeholder="e.g. Checkout flow"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label htmlFor="test-intent" className="text-[12px] font-medium text-foreground/80 mb-1.5 block">Intent</label>
-            <Textarea
-              id="test-intent"
-              value={intent}
-              onChange={(e) => onIntent(e.target.value)}
-              rows={4}
-              placeholder="Describe what the agent should do…"
-              className="min-h-[100px] resize-y"
-            />
-          </div>
-          <div>
-            <label htmlFor="test-context" className="text-[12px] font-medium text-foreground/80 mb-1.5 block">
-              Context <span className="text-muted-foreground/60 font-normal">(optional)</span>
-            </label>
-            <Textarea
-              id="test-context"
-              value={context}
-              onChange={(e) => onContext(e.target.value)}
-              rows={4}
-              placeholder="Expected behaviors, known bug-prone areas, what to check…"
-              className="min-h-[100px] resize-y"
-            />
-            <p className="mt-1.5 text-[11px] text-muted-foreground/60">Injected into the agent prompt to guide bug detection.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardContent className="pt-4 pb-4 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">Save screenshots</p>
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5">Store the browser screenshot for each LLM call. Increases run storage size.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={saveScreenshots}
-              onClick={() => onSaveScreenshots(!saveScreenshots)}
-              className={cn(
-                "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                saveScreenshots ? "bg-primary" : "bg-muted",
-              )}
-            >
-              <span
-                className={cn(
-                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200",
-                  saveScreenshots ? "translate-x-4" : "translate-x-0",
-                )}
-              />
-            </button>
-          </div>
-          <div className="border-t border-border pt-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                Max steps <span className="text-muted-foreground/60 font-normal text-[11px]">(optional)</span>
-              </p>
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5">Override the default 50-step limit for this flow. Maximum 250.</p>
-            </div>
-            <Input
-              type="number"
-              min={1}
-              max={250}
-              value={maxSteps}
-              onChange={(e) => onMaxSteps(e.target.value)}
-              placeholder="50"
-              className="w-20 h-8 text-[12px] text-right"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex gap-2">
-        <Button onClick={onSave} disabled={saving || !canSave} className="gap-1.5">
-          <Check className="h-3.5 w-3.5" />
-          {saving ? "Saving…" : editing ? "Save changes" : "Create test flow"}
-        </Button>
-        <Button variant="ghost" onClick={onCancel} className="gap-1.5">
-          <X className="h-3.5 w-3.5" /> Cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── TestDetail ───────────────────────────────────────────────────────────────
-
-function TestDetail({
-  test, tab, onTab, memory, memoryLoading, running,
-  environments, selectedEnvId, onEnvChange,
-  onRun, onEdit, onDelete, onClearMemory, onDeleteFact, currentProjectId,
-}: {
-  test: SavedTest; tab: "runs" | "script" | "memory" | "details"; onTab: (t: "runs" | "script" | "memory" | "details") => void;
-  memory: MemoryFact[]; memoryLoading: boolean; running: boolean;
-  environments: any[]; selectedEnvId: string | null; onEnvChange: (id: string) => void;
-  onRun: () => void; onEdit: () => void; onDelete: () => void;
-  onClearMemory: () => void; onDeleteFact: (s: string, a: string) => void;
-  currentProjectId: string | null;
-}) {
-  const [flowRuns, setFlowRuns] = React.useState<any[]>([]);
-  const [runsLoading, setRunsLoading] = React.useState(false);
-  const canRun = !!selectedEnvId;
-
-  React.useEffect(() => {
-    if (tab !== "runs" || !currentProjectId) return;
-    setRunsLoading(true);
-    fetchProjectRuns(currentProjectId)
-      .then((res) => {
-        const runs = (res.runs ?? []).filter((r: any) => r.test_id === test.id);
-        setFlowRuns(runs);
-      })
-      .finally(() => setRunsLoading(false));
-  }, [tab, currentProjectId, test.id]);
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-8 py-5 border-b border-border bg-card/50">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-[15px] font-semibold text-foreground truncate">{test.name}</h2>
-            <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{test.id.slice(0, 12)}…</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {environments.length > 0 && (
-              <Select
-                value={selectedEnvId ?? ""}
-                onChange={(e) => onEnvChange(e.target.value)}
-                className="w-[160px] h-8 text-[12px] py-1"
-              >
-                {environments.map((env) => (
-                  <option key={env.id} value={env.id}>{env.name}</option>
-                ))}
-              </Select>
-            )}
-            <Button size="sm" onClick={onRun} disabled={running || !canRun} className="gap-1.5 h-7 text-[12px]"
-              title={!canRun ? "Select an environment first" : undefined}>
-              <Play className="h-3 w-3" />
-              {running ? "Starting…" : "Run"}
-            </Button>
-          </div>
-        </div>
-        <div className="flex gap-0.5 mt-4">
-          {(["runs", "script", "memory", "details"] as const).map((t) => (
-            <button key={t} onClick={() => onTab(t)}
-              className={cn(
-                "px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
-                tab === t ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-              )}
-            >
-              {t === "script" ? "Script" : t.charAt(0).toUpperCase() + t.slice(1)}
-              {t === "script" && test.plan_status === "ready" && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-8 py-6 max-w-3xl mx-auto w-full">
-        {tab === "runs" && (
-          <div className="animate-fade-in">
-            <RunList
-              runs={flowRuns}
-              title="Runs for this test flow"
-              loading={runsLoading}
-              emptyMessage="No runs yet. Use Run above to execute this flow."
-            />
-          </div>
-        )}
-
-        {tab === "script" && (
-          <ScriptTab plan={test.regression_plan} planStatus={test.plan_status} successCount={test.plan_success_count} />
-        )}
-
-        {tab === "details" && (
-          <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={onEdit} className="gap-1.5 h-7 text-[12px]">
-                <Pencil className="h-3 w-3" /> Edit
-              </Button>
-              <Button size="sm" variant="outline" onClick={onDelete}
-                className="gap-1.5 h-7 text-[12px] text-destructive border-destructive/50 hover:bg-destructive/10">
-                <Trash2 className="h-3 w-3" /> Delete
-              </Button>
-            </div>
-            <Card>
-              <CardHeader className="pb-2">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Intent</p>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="rounded-md bg-muted/40 p-4 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">{test.intent}</div>
-              </CardContent>
-            </Card>
-            {test.context ? (
-              <Card>
-                <CardHeader className="pb-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Context</p>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="rounded-md bg-muted/40 p-4 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">{test.context}</div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-dashed">
-                <CardContent className="py-8 text-center">
-                  <p className="text-[13px] text-muted-foreground">No context set</p>
-                  <p className="text-[11px] text-muted-foreground/60 mt-0.5">Edit this test flow to add expected behaviors or known bug-prone areas.</p>
-                </CardContent>
-              </Card>
-            )}
-            <Card>
-              <CardContent className="pt-4 pb-4 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-[13px] font-medium text-foreground">Save screenshots</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">Store the browser screenshot for each LLM call</p>
-                  </div>
-                  <span className={cn(
-                    "text-[11px] font-semibold px-2.5 py-1 rounded-full",
-                    test.save_screenshots
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                      : "bg-muted text-muted-foreground",
-                  )}>
-                    {test.save_screenshots ? "On" : "Off"}
-                  </span>
-                </div>
-                <div className="border-t border-border pt-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-[13px] font-medium text-foreground">Max steps</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">Step budget for this flow</p>
-                  </div>
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground tabular-nums">
-                    {test.max_steps ?? 50}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {tab === "memory" && (
-          <div className="space-y-4 animate-fade-in max-w-2xl mx-auto">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 px-0.5">
-                Flow memory {memory.length > 0 && <span className="ml-1 text-muted-foreground/40">({memory.length})</span>}
-              </p>
-              {memory.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={onClearMemory}
-                  className="gap-1.5 h-7 text-[12px] text-destructive hover:text-destructive hover:bg-destructive/10">
-                  <Trash2 className="h-3 w-3" /> Clear all
-                </Button>
-              )}
-            </div>
-            {memoryLoading ? (
-              <Card><CardContent className="py-12 text-center"><p className="text-[13px] text-muted-foreground">Loading…</p></CardContent></Card>
-            ) : memory.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="py-12 text-center">
-                  <Brain className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-[13px] text-muted-foreground">No test memory yet</p>
-                  <p className="text-[11px] text-muted-foreground/60 mt-1">Memory is populated when you run this flow.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="overflow-hidden">
-                <div className="divide-y divide-border">
-                  {memory.map((fact, i) => (
-                    <div key={i} className="flex items-center gap-3 px-4 py-2.5 group hover:bg-accent/30 transition-colors">
-                      <MemIcon action={fact.action} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] text-foreground truncate">{fact.purpose}</p>
-                        <p className="text-[11px] font-mono text-muted-foreground truncate">{fact.selector}</p>
-                      </div>
-                      <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums">{fact.hits}×</span>
-                      <button onClick={() => onDeleteFact(fact.selector, fact.action)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/50 hover:text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MemIcon({ action }: { action: string }) {
-  const cls = "h-3.5 w-3.5 flex-shrink-0";
-  if (action === "fill")     return <Keyboard          className={cn(cls, "text-blue-500/70")} />;
-  if (action === "click")    return <MousePointerClick className={cn(cls, "text-emerald-500/70")} />;
-  if (action === "navigate") return <Navigation        className={cn(cls, "text-violet-500/70")} />;
-  return <Globe className={cn(cls, "text-muted-foreground/50")} />;
-}
-
-// ─── Script Tab (Regression Plan Viewer) ──────────────────────────────────────
+// ─── Script Tab ───────────────────────────────────────────────────────────────
 
 function ScriptTab({ plan, planStatus, successCount }: {
   plan?: RegressionStep[] | null;
@@ -779,19 +582,12 @@ function ScriptTab({ plan, planStatus, successCount }: {
   const steps = plan ?? [];
 
   return (
-    <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
-      {/* Status header */}
+    <div className="space-y-4 max-w-2xl">
       <div className="flex items-center gap-3">
         {status === "ready" ? (
-          <span className="flex items-center gap-1.5 text-[12px] font-medium text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Regression script active
-          </span>
+          <Badge variant="success" dot>Regression script active</Badge>
         ) : status === "stale" ? (
-          <span className="flex items-center gap-1.5 text-[12px] font-medium text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Script stale — will regenerate on next passing run
-          </span>
+          <Badge variant="warning" dot>Script stale -- regenerates on next pass</Badge>
         ) : (
           <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
             <Repeat className="h-3.5 w-3.5" />
@@ -799,28 +595,23 @@ function ScriptTab({ plan, planStatus, successCount }: {
           </span>
         )}
         {(successCount ?? 0) > 0 && (
-          <span className="text-[11px] text-muted-foreground/50 ml-auto">
+          <span className="text-[11px] font-mono text-muted-foreground/50 ml-auto tabular-nums">
             {successCount} successful replay{successCount !== 1 ? "s" : ""}
           </span>
         )}
       </div>
 
       {status === "none" || steps.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Repeat className="h-6 w-6 text-muted-foreground/20 mx-auto mb-3" />
-            <p className="text-[13px] text-muted-foreground">No script generated yet</p>
-            <p className="text-[11px] text-muted-foreground/60 mt-1">
-              Run this flow successfully and a deterministic Playwright script will be compiled automatically.
-              Subsequent runs replay the script without LLM calls.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Repeat className="h-5 w-5" />}
+          title="No script generated"
+          description="Run this flow successfully and a deterministic Playwright script will be compiled automatically. Subsequent runs replay without LLM calls."
+        />
       ) : (
         <>
           <p className="text-[11px] text-muted-foreground">
-            {steps.length} step{steps.length !== 1 ? "s" : ""} · Pure Playwright replay (no LLM calls)
-            {status === "ready" && " · Self-heals via Stagehand when selectors break"}
+            {steps.length} step{steps.length !== 1 ? "s" : ""} -- pure Playwright replay (no LLM calls)
+            {status === "ready" && " -- self-heals via Stagehand when selectors break"}
           </p>
           <RegressionPlanView steps={steps} />
         </>
@@ -829,7 +620,121 @@ function ScriptTab({ plan, planStatus, successCount }: {
   );
 }
 
-// ─── Shared Regression Plan Step Viewer ────────────────────────────────────────
+// ─── Memory Tab ───────────────────────────────────────────────────────────────
+
+function MemoryTab({ memory, loading }: { memory: MemoryFact[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="space-y-2 max-w-2xl">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (memory.length === 0) {
+    return (
+      <EmptyState
+        icon={<Brain className="h-5 w-5" />}
+        title="No memory entries"
+        description="Memory is populated automatically when you run this flow."
+      />
+    );
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-3">
+        {memory.length} entr{memory.length !== 1 ? "ies" : "y"}
+      </p>
+      <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+        {memory.map((fact, i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/30 transition-colors">
+            <MemIcon action={fact.action} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] text-foreground truncate">{fact.purpose}</p>
+              <p className="text-[11px] font-mono text-muted-foreground/60 truncate">{fact.selector}</p>
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums flex-shrink-0">
+              {fact.hits}x
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Details Tab ──────────────────────────────────────────────────────────────
+
+function DetailsTab({ test }: { test: SavedTest }) {
+  return (
+    <div className="space-y-5 max-w-2xl">
+      <div>
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Intent</p>
+        <div className="rounded-md bg-muted/40 border border-border px-4 py-3 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
+          {test.intent}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Context</p>
+        {test.context ? (
+          <div className="rounded-md bg-muted/40 border border-border px-4 py-3 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
+            {test.context}
+          </div>
+        ) : (
+          <p className="text-[12px] text-muted-foreground/50 italic">No context set</p>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Settings</p>
+        <div className="flex items-center justify-between gap-4 py-1">
+          <span className="text-[13px] text-foreground">Save screenshots</span>
+          <Badge variant={test.save_screenshots ? "success" : "neutral"}>
+            {test.save_screenshots ? "On" : "Off"}
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between gap-4 py-1">
+          <span className="text-[13px] text-foreground">Max steps</span>
+          <span className="text-[12px] font-mono text-muted-foreground tabular-nums">
+            {test.max_steps ?? 50}
+          </span>
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-1">
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Metadata</p>
+        <div className="flex items-center justify-between gap-4 py-1">
+          <span className="text-[12px] text-muted-foreground">ID</span>
+          <span className="text-[11px] font-mono text-muted-foreground/60">{test.id}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4 py-1">
+          <span className="text-[12px] text-muted-foreground">Created</span>
+          <span className="text-[11px] font-mono text-muted-foreground/60">{relativeTime(test.created_at)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function MemIcon({ action }: { action: string }) {
+  const cls = "h-3.5 w-3.5 flex-shrink-0";
+  if (action === "fill")     return <Keyboard          className={cn(cls, "text-blue-500/70")} />;
+  if (action === "click")    return <MousePointerClick className={cn(cls, "text-emerald-500/70")} />;
+  if (action === "navigate") return <Navigation        className={cn(cls, "text-violet-500/70")} />;
+  return <Globe className={cn(cls, "text-muted-foreground/50")} />;
+}
+
+// ─── Shared Regression Plan Step Viewer (exported for PageDetail.tsx) ────────
 
 const STEP_ACTION_COLORS: Record<string, string> = {
   click:         "text-emerald-600 dark:text-emerald-400",
