@@ -30,7 +30,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      AGENT_MODEL: ${AGENT_MODEL:-openai/gpt-4o-mini}
+      AGENT_MODEL: ${AGENT_MODEL:-openai/gpt-4.1-mini}
       SUMMARY_MODEL: ${SUMMARY_MODEL:-gemini-2.5-flash-lite}
       REVIEW_MODEL: ${REVIEW_MODEL:-gemini-2.5-flash-lite}
       REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-4.6}
