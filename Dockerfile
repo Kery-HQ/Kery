@@ -31,10 +31,10 @@ COPY packages/ packages/
 COPY apps/ apps/
 
 # Build
-RUN npm run build --workspace=packages/engine 2>/dev/null || true
-RUN npm run build --workspace=packages/db 2>/dev/null || true
-RUN npm run build --workspace=apps/api 2>/dev/null || true
+RUN npm run build --workspace=packages/engine
+RUN npm run build --workspace=packages/db
+RUN npm run build --workspace=apps/api
 
 # Run migrations then start
 COPY packages/db/migrations packages/db/migrations
-CMD ["sh", "-c", "node --loader ts-node/esm packages/db/src/migrate.ts && node --loader tsx apps/api/src/server.ts"]
+CMD ["sh", "-c", "node packages/db/dist/migrate.js && node apps/api/dist/server.js"]
