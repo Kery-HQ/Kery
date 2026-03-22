@@ -64,4 +64,9 @@ export interface StorageAdapter {
   // Saved tests
   getSavedTest(id: string): Promise<any>;
   updateSavedTest(id: string, data: Record<string, any>): Promise<void>;
+
+  // Global settings
+  getSettings(): Promise<Record<string, string>>;
+  saveSetting(key: string, value: string): Promise<void>;
+  deleteSettings(keys: string[]): Promise<void>;
 }

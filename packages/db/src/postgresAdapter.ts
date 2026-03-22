@@ -253,6 +253,27 @@ export class PostgresAdapter implements StorageAdapter {
     await this.pool.query(`UPDATE app_tree_destinations SET ${sets} WHERE id = $1`, [destinationId, ...values]);
   }
 
+  // ─── Settings ─────────────────────────────────────────────────────────────────
+
+  async getSettings(): Promise<Record<string, string>> {
+    const { rows } = await this.pool.query(`SELECT key, value FROM settings`);
+    const result: Record<string, string> = {};
+    for (const row of rows) result[row.key] = row.value;
+    return result;
+  }
+
+  async saveSetting(key: string, value: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, now()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now()`,
+      [key, value],
+    );
+  }
+
+  async deleteSettings(keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    await this.pool.query(`DELETE FROM settings WHERE key = ANY($1)`, [keys]);
+  }
+
   // ─── Saved Tests ────────────────────────────────────────────────────────────
 
   async getSavedTest(id: string) {

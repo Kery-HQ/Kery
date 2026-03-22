@@ -1,5 +1,5 @@
 // ─── Config ──────────────────────────────────────────────────────────────────
-export { initEngineConfig, getConfig, type EngineConfig } from "./config.js";
+export { initEngineConfig, getConfig, updateEngineConfig, type EngineConfig } from "./config.js";
 export { logger } from "./logger.js";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────

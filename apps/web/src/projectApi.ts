@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:19833";
 
 async function apiFetch<T = any>(url: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(url, {
@@ -251,6 +251,27 @@ export async function saveCrawlSettings(projectId: string, settings: { crawlEnvi
     method: "PUT",
     body: JSON.stringify(settings),
   });
+}
+
+// --- Model settings (global) ---
+
+export type ModelSettingsResponse = {
+  models: Record<string, { current: string; default: string; customized: boolean }>;
+};
+
+export async function fetchModelSettings(): Promise<ModelSettingsResponse> {
+  return apiFetch(`${API_BASE}/api/settings/models`);
+}
+
+export async function saveModelSettings(settings: Record<string, string>) {
+  return apiFetch(`${API_BASE}/api/settings/models`, {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+}
+
+export async function resetModelSettings() {
+  return apiFetch(`${API_BASE}/api/settings/models`, { method: "DELETE" });
 }
 
 export async function fetchRunSettings(projectId: string) {

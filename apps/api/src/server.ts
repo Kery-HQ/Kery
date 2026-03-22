@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { config } from "./config.js";
-import { initEngineConfig } from "@kery/engine";
+import { initEngineConfig, updateEngineConfig } from "@kery/engine";
 import { initPool } from "@kery/db";
 import { PostgresAdapter } from "@kery/db";
 import { registerProjectRoutes } from "./routes/projects.js";
@@ -9,6 +9,7 @@ import { registerRunRoutes } from "./routes/runs.js";
 import { registerCrawlRoutes } from "./routes/crawl.js";
 import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
+import { registerSettingsRoutes, applyDbModelSettings } from "./routes/settings.js";
 
 // Initialize engine config from environment
 initEngineConfig({
@@ -34,9 +35,12 @@ const storage = new PostgresAdapter(pool);
 const app = Fastify({ logger: true });
 
 await app.register(cors, {
-  origin: [config.appUrl, "http://localhost:5173", "http://localhost:3000"],
+  origin: [config.appUrl, "http://localhost:19834", "http://localhost:3000"],
   credentials: true,
 });
+
+// Apply any model overrides saved in the DB
+await applyDbModelSettings(storage);
 
 // Health check
 app.get("/health", async () => ({ status: "ok" }));
@@ -47,6 +51,7 @@ registerRunRoutes(app, storage);
 registerCrawlRoutes(app, storage);
 registerTestRoutes(app, storage);
 registerBugRoutes(app, storage);
+registerSettingsRoutes(app, storage);
 
 // Start server
 try {
