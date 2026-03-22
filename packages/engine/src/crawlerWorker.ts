@@ -12,7 +12,7 @@ import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { handleAuth, waitForPageStable } from "./agent.js";
 import type { AuthConfig, AppTreeForm, AppTreeButton, AppTreeInteraction, AppTreeFormField } from "./types.js";
-import { geminiChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./gemini.js";
+import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 import type { StorageAdapter } from "./storage.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -280,8 +280,8 @@ ${sitemapText}
 Return ONLY a JSON array: [{"name":"Short name","intent":"Step-by-step instructions starting from ${baseUrl}","discoveredRoute":"/route"}]`;
 
   try {
-    const { content: raw, usage } = await geminiChat([{ role: "user", content: prompt }], config.geminiScriptModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3 });
-    costAccum.usd += calcCostUsd(config.geminiScriptModel, usage.inputTokens, usage.outputTokens);
+    const { content: raw, usage } = await llmChat([{ role: "user", content: prompt }], config.scriptModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3 });
+    costAccum.usd += calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens);
     const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
     const start = stripped.indexOf("[");
     const end = stripped.lastIndexOf("]");
@@ -306,7 +306,7 @@ export async function generateIntentForNode(
 
   const prompt = `Generate a single test intent for this page starting from ${baseUrl}.\n\n${context.join("\n")}\n\nReply with ONLY the intent text.`;
   try {
-    const { content } = await geminiChat([{ role: "user", content: prompt }], config.geminiSummaryModel, { maxTokens: 16384, temperature: 0.2 });
+    const { content } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: 16384, temperature: 0.2 });
     const intent = content.trim();
     return intent.length > 20 ? intent : null;
   } catch { return null; }

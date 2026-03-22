@@ -21,9 +21,8 @@ export {
 export type { MemoryEntry, MemoryEntryInsert, MemoryEntryType, MemorySource } from "./agentMemory.js";
 
 // ─── LLM ─────────────────────────────────────────────────────────────────────
-export { geminiChat, geminiAgentChat, geminiSummarize, geminiReviewAnalysis, geminiPathPlan, calcCostUsd, MAX_OUTPUT_TOKENS } from "./gemini.js";
-export type { GeminiUsage } from "./gemini.js";
-export { callLLM } from "./llm.js";
+export { llmChat, llmAgentChat, llmSummarize, llmReviewAnalysis, llmPathPlan, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+export type { LLMUsage } from "./llmClient.js";
 
 // ─── A11y Tree ───────────────────────────────────────────────────────────────
 export { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText } from "./a11yTree.js";

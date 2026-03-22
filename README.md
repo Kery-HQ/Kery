@@ -49,8 +49,8 @@ npm run dev:api
 | `DATABASE_URL` | `postgresql://kery:kery@localhost:5432/kery` | PostgreSQL connection string |
 | `OPENROUTER_API_KEY` | | OpenRouter API key (recommended — routes to all models) |
 | `OPENAI_API_KEY` | | Direct OpenAI API key (fallback) |
-| `GEMINI_AGENT_MODEL` | `openai/gpt-4o-mini` | Model for browser automation decisions |
-| `GEMINI_SUMMARY_MODEL` | `gemini-2.5-flash-lite` | Model for run summaries |
+| `AGENT_MODEL` | `openai/gpt-4o-mini` | Model for browser automation decisions |
+| `SUMMARY_MODEL` | `gemini-2.5-flash-lite` | Model for run summaries |
 | `REVIEW_AGENT_MODEL` | `anthropic/claude-sonnet-4.6` | Model for screenshot review |
 | `STAGEHAND_ENABLED` | `true` | Enable Stagehand for smart element finding |
 | `RUN_TIMEOUT_MINUTES` | `15` | Max wall-clock time per test run |
