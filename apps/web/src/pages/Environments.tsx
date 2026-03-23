@@ -26,8 +26,10 @@ import {
 const AUTH_MODES = [
   { value: "none", label: "No auth" },
   { value: "ui", label: "Form-based (UI login)" },
-  { value: "apiToken", label: "API token" },
-  { value: "oauthToken", label: "OAuth token" },
+  { value: "clerk", label: "Clerk" },
+  { value: "supabase", label: "Supabase" },
+  { value: "apiToken", label: "API token (custom)" },
+  { value: "oauthToken", label: "OAuth token (custom)" },
 ] as const;
 
 type UiAuthForm = {
@@ -45,6 +47,20 @@ const DEFAULT_UI_FORM: UiAuthForm = {
   passwordField: "#password",
   submitButton: "button[type=submit]",
   username: "",
+  password: "",
+};
+
+type TokenProviderForm = {
+  apiUrl: string;
+  apiKey: string;
+  email: string;
+  password: string;
+};
+
+const DEFAULT_TOKEN_FORM: TokenProviderForm = {
+  apiUrl: "",
+  apiKey: "",
+  email: "",
   password: "",
 };
 
@@ -72,6 +88,31 @@ function configFromUiForm(f: UiAuthForm): Record<string, any> {
     credentials: {
       username: f.username.trim() || undefined,
       password: f.password || undefined,
+    },
+  };
+}
+
+function tokenFormFromConfig(config: Record<string, any>): TokenProviderForm {
+  const tp = config?.tokenProvider ?? {};
+  const creds = tp.credentials ?? {};
+  return {
+    apiUrl: tp.apiUrl ?? "",
+    apiKey: tp.apiKey ?? "",
+    email: creds.email ?? "",
+    password: creds.password ?? "",
+  };
+}
+
+function configFromTokenForm(f: TokenProviderForm, providerType: string): Record<string, any> {
+  return {
+    tokenProvider: {
+      type: providerType,
+      apiUrl: f.apiUrl.trim(),
+      apiKey: f.apiKey.trim(),
+      credentials: {
+        email: f.email.trim(),
+        password: f.password,
+      },
     },
   };
 }
@@ -104,6 +145,7 @@ export const Environments: React.FC = () => {
   const [authMode, setAuthMode] = React.useState<string>("none");
   const [authJson, setAuthJson] = React.useState("{}");
   const [uiForm, setUiForm] = React.useState<UiAuthForm>(DEFAULT_UI_FORM);
+  const [tokenForm, setTokenForm] = React.useState<TokenProviderForm>(DEFAULT_TOKEN_FORM);
   const [authSaving, setAuthSaving] = React.useState(false);
   const [authStatus, setAuthStatus] = React.useState("");
 
@@ -135,19 +177,27 @@ export const Environments: React.FC = () => {
     try {
       const { auth } = await fetchAuth(currentProjectId, env.id);
       if (auth) {
-        setAuthMode(auth.mode || "none");
         const cfg = auth.config_json || {};
+        // Map tokenProvider mode to clerk/supabase UI mode
+        if (auth.mode === "tokenProvider" && cfg.tokenProvider?.type) {
+          setAuthMode(cfg.tokenProvider.type); // "clerk" or "supabase"
+        } else {
+          setAuthMode(auth.mode || "none");
+        }
         setAuthJson(JSON.stringify(cfg, null, 2));
         setUiForm(uiFormFromConfig(cfg));
+        setTokenForm(tokenFormFromConfig(cfg));
       } else {
         setAuthMode("none");
         setAuthJson("{}");
         setUiForm(DEFAULT_UI_FORM);
+        setTokenForm(DEFAULT_TOKEN_FORM);
       }
     } catch {
       setAuthMode("none");
       setAuthJson("{}");
       setUiForm(DEFAULT_UI_FORM);
+      setTokenForm(DEFAULT_TOKEN_FORM);
     }
   }
 
@@ -168,6 +218,7 @@ export const Environments: React.FC = () => {
       setAuthMode("none");
       setAuthJson("{}");
       setUiForm(DEFAULT_UI_FORM);
+      setTokenForm(DEFAULT_TOKEN_FORM);
       setAuthStatus("");
       setCreateOpen(false);
       setNewName("");
@@ -212,13 +263,19 @@ export const Environments: React.FC = () => {
     setAuthSaving(true);
     setAuthStatus("");
     try {
-      const config =
-        authMode === "none"
-          ? {}
-          : authMode === "ui"
-            ? configFromUiForm(uiForm)
-            : JSON.parse(authJson);
-      await saveAuth(currentProjectId, expandedEnvId, authMode, config);
+      let config: Record<string, any>;
+      let mode = authMode;
+      if (authMode === "none") {
+        config = {};
+      } else if (authMode === "ui") {
+        config = configFromUiForm(uiForm);
+      } else if (authMode === "clerk" || authMode === "supabase") {
+        config = configFromTokenForm(tokenForm, authMode);
+        mode = "tokenProvider";
+      } else {
+        config = JSON.parse(authJson);
+      }
+      await saveAuth(currentProjectId, expandedEnvId, mode, config);
       setAuthStatus("Saved.");
     } catch (e: any) {
       setAuthStatus(e?.message?.includes("Save failed") ? "Save failed." : "Invalid JSON.");
@@ -513,6 +570,105 @@ export const Environments: React.FC = () => {
                                   placeholder="password"
                                   value={uiForm.password}
                                   onChange={(e) => setUiForm((f) => ({ ...f, password: e.target.value }))}
+                                  className="text-[12px]"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {authMode === "clerk" && (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk Secret Key</label>
+                              <Input
+                                type="password"
+                                autoComplete="off"
+                                placeholder="sk_test_..."
+                                value={tokenForm.apiKey}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
+                                className="font-mono text-[12px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk API URL</label>
+                              <Input
+                                type="url"
+                                placeholder="https://api.clerk.com"
+                                value={tokenForm.apiUrl}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
+                                className="font-mono text-[12px]"
+                              />
+                              <p className="text-[10px] text-muted-foreground/60 mt-1">Clerk Backend API base URL</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
+                                <Input
+                                  autoComplete="off"
+                                  placeholder="test@example.com"
+                                  value={tokenForm.email}
+                                  onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
+                                  className="text-[12px]"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
+                                <Input
+                                  type="password"
+                                  autoComplete="off"
+                                  placeholder="password"
+                                  value={tokenForm.password}
+                                  onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
+                                  className="text-[12px]"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {authMode === "supabase" && (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Project URL</label>
+                              <Input
+                                type="url"
+                                placeholder="https://your-ref.supabase.co"
+                                value={tokenForm.apiUrl}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
+                                className="font-mono text-[12px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Anon Key</label>
+                              <Input
+                                type="password"
+                                autoComplete="off"
+                                placeholder="eyJhbGciOi..."
+                                value={tokenForm.apiKey}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
+                                className="font-mono text-[12px]"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
+                                <Input
+                                  autoComplete="off"
+                                  placeholder="test@example.com"
+                                  value={tokenForm.email}
+                                  onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
+                                  className="text-[12px]"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
+                                <Input
+                                  type="password"
+                                  autoComplete="off"
+                                  placeholder="password"
+                                  value={tokenForm.password}
+                                  onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
                                   className="text-[12px]"
                                 />
                               </div>

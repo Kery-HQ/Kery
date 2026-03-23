@@ -18,6 +18,7 @@ import { formatMemoryForPrompt } from "./agentMemory.js";
 import { llmAgentChat, calcCostUsd } from "./llmClient.js";
 import { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText, type A11yElement, type A11yTextNode } from "./a11yTree.js";
 import { PlanTracker } from "./planTracker.js";
+import { handleTokenAuth } from "./tokenAuth.js";
 import {
   stagehandObserve, formatObserveForLLM, hasSufficientObserve,
   stagehandAct, actionToInstruction, isObserveCircuitOpen,
@@ -783,8 +784,16 @@ export async function executeAction(page: Page, action: AgentAction): Promise<Ex
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
-export async function handleAuth(page: Page, auth: AuthConfig | null, context?: string): Promise<boolean> {
-  if (!auth?.loginUrl || !auth.credentials) return false;
+export async function handleAuth(page: Page, auth: AuthConfig | null, context?: string, baseUrl?: string): Promise<boolean> {
+  if (!auth) return false;
+
+  // Token-based auth (Clerk, Supabase)
+  if (auth.mode === "tokenProvider" && auth.tokenProvider) {
+    const url = baseUrl || auth.loginUrl || page.url();
+    return handleTokenAuth(page, auth.tokenProvider, url);
+  }
+
+  if (!auth.loginUrl || !auth.credentials) return false;
 
   logger.info({ url: auth.loginUrl }, "Authenticating");
   await page.goto(auth.loginUrl, { waitUntil: "domcontentloaded" });
@@ -931,7 +940,7 @@ export async function runAgent(
   const stagehandPage = stagehandSession?.page ?? null;
 
   try {
-    const authed = await handleAuth(page, auth, context);
+    const authed = await handleAuth(page, auth, context, baseUrl);
     if (authed) {
       stepCounter++;
       const authStep: RunStep = {

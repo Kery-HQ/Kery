@@ -163,7 +163,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (regressionPlan && regressionPlan.length > 0) {
       try {
         if (job.auth) {
-          const authed = await handleAuth(page, job.auth, context);
+          const authed = await handleAuth(page, job.auth, context, job.baseUrl);
           if (!authed) regressionPlan = null;
         }
       } catch {

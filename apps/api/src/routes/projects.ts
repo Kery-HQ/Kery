@@ -15,7 +15,7 @@ const EnvironmentSchema = z.object({
 });
 
 const AuthSchema = z.object({
-  mode: z.enum(["ui", "apiToken", "oauthToken", "none"]),
+  mode: z.enum(["ui", "apiToken", "oauthToken", "tokenProvider", "none"]),
   config: z.any().optional(),
 });
 
