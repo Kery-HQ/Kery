@@ -16,7 +16,7 @@ export type Environment = {
 
 /** Auth configuration for an environment. */
 export type AuthConfig = {
-  mode: "ui" | "apiToken" | "oauthToken" | "none";
+  mode: "ui" | "apiToken" | "oauthToken" | "tokenProvider" | "none";
   config?: Record<string, unknown>;
 };
 
