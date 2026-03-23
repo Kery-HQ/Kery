@@ -10,10 +10,10 @@ export function registerSetupTool(server: McpServer, client: KeryClient) {
       name: z.string().describe("Project name (e.g. 'my-saas-app')"),
       baseUrl: z.string().url().describe("The app's URL to test (e.g. 'http://localhost:3000')"),
       domain: z.string().optional().describe("Domain hint (optional)"),
-      authMode: z.enum(["ui", "apiToken", "oauthToken", "none"]).optional()
-        .describe("Authentication mode. 'ui' for form-based login, 'apiToken' for API token, 'none' for no auth."),
+      authMode: z.enum(["ui", "apiToken", "oauthToken", "tokenProvider", "none"]).optional()
+        .describe("Authentication mode. 'ui' for form-based login, 'tokenProvider' for Clerk/Supabase token injection, 'apiToken' for custom API token, 'none' for no auth."),
       authConfig: z.record(z.unknown()).optional()
-        .describe("Auth configuration object (varies by mode). For 'ui': { loginUrl, credentials: { username, password }, selectors: { usernameField, passwordField, submitButton } }"),
+        .describe("Auth configuration object (varies by mode). For 'ui': { loginUrl, credentials: { username, password }, selectors: { usernameField, passwordField, submitButton } }. For 'tokenProvider': { tokenProvider: { type: 'clerk' | 'supabase', apiUrl, apiKey, credentials: { email, password } } }. Clerk apiUrl is the Backend API URL (https://api.clerk.com), apiKey is your secret key (sk_test_...). Supabase apiUrl is your project URL (https://ref.supabase.co), apiKey is the anon key."),
     },
     async ({ name, baseUrl, domain, authMode, authConfig }) => {
       // Check health first
