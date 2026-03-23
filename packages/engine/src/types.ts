@@ -1,5 +1,5 @@
 export type AuthConfig = {
-  mode: "ui" | "apiToken" | "oauthToken";
+  mode: "ui" | "apiToken" | "oauthToken" | "tokenProvider";
   loginUrl?: string;
   selectors?: {
     usernameField?: string;
@@ -14,6 +14,11 @@ export type AuthConfig = {
     type: "supabase" | "clerk" | "custom";
     apiUrl: string;
     apiKey: string;
+    credentials?: {
+      email: string;
+      password: string;
+    };
+    appDomain?: string;
     refreshToken?: string;
   };
   oauthProvider?: {

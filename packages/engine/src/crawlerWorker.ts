@@ -205,7 +205,7 @@ export async function runCrawl(
   const costAccum = { usd: 0 };
 
   try {
-    const authed = await handleAuth(page, auth);
+    const authed = await handleAuth(page, auth, undefined, baseUrl);
     if (authed) {
       await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     } else {
@@ -328,7 +328,7 @@ export async function executeCrawlRun(
   let auth: AuthConfig | null = null;
   if (authRow) {
     const cfg = authRow.config_json as any;
-    auth = { mode: authRow.mode, loginUrl: cfg.loginUrl, selectors: cfg.selectors, credentials: cfg.credentials };
+    auth = { mode: authRow.mode, ...cfg };
   }
 
   const existingTestNames = await storage.getExistingTestNames(projectId);
