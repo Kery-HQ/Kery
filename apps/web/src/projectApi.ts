@@ -106,6 +106,10 @@ export function getRunStreamUrl(runId: string): string {
   return `${API_BASE}/api/runs/${runId}/stream`;
 }
 
+export async function stopRun(runId: string) {
+  return apiFetch(`${API_BASE}/api/runs/${runId}/stop`, { method: "POST", body: JSON.stringify({}) });
+}
+
 export async function fetchRunBugs(runId: string) {
   return apiFetch(`${API_BASE}/api/runs/${runId}/bugs`);
 }

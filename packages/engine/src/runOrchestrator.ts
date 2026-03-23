@@ -11,6 +11,7 @@ import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentTy
 import { waitForPageStable } from "./agent.js";
 import type { AuthConfig } from "./types.js";
 import { createReviewProcessor, type ReviewRequest } from "./reviewAgent.js";
+import { isStopRequested } from "./runEvents.js";
 import { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
 import { calcCostUsd } from "./llmClient.js";
 import { summarizeRun } from "./summarizer.js";
@@ -24,8 +25,10 @@ import {
 } from "./agentMemory.js";
 import { initStagehandSession, destroyStagehandSession, type StagehandSession } from "./stagehandBridge.js";
 import type { StorageAdapter } from "./storage.js";
+import { rewriteForDocker } from "./dockerHost.js";
 
 export type RunJob = {
+  runId?: string;
   baseUrl: string;
   intent: string;
   projectId?: string;
@@ -55,6 +58,9 @@ export type RunResult = {
 
 export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): Promise<RunResult> {
   const config = getConfig();
+  job.baseUrl = rewriteForDocker(job.baseUrl);
+  if (job.auth?.loginUrl) job.auth.loginUrl = rewriteForDocker(job.auth.loginUrl);
+
   logger.info({ intent: job.intent }, "Starting orchestrated run");
 
   let context = job.context ?? "";
@@ -123,6 +129,12 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
   // Launch browser
   let browser;
   let shSession: StagehandSession | undefined;
+  const collectedLLMCalls: LLMCallRecord[] = [];
+  const origOnLLMCall = job.onLLMCall;
+  job.onLLMCall = (call) => {
+    collectedLLMCalls.push(call);
+    origOnLLMCall?.(call);
+  };
 
   try {
     if (config.stagehandEnabled) {
@@ -138,7 +150,11 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (shSession) {
       page = shSession.page;
     } else {
-      browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+      browser = await chromium.launch({
+        headless: true,
+        executablePath: process.env.CHROMIUM_PATH || undefined,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
       page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     }
     await page.setDefaultTimeout(10000);
@@ -232,6 +248,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         reviewProcessor.push(req);
       },
       job.onLLMCall, job.maxSteps, targetUrl, shSession,
+      job.runId ? () => isStopRequested(job.runId!) : undefined,
     );
 
     const reviewBugs = await reviewProcessor.flush();
@@ -265,7 +282,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     else if (browser) await browser.close().catch(() => {});
     return {
       status: "failed", steps: [], stepsDetail: [], memoryLoaded: [], memoryProposed: 0,
-      bugsFound: [], llmCalls: [], error: String(err),
+      bugsFound: [], llmCalls: collectedLLMCalls, error: String(err),
     };
   }
 }

@@ -360,7 +360,7 @@ RULES:
 - Auth in conversation history = already logged in, skip re-login
 - If on wrong page, use navigate to go directly to the target URL
 
-Reply with ONLY a single JSON object per turn.`;
+IMPORTANT: Reply with EXACTLY ONE JSON object. Do NOT output multiple actions — only the single next action to take.`;
 }
 
 // ─── Observation builder ──────────────────────────────────────────────────────
@@ -577,10 +577,18 @@ async function decideNextAction(params: {
     if (!raw) continue;
 
     const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
     if (start === -1) continue;
 
-    const jsonSlice = raw.slice(start, end + 1);
+    // Extract first complete JSON object (handle LLM returning multiple concatenated objects)
+    let depth = 0;
+    let firstEnd = -1;
+    for (let j = start; j < raw.length; j++) {
+      if (raw[j] === "{") depth++;
+      else if (raw[j] === "}") { depth--; if (depth === 0) { firstEnd = j; break; } }
+    }
+    if (firstEnd === -1) continue;
+
+    const jsonSlice = raw.slice(start, firstEnd + 1);
     try {
       const parsed: AgentAction = JSON.parse(jsonSlice);
       return sanitizeAction(parsed);
@@ -897,6 +905,7 @@ export async function runAgent(
   maxSteps?: number,
   targetUrl?: string,
   stagehandSession?: StagehandSession,
+  shouldStop?: () => boolean,
 ): Promise<AgentResult> {
   const config = getConfig();
   const MAX_STEPS = Math.min(maxSteps ?? DEFAULT_MAX_STEPS, MAX_STEPS_HARD_CAP);
@@ -1001,6 +1010,11 @@ export async function runAgent(
       if (Date.now() > runDeadline) {
         steps.push(`[TIMEOUT] Run exceeded ${config.runTimeoutMinutes}-minute limit`);
         return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: `Run timed out` };
+      }
+
+      if (shouldStop?.()) {
+        steps.push(`[STOPPED] Run stopped by user`);
+        return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: "Stopped by user" };
       }
 
       const snapshot = await takeStableSnapshot(page, stagehandPage);

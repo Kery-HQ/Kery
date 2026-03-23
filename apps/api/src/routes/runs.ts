@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun, generateRegressionPlan,
-  createEmitter, getEmitter, destroyEmitter, logger,
+  createEmitter, getEmitter, destroyEmitter, requestStop, logger,
 } from "@kery/engine";
 
 const RunSchema = z.object({
@@ -67,7 +67,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
     setImmediate(async () => {
       try {
         const result = await runOrchestratedJob(storage, {
-          baseUrl: env.base_url, intent: intent!,
+          runId: run.id, baseUrl: env.base_url, intent: intent!,
           projectId, auth: authConfig, testId, destinationId,
           context, saveScreenshots, maxSteps,
           onStep: (step) => emitter.emit("step", step),
@@ -180,5 +180,21 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
     reply.send({ run });
+  });
+
+  // Stop a running run
+  app.post("/api/runs/:runId/stop", async (req, reply) => {
+    const { runId } = req.params as any;
+    const run = await storage.getTestRun(runId);
+    if (!run) { reply.code(404).send({ error: "run not found" }); return; }
+    if (run.status !== "running") { reply.send({ ok: true, status: run.status }); return; }
+    const stopped = requestStop(runId);
+    if (!stopped) {
+      // No active emitter — force-mark as failed directly
+      await storage.updateTestRun(runId, {
+        status: "failed", summary: "Stopped by user", completed_at: new Date().toISOString(),
+      });
+    }
+    reply.send({ ok: true });
   });
 }
