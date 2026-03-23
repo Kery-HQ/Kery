@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchRun, fetchRunBugs, getRunStreamUrl } from "@/projectApi";
+import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun } from "@/projectApi";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -180,6 +181,7 @@ export const RunDetail: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [liveScreenshot, setLiveScreenshot] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<Tab>("overview");
+  const [stopping, setStopping] = React.useState(false);
 
   // --- SSE or polling ---
 
@@ -323,7 +325,21 @@ export const RunDetail: React.FC = () => {
           {run.status}
         </Badge>
         {run.status === "running" && (
-          <Loader2 className="h-3.5 w-3.5 text-status-running animate-spin" />
+          <>
+            <Loader2 className="h-3.5 w-3.5 text-status-running animate-spin" />
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-7 text-[11px] px-2.5"
+              disabled={stopping}
+              onClick={async () => {
+                setStopping(true);
+                await stopRun(run.id).catch(() => {});
+              }}
+            >
+              {stopping ? "Stopping..." : "Stop"}
+            </Button>
+          </>
         )}
       </PageHeader>
 

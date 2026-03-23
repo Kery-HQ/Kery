@@ -14,6 +14,7 @@ import { handleAuth, waitForPageStable } from "./agent.js";
 import type { AuthConfig, AppTreeForm, AppTreeButton, AppTreeInteraction, AppTreeFormField } from "./types.js";
 import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 import type { StorageAdapter } from "./storage.js";
+import { rewriteForDocker } from "./dockerHost.js";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -339,11 +340,15 @@ export async function executeCrawlRun(
 
   let browser: Browser | undefined;
   try {
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+    browser = await chromium.launch({
+      headless: true,
+      executablePath: process.env.CHROMIUM_PATH || undefined,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     await page.setDefaultTimeout(10000);
 
-    const result = await runCrawl(page, env.base_url, auth, existingTestNames);
+    const result = await runCrawl(page, rewriteForDocker(env.base_url), auth, existingTestNames);
 
     const treeDiff = await storage.buildAppTree(projectId, crawlRunId, result.sitemap);
     result.destinationsBuilt = treeDiff.added ?? result.destinationsBuilt;

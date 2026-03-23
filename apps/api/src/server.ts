@@ -42,6 +42,13 @@ await app.register(cors, {
 // Apply any model overrides saved in the DB
 await applyDbModelSettings(storage);
 
+// Mark zombie runs (stuck in "running" from a previous crash) as failed
+await pool.query(
+  `UPDATE test_runs SET status = 'failed', summary = 'Interrupted — server restarted', completed_at = now() WHERE status = 'running'`,
+).then(({ rowCount }) => {
+  if (rowCount && rowCount > 0) console.log(`Recovered ${rowCount} zombie run(s) from previous crash`);
+}).catch(() => {});
+
 // Health check
 app.get("/health", async () => ({ status: "ok" }));
 

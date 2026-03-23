@@ -148,7 +148,22 @@ export async function extractA11yTree(page: Page): Promise<{ elements: A11yEleme
     const raw = await page.evaluate(A11Y_EXTRACT_SCRIPT) as string;
     const snapshot = raw ? JSON.parse(raw) : null;
 
-    if (!snapshot) return { elements, textNodes, tree: [] };
+    // Also extract from iframes (e.g. Clerk, Stripe, etc.)
+    const iframeSnapshots: any[] = [];
+    try {
+      for (const frame of page.frames()) {
+        if (frame === page.mainFrame()) continue;
+        try {
+          const frameRaw = await frame.evaluate(A11Y_EXTRACT_SCRIPT).catch(() => null) as string | null;
+          if (frameRaw) {
+            const parsed = JSON.parse(frameRaw);
+            if (parsed) iframeSnapshots.push(parsed);
+          }
+        } catch { /* skip inaccessible frames */ }
+      }
+    } catch { /* frames() may throw */ }
+
+    if (!snapshot && iframeSnapshots.length === 0) return { elements, textNodes, tree: [] };
 
     const walk = (node: any) => {
       if (!node) return;
@@ -184,7 +199,8 @@ export async function extractA11yTree(page: Page): Promise<{ elements: A11yEleme
       }
     };
 
-    walk(snapshot);
+    if (snapshot) walk(snapshot);
+    for (const iframeSnap of iframeSnapshots) walk(iframeSnap);
 
     if (elements.length > 0 || textNodes.length > 0) {
       const roleCounts: Record<string, number> = {};
@@ -335,6 +351,17 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
           logger.debug({ id: element.id, name: element.name, strategy: "getByText" }, "Element resolved via text fallback");
           return byText.first();
         }
+      }
+      // Search inside iframes as a last resort
+      for (const frame of page.frames()) {
+        if (frame === page.mainFrame()) continue;
+        try {
+          const frameLoc = frame.getByRole(element.role as any, { name: element.name });
+          if (await frameLoc.count() > 0) {
+            logger.debug({ id: element.id, role: element.role, name: element.name, strategy: "iframe-role" }, "Element resolved in iframe");
+            return frameLoc.first();
+          }
+        } catch { /* skip inaccessible frames */ }
       }
       logger.debug({ id: element.id, role: element.role, name: element.name }, "Element NOT found \u2014 no locator matched");
     }

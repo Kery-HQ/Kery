@@ -1,3 +1,6 @@
+// ─── Docker Host ────────────────────────────────────────────────────────────
+export { rewriteForDocker } from "./dockerHost.js";
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 export { initEngineConfig, getConfig, updateEngineConfig, type EngineConfig } from "./config.js";
 export { logger } from "./logger.js";
@@ -59,7 +62,7 @@ export { enrichBugsForRun } from "./bugEnrichment.js";
 export { summarizeRun } from "./summarizer.js";
 
 // ─── Run Events ──────────────────────────────────────────────────────────────
-export { createEmitter, getEmitter, destroyEmitter } from "./runEvents.js";
+export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested } from "./runEvents.js";
 
 // ─── Crawler ─────────────────────────────────────────────────────────────────
 export { runCrawl, executeCrawlRun, generateIntentForNode } from "./crawlerWorker.js";

@@ -69,6 +69,7 @@ export async function initStagehandSession(): Promise<StagehandSession> {
     domSettleTimeoutMs: 2000,
     localBrowserLaunchOptions: {
       headless: true,
+      executablePath: process.env.CHROMIUM_PATH || undefined,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
     logger: (line) => {
