@@ -1,11 +1,15 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
+import * as fs from "fs";
+import * as path from "path";
 import { Pool } from "pg";
 import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun, generateRegressionPlan,
   createEmitter, getEmitter, destroyEmitter, requestStop, logger,
 } from "@kery/engine";
+
+const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 
 const RunSchema = z.object({
   projectId: z.string().uuid(),
@@ -70,6 +74,8 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
           runId: run.id, baseUrl: env.base_url, intent: intent!,
           projectId, auth: authConfig, testId, destinationId,
           context, saveScreenshots, maxSteps,
+          recordVideo: process.env.RECORD_VIDEO !== "false",
+          videosDir: VIDEOS_DIR,
           onStep: (step) => emitter.emit("step", step),
           onScreenshot: (buf) => emitter.emit("screenshot", buf.toString("base64")),
           onLLMCall: (call) => emitter.emit("llm_call", call),
@@ -82,6 +88,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
           status: result.status, summary: result.summary,
           steps_json: result.stepsDetail, bugs_json: enrichedBugs,
           llm_calls_json: result.llmCalls, completed_at: completedAt,
+          video_url: result.videoUrl || null,
         });
 
         await storage.persistBugsFromRun(projectId, run.id, run.trigger_ref, completedAt, environmentId, env.name, enrichedBugs);
@@ -196,5 +203,20 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
       });
     }
     reply.send({ ok: true });
+  });
+
+  // Serve run video recording
+  app.get("/api/runs/:runId/video", async (req, reply) => {
+    const { runId } = req.params as any;
+    const videoPath = path.join(VIDEOS_DIR, `${runId}.webm`);
+    if (!fs.existsSync(videoPath)) {
+      reply.code(404).send({ error: "video not found" });
+      return;
+    }
+    const stat = fs.statSync(videoPath);
+    reply.header("Content-Type", "video/webm");
+    reply.header("Content-Length", stat.size);
+    reply.header("Accept-Ranges", "bytes");
+    reply.send(fs.createReadStream(videoPath));
   });
 }

@@ -38,6 +38,10 @@ services:
       STAGEHAND_ENABLED: ${STAGEHAND_ENABLED:-true}
       STAGEHAND_MODEL: ${STAGEHAND_MODEL:-google/gemini-2.0-flash}
       RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-15}
+      RECORD_VIDEO: ${RECORD_VIDEO:-true}
+      VIDEOS_DIR: /app/data/videos
+    volumes:
+      - videodata:/app/data/videos
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -55,3 +59,4 @@ services:
 
 volumes:
   pgdata:
+  videodata:

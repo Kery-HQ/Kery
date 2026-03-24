@@ -4,7 +4,10 @@
  * OSS version: always uses local Playwright (no BrowserStack).
  * Accepts StorageAdapter for all database operations.
  */
-import { chromium, type Page } from "playwright";
+import { chromium, type Page, type BrowserContext } from "playwright";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentType } from "./agent.js";
@@ -38,6 +41,8 @@ export type RunJob = {
   context?: string;
   saveScreenshots?: boolean;
   maxSteps?: number;
+  recordVideo?: boolean;
+  videosDir?: string;
   onStep?: (step: RunStep) => void;
   onScreenshot?: (screenshot: Buffer) => void;
   onLLMCall?: (call: LLMCallRecord) => void;
@@ -128,6 +133,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
   // Launch browser
   let browser;
+  let browserContext: BrowserContext | undefined;
   let shSession: StagehandSession | undefined;
   const collectedLLMCalls: LLMCallRecord[] = [];
   const origOnLLMCall = job.onLLMCall;
@@ -135,6 +141,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     collectedLLMCalls.push(call);
     origOnLLMCall?.(call);
   };
+
+  const shouldRecord = job.recordVideo !== false;
+  const videoTmpDir = shouldRecord ? fs.mkdtempSync(path.join(os.tmpdir(), "kery-video-")) : undefined;
 
   try {
     if (config.stagehandEnabled) {
@@ -155,7 +164,12 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         executablePath: process.env.CHROMIUM_PATH || undefined,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
-      page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+      const contextOpts: any = { viewport: { width: 1920, height: 1080 } };
+      if (videoTmpDir) {
+        contextOpts.recordVideo = { dir: videoTmpDir, size: { width: 1920, height: 1080 } };
+      }
+      browserContext = await browser.newContext(contextOpts);
+      page = await browserContext.newPage();
     }
     await page.setDefaultTimeout(10000);
 
@@ -198,13 +212,18 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           }));
 
           if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-          else await browser?.close();
+          else {
+            await browserContext?.close();
+            await browser?.close();
+          }
+
+          const videoUrl = await finalizeVideo(videoTmpDir, job.videosDir, job.runId);
 
           return {
             status: regResult.status === "passed" ? "passed" : "failed",
             steps: stepsDetail.map(s => `[${s.index}] ${s.action} \u2192 ${s.target ?? ""}`),
             stepsDetail, bugsFound, llmCalls: pathGenCalls,
-            memoryLoaded: allMemory, memoryProposed: 0,
+            memoryLoaded: allMemory, memoryProposed: 0, videoUrl,
           };
         }
 
@@ -261,7 +280,12 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (job.destinationId && proposed.length > 0) await savePageMemoryEntries(storage, job.destinationId, proposed);
 
     if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-    else await browser?.close();
+    else {
+      await browserContext?.close();
+      await browser?.close();
+    }
+
+    const videoUrl = await finalizeVideo(videoTmpDir, job.videosDir, job.runId);
 
     let finalStatus = agentResult.status;
     const okSteps = agentResult.stepsDetail.filter(s => s.status === "ok" && !["done", "auth", "bug"].includes(s.action));
@@ -292,12 +316,16 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     return {
       status: finalStatus, steps: agentResult.steps, stepsDetail: agentResult.stepsDetail,
       memoryLoaded: allMemory, memoryProposed: proposed.length,
-      bugsFound, llmCalls: mergedCalls, summary: summarizeResult.summary,
+      bugsFound, llmCalls: mergedCalls, summary: summarizeResult.summary, videoUrl,
     };
   } catch (err) {
     logger.error({ err: String(err) }, "Run failed");
     if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-    else if (browser) await browser.close().catch(() => {});
+    else {
+      await browserContext?.close().catch(() => {});
+      if (browser) await browser.close().catch(() => {});
+    }
+    cleanupVideoTmpDir(videoTmpDir);
     return {
       status: "failed", steps: [], stepsDetail: [], memoryLoaded: [], memoryProposed: 0,
       bugsFound: [], llmCalls: collectedLLMCalls, error: String(err),
@@ -343,4 +371,41 @@ function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[]): RunStep[] {
   }
   out.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
   return out;
+}
+
+// ─── Video helpers ──────────────────────────────────────────────────────────
+
+async function finalizeVideo(
+  tmpDir: string | undefined,
+  videosDir: string | undefined,
+  runId: string | undefined,
+): Promise<string | undefined> {
+  if (!tmpDir || !runId) return undefined;
+  try {
+    const files = fs.readdirSync(tmpDir).filter(f => f.endsWith(".webm"));
+    if (files.length === 0) return undefined;
+
+    const srcPath = path.join(tmpDir, files[0]);
+    const destDir = videosDir || path.join(process.cwd(), "data", "videos");
+    fs.mkdirSync(destDir, { recursive: true });
+
+    const destFile = `${runId}.webm`;
+    const destPath = path.join(destDir, destFile);
+    fs.renameSync(srcPath, destPath);
+
+    cleanupVideoTmpDir(tmpDir);
+    logger.info({ runId, path: destPath }, "Video recording saved");
+    return `/api/runs/${runId}/video`;
+  } catch (err) {
+    logger.warn({ err: String(err) }, "Failed to finalize video recording");
+    cleanupVideoTmpDir(tmpDir);
+    return undefined;
+  }
+}
+
+function cleanupVideoTmpDir(tmpDir: string | undefined): void {
+  if (!tmpDir) return;
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch {}
 }
