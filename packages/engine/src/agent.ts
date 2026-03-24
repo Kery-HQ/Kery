@@ -56,6 +56,7 @@ export type RunStep = {
   at?: number;
   source?: "navigator" | "review" | "pathgen";
   elementRef?: { role: string; name: string };
+  screenshotBase64?: string;
 };
 
 export type LLMAgentType = "navigator" | "review" | "pathgen" | "summary";
