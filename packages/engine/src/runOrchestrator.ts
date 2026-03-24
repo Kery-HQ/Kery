@@ -269,12 +269,30 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       finalStatus = "partial";
     }
 
-    const summary = await summarizeRun(job.intent, finalStatus, agentResult.steps);
+    const summarizeResult = await summarizeRun(job.intent, finalStatus, agentResult.steps);
+
+    if (summarizeResult.usage && summarizeResult.model) {
+      mergedCalls.push({
+        seq: mergedCalls.length + 1,
+        stepIndex: 0,
+        model: summarizeResult.model,
+        hasVision: false,
+        attempt: 1,
+        inputTokens: summarizeResult.usage.inputTokens,
+        outputTokens: summarizeResult.usage.outputTokens,
+        totalTokens: summarizeResult.usage.totalTokens,
+        durationMs: summarizeResult.durationMs ?? 0,
+        costUsd: summarizeResult.costUsd ?? 0,
+        query: "Summarize test run",
+        response: summarizeResult.summary.slice(0, 2000),
+        agent: "summary",
+      });
+    }
 
     return {
       status: finalStatus, steps: agentResult.steps, stepsDetail: agentResult.stepsDetail,
       memoryLoaded: allMemory, memoryProposed: proposed.length,
-      bugsFound, llmCalls: mergedCalls, summary,
+      bugsFound, llmCalls: mergedCalls, summary: summarizeResult.summary,
     };
   } catch (err) {
     logger.error({ err: String(err) }, "Run failed");

@@ -1,6 +1,15 @@
-import { llmSummarize } from "./llmClient.js";
+import { llmSummarize, calcCostUsd } from "./llmClient.js";
+import { getConfig } from "./config.js";
 
-export async function summarizeRun(intent: string, status: string, steps: string[], videoUrl?: string) {
+export type SummarizeResult = {
+  summary: string;
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+  costUsd?: number;
+  model?: string;
+  durationMs?: number;
+};
+
+export async function summarizeRun(intent: string, status: string, steps: string[], videoUrl?: string): Promise<SummarizeResult> {
   const stepList = steps.length > 0
     ? steps.slice(-20).join("\n")
     : "No steps recorded.";
@@ -17,8 +26,14 @@ ${stepList}
 Focus on what the agent did, what succeeded, and what failed if applicable.`;
 
   try {
-    return await llmSummarize(prompt);
+    const config = getConfig();
+    const model = config.summaryModel;
+    const t0 = Date.now();
+    const { content, usage } = await llmSummarize(prompt);
+    const durationMs = Date.now() - t0;
+    const costUsd = calcCostUsd(model, usage.inputTokens, usage.outputTokens);
+    return { summary: content, usage, costUsd, model, durationMs };
   } catch {
-    return status === "passed" ? "All steps passed." : "Test failed. Review video/logs.";
+    return { summary: status === "passed" ? "All steps passed." : "Test failed. Review video/logs." };
   }
 }

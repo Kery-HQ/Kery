@@ -203,13 +203,13 @@ export async function llmAgentChat(messages: any[]): Promise<{ content: string; 
 
 // ─── Summarization (text only) ────────────────────────────────────────────────
 
-export async function llmSummarize(prompt: string): Promise<string> {
-  const { content } = await llmChat(
+export async function llmSummarize(prompt: string): Promise<{ content: string; usage: { inputTokens: number; outputTokens: number; totalTokens: number } }> {
+  const { content, usage } = await llmChat(
     [{ role: "user", content: prompt }],
     getConfig().summaryModel,
     { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 }
   );
-  return content;
+  return { content, usage };
 }
 
 // ─── Review Agent (vision + text, structured bugs) ─────────────────────────────
