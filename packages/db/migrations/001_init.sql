@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS projects (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name                  text NOT NULL,
   domain                text,
-  use_local_playwright  boolean NOT NULL DEFAULT true,
   crawl_environment_id  uuid,
   auto_crawl_weekly     boolean NOT NULL DEFAULT false,
   created_at            timestamptz NOT NULL DEFAULT now()
