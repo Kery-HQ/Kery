@@ -10,6 +10,7 @@ import {
 } from "@kery/engine";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
+const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
 
 const RunSchema = z.object({
   projectId: z.string().uuid(),
@@ -83,6 +84,9 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
 
         const completedAt = new Date().toISOString();
         const enrichedBugs = enrichBugsForRun(run.id, completedAt, run.trigger_ref, result.bugsFound, result.stepsDetail);
+
+        // Extract screenshots from bugs to filesystem
+        extractBugScreenshots(run.id, enrichedBugs);
 
         await storage.updateTestRun(run.id, {
           status: result.status, summary: result.summary,
@@ -219,4 +223,49 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
     reply.header("Accept-Ranges", "bytes");
     reply.send(fs.createReadStream(videoPath));
   });
+
+  // Serve bug screenshot
+  app.get("/api/bugs/:runId/:filename", async (req, reply) => {
+    const { runId, filename } = req.params as any;
+    // Sanitize to prevent path traversal
+    const safe = path.basename(filename);
+    const filePath = path.join(SCREENSHOTS_DIR, runId, safe);
+    if (!fs.existsSync(filePath)) {
+      reply.code(404).send({ error: "screenshot not found" });
+      return;
+    }
+    const stat = fs.statSync(filePath);
+    reply.header("Content-Type", "image/jpeg");
+    reply.header("Content-Length", stat.size);
+    reply.header("Cache-Control", "public, max-age=31536000, immutable");
+    reply.send(fs.createReadStream(filePath));
+  });
+}
+
+/**
+ * Extract base64 screenshots from enriched bugs, write to disk,
+ * and replace screenshotBase64 with a URL path. Mutates the array in place.
+ */
+function extractBugScreenshots(runId: string, bugs: any[]): void {
+  const dir = path.join(SCREENSHOTS_DIR, runId);
+  let dirCreated = false;
+
+  for (const bug of bugs) {
+    if (!bug.screenshotBase64) continue;
+
+    try {
+      if (!dirCreated) {
+        fs.mkdirSync(dir, { recursive: true });
+        dirCreated = true;
+      }
+      const filename = `bug-${bug.index ?? 0}.jpg`;
+      const filePath = path.join(dir, filename);
+      fs.writeFileSync(filePath, Buffer.from(bug.screenshotBase64, "base64"));
+
+      // Replace base64 blob with URL path
+      bug.screenshotBase64 = `/api/bugs/${runId}/${filename}`;
+    } catch {
+      // Keep original base64 if write fails
+    }
+  }
 }
