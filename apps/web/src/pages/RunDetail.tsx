@@ -1,4 +1,5 @@
 import React from "react";
+import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun } from "@/projectApi";
 import { Button } from "@/components/ui/button";
@@ -455,8 +456,21 @@ function OverviewTab({
       {/* Summary */}
       {run.summary && (
         <Card>
-          <CardContent className="p-4">
-            <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap">{run.summary}</p>
+          <CardContent className="p-4 prose prose-sm prose-invert max-w-none
+            prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
+            prose-h2:text-[16px] prose-h2:mt-0 prose-h2:mb-3 prose-h2:border-b prose-h2:border-border prose-h2:pb-2
+            prose-h3:text-[14px] prose-h3:mt-4 prose-h3:mb-2
+            prose-h4:text-[13px] prose-h4:mt-3 prose-h4:mb-1
+            prose-p:text-[13px] prose-p:text-foreground/90 prose-p:leading-relaxed prose-p:my-1.5
+            prose-li:text-[13px] prose-li:text-foreground/90 prose-li:my-0.5
+            prose-strong:text-foreground prose-strong:font-medium
+            prose-code:text-[12px] prose-code:font-mono prose-code:bg-accent/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+            prose-table:text-[12px] prose-th:text-[11px] prose-th:font-medium prose-th:uppercase prose-th:tracking-wider prose-th:text-muted-foreground
+            prose-td:py-1.5 prose-th:py-1.5 prose-td:px-3 prose-th:px-3
+            prose-tr:border-border
+            prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+          ">
+            <ReactMarkdown>{run.summary}</ReactMarkdown>
           </CardContent>
         </Card>
       )}

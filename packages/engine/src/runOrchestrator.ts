@@ -17,7 +17,7 @@ import { createReviewProcessor, type ReviewRequest } from "./reviewAgent.js";
 import { isStopRequested } from "./runEvents.js";
 import { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
 import { calcCostUsd } from "./llmClient.js";
-import { summarizeRun } from "./summarizer.js";
+import { summarizeRun, type SummarizeInput } from "./summarizer.js";
 import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, generateRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
 import {
@@ -293,7 +293,17 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       finalStatus = "partial";
     }
 
-    const summarizeResult = await summarizeRun(job.intent, finalStatus, agentResult.steps);
+    const runStartedAt = agentResult.stepsDetail[0]?.at;
+    const runEndedAt = agentResult.stepsDetail[agentResult.stepsDetail.length - 1]?.at;
+    const runDurationMs = runStartedAt && runEndedAt ? runEndedAt - runStartedAt : undefined;
+
+    const summarizeInput: SummarizeInput = {
+      intent: job.intent, status: finalStatus, baseUrl: job.baseUrl,
+      stepsDetail: agentResult.stepsDetail, bugsFound, llmCalls: mergedCalls,
+      memoryLoaded: allMemory, memoryProposed: proposed.length,
+      videoUrl, durationMs: runDurationMs,
+    };
+    const summarizeResult = await summarizeRun(summarizeInput);
 
     if (summarizeResult.usage && summarizeResult.model) {
       mergedCalls.push({

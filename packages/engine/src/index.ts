@@ -63,6 +63,7 @@ export { enrichBugsForRun } from "./bugEnrichment.js";
 
 // ─── Summarizer ──────────────────────────────────────────────────────────────
 export { summarizeRun } from "./summarizer.js";
+export type { SummarizeInput, SummarizeResult } from "./summarizer.js";
 
 // ─── Run Events ──────────────────────────────────────────────────────────────
 export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested } from "./runEvents.js";
