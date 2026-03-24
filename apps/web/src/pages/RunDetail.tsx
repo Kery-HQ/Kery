@@ -46,6 +46,7 @@ import {
   Route,
   ExternalLink,
   Hash,
+  FileText,
 } from "lucide-react";
 
 // --- Types ---
@@ -72,7 +73,7 @@ type RunStep = {
   category?: string;
 };
 
-type LLMAgentType = "navigator" | "review" | "pathgen";
+type LLMAgentType = "navigator" | "review" | "pathgen" | "summary";
 
 type LLMCallRecord = {
   seq: number;
@@ -167,6 +168,7 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
   navigator: { label: "Navigator", color: "text-emerald-400", Icon: Compass },
   review:    { label: "Review",    color: "text-violet-400",  Icon: Eye },
   pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Route },
+  summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
 };
 
 // --- Main component ---
@@ -868,7 +870,7 @@ function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost:
 
   const agentCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: llmCalls.length };
-    for (const a of ["navigator", "review", "pathgen"] as const) {
+    for (const a of ["navigator", "review", "pathgen", "summary"] as const) {
       counts[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).length;
     }
     return counts;
@@ -876,13 +878,13 @@ function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost:
 
   const agentCosts = React.useMemo(() => {
     const cost: Record<string, number> = {};
-    for (const a of ["navigator", "review", "pathgen"] as const) {
+    for (const a of ["navigator", "review", "pathgen", "summary"] as const) {
       cost[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).reduce((s, c) => s + c.costUsd, 0);
     }
     return cost;
   }, [llmCalls]);
 
-  const agentsWithCalls = (["navigator", "review", "pathgen"] as const).filter((a) => agentCounts[a] > 0);
+  const agentsWithCalls = (["navigator", "review", "pathgen", "summary"] as const).filter((a) => agentCounts[a] > 0);
 
   return (
     <div className="px-6 py-5 max-w-5xl w-full mx-auto space-y-4 animate-fade-in">
@@ -988,6 +990,7 @@ function LLMCallRow({ call }: { call: LLMCallRecord }) {
       agent === "navigator" && "border-l-2 border-l-emerald-500/30",
       agent === "review"    && "border-l-2 border-l-violet-500/30",
       agent === "pathgen"   && "border-l-2 border-l-amber-500/30",
+      agent === "summary"   && "border-l-2 border-l-sky-500/30",
     )}>
       <button
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"

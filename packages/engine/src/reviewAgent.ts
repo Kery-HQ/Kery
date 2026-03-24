@@ -1,7 +1,7 @@
 import type { ReviewBug } from "./types.js";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { llmChat } from "./llmClient.js";
+import { llmChat, calcCostUsd } from "./llmClient.js";
 import type { LLMCallRecord } from "./agent.js";
 
 export type ReviewRequest = {
@@ -134,11 +134,6 @@ async function callReviewLLM(messages: any[]): Promise<{ content: string; inputT
   };
 }
 
-function estimateReviewCost(model: string, inputTokens: number, outputTokens: number): number {
-  if (model.includes("sonnet")) return (inputTokens * 3 + outputTokens * 15) / 1_000_000;
-  if (model.includes("haiku")) return (inputTokens * 1 + outputTokens * 5) / 1_000_000;
-  return (inputTokens * 0.15 + outputTokens * 0.6) / 1_000_000;
-}
 
 async function processOne(
   req: ReviewRequest,
@@ -167,7 +162,7 @@ async function processOne(
       outputTokens,
       totalTokens: inputTokens + outputTokens,
       durationMs,
-      costUsd: estimateReviewCost(model, inputTokens, outputTokens),
+      costUsd: calcCostUsd(model, inputTokens, outputTokens),
       query: `Review step ${req.stepIndex}: ${req.action} \u2192 ${req.actionResult}`,
       response: content.slice(0, 2000),
       agent: "review",

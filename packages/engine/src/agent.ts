@@ -58,7 +58,7 @@ export type RunStep = {
   elementRef?: { role: string; name: string };
 };
 
-export type LLMAgentType = "navigator" | "review" | "pathgen";
+export type LLMAgentType = "navigator" | "review" | "pathgen" | "summary";
 
 export type LLMCallRecord = {
   seq: number;

@@ -299,6 +299,7 @@ Return ONLY a JSON array: [{"name":"Short name","intent":"Step-by-step instructi
 
 export async function generateIntentForNode(
   route: string, title: string, forms: AppTreeForm[], buttons: AppTreeButton[], interactions: AppTreeInteraction[], baseUrl: string,
+  costAccum?: { usd: number },
 ): Promise<string | null> {
   const config = getConfig();
   const context: string[] = [`Route: ${route}`, `Title: ${title}`];
@@ -307,7 +308,8 @@ export async function generateIntentForNode(
 
   const prompt = `Generate a single test intent for this page starting from ${baseUrl}.\n\n${context.join("\n")}\n\nReply with ONLY the intent text.`;
   try {
-    const { content } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: 16384, temperature: 0.2 });
+    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: 16384, temperature: 0.2 });
+    if (costAccum) costAccum.usd += calcCostUsd(config.summaryModel, usage.inputTokens, usage.outputTokens);
     const intent = content.trim();
     return intent.length > 20 ? intent : null;
   } catch { return null; }

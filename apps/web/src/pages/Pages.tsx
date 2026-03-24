@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
-import { relativeTime } from "@/lib/formatters";
+import { relativeTime, formatCost } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchPages, fetchEnvironments, triggerScan, fetchScanStatus,
@@ -158,6 +158,9 @@ export function Pages() {
         {lastScan?.completed_at && (
           <span className="text-[11px] text-muted-foreground/50">
             Scanned {relativeTime(lastScan.completed_at)}
+            {lastScan.cost_usd != null && lastScan.cost_usd > 0 && (
+              <> &middot; <span className="font-mono">{formatCost(lastScan.cost_usd)}</span></>
+            )}
           </span>
         )}
         <Button
