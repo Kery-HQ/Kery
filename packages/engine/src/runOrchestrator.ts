@@ -1,7 +1,5 @@
 /**
  * Run Orchestrator — multi-agent orchestration for test runs.
- *
- * OSS version: always uses local Playwright (no BrowserStack).
  * Accepts StorageAdapter for all database operations.
  */
 import { chromium, type Page, type BrowserContext } from "playwright";

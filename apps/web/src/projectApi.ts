@@ -278,17 +278,6 @@ export async function resetModelSettings() {
   return apiFetch(`${API_BASE}/api/settings/models`, { method: "DELETE" });
 }
 
-export async function fetchRunSettings(projectId: string) {
-  return apiFetch<{ useLocalPlaywright: boolean }>(`${API_BASE}/api/projects/${projectId}/run/settings`);
-}
-
-export async function saveRunSettings(projectId: string, settings: { useLocalPlaywright: boolean }) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/run/settings`, {
-    method: "PUT",
-    body: JSON.stringify(settings),
-  });
-}
-
 export async function resetCrawlData(projectId: string, deleteFlows = false) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl${deleteFlows ? "?deleteFlows=true" : ""}`, { method: "DELETE" });
 }

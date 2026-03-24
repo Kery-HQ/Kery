@@ -3,7 +3,6 @@ import { Settings as SettingsIcon, Trash2, RotateCcw, Copy, Check } from "lucide
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { useProject } from "@/lib/projectContext";
 import {
-  updateProject, deleteProject, fetchRunSettings, saveRunSettings,
+  updateProject, deleteProject,
   fetchModelSettings, saveModelSettings, resetModelSettings,
 } from "@/projectApi";
 import { useNavigate } from "react-router-dom";
@@ -33,9 +32,6 @@ export const Settings: React.FC = () => {
   const [deleting, setDeleting] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
 
-  const [useLocalPlaywright, setUseLocalPlaywright] = React.useState(false);
-  const [runSettingsSaving, setRunSettingsSaving] = React.useState(false);
-
   const [modelSettings, setModelSettings] = React.useState<Record<string, { current: string; default: string; customized: boolean }>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
@@ -49,30 +45,10 @@ export const Settings: React.FC = () => {
   }, [currentProject?.id]);
 
   React.useEffect(() => {
-    if (!currentProjectId) return;
-    fetchRunSettings(currentProjectId)
-      .then((r: any) => setUseLocalPlaywright(r?.useLocalPlaywright ?? false))
-      .catch(() => {});
-  }, [currentProjectId]);
-
-  React.useEffect(() => {
     fetchModelSettings()
       .then((r) => setModelSettings(r.models))
       .catch(() => {});
   }, []);
-
-  async function handleRunSettingChange(value: boolean) {
-    if (!currentProjectId) return;
-    setUseLocalPlaywright(value);
-    setRunSettingsSaving(true);
-    try {
-      await saveRunSettings(currentProjectId, { useLocalPlaywright: value });
-    } catch {
-      setUseLocalPlaywright(!value);
-    } finally {
-      setRunSettingsSaving(false);
-    }
-  }
 
   async function handleModelChange(key: string, value: string) {
     setModelSaving(key);
@@ -207,30 +183,6 @@ export const Settings: React.FC = () => {
                     {copied ? <Check className="h-3.5 w-3.5 text-status-pass" /> : <Copy className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Test Runs */}
-        <section>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
-            Test runs
-          </p>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[13px] font-medium text-foreground">Use local Playwright</p>
-                  <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-                    Run tests with a local Chromium instance. No cloud credentials required.
-                  </p>
-                </div>
-                <Switch
-                  checked={useLocalPlaywright}
-                  onCheckedChange={handleRunSettingChange}
-                  disabled={runSettingsSaving}
-                />
               </div>
             </CardContent>
           </Card>
