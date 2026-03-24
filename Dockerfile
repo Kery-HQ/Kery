@@ -25,6 +25,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 
 RUN npm install --workspaces --include-workspace-root 2>/dev/null || npm install
+RUN npx playwright install ffmpeg
 
 # Copy source
 COPY tsconfig.base.json ./

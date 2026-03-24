@@ -156,6 +156,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
 
     let page;
+    let videoEnabled = !!videoTmpDir;
     if (shSession) {
       page = shSession.page;
     } else {
@@ -168,8 +169,20 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       if (videoTmpDir) {
         contextOpts.recordVideo = { dir: videoTmpDir, size: { width: 1920, height: 1080 } };
       }
-      browserContext = await browser.newContext(contextOpts);
-      page = await browserContext.newPage();
+      try {
+        browserContext = await browser.newContext(contextOpts);
+        page = await browserContext.newPage();
+      } catch (err) {
+        if (videoTmpDir && String(err).includes("ffmpeg")) {
+          logger.warn("ffmpeg not available — disabling video recording");
+          videoEnabled = false;
+          delete contextOpts.recordVideo;
+          browserContext = await browser.newContext(contextOpts);
+          page = await browserContext.newPage();
+        } else {
+          throw err;
+        }
+      }
     }
     await page.setDefaultTimeout(10000);
 
@@ -247,6 +260,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     let lastStep: RunStep | null = null;
     let screenshotStepIndex = 0;
     let previousUrl = "";
+    const screenshotsByStep = new Map<number, string>();
 
     const agentResult = await runAgent(
       page, job.intent, job.baseUrl, job.auth ?? null, allMemory,
@@ -257,6 +271,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         const url = page.url();
         const title = await page.title().catch(() => "");
         screenshotStepIndex++;
+        if (screenshot.length > 0) {
+          screenshotsByStep.set(screenshotStepIndex, screenshot.toString("base64"));
+        }
         const req: ReviewRequest = {
           screenshot, url, title, stepIndex: screenshotStepIndex,
           action: lastStep ? `${lastStep.action} ${lastStep.target ?? ""}`.trim() : "initial",
@@ -271,7 +288,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     );
 
     const reviewBugs = await reviewProcessor.flush();
-    const bugsFound = mergeBugs(agentResult.stepsDetail, reviewBugs);
+    const bugsFound = mergeBugs(agentResult.stepsDetail, reviewBugs, screenshotsByStep);
     const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, reviewCalls);
 
     // Save memory
@@ -359,7 +376,7 @@ function mergeLLMCalls(pathGen: LLMCallRecord[], navigator: LLMCallRecord[], rev
   return merged;
 }
 
-function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[]): RunStep[] {
+function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[], screenshotsByStep?: Map<number, string>): RunStep[] {
   const out: RunStep[] = [];
   for (const step of stepsDetail) {
     if (step.status === "failed" && step.action !== "bug") {
@@ -368,6 +385,7 @@ function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[]): RunStep[] {
         reasoning: step.error ?? `Step failed: ${step.action} ${step.target ?? ""}`,
         url: step.url, status: "ok", fromMemory: false,
         bugType: "functional", severity: "medium", source: "navigator", at: step.at,
+        screenshotBase64: screenshotsByStep?.get(step.index ?? 0),
       });
     }
   }
@@ -377,6 +395,7 @@ function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[]): RunStep[] {
       index: b.stepIndex, action: "bug", reasoning: b.description,
       status: "ok", fromMemory: false, bugType, severity: b.severity,
       source: "review", at: b.at,
+      screenshotBase64: screenshotsByStep?.get(b.stepIndex),
     });
   }
   out.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
@@ -401,7 +420,8 @@ async function finalizeVideo(
 
     const destFile = `${runId}.webm`;
     const destPath = path.join(destDir, destFile);
-    fs.renameSync(srcPath, destPath);
+    fs.copyFileSync(srcPath, destPath);
+    fs.unlinkSync(srcPath);
 
     cleanupVideoTmpDir(tmpDir);
     logger.info({ runId, path: destPath }, "Video recording saved");
