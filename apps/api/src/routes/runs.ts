@@ -128,13 +128,15 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
           }
         }
 
-        emitter.emit("done", { ...run, status: result.status, summary: result.summary });
+        const completedRun = await storage.getTestRun(run.id);
+        emitter.emit("done", completedRun ?? { ...run, status: result.status, summary: result.summary });
       } catch (err) {
         logger.error({ runId: run.id, err: String(err) }, "Background run error");
         await storage.updateTestRun(run.id, {
           status: "failed", summary: String(err), completed_at: new Date().toISOString(),
         });
-        emitter.emit("done", { ...run, status: "failed", summary: String(err) });
+        const failedRun = await storage.getTestRun(run.id).catch(() => null);
+        emitter.emit("done", failedRun ?? { ...run, status: "failed", summary: String(err) });
       } finally {
         destroyEmitter(run.id);
       }
@@ -191,6 +193,16 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
     reply.send({ run });
+  });
+
+  // Get bugs for a specific run
+  app.get("/api/runs/:runId/bugs", async (req, reply) => {
+    const { runId } = req.params as any;
+    const { rows: bugs } = await pool.query(
+      "SELECT * FROM bugs WHERE run_id = $1 ORDER BY step_index ASC, created_at ASC",
+      [runId],
+    );
+    reply.send({ bugs });
   });
 
   // Stop a running run

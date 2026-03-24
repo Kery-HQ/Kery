@@ -146,7 +146,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
   try {
     if (config.stagehandEnabled) {
       try {
-        shSession = await initStagehandSession();
+        shSession = await initStagehandSession(
+          videoTmpDir ? { recordVideo: { dir: videoTmpDir, size: { width: 1920, height: 1080 } } } : undefined,
+        );
       } catch (err) {
         logger.warn({ err: String(err).slice(0, 200) }, "Stagehand session init failed — falling back to plain Playwright");
         shSession = undefined;

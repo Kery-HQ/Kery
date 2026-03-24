@@ -56,7 +56,9 @@ function resetCircuitBreaker(): void {
 
 // ─── Init / Teardown ────────────────────────────────────────────────────────
 
-export async function initStagehandSession(): Promise<StagehandSession> {
+export async function initStagehandSession(opts?: {
+  recordVideo?: { dir: string; size?: { width: number; height: number } };
+}): Promise<StagehandSession> {
   const model = getConfig().stagehandModel || "google/gemini-2.0-flash";
 
   logger.info({ model, env: "LOCAL" }, "Initializing Stagehand");
@@ -71,6 +73,7 @@ export async function initStagehandSession(): Promise<StagehandSession> {
       headless: true,
       executablePath: process.env.CHROMIUM_PATH || undefined,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      recordVideo: opts?.recordVideo,
     },
     logger: (line) => {
       if (line.level === 0) logger.debug({ sh: true, cat: line.category }, String(line.message));

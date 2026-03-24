@@ -457,19 +457,24 @@ function OverviewTab({
       {/* Summary */}
       {run.summary && (
         <Card>
-          <CardContent className="p-4 prose prose-sm prose-invert max-w-none
+          <CardContent className="p-4 prose prose-sm dark:prose-invert max-w-none
             prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
             prose-h2:text-[16px] prose-h2:mt-0 prose-h2:mb-3 prose-h2:border-b prose-h2:border-border prose-h2:pb-2
             prose-h3:text-[14px] prose-h3:mt-4 prose-h3:mb-2
             prose-h4:text-[13px] prose-h4:mt-3 prose-h4:mb-1
             prose-p:text-[13px] prose-p:text-foreground/90 prose-p:leading-relaxed prose-p:my-1.5
             prose-li:text-[13px] prose-li:text-foreground/90 prose-li:my-0.5
+            prose-ul:my-1 prose-ol:my-1
             prose-strong:text-foreground prose-strong:font-medium
-            prose-code:text-[12px] prose-code:font-mono prose-code:bg-accent/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-            prose-table:text-[12px] prose-th:text-[11px] prose-th:font-medium prose-th:uppercase prose-th:tracking-wider prose-th:text-muted-foreground
-            prose-td:py-1.5 prose-th:py-1.5 prose-td:px-3 prose-th:px-3
-            prose-tr:border-border
+            prose-code:text-[12px] prose-code:font-mono prose-code:bg-muted prose-code:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
+            prose-table:text-[12px] prose-table:w-full
+            prose-thead:border-b prose-thead:border-border
+            prose-th:text-[11px] prose-th:font-medium prose-th:uppercase prose-th:tracking-wider prose-th:text-muted-foreground prose-th:text-left
+            prose-th:py-2 prose-th:px-3
+            prose-td:py-2 prose-td:px-3 prose-td:text-foreground/90
+            prose-tr:border-b prose-tr:border-border/50
             prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+            prose-hr:border-border
           ">
             <ReactMarkdown>{run.summary}</ReactMarkdown>
           </CardContent>
