@@ -2,6 +2,7 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun } from "@/projectApi";
+import { API_BASE } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -664,7 +665,7 @@ function BugCard({
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Screenshot</p>
               <div className="rounded border border-border bg-black overflow-hidden">
                 <img
-                  src={bug.screenshot.startsWith("data:") ? bug.screenshot : `data:image/png;base64,${bug.screenshot}`}
+                  src={bug.screenshot.startsWith("/api/") ? `${API_BASE}${bug.screenshot}` : bug.screenshot.startsWith("data:") ? bug.screenshot : `data:image/png;base64,${bug.screenshot}`}
                   alt="Bug screenshot"
                   className="w-full block max-h-64 object-contain object-top"
                 />

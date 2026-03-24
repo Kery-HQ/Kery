@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { formatReportedAt } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchProjectBugs } from "@/projectApi";
+import { API_BASE } from "@/api";
 
 export type BugRecord = {
   name: string;
@@ -259,7 +260,7 @@ export const Bugs: React.FC = () => {
                                 <DialogTrigger asChild>
                                   <button className="rounded-lg border border-border overflow-hidden hover:ring-1 hover:ring-primary/30 transition-all cursor-zoom-in">
                                     <img
-                                      src={`data:image/jpeg;base64,${bug.screenshotBase64}`}
+                                      src={bug.screenshotBase64.startsWith("/api/") ? `${API_BASE}${bug.screenshotBase64}` : `data:image/jpeg;base64,${bug.screenshotBase64}`}
                                       alt="Bug screenshot"
                                       className="max-w-full max-h-[200px] object-contain bg-black/5"
                                     />
@@ -270,7 +271,7 @@ export const Bugs: React.FC = () => {
                                     <DialogTitle>Screenshot</DialogTitle>
                                   </DialogHeader>
                                   <img
-                                    src={`data:image/jpeg;base64,${bug.screenshotBase64}`}
+                                    src={bug.screenshotBase64.startsWith("/api/") ? `${API_BASE}${bug.screenshotBase64}` : `data:image/jpeg;base64,${bug.screenshotBase64}`}
                                     alt="Bug screenshot"
                                     className="w-full rounded-lg border border-border object-contain bg-black/5"
                                   />
