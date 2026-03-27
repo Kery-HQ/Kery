@@ -170,6 +170,7 @@ export async function executeRegressionPlan(
   };
 
   let consecutiveStale = 0;
+  const staleStepIndices = new Set<number>();
 
   for (let i = 0; i < plan.length; i++) {
     const step = plan[i];
@@ -210,10 +211,14 @@ export async function executeRegressionPlan(
         consecutiveStale = 0;
       } else {
         result.staleSteps++;
+        staleStepIndices.add(i);
         consecutiveStale++;
 
-        if (consecutiveStale >= 3) {
-          logger.warn("3 consecutive stale steps \u2014 marking plan as stale");
+        // Only mark plan as stale after 5 consecutive stale steps (was 3),
+        // or if >50% of attempted steps are stale (plan is fundamentally outdated)
+        const staleRatio = staleStepIndices.size / (i + 1);
+        if (consecutiveStale >= 5 || (i >= 4 && staleRatio > 0.5)) {
+          logger.warn({ consecutiveStale, staleRatio: staleRatio.toFixed(2), staleSteps: staleStepIndices.size }, "Plan marked as stale — too many unresolvable steps");
           result.status = "stale";
           return result;
         }

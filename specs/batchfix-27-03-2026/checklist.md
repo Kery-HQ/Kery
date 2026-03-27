@@ -48,7 +48,7 @@
 
 ## P3 — Low
 
-- [ ] **#35** Regression stale detection too aggressive (engine)
+- [x] **#35** Regression stale detection too aggressive (engine) — Increased consecutive stale threshold from 3 to 5, added >50% stale ratio check, and track per-step staleness.
 - [ ] **#36** Bug name dedup unreliable (engine)
 - [ ] **#37** No 2FA/MFA support (engine)
 - [ ] **#38** OAuth 2.0 unimplemented (engine)
