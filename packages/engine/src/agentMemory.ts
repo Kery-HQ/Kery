@@ -187,6 +187,58 @@ export function proposeMemoriesFromRun(
   return proposals;
 }
 
+// ─── Confidence decay + pruning ──────────────────────────────────────────────
+
+const DECAY_THRESHOLD_DAYS = 14;
+const DECAY_AMOUNT = 10;
+const PRUNE_CONFIDENCE_MIN = 10;
+
+/**
+ * Apply confidence decay to entries older than DECAY_THRESHOLD_DAYS,
+ * and prune entries that fall below the minimum confidence threshold.
+ * Returns the list of IDs that were pruned (caller can delete from storage).
+ */
+export function decayAndPrune(entries: MemoryEntry[]): { surviving: MemoryEntry[]; prunedIds: string[] } {
+  const now = Date.now();
+  const surviving: MemoryEntry[] = [];
+  const prunedIds: string[] = [];
+
+  for (const entry of entries) {
+    const ageMs = now - new Date(entry.updated_at).getTime();
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+
+    // Decay confidence for old entries
+    let confidence = entry.confidence;
+    if (ageDays > DECAY_THRESHOLD_DAYS) {
+      const decayMultiplier = Math.floor(ageDays / DECAY_THRESHOLD_DAYS);
+      confidence = Math.max(0, confidence - DECAY_AMOUNT * decayMultiplier);
+    }
+
+    if (confidence < PRUNE_CONFIDENCE_MIN) {
+      prunedIds.push(entry.id);
+    } else {
+      surviving.push({ ...entry, confidence });
+    }
+  }
+
+  return { surviving, prunedIds };
+}
+
+/**
+ * Load memory with automatic decay and pruning applied.
+ */
+export async function loadProjectMemoryWithDecay(storage: StorageAdapter, projectId: string): Promise<MemoryEntry[]> {
+  const raw = await loadProjectMemory(storage, projectId);
+  const { surviving } = decayAndPrune(raw);
+  return surviving;
+}
+
+export async function loadPageMemoryWithDecay(storage: StorageAdapter, destinationId: string): Promise<MemoryEntry[]> {
+  const raw = await loadPageMemory(storage, destinationId);
+  const { surviving } = decayAndPrune(raw);
+  return surviving;
+}
+
 // ─── Legacy compat ─────────────────────────────────────────────────────────────
 
 export type AgentFact = {
