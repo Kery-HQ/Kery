@@ -833,6 +833,18 @@ export async function handleAuth(page: Page, auth: AuthConfig | null, context?: 
     return handleTokenAuth(page, auth.tokenProvider, url);
   }
 
+  // API Token auth — inject header on all requests via page.route()
+  if (auth.mode === "apiToken" && auth.apiTokenConfig) {
+    const { token, headerName = "Authorization", headerPrefix = "Bearer" } = auth.apiTokenConfig;
+    const headerValue = headerPrefix ? `${headerPrefix} ${token}` : token;
+    await page.route("**/*", async (route) => {
+      const headers = { ...route.request().headers(), [headerName]: headerValue };
+      await route.continue({ headers });
+    });
+    logger.info({ headerName }, "API Token auth: header injection configured");
+    return true;
+  }
+
   if (!auth.loginUrl || !auth.credentials) return false;
 
   logger.info({ url: auth.loginUrl }, "Authenticating");

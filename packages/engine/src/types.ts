@@ -21,6 +21,11 @@ export type AuthConfig = {
     appDomain?: string;
     refreshToken?: string;
   };
+  apiTokenConfig?: {
+    token: string;
+    headerName?: string;  // Default: "Authorization"
+    headerPrefix?: string; // Default: "Bearer"
+  };
   oauthProvider?: {
     name: string;
     clientId: string;
