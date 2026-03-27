@@ -167,6 +167,63 @@ export async function injectSupabaseSession(
   logger.info({ projectRef }, "Supabase session injected into localStorage");
 }
 
+// ─── OAuth 2.0 Pre-obtained Token ────────────────────────────────────────────
+
+export type OAuthTokenConfig = {
+  accessToken: string;
+  /** How to inject: "cookie" sets a cookie, "localStorage" puts it in localStorage, "header" uses route interception */
+  injection?: "cookie" | "localStorage" | "header";
+  /** Cookie/localStorage key name. Default: "access_token" */
+  keyName?: string;
+  /** Header prefix for header injection. Default: "Bearer" */
+  headerPrefix?: string;
+};
+
+/**
+ * Inject a pre-obtained OAuth access token into the page session.
+ * Supports cookie, localStorage, or header injection modes.
+ */
+export async function injectOAuthToken(
+  page: Page,
+  config: OAuthTokenConfig,
+  baseUrl: string,
+): Promise<void> {
+  const mode = config.injection ?? "cookie";
+  const keyName = config.keyName ?? "access_token";
+  const domain = new URL(baseUrl).hostname;
+
+  if (mode === "cookie") {
+    await page.context().addCookies([
+      {
+        name: keyName,
+        value: config.accessToken,
+        domain: domain.startsWith(".") ? domain : `.${domain}`,
+        path: "/",
+        httpOnly: false,
+        secure: true,
+        sameSite: "Lax",
+      },
+    ]);
+    logger.info({ domain, keyName }, "OAuth token injected as cookie");
+  } else if (mode === "localStorage") {
+    // localStorage requires same-origin — navigate first
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+    await page.evaluate(
+      ({ key, value }) => { localStorage.setItem(key, value); },
+      { key: keyName, value: config.accessToken },
+    );
+    await page.reload({ waitUntil: "domcontentloaded" });
+    logger.info({ keyName }, "OAuth token injected into localStorage");
+  } else if (mode === "header") {
+    const prefix = config.headerPrefix ?? "Bearer";
+    await page.route("**/*", (route) => {
+      const headers = { ...route.request().headers(), Authorization: `${prefix} ${config.accessToken}` };
+      route.continue({ headers });
+    });
+    logger.info("OAuth token injected via header interception");
+  }
+}
+
 // ─── Token session state (tracks expiry for refresh) ─────────────────────────
 
 export type TokenSession = {

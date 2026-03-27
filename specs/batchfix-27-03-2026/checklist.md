@@ -51,7 +51,7 @@
 - [x] **#35** Regression stale detection too aggressive (engine) — Increased consecutive stale threshold from 3 to 5, added >50% stale ratio check, and track per-step staleness.
 - [x] **#36** Bug name dedup unreliable (engine) — Added trigram-based fuzzy name similarity (>0.7 threshold) alongside exact tuple dedup, with normalized name stripping punctuation, whitespace, and stop-words.
 - [x] **#37** No 2FA/MFA support (engine) — Added totp_secret to AuthConfig, TOTP code generation (RFC 6238 HMAC-SHA1), 2FA screen detection via page text indicators, and auto-fill handler.
-- [ ] **#38** OAuth 2.0 unimplemented (engine)
+- [x] **#38** OAuth 2.0 unimplemented (engine) — Added injectOAuthToken() supporting pre-obtained access_token injection via cookie, localStorage, or header interception.
 - [ ] **#39** No cross-agent communication during run (engine)
 - [ ] **#40** No prompt injection sanitization (engine)
 - [ ] **#41** Screenshot quality too low for review (engine)
