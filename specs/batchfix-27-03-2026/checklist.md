@@ -9,7 +9,7 @@
 
 ## P1 — High
 
-- [ ] **#6** buildAppTree() N+1 queries — batch INSERT ON CONFLICT (DB adapter)
+- [x] **#6** buildAppTree() N+1 queries — batch INSERT ON CONFLICT (DB adapter) — Replaced per-page SELECT+INSERT/UPDATE loop with single batch INSERT ... ON CONFLICT DO UPDATE.
 - [ ] **#7** Memory save loops — multi-row INSERT (DB adapter)
 - [ ] **#8** listBugs() fetches screenshot blobs — exclude column, add endpoint (DB adapter + API)
 - [ ] **#9** Missing composite DB indexes — add 4 indexes (DB)

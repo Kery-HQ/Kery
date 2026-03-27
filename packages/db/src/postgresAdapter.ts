@@ -238,29 +238,41 @@ export class PostgresAdapter implements StorageAdapter {
 
   async buildAppTree(projectId: string, crawlRunId: string, sitemap: any[]) {
     const now = new Date().toISOString();
-    let added = 0, updated = 0;
+    const validPages = sitemap.filter(p => p.route);
+    if (validPages.length === 0) return { added: 0, updated: 0 };
 
-    for (const page of sitemap) {
-      if (!page.route) continue;
-      const { rows: existing } = await this.db.query(
-        `SELECT id FROM app_tree_destinations WHERE project_id = $1 AND normalized_route = $2`,
-        [projectId, page.route],
+    // Batch upsert: single INSERT ... ON CONFLICT DO UPDATE
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    let idx = 1;
+    for (const page of validPages) {
+      placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6}, $${idx+7}, $${idx+8}, true)`);
+      values.push(
+        projectId, page.route, page.title,
+        JSON.stringify(page.forms), JSON.stringify(page.buttons),
+        JSON.stringify(page.interactions), JSON.stringify(page.navLinks),
+        now, crawlRunId,
       );
-      if (existing.length > 0) {
-        await this.db.query(
-          `UPDATE app_tree_destinations SET title = $1, forms_json = $2, buttons_json = $3, interactions_json = $4, nav_links = $5, last_crawled_at = $6, crawl_run_id = $7, updated_at = $6 WHERE id = $8`,
-          [page.title, JSON.stringify(page.forms), JSON.stringify(page.buttons), JSON.stringify(page.interactions), JSON.stringify(page.navLinks), now, crawlRunId, existing[0].id],
-        );
-        updated++;
-      } else {
-        await this.db.query(
-          `INSERT INTO app_tree_destinations (project_id, normalized_route, title, forms_json, buttons_json, interactions_json, nav_links, last_crawled_at, crawl_run_id, enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true)`,
-          [projectId, page.route, page.title, JSON.stringify(page.forms), JSON.stringify(page.buttons), JSON.stringify(page.interactions), JSON.stringify(page.navLinks), now, crawlRunId],
-        );
-        added++;
-      }
+      idx += 9;
     }
-    return { added, updated };
+
+    const { rows } = await this.db.query(
+      `INSERT INTO app_tree_destinations (project_id, normalized_route, title, forms_json, buttons_json, interactions_json, nav_links, last_crawled_at, crawl_run_id, enabled)
+       VALUES ${placeholders.join(", ")}
+       ON CONFLICT (project_id, normalized_route) DO UPDATE SET
+         title = EXCLUDED.title,
+         forms_json = EXCLUDED.forms_json,
+         buttons_json = EXCLUDED.buttons_json,
+         interactions_json = EXCLUDED.interactions_json,
+         nav_links = EXCLUDED.nav_links,
+         last_crawled_at = EXCLUDED.last_crawled_at,
+         crawl_run_id = EXCLUDED.crawl_run_id,
+         updated_at = EXCLUDED.last_crawled_at
+       RETURNING (xmax = 0) AS inserted`,
+      values,
+    );
+    const added = rows.filter((r: any) => r.inserted).length;
+    return { added, updated: rows.length - added };
   }
 
   async upsertCrawlNodes(_projectId: string, _crawlRunId: string, _result: any) {
