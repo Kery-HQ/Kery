@@ -22,8 +22,7 @@ const AuthSchema = z.object({
 });
 
 export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdapter) {
-  // We need the raw pool for direct queries not in the StorageAdapter
-  const pool = (storage as any).pool as Pool;
+  const pool = storage.getPool() as Pool;
 
   app.get("/api/projects", async (_req, reply) => {
     const { rows } = await pool.query("SELECT * FROM projects ORDER BY created_at DESC");

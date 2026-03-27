@@ -11,7 +11,7 @@ const TestSchema = z.object({
 });
 
 export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter) {
-  const pool = (storage as any).pool as Pool;
+  const pool = storage.getPool() as Pool;
 
   app.get("/api/projects/:projectId/tests", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
