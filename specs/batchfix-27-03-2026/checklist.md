@@ -14,7 +14,7 @@
 - [x] **#8** listBugs() fetches screenshot blobs — exclude column, add endpoint (DB adapter + API) — Excluded screenshot_base64 from listBugs SELECT, added getBugScreenshot() method and /api/bugs/:bugId/screenshot endpoint.
 - [x] **#9** Missing composite DB indexes — add 4 indexes (DB) — Added migration 003 with 4 composite indexes on test_runs, run_coverage, bugs, and memory_entries.
 - [x] **#10** 401/403 not intercepted — auth-aware error classification (engine) — Network monitor now detects token auth sessions and triggers refresh on first 401/403 before reporting as bug.
-- [ ] **#11** Stagehand circuit breaker no recovery — add half-open timer (engine)
+- [x] **#11** Stagehand circuit breaker no recovery — add half-open timer (engine) — Circuit breaker now transitions to half-open after 30s, allowing a probe request to recover from transient failures.
 - [ ] **#12** Context amnesia — add rolling testing progress summary (engine)
 - [ ] **#13** No graceful shutdown — SIGTERM handler (API)
 - [ ] **#14** `as any` x46 in API routes — add Zod schemas (API)
