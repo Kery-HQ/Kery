@@ -5,6 +5,7 @@ export const config = {
   port: Number(process.env.PORT || 19833),
   appUrl: process.env.APP_URL || "http://localhost:19834",
   databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:19832/kery",
+  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",

@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: .
@@ -25,6 +37,7 @@ services:
       - "19833:19833"
     environment:
       DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
+      REDIS_URL: redis://redis:6379
       PORT: 19833
       APP_URL: http://localhost:19834
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
@@ -48,6 +61,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   web:
     build:
@@ -61,3 +76,4 @@ services:
 volumes:
   pgdata:
   appdata:
+  redisdata:

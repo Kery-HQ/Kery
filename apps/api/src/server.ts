@@ -10,6 +10,7 @@ import { registerCrawlRoutes } from "./routes/crawl.js";
 import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings } from "./routes/settings.js";
+import { createRunQueue, createRunWorker } from "./runQueue.js";
 
 // Initialize engine config from environment
 initEngineConfig({
@@ -32,6 +33,10 @@ initEngineConfig({
 const pool = initPool(config.databaseUrl);
 const storage = new PostgresAdapter(pool);
 
+// Initialize BullMQ run queue + worker
+const { queue: runQueue, connection: redisConnection } = createRunQueue(config.redisUrl);
+const runWorker = createRunWorker(redisConnection, storage);
+
 const app = Fastify({ logger: true });
 
 await app.register(cors, {
@@ -52,9 +57,9 @@ await pool.query(
 // Health check
 app.get("/health", async () => ({ status: "ok" }));
 
-// Register routes — pass storage adapter
+// Register routes — pass storage adapter and run queue
 registerProjectRoutes(app, storage);
-registerRunRoutes(app, storage);
+registerRunRoutes(app, storage, runQueue);
 registerCrawlRoutes(app, storage);
 registerTestRoutes(app, storage);
 registerBugRoutes(app, storage);
@@ -68,3 +73,19 @@ try {
   app.log.error(err);
   process.exit(1);
 }
+
+// Graceful shutdown
+async function shutdown() {
+  console.log("Shutting down gracefully...");
+  // Stop accepting new jobs
+  await runWorker.close();
+  await runQueue.close();
+  // Close HTTP server
+  await app.close();
+  // Close DB pool
+  await pool.end();
+  process.exit(0);
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

@@ -3,11 +3,12 @@ import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
 import { Pool } from "pg";
+import type { Queue } from "bullmq";
 import type { StorageAdapter } from "@kery/engine";
 import {
-  runOrchestratedJob, enrichBugsForRun, generateRegressionPlan,
-  createEmitter, getEmitter, destroyEmitter, requestStop, logger,
+  getEmitter, requestStop, logger,
 } from "@kery/engine";
+import type { RunJobData } from "../runQueue.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
@@ -20,7 +21,7 @@ const RunSchema = z.object({
   destinationId: z.string().uuid().optional(),
 });
 
-export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter) {
+export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter, runQueue: Queue<RunJobData>) {
   const pool = (storage as any).pool as Pool;
 
   app.post("/api/projects/:projectId/run", async (req, reply) => {
@@ -64,83 +65,27 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
       status: "running", started_at: new Date().toISOString(),
     });
 
-    const emitter = createEmitter(run.id);
-    reply.send({ runId: run.id, status: "running" });
-
     const authConfig = authRow ? { mode: authRow.mode, ...authRow.config_json } : null;
 
-    setImmediate(async () => {
-      try {
-        const result = await runOrchestratedJob(storage, {
-          runId: run.id, baseUrl: env.base_url, intent: intent!,
-          projectId, auth: authConfig, testId, destinationId,
-          context, saveScreenshots, maxSteps,
-          recordVideo: process.env.RECORD_VIDEO !== "false",
-          videosDir: VIDEOS_DIR,
-          onStep: (step) => emitter.emit("step", step),
-          onScreenshot: (buf) => emitter.emit("screenshot", buf.toString("base64")),
-          onLLMCall: (call) => emitter.emit("llm_call", call),
-        });
+    // Enqueue run job via BullMQ instead of setImmediate
+    await runQueue.add("run", {
+      runId: run.id,
+      baseUrl: env.base_url,
+      intent: intent!,
+      projectId,
+      environmentId,
+      environmentName: env.name,
+      auth: authConfig,
+      testId,
+      destinationId,
+      context,
+      saveScreenshots,
+      maxSteps,
+      recordVideo: process.env.RECORD_VIDEO !== "false",
+      triggerRef: run.trigger_ref,
+    } satisfies RunJobData);
 
-        const completedAt = new Date().toISOString();
-        const enrichedBugs = enrichBugsForRun(run.id, completedAt, run.trigger_ref, result.bugsFound, result.stepsDetail);
-
-        // Extract screenshots from bugs to filesystem
-        extractBugScreenshots(run.id, enrichedBugs);
-
-        await storage.updateTestRun(run.id, {
-          status: result.status, summary: result.summary,
-          steps_json: result.stepsDetail, bugs_json: enrichedBugs,
-          llm_calls_json: result.llmCalls, completed_at: completedAt,
-          video_url: result.videoUrl || null,
-        });
-
-        await storage.persistBugsFromRun(projectId, run.id, run.trigger_ref, completedAt, environmentId, env.name, enrichedBugs);
-
-        if (destinationId) {
-          await storage.upsertRunCoverage(run.id, destinationId, enrichedBugs.length);
-          const healthData: any = { last_inspected_at: completedAt };
-          if (enrichedBugs.length > 0) {
-            healthData.health_status = "issues";
-            healthData.issues_count = enrichedBugs.length;
-          } else {
-            healthData.health_status = "clean";
-            healthData.issues_count = 0;
-          }
-          await storage.updateDestinationHealth(destinationId, healthData);
-
-          if ((result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
-            const regPlan = generateRegressionPlan(result.stepsDetail);
-            if (regPlan.length > 0) {
-              await storage.updateRegressionPlan("app_tree_destinations", destinationId, {
-                regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
-              });
-            }
-          }
-        }
-
-        if (testId && (result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
-          const regPlan = generateRegressionPlan(result.stepsDetail);
-          if (regPlan.length > 0) {
-            await storage.updateSavedTest(testId, {
-              regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
-            });
-          }
-        }
-
-        const completedRun = await storage.getTestRun(run.id);
-        emitter.emit("done", completedRun ?? { ...run, status: result.status, summary: result.summary });
-      } catch (err) {
-        logger.error({ runId: run.id, err: String(err) }, "Background run error");
-        await storage.updateTestRun(run.id, {
-          status: "failed", summary: String(err), completed_at: new Date().toISOString(),
-        });
-        const failedRun = await storage.getTestRun(run.id).catch(() => null);
-        emitter.emit("done", failedRun ?? { ...run, status: "failed", summary: String(err) });
-      } finally {
-        destroyEmitter(run.id);
-      }
-    });
+    reply.send({ runId: run.id, status: "running" });
   });
 
   // SSE streaming
@@ -252,32 +197,4 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter)
     reply.header("Cache-Control", "public, max-age=31536000, immutable");
     reply.send(fs.createReadStream(filePath));
   });
-}
-
-/**
- * Extract base64 screenshots from enriched bugs, write to disk,
- * and replace screenshotBase64 with a URL path. Mutates the array in place.
- */
-function extractBugScreenshots(runId: string, bugs: any[]): void {
-  const dir = path.join(SCREENSHOTS_DIR, runId);
-  let dirCreated = false;
-
-  for (const bug of bugs) {
-    if (!bug.screenshotBase64) continue;
-
-    try {
-      if (!dirCreated) {
-        fs.mkdirSync(dir, { recursive: true });
-        dirCreated = true;
-      }
-      const filename = `bug-${bug.index ?? 0}.jpg`;
-      const filePath = path.join(dir, filename);
-      fs.writeFileSync(filePath, Buffer.from(bug.screenshotBase64, "base64"));
-
-      // Replace base64 blob with URL path
-      bug.screenshotBase64 = `/api/bugs/${runId}/${filename}`;
-    } catch {
-      // Keep original base64 if write fails
-    }
-  }
 }
