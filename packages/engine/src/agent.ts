@@ -454,6 +454,45 @@ function buildObservation(params: {
   return content;
 }
 
+// ─── Progress Summary (survives conversation pruning) ────────────────────────
+
+class ProgressSummary {
+  private pagesVisited = new Set<string>();
+  private actionsCompleted: string[] = [];
+  private bugsFound: string[] = [];
+  private failedAttempts: string[] = [];
+
+  recordStep(step: RunStep): void {
+    if (step.url) this.pagesVisited.add(new URL(step.url).pathname);
+    if (step.action !== "done" && step.status === "ok") {
+      this.actionsCompleted.push(`${step.action} ${step.target ?? ""}`.trim());
+    }
+    if (step.status === "failed") {
+      this.failedAttempts.push(`${step.action} ${step.target ?? ""}`.trim());
+    }
+  }
+
+  recordBug(name: string): void {
+    this.bugsFound.push(name);
+  }
+
+  format(): string {
+    if (this.actionsCompleted.length === 0) return "";
+    const lines = [
+      `PROGRESS SUMMARY (${this.actionsCompleted.length} actions completed):`,
+      `Pages visited: ${[...this.pagesVisited].join(", ") || "none"}`,
+      `Recent actions: ${this.actionsCompleted.slice(-10).join("; ")}`,
+    ];
+    if (this.bugsFound.length > 0) {
+      lines.push(`Bugs found so far: ${this.bugsFound.join("; ")}`);
+    }
+    if (this.failedAttempts.length > 0) {
+      lines.push(`Failed attempts: ${this.failedAttempts.slice(-5).join("; ")}`);
+    }
+    return lines.join("\n");
+  }
+}
+
 // ─── Conversation pruning ─────────────────────────────────────────────────────
 
 const KEEP_FULL_TURNS = 5;
@@ -993,8 +1032,10 @@ export async function runAgent(
       }
     }
 
+    const baseSystemPrompt = buildSystemPrompt({ intent, context, memoryEntries, targetUrl });
+    const progress = new ProgressSummary();
     const messages: any[] = [
-      { role: "system", content: buildSystemPrompt({ intent, context, memoryEntries, targetUrl }) },
+      { role: "system", content: baseSystemPrompt },
     ];
     let prevResult: {
       action: AgentAction;
@@ -1081,6 +1122,12 @@ export async function runAgent(
         stuckHint: stuckHint || undefined,
       });
       messages.push({ role: "user", content: observation });
+
+      // Inject rolling progress summary into system prompt (survives pruning)
+      const progressText = progress.format();
+      messages[0].content = progressText
+        ? `${baseSystemPrompt}\n\n${progressText}`
+        : baseSystemPrompt;
 
       const screenshotBase64 = saveScreenshots && screenshot.length > 0
         ? screenshot.toString("base64") : undefined;
@@ -1227,6 +1274,7 @@ export async function runAgent(
           elementRef: resolvedA11yEl ? { role: resolvedA11yEl.role, name: resolvedA11yEl.name } : undefined,
         };
         stepsDetail.push(okStep);
+        progress.recordStep(okStep);
         onStep?.(okStep);
       } catch (err) {
         const errMsg = String(err).split("\n")[0];
@@ -1241,6 +1289,7 @@ export async function runAgent(
           url, status: "failed", error: errMsg, fromMemory: false, at: stepTimestamp(),
         };
         stepsDetail.push(failedStep);
+        progress.recordStep(failedStep);
         onStep?.(failedStep);
         if (action.target) failedTargets.add(action.target);
       }
