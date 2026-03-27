@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { StorageAdapter } from "@kery/engine";
 import { Pool } from "pg";
+import { encryptConfigJson } from "@kery/db";
 
 const ProjectSchema = z.object({
   name: z.string().min(2),
@@ -108,9 +109,10 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
       reply.send({ auth: null });
       return;
     }
+    const configToStore = encryptConfigJson(parsed.data.config ?? {});
     const { rows } = await pool.query(
       `INSERT INTO auth_configs (project_id, environment_id, mode, config_json) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, environment_id) DO UPDATE SET mode = $3, config_json = $4 RETURNING *`,
-      [projectId, environmentId, parsed.data.mode, JSON.stringify(parsed.data.config ?? {})],
+      [projectId, environmentId, parsed.data.mode, JSON.stringify(configToStore)],
     );
     reply.send({ auth: rows[0] });
   });
