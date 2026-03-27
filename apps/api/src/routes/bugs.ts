@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import { ProjectIdParams, BugIdParams, ProjectBugParams, BugPatchBody } from "./params.js";
 
 export function registerBugRoutes(app: FastifyInstance, storage: StorageAdapter) {
-  const pool = (storage as any).pool as Pool;
+  const pool = storage.getPool() as Pool;
 
   app.get("/api/projects/:projectId/bugs", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);

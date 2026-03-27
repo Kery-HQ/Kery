@@ -27,7 +27,7 @@ const RunSchema = z.object({
 });
 
 export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter, runQueue: Queue<RunJobData>) {
-  const pool = (storage as any).pool as Pool;
+  const pool = storage.getPool() as Pool;
 
   app.post("/api/projects/:projectId/run", async (req, reply) => {
     // Idempotency key dedup

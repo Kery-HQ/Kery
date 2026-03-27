@@ -73,4 +73,7 @@ export interface StorageAdapter {
 
   // Transaction support
   withTransaction<T>(fn: (txStorage: StorageAdapter) => Promise<T>): Promise<T>;
+
+  // Raw pool access (typed alternative to `(storage as any).pool`)
+  getPool(): unknown;
 }

@@ -29,6 +29,10 @@ export class PostgresAdapter implements StorageAdapter {
     }
   }
 
+  getPool(): Pool {
+    return this.pool;
+  }
+
   // ─── Memory ─────────────────────────────────────────────────────────────────
 
   async loadProjectMemory(projectId: string) {

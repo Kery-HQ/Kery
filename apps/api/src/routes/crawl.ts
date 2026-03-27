@@ -5,7 +5,7 @@ import { executeCrawlRun, logger } from "@kery/engine";
 import { ProjectIdParams } from "./params.js";
 
 export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapter) {
-  const pool = (storage as any).pool as Pool;
+  const pool = storage.getPool() as Pool;
 
   app.post("/api/projects/:projectId/crawl", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
