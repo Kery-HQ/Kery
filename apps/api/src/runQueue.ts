@@ -76,7 +76,7 @@ export function createRunWorker(
           recordVideo: data.recordVideo,
           videosDir: VIDEOS_DIR,
           onStep: (step) => emitter.emit("step", step),
-          onScreenshot: (buf) => emitter.emit("screenshot", buf.toString("base64")),
+          onScreenshot: (buf) => emitter.emit("screenshot", buf.toString("base64")),  // SSE gets marked screenshot
           onLLMCall: (call) => emitter.emit("llm_call", call),
         });
 

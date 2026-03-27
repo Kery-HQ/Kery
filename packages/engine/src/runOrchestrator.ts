@@ -42,7 +42,7 @@ export type RunJob = {
   recordVideo?: boolean;
   videosDir?: string;
   onStep?: (step: RunStep) => void;
-  onScreenshot?: (screenshot: Buffer) => void;
+  onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer) => void;
   onLLMCall?: (call: LLMCallRecord) => void;
 };
 
@@ -266,16 +266,17 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       page, job.intent, job.baseUrl, job.auth ?? null, allMemory,
       context, job.saveScreenshots ?? false,
       (step) => { lastStep = step; job.onStep?.(step); },
-      async (screenshot) => {
-        job.onScreenshot?.(screenshot);
+      async (screenshot, cleanScreenshot) => {
+        job.onScreenshot?.(screenshot, cleanScreenshot);
         const url = page.url();
         const title = await page.title().catch(() => "");
         screenshotStepIndex++;
-        if (screenshot.length > 0) {
-          screenshotsByStep.set(screenshotStepIndex, screenshot.toString("base64"));
+        if (cleanScreenshot.length > 0) {
+          // Store clean screenshots (without green markers) for bug reports
+          screenshotsByStep.set(screenshotStepIndex, cleanScreenshot.toString("base64"));
         }
         const req: ReviewRequest = {
-          screenshot, url, title, stepIndex: screenshotStepIndex,
+          screenshot: cleanScreenshot, url, title, stepIndex: screenshotStepIndex,
           action: lastStep ? `${lastStep.action} ${lastStep.target ?? ""}`.trim() : "initial",
           actionResult: lastStep?.status ?? "ok", expectation: lastStep?.reasoning,
           previousUrl: previousUrl || undefined,

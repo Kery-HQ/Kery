@@ -20,7 +20,7 @@
 - [x] **#14** `as any` x46 in API routes — add Zod schemas (API) — Added shared Zod param schemas (params.ts), replaced all route param/body `as any` casts with validated parsing. Remaining 5 are pool access (#29) and Fastify SSE flush.
 - [x] **#15** API Token auth mode unimplemented — page.route() header injection (engine) — Implemented apiToken auth mode using page.route('**/*') header injection with configurable headerName and headerPrefix.
 - [x] **#43** Bounding boxes miss interactive controls — expand roles + getImplicitRole (engine) — Added 15 missing INTERACTIVE_ROLES and extended getImplicitRole to detect summary, contenteditable, onclick, tabindex elements as interactive.
-- [ ] **#44** Review agent sees green boxes as bugs — return clean screenshot separately (engine)
+- [x] **#44** Review agent sees green boxes as bugs — return clean screenshot separately (engine) — takeStableSnapshot now returns both marked and clean screenshots; review agent and bug storage use clean version. Added defense-in-depth prompt note.
 - [ ] **#45** Video recording broken with Stagehand — explicit save, error handling (engine)
 - [ ] **#46** Bug screenshots not attached — fix step index mismatch (engine)
 - [ ] **#47** Run detail page lacks agent observability — per-step screenshots, a11y tree, LLM prompts, agent flow view (web)

@@ -30,6 +30,7 @@ YOUR JOB: Find REAL bugs in the APPLICATION, not problems caused by the Navigato
 - Broken features: buttons/forms that genuinely don't work for a human user
 
 ## What is NOT a bug (DO NOT report these):
+- IGNORE any green numbered circles, green bounding box outlines, or numbered markers overlaid on the page — these are test automation overlays, NOT part of the application
 - The Navigator's action failed (timeout, element not found) — that's a Navigator issue, not an app bug
 - The Navigator clicked the wrong button — not an app bug
 - The Navigator is confused about what happened — not an app bug

@@ -267,6 +267,7 @@ async function extractDOM(page: Page): Promise<{ text: string; snapshot: DOMSnap
 
 async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
   screenshot: Buffer;
+  cleanScreenshot: Buffer;
   dom: string;
   url: string;
   title: string;
@@ -279,8 +280,8 @@ async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
   const url = page.url();
   const title = await page.title().catch(() => "");
 
-  // Take screenshot
-  const screenshot = await page.screenshot({ type: "jpeg", quality: 75 }).catch(() => Buffer.alloc(0));
+  // Take clean screenshot (before any marker injection — for review agent)
+  const cleanScreenshot = await page.screenshot({ type: "jpeg", quality: 75 }).catch(() => Buffer.alloc(0));
 
   // Try Stagehand observe first
   let observedElements: ObservedElement[] | undefined;
@@ -289,7 +290,7 @@ async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
     if (hasSufficientObserve(observedElements)) {
       const dom = formatObserveForLLM(observedElements);
       const pageText = await extractVisibleText(page);
-      return { screenshot, dom, url, title, pageText, observedElements };
+      return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, observedElements };
     }
   }
 
@@ -297,17 +298,17 @@ async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
   const { elements: a11yElements, textNodes: a11yTextNodes } = await extractA11yTree(page);
   if (hasSufficientA11y(a11yElements)) {
     await injectElementMarkers(page, a11yElements);
-    const markedScreenshot = await page.screenshot({ type: "jpeg", quality: 75 }).catch(() => screenshot);
+    const markedScreenshot = await page.screenshot({ type: "jpeg", quality: 75 }).catch(() => cleanScreenshot);
     await removeElementMarkers(page);
     const dom = formatA11yForLLM(a11yElements, a11yTextNodes);
     const pageText = await extractVisibleText(page);
-    return { screenshot: markedScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes };
+    return { screenshot: markedScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes };
   }
 
   // Fallback to DOM extraction
   const { text: dom } = await extractDOM(page);
   const pageText = await extractVisibleText(page);
-  return { screenshot, dom, url, title, pageText, a11yElements, a11yTextNodes };
+  return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes };
 }
 
 // ─── System prompt builder ────────────────────────────────────────────────────
@@ -961,7 +962,7 @@ export async function runAgent(
   context?: string,
   saveScreenshots = false,
   onStep?: (step: RunStep) => void,
-  onScreenshot?: (screenshot: Buffer) => void,
+  onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer) => void,
   onLLMCall?: (call: LLMCallRecord) => void,
   maxSteps?: number,
   targetUrl?: string,
@@ -1084,12 +1085,12 @@ export async function runAgent(
       }
 
       const snapshot = await takeStableSnapshot(page, stagehandPage);
-      const { screenshot, dom, url, title, pageText } = snapshot;
+      const { screenshot, cleanScreenshot, dom, url, title, pageText } = snapshot;
       currentElements = snapshot.a11yElements;
       currentObserved = snapshot.observedElements;
 
       if (screenshot.length === 0 && dom === "(DOM extraction failed)") break;
-      if (screenshot.length > 0) onScreenshot?.(screenshot);
+      if (screenshot.length > 0) onScreenshot?.(screenshot, cleanScreenshot);
       if (dom === "(DOM extraction failed)") continue;
 
       const loopResult = detectLoop(recentActions);
