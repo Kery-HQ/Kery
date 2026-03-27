@@ -18,7 +18,7 @@ import { formatMemoryForPrompt } from "./agentMemory.js";
 import { llmAgentChat, calcCostUsd } from "./llmClient.js";
 import { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText, type A11yElement, type A11yTextNode } from "./a11yTree.js";
 import { PlanTracker } from "./planTracker.js";
-import { handleTokenAuth } from "./tokenAuth.js";
+import { handleTokenAuth, refreshIfNeeded } from "./tokenAuth.js";
 import {
   stagehandObserve, formatObserveForLLM, hasSufficientObserve,
   stagehandAct, actionToInstruction, isObserveCircuitOpen,
@@ -1009,6 +1009,9 @@ export async function runAgent(
     let currentObserved: ObservedElement[] | undefined;
 
     for (let i = 0; i < MAX_STEPS; i++) {
+      // Refresh token if expiring soon (Clerk ~60s, Supabase ~3600s)
+      await refreshIfNeeded(page);
+
       const currentUrl = page.url();
 
       if (prevUrl && !isSamePage(currentUrl, prevUrl)) {
