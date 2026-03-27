@@ -181,6 +181,30 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
     reply.send(fs.createReadStream(videoPath));
   });
 
+  // Delete a run and its associated video/screenshot files
+  app.delete("/api/runs/:runId", async (req, reply) => {
+    const { runId } = RunIdParams.parse(req.params);
+    const run = await storage.getTestRun(runId);
+    if (!run) { reply.code(404).send({ error: "run not found" }); return; }
+
+    // Delete video file
+    const videoPath = path.join(VIDEOS_DIR, `${runId}.webm`);
+    try { if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch (err) {
+      logger.warn({ err: String(err), runId }, "Failed to delete video file");
+    }
+
+    // Delete screenshot directory
+    const screenshotDir = path.join(SCREENSHOTS_DIR, runId);
+    try { if (fs.existsSync(screenshotDir)) fs.rmSync(screenshotDir, { recursive: true, force: true }); } catch (err) {
+      logger.warn({ err: String(err), runId }, "Failed to delete screenshot directory");
+    }
+
+    // Delete run from DB
+    await pool.query("DELETE FROM bugs WHERE run_id = $1", [runId]);
+    await pool.query("DELETE FROM test_runs WHERE id = $1", [runId]);
+    reply.send({ ok: true });
+  });
+
   // Serve bug screenshot
   app.get("/api/bugs/:runId/:filename", async (req, reply) => {
     const { runId, filename } = RunFilenameParams.parse(req.params);
