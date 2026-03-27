@@ -407,7 +407,7 @@ export const RunDetail: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="steps" className="mt-0">
-            <StepsTab steps={steps} run={run} liveScreenshot={liveScreenshot} />
+            <StepsTab steps={steps} run={run} liveScreenshot={liveScreenshot} llmCalls={llmCalls} />
           </TabsContent>
 
           <TabsContent value="llm" className="mt-0">
@@ -695,7 +695,19 @@ function BugCard({
 // Steps tab -- vertical timeline
 // ============================================================
 
-function StepsTab({ steps, run, liveScreenshot }: { steps: RunStep[]; run: Run; liveScreenshot: string | null }) {
+function StepsTab({ steps, run, liveScreenshot, llmCalls }: { steps: RunStep[]; run: Run; liveScreenshot: string | null; llmCalls: LLMCallRecord[] }) {
+  // Build step-to-LLM-calls index for per-step observability
+  const llmCallsByStep = React.useMemo(() => {
+    const map = new Map<number, LLMCallRecord[]>();
+    for (const call of llmCalls) {
+      const key = call.stepIndex ?? 0;
+      const arr = map.get(key) || [];
+      arr.push(call);
+      map.set(key, arr);
+    }
+    return map;
+  }, [llmCalls]);
+
   return (
     <div className="px-6 py-5 max-w-4xl w-full mx-auto space-y-4 animate-fade-in">
 
@@ -735,7 +747,7 @@ function StepsTab({ steps, run, liveScreenshot }: { steps: RunStep[]; run: Run; 
 
           <div className="space-y-0">
             {steps.map((step, i) => (
-              <StepTimelineRow key={i} step={step} isLast={i === steps.length - 1 && run.status !== "running"} />
+              <StepTimelineRow key={i} step={step} isLast={i === steps.length - 1 && run.status !== "running"} stepLLMCalls={llmCallsByStep.get(step.index) ?? []} />
             ))}
 
             {/* Running indicator at end */}
@@ -754,10 +766,12 @@ function StepsTab({ steps, run, liveScreenshot }: { steps: RunStep[]; run: Run; 
   );
 }
 
-function StepTimelineRow({ step, isLast }: { step: RunStep; isLast: boolean }) {
+function StepTimelineRow({ step, isLast, stepLLMCalls }: { step: RunStep; isLast: boolean; stepLLMCalls: LLMCallRecord[] }) {
   const [expanded, setExpanded] = React.useState(false);
   const isBug   = step.action === "bug";
-  const hasDetail = !!(step.reasoning || step.error || step.url);
+  const hasDetail = !!(step.reasoning || step.error || step.url || stepLLMCalls.length > 0);
+  const stepCost = stepLLMCalls.reduce((sum, c) => sum + c.costUsd, 0);
+  const stepTokens = stepLLMCalls.reduce((sum, c) => sum + c.totalTokens, 0);
 
   return (
     <div className="relative">
@@ -828,6 +842,11 @@ function StepTimelineRow({ step, isLast }: { step: RunStep; isLast: boolean }) {
               memory
             </span>
           )}
+          {stepCost > 0 && (
+            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums hidden sm:inline">
+              {formatCost(stepCost)}
+            </span>
+          )}
           {step.at != null && (
             <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums hidden sm:inline">
               {formatStepTime(step.at)}
@@ -845,7 +864,7 @@ function StepTimelineRow({ step, isLast }: { step: RunStep; isLast: boolean }) {
 
       {/* Expanded detail */}
       {expanded && (
-        <div className="ml-[34px] mr-3 mb-2 px-3 py-2.5 rounded-md bg-muted/30 border border-border/50 space-y-1.5">
+        <div className="ml-[34px] mr-3 mb-2 px-3 py-2.5 rounded-md bg-muted/30 border border-border/50 space-y-2">
           {step.url && (
             <p className="text-[11px] font-mono text-muted-foreground/60 truncate">{step.url}</p>
           )}
@@ -857,6 +876,51 @@ function StepTimelineRow({ step, isLast }: { step: RunStep; isLast: boolean }) {
               {step.error}
             </p>
           )}
+
+          {/* Per-step LLM calls */}
+          {stepLLMCalls.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50 flex items-center gap-1.5">
+                <Brain className="h-3 w-3" />
+                LLM Calls ({stepLLMCalls.length}) — {stepTokens.toLocaleString()} tokens — {formatCost(stepCost)}
+              </p>
+              {stepLLMCalls.map((call, ci) => (
+                <details key={ci} className="group">
+                  <summary className="text-[11px] font-mono cursor-pointer hover:text-foreground text-muted-foreground flex items-center gap-2">
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase",
+                      call.agent === "navigator" ? "bg-emerald-500/10 text-emerald-400"
+                        : call.agent === "review" ? "bg-violet-500/10 text-violet-400"
+                        : "bg-amber-500/10 text-amber-400"
+                    )}>{call.agent ?? "nav"}</span>
+                    <span>{call.model}</span>
+                    {call.hasVision && <Eye className="h-3 w-3 text-blue-400" />}
+                    <span className="ml-auto tabular-nums">{formatMs(call.durationMs)}</span>
+                  </summary>
+                  <div className="mt-1 ml-2 space-y-1 text-[10px] font-mono text-muted-foreground/60">
+                    {call.imageBase64 && (
+                      <div className="rounded border border-border overflow-hidden max-w-xs">
+                        <img src={`data:image/jpeg;base64,${call.imageBase64}`} alt="Screenshot sent to LLM" className="max-h-32 object-contain" />
+                      </div>
+                    )}
+                    {call.query && (
+                      <details>
+                        <summary className="cursor-pointer hover:text-muted-foreground">Prompt</summary>
+                        <pre className="whitespace-pre-wrap break-all max-h-40 overflow-y-auto mt-0.5">{call.query}</pre>
+                      </details>
+                    )}
+                    {call.response && (
+                      <details>
+                        <summary className="cursor-pointer hover:text-muted-foreground">Response</summary>
+                        <pre className="whitespace-pre-wrap break-all max-h-40 overflow-y-auto mt-0.5">{call.response}</pre>
+                      </details>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+
           <details className="mt-2">
             <summary className="text-[10px] text-muted-foreground/50 cursor-pointer hover:text-muted-foreground">
               Raw JSON
