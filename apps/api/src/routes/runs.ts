@@ -9,6 +9,7 @@ import {
   getEmitter, requestStop, logger,
 } from "@kery/engine";
 import type { RunJobData } from "../runQueue.js";
+import { RunIdParams, RunFilenameParams } from "./params.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
@@ -25,9 +26,8 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
   const pool = (storage as any).pool as Pool;
 
   app.post("/api/projects/:projectId/run", async (req, reply) => {
-    const projectId = (req.params as any).projectId;
-    const body = req.body as any;
-    const parsed = RunSchema.safeParse({ ...body, projectId });
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
+    const parsed = RunSchema.safeParse({ ...(req.body as Record<string, unknown>), projectId });
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
 
     const { environmentId, testId, destinationId } = parsed.data;
@@ -90,7 +90,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
   // SSE streaming
   app.get("/api/runs/:runId/stream", async (req, reply) => {
-    const { runId } = req.params as any;
+    const { runId } = RunIdParams.parse(req.params);
     reply.hijack();
     reply.raw.setHeader("Access-Control-Allow-Origin", "*");
     reply.raw.setHeader("Content-Type", "text/event-stream");
@@ -134,7 +134,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
   // Get single run
   app.get("/api/runs/:runId", async (req, reply) => {
-    const { runId } = req.params as any;
+    const { runId } = RunIdParams.parse(req.params);
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
     reply.send({ run });
@@ -142,7 +142,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
   // Get bugs for a specific run
   app.get("/api/runs/:runId/bugs", async (req, reply) => {
-    const { runId } = req.params as any;
+    const { runId } = RunIdParams.parse(req.params);
     const { rows: bugs } = await pool.query(
       "SELECT * FROM bugs WHERE run_id = $1 ORDER BY step_index ASC, created_at ASC",
       [runId],
@@ -152,7 +152,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
   // Stop a running run
   app.post("/api/runs/:runId/stop", async (req, reply) => {
-    const { runId } = req.params as any;
+    const { runId } = RunIdParams.parse(req.params);
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
     if (run.status !== "running") { reply.send({ ok: true, status: run.status }); return; }
@@ -168,7 +168,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
   // Serve run video recording
   app.get("/api/runs/:runId/video", async (req, reply) => {
-    const { runId } = req.params as any;
+    const { runId } = RunIdParams.parse(req.params);
     const videoPath = path.join(VIDEOS_DIR, `${runId}.webm`);
     if (!fs.existsSync(videoPath)) {
       reply.code(404).send({ error: "video not found" });
@@ -183,7 +183,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
   // Serve bug screenshot
   app.get("/api/bugs/:runId/:filename", async (req, reply) => {
-    const { runId, filename } = req.params as any;
+    const { runId, filename } = RunFilenameParams.parse(req.params);
     // Sanitize to prevent path traversal
     const safe = path.basename(filename);
     const filePath = path.join(SCREENSHOTS_DIR, runId, safe);

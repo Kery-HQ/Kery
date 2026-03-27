@@ -16,8 +16,8 @@
 - [x] **#10** 401/403 not intercepted — auth-aware error classification (engine) — Network monitor now detects token auth sessions and triggers refresh on first 401/403 before reporting as bug.
 - [x] **#11** Stagehand circuit breaker no recovery — add half-open timer (engine) — Circuit breaker now transitions to half-open after 30s, allowing a probe request to recover from transient failures.
 - [x] **#12** Context amnesia — add rolling testing progress summary (engine) — Added ProgressSummary class that tracks pages visited, actions completed, bugs found, and failed attempts; injected into system prompt each step to survive conversation pruning.
-- [ ] **#13** No graceful shutdown — SIGTERM handler (API)
-- [ ] **#14** `as any` x46 in API routes — add Zod schemas (API)
+- [x] **#13** No graceful shutdown — SIGTERM handler (API) — Added in #1: SIGTERM/SIGINT handler closes BullMQ worker, queue, HTTP server, and DB pool.
+- [x] **#14** `as any` x46 in API routes — add Zod schemas (API) — Added shared Zod param schemas (params.ts), replaced all route param/body `as any` casts with validated parsing. Remaining 5 are pool access (#29) and Fastify SSE flush.
 - [ ] **#15** API Token auth mode unimplemented — page.route() header injection (engine)
 - [ ] **#43** Bounding boxes miss interactive controls — expand roles + getImplicitRole (engine)
 - [ ] **#44** Review agent sees green boxes as bugs — return clean screenshot separately (engine)
