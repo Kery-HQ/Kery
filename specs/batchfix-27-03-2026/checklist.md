@@ -23,7 +23,7 @@
 - [x] **#44** Review agent sees green boxes as bugs — return clean screenshot separately (engine) — takeStableSnapshot now returns both marked and clean screenshots; review agent and bug storage use clean version. Added defense-in-depth prompt note.
 - [x] **#45** Video recording broken with Stagehand — explicit save, error handling (engine) — Added explicit page.video().path() + copyFile before Stagehand destroy, replaced .catch(()=>{}) with logged warnings, added missing .webm detection logging.
 - [x] **#46** Bug screenshots not attached — fix step index mismatch (engine) — Fixed by keying screenshots by agent step.index in onStep callback (for navigator bugs) and by screenshotSeq in onScreenshot (for review bugs).
-- [ ] **#47** Run detail page lacks agent observability — per-step screenshots, a11y tree, LLM prompts, agent flow view (web)
+- [x] **#47** Run detail page lacks agent observability — per-step screenshots, a11y tree, LLM prompts, agent flow view (web) — Enhanced Steps tab with per-step LLM call correlation (prompt, response, screenshot, model, cost, tokens, duration), per-step cost display, and expandable agent decision view.
 
 ## P2 — Medium
 
