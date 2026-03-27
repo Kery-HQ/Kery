@@ -54,7 +54,7 @@
 - [x] **#38** OAuth 2.0 unimplemented (engine) — Added injectOAuthToken() supporting pre-obtained access_token injection via cookie, localStorage, or header interception.
 - [x] **#39** No cross-agent communication during run (engine) — Added getCompletedBugs() to ReviewProcessor and cross-agent feedback loop in orchestrator's onStep callback that feeds review bugs back to navigator context mid-run.
 - [x] **#40** No prompt injection sanitization (engine) — Added sanitizeForPrompt() that strips instruction-hijacking patterns from page text/a11y content before including in LLM prompts.
-- [ ] **#41** Screenshot quality too low for review (engine)
+- [x] **#41** Screenshot quality too low for review (engine) — Bumped cleanScreenshot quality to 90% for review agent; marked screenshot stays at 75% for navigator token efficiency.
 - [ ] **#42** No structured logging/observability (API/infra)
 
 ---
