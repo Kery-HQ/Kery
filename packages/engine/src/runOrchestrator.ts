@@ -297,8 +297,36 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (job.projectId && proposed.length > 0) await saveProjectMemoryEntries(storage, job.projectId, proposed);
     if (job.destinationId && proposed.length > 0) await savePageMemoryEntries(storage, job.destinationId, proposed);
 
-    if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-    else {
+    // Finalize video before closing browser — explicit page.close() triggers video write
+    if (shSession) {
+      try {
+        const shPage = shSession.page;
+        // Explicitly save video before Stagehand cleanup destroys the temp dir
+        if (videoTmpDir) {
+          try {
+            const video = (shPage as any).video?.();
+            if (video) {
+              const tmpPath = await video.path();
+              if (tmpPath) {
+                await (shPage as any).close();
+                // video.saveAs must be called after page.close()
+                const destPath = `${videoTmpDir}/${job.runId || "video"}.webm`;
+                const fs = await import("fs");
+                fs.mkdirSync(videoTmpDir, { recursive: true });
+                fs.copyFileSync(tmpPath, destPath);
+              }
+            }
+          } catch (videoErr) {
+            logger.warn({ err: String(videoErr).slice(0, 200) }, "Stagehand video save failed");
+          }
+        }
+        await destroyStagehandSession(shSession).catch((err) => {
+          logger.warn({ err: String(err).slice(0, 200) }, "Stagehand destroy error (non-fatal)");
+        });
+      } catch (err) {
+        logger.warn({ err: String(err).slice(0, 200) }, "Stagehand cleanup error");
+      }
+    } else {
       await browserContext?.close();
       await browser?.close();
     }
@@ -413,7 +441,10 @@ async function finalizeVideo(
   if (!tmpDir || !runId) return undefined;
   try {
     const files = fs.readdirSync(tmpDir).filter(f => f.endsWith(".webm"));
-    if (files.length === 0) return undefined;
+    if (files.length === 0) {
+      logger.warn({ tmpDir, allFiles: fs.readdirSync(tmpDir) }, "No .webm video files found in temp dir");
+      return undefined;
+    }
 
     const srcPath = path.join(tmpDir, files[0]);
     const destDir = videosDir || path.join(process.cwd(), "data", "videos");
