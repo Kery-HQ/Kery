@@ -16,7 +16,7 @@ export { runAgent, handleAuth, waitForPageStable, executeAction } from "./agent.
 export type { AgentAction, RunStep, LLMCallRecord, AgentResult, LLMAgentType } from "./agent.js";
 
 // ─── Token Auth (Clerk, Supabase) ────────────────────────────────────────────
-export { handleTokenAuth, authenticateWithClerk, authenticateWithSupabase } from "./tokenAuth.js";
+export { handleTokenAuth, authenticateWithClerk, authenticateWithSupabase, refreshIfNeeded } from "./tokenAuth.js";
 
 // ─── Memory ──────────────────────────────────────────────────────────────────
 export {
