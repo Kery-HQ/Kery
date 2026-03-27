@@ -27,7 +27,7 @@
 
 ## P2 — Medium
 
-- [ ] **#16** Vision token overhead — skip screenshot when page unchanged (engine)
+- [x] **#16** Vision token overhead — skip screenshot when page unchanged (engine) — Added simpleDomHash comparison between steps; onScreenshot only fires when URL+DOM content changes.
 - [ ] **#17** A11y tree slow on complex pages — cache + prune (engine)
 - [ ] **#18** Review Agent screenshot buffer — add backpressure (engine)
 - [ ] **#19** No memory pruning — TTL + confidence decay (engine)
