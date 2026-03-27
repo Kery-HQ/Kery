@@ -53,6 +53,22 @@ const TEXT_ROLES = new Set([
   "note", "tooltip", "log",
 ]);
 
+// ─── A11y Tree Cache ─────────────────────────────────────────────────────────
+
+type A11yCacheEntry = {
+  elements: A11yElement[];
+  textNodes: A11yTextNode[];
+  tree: A11yNode[];
+};
+
+const a11yCache = new Map<string, A11yCacheEntry>();
+const A11Y_CACHE_MAX = 20;
+
+/** Clear the a11y cache (call between runs). */
+export function clearA11yCache(): void {
+  a11yCache.clear();
+}
+
 // ─── Extract A11y Tree ───────────────────────────────────────────────────────
 
 const A11Y_EXTRACT_SCRIPT = `(function() {
@@ -160,7 +176,12 @@ export type A11yTextNode = {
   name: string;
 };
 
-export async function extractA11yTree(page: Page): Promise<{ elements: A11yElement[]; textNodes: A11yTextNode[]; tree: A11yNode[] }> {
+export async function extractA11yTree(page: Page, domHash?: string): Promise<{ elements: A11yElement[]; textNodes: A11yTextNode[]; tree: A11yNode[] }> {
+  // Return cached result when DOM hash is unchanged
+  if (domHash && a11yCache.has(domHash)) {
+    logger.debug({ domHash }, "A11y tree cache hit");
+    return a11yCache.get(domHash)!;
+  }
   const elements: A11yElement[] = [];
   const textNodes: A11yTextNode[] = [];
   let nextId = 1;
@@ -244,7 +265,16 @@ export async function extractA11yTree(page: Page): Promise<{ elements: A11yEleme
       logger.debug({ total: elements.length, withBbox, withoutBbox: elements.length - withBbox }, "Bounding boxes resolved");
     }
 
-    return { elements, textNodes, tree: snapshot.children ?? [] };
+    const result = { elements, textNodes, tree: snapshot.children ?? [] };
+    // Cache result keyed by domHash
+    if (domHash) {
+      if (a11yCache.size >= A11Y_CACHE_MAX) {
+        const oldest = a11yCache.keys().next().value;
+        if (oldest !== undefined) a11yCache.delete(oldest);
+      }
+      a11yCache.set(domHash, result);
+    }
+    return result;
   } catch (err) {
     logger.warn({ err: String(err).slice(0, 200) }, "A11y tree extraction failed \u2014 will fall back to DOM");
     return { elements, textNodes, tree: [] };
