@@ -190,10 +190,19 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     if (regressionPlan && regressionPlan.length > 0) {
       try {
         if (job.auth) {
-          const authed = await handleAuth(page, job.auth, context, job.baseUrl);
-          if (!authed) regressionPlan = null;
+          let authed = await handleAuth(page, job.auth, context, job.baseUrl);
+          // Retry auth once before giving up
+          if (!authed) {
+            logger.warn("Regression replay: first auth attempt failed, retrying once");
+            authed = await handleAuth(page, job.auth, context, job.baseUrl);
+          }
+          if (!authed) {
+            logger.warn("Regression replay: auth failed after retry, falling back to Navigator");
+            regressionPlan = null;
+          }
         }
-      } catch {
+      } catch (authErr) {
+        logger.warn({ err: String(authErr).slice(0, 200) }, "Regression replay: auth threw, falling back to Navigator");
         regressionPlan = null;
       }
     }

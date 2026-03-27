@@ -42,7 +42,7 @@
 - [x] **#29** StorageAdapter bypassed — add missing methods (DB adapter) — Added getPool() to StorageAdapter interface and PostgresAdapter; replaced all `(storage as any).pool` casts across 5 route files.
 - [x] **#30** Summarizer lacks actionability — structured recommendations (engine) — Added structured recommendation types (FIX, FLAKY, COVERAGE, PERF, CONFIG) to summarizer prompt template.
 - [x] **#31** Login-page detection missing in crawler (engine) — Added URL-based and content-based login page detection; skips auth URLs and pages with password fields + login titles.
-- [ ] **#32** Regression replay silent auth failure — retry auth (engine)
+- [x] **#32** Regression replay silent auth failure — retry auth (engine) — Added one auth retry before falling back to Navigator; improved error logging on auth failure.
 - [ ] **#33** No test suite — focused tests for high-risk modules (engine)
 - [ ] **#34** Memory formatting weak signal-to-noise — temporal + usage context (engine)
 
