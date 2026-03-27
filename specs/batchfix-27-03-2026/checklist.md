@@ -3,7 +3,7 @@
 ## P0 — Critical
 
 - [x] **#1** No run queue — add BullMQ + Redis, auto-detect concurrency (API/infra) — Added BullMQ worker with auto-detected concurrency based on available memory, Redis service in docker-compose, and queue-based run dispatch replacing setImmediate.
-- [ ] **#3** No transaction safety on run completion — wrap in BEGIN/COMMIT (DB adapter)
+- [x] **#3** No transaction safety on run completion — wrap in BEGIN/COMMIT (DB adapter) — Added withTransaction() helper to StorageAdapter/PostgresAdapter, wrapped all post-run writes in atomic transaction.
 - [ ] **#4** Credentials stored in plaintext — AES-256-GCM with ENCRYPTION_KEY env var (DB adapter)
 - [ ] **#5** No token refresh — add refreshIfNeeded() for Clerk/Supabase (engine)
 

@@ -69,4 +69,7 @@ export interface StorageAdapter {
   getSettings(): Promise<Record<string, string>>;
   saveSetting(key: string, value: string): Promise<void>;
   deleteSettings(keys: string[]): Promise<void>;
+
+  // Transaction support
+  withTransaction<T>(fn: (txStorage: StorageAdapter) => Promise<T>): Promise<T>;
 }

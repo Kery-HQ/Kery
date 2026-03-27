@@ -1,13 +1,37 @@
-import { Pool } from "pg";
+import { Pool, PoolClient } from "pg";
 import type { StorageAdapter } from "@kery/engine";
 
+/** Queryable — either the Pool or a PoolClient (transaction) */
+type Queryable = Pool | PoolClient;
+
 export class PostgresAdapter implements StorageAdapter {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool, private client?: Queryable) {}
+
+  /** Get the active queryable (transaction client or pool) */
+  private get db(): Queryable {
+    return this.client ?? this.pool;
+  }
+
+  async withTransaction<T>(fn: (txStorage: StorageAdapter) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const txAdapter = new PostgresAdapter(this.pool, client);
+      const result = await fn(txAdapter);
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
 
   // ─── Memory ─────────────────────────────────────────────────────────────────
 
   async loadProjectMemory(projectId: string) {
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT * FROM memory_entries WHERE scope = 'project' AND project_id = $1 ORDER BY confidence DESC LIMIT 50`,
       [projectId],
     );
@@ -15,7 +39,7 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   async loadPageMemory(destinationId: string) {
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT * FROM memory_entries WHERE scope = 'page' AND destination_id = $1 ORDER BY confidence DESC LIMIT 50`,
       [destinationId],
     );
@@ -24,7 +48,7 @@ export class PostgresAdapter implements StorageAdapter {
 
   async saveProjectMemoryEntries(projectId: string, entries: any[]) {
     for (const e of entries) {
-      await this.pool.query(
+      await this.db.query(
         `INSERT INTO memory_entries (scope, project_id, type, summary, content, region, source, confidence) VALUES ('project', $1, $2, $3, $4, $5, $6, $7)`,
         [projectId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50],
       );
@@ -33,7 +57,7 @@ export class PostgresAdapter implements StorageAdapter {
 
   async savePageMemoryEntries(destinationId: string, entries: any[]) {
     for (const e of entries) {
-      await this.pool.query(
+      await this.db.query(
         `INSERT INTO memory_entries (scope, destination_id, type, summary, content, region, source, confidence) VALUES ('page', $1, $2, $3, $4, $5, $6, $7)`,
         [destinationId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50],
       );
@@ -42,7 +66,7 @@ export class PostgresAdapter implements StorageAdapter {
 
   async boostConfidence(ids: string[], amount = 5) {
     for (const id of ids) {
-      await this.pool.query(
+      await this.db.query(
         `UPDATE memory_entries SET confidence = LEAST(100, confidence + $1), updated_at = now() WHERE id = $2`,
         [amount, id],
       );
@@ -56,13 +80,13 @@ export class PostgresAdapter implements StorageAdapter {
     let skipped = 0;
     for (const bug of enrichedBugs) {
       // Simple dedup: same name + url + category within project
-      const { rows: existing } = await this.pool.query(
+      const { rows: existing } = await this.db.query(
         `SELECT id FROM bugs WHERE project_id = $1 AND name = $2 AND url IS NOT DISTINCT FROM $3 AND category = $4 LIMIT 1`,
         [projectId, bug.name, bug.url, bug.category],
       );
       if (existing.length > 0) { skipped++; continue; }
 
-      await this.pool.query(
+      await this.db.query(
         `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, screenshot_base64) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [projectId, runId, environmentId, bug.name, bug.description, bug.category, bug.severity, bug.status ?? "open", JSON.stringify(bug.stepsToReproduce ?? []), bug.url, runLabel, reportedAt, environmentName, bug.index ?? null, bug.screenshotBase64 ?? null],
       );
@@ -72,7 +96,7 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   async listBugs(projectId: string) {
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT * FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
       [projectId],
     );
@@ -82,7 +106,7 @@ export class PostgresAdapter implements StorageAdapter {
   // ─── Runs ───────────────────────────────────────────────────────────────────
 
   async getTestRun(runId: string) {
-    const { rows } = await this.pool.query(`SELECT * FROM test_runs WHERE id = $1`, [runId]);
+    const { rows } = await this.db.query(`SELECT * FROM test_runs WHERE id = $1`, [runId]);
     return rows[0] ?? null;
   }
 
@@ -90,14 +114,14 @@ export class PostgresAdapter implements StorageAdapter {
     const keys = Object.keys(data);
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.pool.query(`UPDATE test_runs SET ${sets} WHERE id = $1`, [runId, ...values]);
+    await this.db.query(`UPDATE test_runs SET ${sets} WHERE id = $1`, [runId, ...values]);
   }
 
   async createTestRun(data: Record<string, any>) {
     const keys = Object.keys(data);
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `INSERT INTO test_runs (${keys.join(", ")}) VALUES (${placeholders}) RETURNING *`,
       values,
     );
@@ -107,7 +131,7 @@ export class PostgresAdapter implements StorageAdapter {
   // ─── Destinations ───────────────────────────────────────────────────────────
 
   async getDestination(id: string) {
-    const { rows } = await this.pool.query(`SELECT * FROM app_tree_destinations WHERE id = $1`, [id]);
+    const { rows } = await this.db.query(`SELECT * FROM app_tree_destinations WHERE id = $1`, [id]);
     return rows[0] ?? null;
   }
 
@@ -118,7 +142,7 @@ export class PostgresAdapter implements StorageAdapter {
   // ─── Coverage ───────────────────────────────────────────────────────────────
 
   async getProjectCoverage(projectId: string) {
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT health_status FROM app_tree_destinations WHERE project_id = $1`,
       [projectId],
     );
@@ -133,13 +157,13 @@ export class PostgresAdapter implements StorageAdapter {
   // ─── Path Generator ─────────────────────────────────────────────────────────
 
   async getPastRunsForDestination(destinationId: string, limit: number) {
-    const { rows: coverage } = await this.pool.query(
+    const { rows: coverage } = await this.db.query(
       `SELECT run_id FROM run_coverage WHERE destination_id = $1 ORDER BY inspected_at DESC LIMIT $2`,
       [destinationId, limit],
     );
     if (coverage.length === 0) return [];
     const runIds = coverage.map((r: any) => r.run_id);
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT id, status, summary, steps_json FROM test_runs WHERE id = ANY($1)`,
       [runIds],
     );
@@ -147,7 +171,7 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   async getOpenBugs(projectId: string, limit: number) {
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT name, description, category, severity, url FROM bugs WHERE project_id = $1 AND status = 'open' ORDER BY reported_at DESC LIMIT $2`,
       [projectId, limit],
     );
@@ -157,7 +181,7 @@ export class PostgresAdapter implements StorageAdapter {
   // ─── Regression Plans ───────────────────────────────────────────────────────
 
   async getRegressionPlan(table: string, id: string) {
-    const { rows } = await this.pool.query(`SELECT * FROM ${table} WHERE id = $1`, [id]);
+    const { rows } = await this.db.query(`SELECT * FROM ${table} WHERE id = $1`, [id]);
     return rows[0] ?? null;
   }
 
@@ -165,13 +189,13 @@ export class PostgresAdapter implements StorageAdapter {
     const keys = Object.keys(data);
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.pool.query(`UPDATE ${table} SET ${sets} WHERE id = $1`, [id, ...values]);
+    await this.db.query(`UPDATE ${table} SET ${sets} WHERE id = $1`, [id, ...values]);
   }
 
   // ─── Crawl ──────────────────────────────────────────────────────────────────
 
   async getCrawlEnvironment(_projectId: string, environmentId: string) {
-    const { rows } = await this.pool.query(`SELECT * FROM environments WHERE id = $1`, [environmentId]);
+    const { rows } = await this.db.query(`SELECT * FROM environments WHERE id = $1`, [environmentId]);
     return rows[0] ?? null;
   }
 
@@ -179,7 +203,7 @@ export class PostgresAdapter implements StorageAdapter {
     const keys = Object.keys(data);
     const values = Object.values(data);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `INSERT INTO crawl_runs (${keys.join(", ")}) VALUES (${placeholders}) RETURNING *`,
       values,
     );
@@ -190,16 +214,16 @@ export class PostgresAdapter implements StorageAdapter {
     const keys = Object.keys(data);
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.pool.query(`UPDATE crawl_runs SET ${sets} WHERE id = $1`, [id, ...values]);
+    await this.db.query(`UPDATE crawl_runs SET ${sets} WHERE id = $1`, [id, ...values]);
   }
 
   async getExistingTestNames(projectId: string) {
-    const { rows } = await this.pool.query(`SELECT name FROM saved_tests WHERE project_id = $1`, [projectId]);
+    const { rows } = await this.db.query(`SELECT name FROM saved_tests WHERE project_id = $1`, [projectId]);
     return rows.map((r: any) => r.name);
   }
 
   async getAuthConfig(projectId: string, environmentId: string) {
-    const { rows } = await this.pool.query(
+    const { rows } = await this.db.query(
       `SELECT * FROM auth_configs WHERE project_id = $1 AND environment_id = $2`,
       [projectId, environmentId],
     );
@@ -212,18 +236,18 @@ export class PostgresAdapter implements StorageAdapter {
 
     for (const page of sitemap) {
       if (!page.route) continue;
-      const { rows: existing } = await this.pool.query(
+      const { rows: existing } = await this.db.query(
         `SELECT id FROM app_tree_destinations WHERE project_id = $1 AND normalized_route = $2`,
         [projectId, page.route],
       );
       if (existing.length > 0) {
-        await this.pool.query(
+        await this.db.query(
           `UPDATE app_tree_destinations SET title = $1, forms_json = $2, buttons_json = $3, interactions_json = $4, nav_links = $5, last_crawled_at = $6, crawl_run_id = $7, updated_at = $6 WHERE id = $8`,
           [page.title, JSON.stringify(page.forms), JSON.stringify(page.buttons), JSON.stringify(page.interactions), JSON.stringify(page.navLinks), now, crawlRunId, existing[0].id],
         );
         updated++;
       } else {
-        await this.pool.query(
+        await this.db.query(
           `INSERT INTO app_tree_destinations (project_id, normalized_route, title, forms_json, buttons_json, interactions_json, nav_links, last_crawled_at, crawl_run_id, enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true)`,
           [projectId, page.route, page.title, JSON.stringify(page.forms), JSON.stringify(page.buttons), JSON.stringify(page.interactions), JSON.stringify(page.navLinks), now, crawlRunId],
         );
@@ -240,7 +264,7 @@ export class PostgresAdapter implements StorageAdapter {
   // ─── Run Coverage ───────────────────────────────────────────────────────────
 
   async upsertRunCoverage(runId: string, destinationId: string, bugsFound: number) {
-    await this.pool.query(
+    await this.db.query(
       `INSERT INTO run_coverage (run_id, destination_id, bugs_found) VALUES ($1, $2, $3) ON CONFLICT (run_id, destination_id) DO UPDATE SET bugs_found = $3`,
       [runId, destinationId, bugsFound],
     );
@@ -250,20 +274,20 @@ export class PostgresAdapter implements StorageAdapter {
     const keys = Object.keys(data);
     const values = Object.values(data);
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.pool.query(`UPDATE app_tree_destinations SET ${sets} WHERE id = $1`, [destinationId, ...values]);
+    await this.db.query(`UPDATE app_tree_destinations SET ${sets} WHERE id = $1`, [destinationId, ...values]);
   }
 
   // ─── Settings ─────────────────────────────────────────────────────────────────
 
   async getSettings(): Promise<Record<string, string>> {
-    const { rows } = await this.pool.query(`SELECT key, value FROM settings`);
+    const { rows } = await this.db.query(`SELECT key, value FROM settings`);
     const result: Record<string, string> = {};
     for (const row of rows) result[row.key] = row.value;
     return result;
   }
 
   async saveSetting(key: string, value: string): Promise<void> {
-    await this.pool.query(
+    await this.db.query(
       `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, now()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now()`,
       [key, value],
     );
@@ -271,13 +295,13 @@ export class PostgresAdapter implements StorageAdapter {
 
   async deleteSettings(keys: string[]): Promise<void> {
     if (keys.length === 0) return;
-    await this.pool.query(`DELETE FROM settings WHERE key = ANY($1)`, [keys]);
+    await this.db.query(`DELETE FROM settings WHERE key = ANY($1)`, [keys]);
   }
 
   // ─── Saved Tests ────────────────────────────────────────────────────────────
 
   async getSavedTest(id: string) {
-    const { rows } = await this.pool.query(`SELECT * FROM saved_tests WHERE id = $1`, [id]);
+    const { rows } = await this.db.query(`SELECT * FROM saved_tests WHERE id = $1`, [id]);
     return rows[0] ?? null;
   }
 
@@ -285,6 +309,6 @@ export class PostgresAdapter implements StorageAdapter {
     const keys = Object.keys(data);
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.pool.query(`UPDATE saved_tests SET ${sets} WHERE id = $1`, [id, ...values]);
+    await this.db.query(`UPDATE saved_tests SET ${sets} WHERE id = $1`, [id, ...values]);
   }
 }
