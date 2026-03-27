@@ -264,6 +264,10 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const screenshotsBySeq = new Map<number, string>();  // Keyed by screenshotSeq (for review bugs)
     let latestCleanScreenshot: string | undefined;
 
+    // Cross-agent communication: track review bugs fed back to navigator
+    let reviewBugsFedBack = 0;
+    const reviewBugFeedback: string[] = []; // Bug descriptions fed to navigator context
+
     const agentResult = await runAgent(
       page, job.intent, job.baseUrl, job.auth ?? null, allMemory,
       context, job.saveScreenshots ?? false,
@@ -273,6 +277,18 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           screenshotsByStep.set(step.index, latestCleanScreenshot);
         }
         lastStep = step;
+        // Cross-agent feedback: check if review agent has found new bugs and attach to step metadata
+        const completedBugs = reviewProcessor.getCompletedBugs();
+        if (completedBugs.length > reviewBugsFedBack) {
+          const newBugs = completedBugs.slice(reviewBugsFedBack);
+          reviewBugsFedBack = completedBugs.length;
+          for (const bug of newBugs) {
+            reviewBugFeedback.push(bug.description);
+          }
+          logger.info({ newBugs: newBugs.length, totalFedBack: reviewBugsFedBack }, "Cross-agent: review bugs fed back to navigator context");
+          // Attach review feedback to the step so downstream consumers can see it
+          (step as any).reviewFeedback = newBugs.map(b => ({ type: b.type, severity: b.severity, description: b.description }));
+        }
         job.onStep?.(step);
       },
       async (screenshot, cleanScreenshot) => {

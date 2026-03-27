@@ -44,8 +44,13 @@ YOUR JOB: Find REAL bugs in the APPLICATION, not problems caused by the Navigato
 Ask yourself: "Would a knowledgeable human user, doing this same task, consider this a bug?"
 If the answer is "no, this is just the automation struggling," return NO bugs.
 
+## Additional bug categories to watch for:
+- Accessibility (a11y): missing alt text on images, form inputs without labels, poor color contrast
+- Performance: visible layout shifts, content jumping after load, slow-loading placeholders still visible
+- Data integrity: wrong counts or totals, duplicate entries, mismatched data between sections
+
 ## Response format:
-Return a JSON object with a "bugs" array. Each bug: { type: "visual" | "ux" | "behavioral", description: string (max 80 chars), severity: "low" | "medium" | "high" }.
+Return a JSON object with a "bugs" array. Each bug: { type: "visual" | "ux" | "behavioral" | "a11y" | "performance" | "data", description: string (max 80 chars), severity: "low" | "medium" | "high" }.
 If no bugs found, return { "bugs": [] }.
 
 Be VERY selective. 0 bugs is a perfectly good answer. Only report issues you're confident about.`;
@@ -97,7 +102,8 @@ function parseReviewResponse(raw: string, stepIndex: number, at: number): Review
     const parsed = JSON.parse(body) as { bugs?: Array<{ type?: string; description?: string; severity?: string; region?: { x: number; y: number; w: number; h: number } }> };
     const list = Array.isArray(parsed?.bugs) ? parsed.bugs : [];
     for (const b of list) {
-      const type = b.type === "visual" || b.type === "ux" || b.type === "behavioral" ? b.type : "visual";
+      const validTypes = ["visual", "ux", "behavioral", "a11y", "performance", "data"];
+      const type = validTypes.includes(b.type ?? "") ? b.type! : "visual";
       const severity = b.severity === "low" || b.severity === "medium" || b.severity === "high" ? b.severity : "medium";
       bugs.push({
         source: "review",
@@ -181,6 +187,8 @@ const REVIEW_BUFFER_MAX = 20;
 export type ReviewProcessor = {
   push: (request: ReviewRequest) => void;
   flush: () => Promise<ReviewBug[]>;
+  /** Get bugs found so far (non-blocking, for mid-run cross-agent communication). */
+  getCompletedBugs: () => ReviewBug[];
 };
 
 export function createReviewProcessor(opts?: { concurrency?: number; onLLMCall?: (call: Omit<LLMCallRecord, "seq">) => void }): ReviewProcessor {
@@ -230,6 +238,9 @@ export function createReviewProcessor(opts?: { concurrency?: number; onLLMCall?:
         });
       }
       return flushPromise.then(() => [...allBugs]);
+    },
+    getCompletedBugs(): ReviewBug[] {
+      return [...allBugs];
     },
   };
 }
