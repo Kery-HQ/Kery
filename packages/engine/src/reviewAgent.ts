@@ -176,6 +176,7 @@ async function processOne(
 }
 
 const REVIEW_CONCURRENCY = 3;
+const REVIEW_BUFFER_MAX = 20;
 
 export type ReviewProcessor = {
   push: (request: ReviewRequest) => void;
@@ -214,6 +215,11 @@ export function createReviewProcessor(opts?: { concurrency?: number; onLLMCall?:
   return {
     push(request: ReviewRequest) {
       queue.push(request);
+      // Backpressure: drop oldest queued entries when buffer exceeds threshold
+      while (queue.length > REVIEW_BUFFER_MAX) {
+        const dropped = queue.shift();
+        if (dropped) logger.debug({ stepIndex: dropped.stepIndex }, "ReviewAgent: dropped oldest queued item (backpressure)");
+      }
       drain();
     },
     flush(): Promise<ReviewBug[]> {

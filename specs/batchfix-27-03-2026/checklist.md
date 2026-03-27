@@ -29,7 +29,7 @@
 
 - [x] **#16** Vision token overhead — skip screenshot when page unchanged (engine) — Added simpleDomHash comparison between steps; onScreenshot only fires when URL+DOM content changes.
 - [x] **#17** A11y tree slow on complex pages — cache + prune (engine) — Added domHash-keyed LRU cache (max 20 entries) for extractA11yTree; cache hit skips full re-extraction.
-- [ ] **#18** Review Agent screenshot buffer — add backpressure (engine)
+- [x] **#18** Review Agent screenshot buffer — add backpressure (engine) — Added REVIEW_BUFFER_MAX (20) limit; drops oldest queued entries when exceeded.
 - [ ] **#19** No memory pruning — TTL + confidence decay (engine)
 - [ ] **#20** No video/screenshot cleanup — delete on run deletion (API)
 - [ ] **#21** Weak iframe support — improve detection + reporting (engine)
