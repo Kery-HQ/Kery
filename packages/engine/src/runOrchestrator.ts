@@ -258,25 +258,35 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     });
 
     let lastStep: RunStep | null = null;
-    let screenshotStepIndex = 0;
+    let screenshotSeq = 0; // Sequential counter for review agent
     let previousUrl = "";
-    const screenshotsByStep = new Map<number, string>();
+    const screenshotsByStep = new Map<number, string>(); // Keyed by agent step.index
+    const screenshotsBySeq = new Map<number, string>();  // Keyed by screenshotSeq (for review bugs)
+    let latestCleanScreenshot: string | undefined;
 
     const agentResult = await runAgent(
       page, job.intent, job.baseUrl, job.auth ?? null, allMemory,
       context, job.saveScreenshots ?? false,
-      (step) => { lastStep = step; job.onStep?.(step); },
+      (step) => {
+        // Associate the latest screenshot with this step's index
+        if (latestCleanScreenshot) {
+          screenshotsByStep.set(step.index, latestCleanScreenshot);
+        }
+        lastStep = step;
+        job.onStep?.(step);
+      },
       async (screenshot, cleanScreenshot) => {
         job.onScreenshot?.(screenshot, cleanScreenshot);
         const url = page.url();
         const title = await page.title().catch(() => "");
-        screenshotStepIndex++;
+        screenshotSeq++;
+        // Track latest clean screenshot for step-aligned keying in onStep
         if (cleanScreenshot.length > 0) {
-          // Store clean screenshots (without green markers) for bug reports
-          screenshotsByStep.set(screenshotStepIndex, cleanScreenshot.toString("base64"));
+          latestCleanScreenshot = cleanScreenshot.toString("base64");
+          screenshotsBySeq.set(screenshotSeq, latestCleanScreenshot);
         }
         const req: ReviewRequest = {
-          screenshot: cleanScreenshot, url, title, stepIndex: screenshotStepIndex,
+          screenshot: cleanScreenshot, url, title, stepIndex: screenshotSeq,
           action: lastStep ? `${lastStep.action} ${lastStep.target ?? ""}`.trim() : "initial",
           actionResult: lastStep?.status ?? "ok", expectation: lastStep?.reasoning,
           previousUrl: previousUrl || undefined,
@@ -289,7 +299,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     );
 
     const reviewBugs = await reviewProcessor.flush();
-    const bugsFound = mergeBugs(agentResult.stepsDetail, reviewBugs, screenshotsByStep);
+    const bugsFound = mergeBugs(agentResult.stepsDetail, reviewBugs, screenshotsByStep, screenshotsBySeq);
     const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, reviewCalls);
 
     // Save memory
@@ -405,7 +415,11 @@ function mergeLLMCalls(pathGen: LLMCallRecord[], navigator: LLMCallRecord[], rev
   return merged;
 }
 
-function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[], screenshotsByStep?: Map<number, string>): RunStep[] {
+function mergeBugs(
+  stepsDetail: RunStep[], reviewBugs: ReviewBug[],
+  screenshotsByStep?: Map<number, string>,
+  screenshotsBySeq?: Map<number, string>,
+): RunStep[] {
   const out: RunStep[] = [];
   for (const step of stepsDetail) {
     if (step.status === "failed" && step.action !== "bug") {
@@ -424,7 +438,8 @@ function mergeBugs(stepsDetail: RunStep[], reviewBugs: ReviewBug[], screenshotsB
       index: b.stepIndex, action: "bug", reasoning: b.description,
       status: "ok", fromMemory: false, bugType, severity: b.severity,
       source: "review", at: b.at,
-      screenshotBase64: screenshotsByStep?.get(b.stepIndex),
+      // Review bugs use screenshotSeq index, navigator bugs use step.index
+      screenshotBase64: screenshotsBySeq?.get(b.stepIndex),
     });
   }
   out.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
