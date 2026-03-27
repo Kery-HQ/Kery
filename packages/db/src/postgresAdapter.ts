@@ -48,30 +48,43 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   async saveProjectMemoryEntries(projectId: string, entries: any[]) {
+    if (entries.length === 0) return;
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    let idx = 1;
     for (const e of entries) {
-      await this.db.query(
-        `INSERT INTO memory_entries (scope, project_id, type, summary, content, region, source, confidence) VALUES ('project', $1, $2, $3, $4, $5, $6, $7)`,
-        [projectId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50],
-      );
+      placeholders.push(`('project', $${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6})`);
+      values.push(projectId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50);
+      idx += 7;
     }
+    await this.db.query(
+      `INSERT INTO memory_entries (scope, project_id, type, summary, content, region, source, confidence) VALUES ${placeholders.join(", ")}`,
+      values,
+    );
   }
 
   async savePageMemoryEntries(destinationId: string, entries: any[]) {
+    if (entries.length === 0) return;
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    let idx = 1;
     for (const e of entries) {
-      await this.db.query(
-        `INSERT INTO memory_entries (scope, destination_id, type, summary, content, region, source, confidence) VALUES ('page', $1, $2, $3, $4, $5, $6, $7)`,
-        [destinationId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50],
-      );
+      placeholders.push(`('page', $${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6})`);
+      values.push(destinationId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50);
+      idx += 7;
     }
+    await this.db.query(
+      `INSERT INTO memory_entries (scope, destination_id, type, summary, content, region, source, confidence) VALUES ${placeholders.join(", ")}`,
+      values,
+    );
   }
 
   async boostConfidence(ids: string[], amount = 5) {
-    for (const id of ids) {
-      await this.db.query(
-        `UPDATE memory_entries SET confidence = LEAST(100, confidence + $1), updated_at = now() WHERE id = $2`,
-        [amount, id],
-      );
-    }
+    if (ids.length === 0) return;
+    await this.db.query(
+      `UPDATE memory_entries SET confidence = LEAST(100, confidence + $1), updated_at = now() WHERE id = ANY($2)`,
+      [amount, ids],
+    );
   }
 
   // ─── Bugs ───────────────────────────────────────────────────────────────────
