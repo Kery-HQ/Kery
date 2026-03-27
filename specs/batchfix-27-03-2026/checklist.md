@@ -37,8 +37,8 @@
 - [x] **#24** Navigator prompt missing error recovery — add guidance (engine) — Added error recovery instructions to system prompt (retry with different selector, keyboard fallback).
 - [x] **#25** Navigator prompt missing form validation testing — add guidance (engine) — Added form validation testing guidance to system prompt (empty fields, invalid values, then happy path).
 - [x] **#26** Review Agent narrow bug categories — add a11y, perf, data (engine) — Added a11y, performance, and data integrity categories to review prompt and response parsing.
-- [ ] **#27** Path Generator shallow plans — remove step limit, full coverage plans (engine)
-- [ ] **#28** Path Generator not prioritized — happy paths first (engine)
+- [x] **#27** Path Generator shallow plans — remove step limit, full coverage plans (engine) — Removed 5-step-per-path limit, added authFlows, dataIntegrity, boundaryValues, crossPageFlows categories.
+- [x] **#28** Path Generator not prioritized — happy paths first (engine) — Added explicit prioritization instruction and ordered formatTestPlanForNavigator output.
 - [ ] **#29** StorageAdapter bypassed — add missing methods (DB adapter)
 - [ ] **#30** Summarizer lacks actionability — structured recommendations (engine)
 - [ ] **#31** Login-page detection missing in crawler (engine)
