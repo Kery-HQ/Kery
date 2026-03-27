@@ -40,7 +40,7 @@
 - [x] **#27** Path Generator shallow plans — remove step limit, full coverage plans (engine) — Removed 5-step-per-path limit, added authFlows, dataIntegrity, boundaryValues, crossPageFlows categories.
 - [x] **#28** Path Generator not prioritized — happy paths first (engine) — Added explicit prioritization instruction and ordered formatTestPlanForNavigator output.
 - [x] **#29** StorageAdapter bypassed — add missing methods (DB adapter) — Added getPool() to StorageAdapter interface and PostgresAdapter; replaced all `(storage as any).pool` casts across 5 route files.
-- [ ] **#30** Summarizer lacks actionability — structured recommendations (engine)
+- [x] **#30** Summarizer lacks actionability — structured recommendations (engine) — Added structured recommendation types (FIX, FLAKY, COVERAGE, PERF, CONFIG) to summarizer prompt template.
 - [ ] **#31** Login-page detection missing in crawler (engine)
 - [ ] **#32** Regression replay silent auth failure — retry auth (engine)
 - [ ] **#33** No test suite — focused tests for high-risk modules (engine)

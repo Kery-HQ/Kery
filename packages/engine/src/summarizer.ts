@@ -203,7 +203,17 @@ Now produce the report using this EXACT markdown template. Every section is mand
 
 ### Recommendations
 
-(1-3 concrete, actionable suggestions based on what happened in this run. Examples: "Retry the failing selector on /settings", "Add explicit wait for the modal at step 12", "The review agent flagged a layout issue on mobile that should be investigated".)
+For each recommendation, categorize it with one of these types:
+- **[FIX]** — A bug or issue that needs to be fixed in the application
+- **[FLAKY]** — A flaky/unreliable test step that needs stabilization (better selectors, explicit waits)
+- **[COVERAGE]** — A gap in test coverage that should be addressed
+- **[PERF]** — A performance concern observed during the run
+- **[CONFIG]** — A configuration or environment issue
+
+Format each recommendation as:
+1. **[TYPE]** Short title — Detailed actionable description referencing specific steps, URLs, or elements.
+
+(1-3 concrete, actionable suggestions based on what happened in this run.)
 \`\`\`
 
 IMPORTANT:
