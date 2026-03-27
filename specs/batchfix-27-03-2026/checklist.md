@@ -34,8 +34,8 @@
 - [x] **#20** No video/screenshot cleanup — delete on run deletion (API) — Added DELETE /api/runs/:runId endpoint that removes video file, screenshot directory, bugs, and DB row.
 - [x] **#21** Weak iframe support — improve detection + reporting (engine) — Replaced silent catch-ignore with explicit per-iframe logging of success/failure counts and frame URLs.
 - [x] **#22** No request idempotency — add idempotency key (API) — Added Idempotency-Key header support on POST /run with 30s TTL dedup cache.
-- [ ] **#24** Navigator prompt missing error recovery — add guidance (engine)
-- [ ] **#25** Navigator prompt missing form validation testing — add guidance (engine)
+- [x] **#24** Navigator prompt missing error recovery — add guidance (engine) — Added error recovery instructions to system prompt (retry with different selector, keyboard fallback).
+- [x] **#25** Navigator prompt missing form validation testing — add guidance (engine) — Added form validation testing guidance to system prompt (empty fields, invalid values, then happy path).
 - [ ] **#26** Review Agent narrow bug categories — add a11y, perf, data (engine)
 - [ ] **#27** Path Generator shallow plans — remove step limit, full coverage plans (engine)
 - [ ] **#28** Path Generator not prioritized — happy paths first (engine)
