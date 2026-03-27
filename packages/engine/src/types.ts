@@ -10,6 +10,8 @@ export type AuthConfig = {
     username?: string;
     password?: string;
   };
+  /** TOTP secret for 2FA/MFA (base32-encoded). Used to generate one-time codes. */
+  totp_secret?: string;
   tokenProvider?: {
     type: "supabase" | "clerk" | "custom";
     apiUrl: string;

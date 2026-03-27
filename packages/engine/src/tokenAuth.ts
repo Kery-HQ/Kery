@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { createHmac } from "crypto";
 import { logger } from "./logger.js";
 
 type TokenProviderConfig = {
@@ -301,4 +302,122 @@ export async function refreshIfNeeded(page: Page): Promise<void> {
   } catch (err) {
     logger.error({ err: String(err).slice(0, 300) }, "Token refresh failed");
   }
+}
+
+// ─── 2FA / MFA Support ──────────────────────────────────────────────────────
+
+const TWO_FA_INDICATORS = [
+  "verification code",
+  "authenticator",
+  "2fa",
+  "two-factor",
+  "two factor",
+  "mfa",
+  "one-time",
+  "one time password",
+  "otp",
+  "6-digit code",
+  "enter code",
+  "security code",
+];
+
+/**
+ * Detect if the current page is a 2FA/MFA challenge screen.
+ */
+export async function detect2FAScreen(page: Page): Promise<boolean> {
+  try {
+    const bodyText = await page.evaluate(() =>
+      document.body?.innerText?.toLowerCase().slice(0, 3000) ?? ""
+    );
+    return TWO_FA_INDICATORS.some(indicator => bodyText.includes(indicator));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Generate a TOTP code from a base32-encoded secret.
+ * Uses HMAC-SHA1 with a 30-second time step (RFC 6238).
+ */
+export function generateTOTP(base32Secret: string, timeStep = 30): string {
+  const epoch = Math.floor(Date.now() / 1000);
+  const counter = Math.floor(epoch / timeStep);
+
+  // Decode base32 secret
+  const secretBytes = base32Decode(base32Secret);
+
+  // Counter as 8-byte big-endian buffer
+  const counterBuf = Buffer.alloc(8);
+  counterBuf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+  counterBuf.writeUInt32BE(counter >>> 0, 4);
+
+  // HMAC-SHA1
+  const hmac = createHmac("sha1", secretBytes);
+  hmac.update(counterBuf);
+  const hash = hmac.digest();
+
+  // Dynamic truncation
+  const offset = hash[hash.length - 1] & 0x0f;
+  const code =
+    ((hash[offset] & 0x7f) << 24) |
+    ((hash[offset + 1] & 0xff) << 16) |
+    ((hash[offset + 2] & 0xff) << 8) |
+    (hash[offset + 3] & 0xff);
+
+  return String(code % 1000000).padStart(6, "0");
+}
+
+/**
+ * Handle 2FA challenge: detect the screen, generate TOTP, and fill the code.
+ * Returns true if 2FA was handled, false if not detected or no secret provided.
+ */
+export async function handle2FA(page: Page, totpSecret?: string): Promise<boolean> {
+  if (!totpSecret) return false;
+
+  const is2FA = await detect2FAScreen(page);
+  if (!is2FA) return false;
+
+  const code = generateTOTP(totpSecret);
+  logger.info("2FA screen detected, entering TOTP code");
+
+  try {
+    // Try common selectors for OTP input fields
+    const otpInput = page.locator(
+      'input[type="text"][autocomplete*="one-time"], input[name*="otp"], input[name*="code"], input[name*="totp"], input[placeholder*="code"], input[aria-label*="code"]'
+    ).first();
+
+    if (await otpInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await otpInput.fill(code);
+      // Try to submit
+      const submitBtn = page.locator('button[type="submit"], button:has-text("Verify"), button:has-text("Submit"), button:has-text("Continue")').first();
+      if (await submitBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await submitBtn.click();
+      }
+      logger.info("2FA code submitted");
+      return true;
+    }
+  } catch (err) {
+    logger.warn({ err: String(err).slice(0, 200) }, "Failed to auto-fill 2FA code");
+  }
+
+  return false;
+}
+
+// ─── Base32 Decode ──────────────────────────────────────────────────────────
+
+const BASE32_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function base32Decode(input: string): Buffer {
+  const cleaned = input.replace(/[\s=-]+/g, "").toUpperCase();
+  let bits = "";
+  for (const char of cleaned) {
+    const val = BASE32_CHARS.indexOf(char);
+    if (val === -1) continue;
+    bits += val.toString(2).padStart(5, "0");
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+  return Buffer.from(bytes);
 }
