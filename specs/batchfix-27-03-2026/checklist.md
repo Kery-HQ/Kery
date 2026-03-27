@@ -36,7 +36,7 @@
 - [x] **#22** No request idempotency — add idempotency key (API) — Added Idempotency-Key header support on POST /run with 30s TTL dedup cache.
 - [x] **#24** Navigator prompt missing error recovery — add guidance (engine) — Added error recovery instructions to system prompt (retry with different selector, keyboard fallback).
 - [x] **#25** Navigator prompt missing form validation testing — add guidance (engine) — Added form validation testing guidance to system prompt (empty fields, invalid values, then happy path).
-- [ ] **#26** Review Agent narrow bug categories — add a11y, perf, data (engine)
+- [x] **#26** Review Agent narrow bug categories — add a11y, perf, data (engine) — Added a11y, performance, and data integrity categories to review prompt and response parsing.
 - [ ] **#27** Path Generator shallow plans — remove step limit, full coverage plans (engine)
 - [ ] **#28** Path Generator not prioritized — happy paths first (engine)
 - [ ] **#29** StorageAdapter bypassed — add missing methods (DB adapter)
