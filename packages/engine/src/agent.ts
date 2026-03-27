@@ -373,6 +373,12 @@ RULES:
 - Auth in conversation history = already logged in, skip re-login
 - If on wrong page, use navigate to go directly to the target URL
 
+ERROR RECOVERY:
+- If an action fails twice, try a different approach: use a different selector, navigate to the page again, or try a keyboard-based alternative (Tab + Enter instead of click).
+
+FORM VALIDATION TESTING:
+- When testing forms, try submitting with empty required fields first, then with invalid values (e.g., 'not-an-email' for email fields), before testing the happy path.
+
 IMPORTANT: Reply with EXACTLY ONE JSON object. Do NOT output multiple actions — only the single next action to take.`;
 }
 
