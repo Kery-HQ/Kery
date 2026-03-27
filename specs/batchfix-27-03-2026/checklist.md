@@ -22,7 +22,7 @@
 - [x] **#43** Bounding boxes miss interactive controls — expand roles + getImplicitRole (engine) — Added 15 missing INTERACTIVE_ROLES and extended getImplicitRole to detect summary, contenteditable, onclick, tabindex elements as interactive.
 - [x] **#44** Review agent sees green boxes as bugs — return clean screenshot separately (engine) — takeStableSnapshot now returns both marked and clean screenshots; review agent and bug storage use clean version. Added defense-in-depth prompt note.
 - [x] **#45** Video recording broken with Stagehand — explicit save, error handling (engine) — Added explicit page.video().path() + copyFile before Stagehand destroy, replaced .catch(()=>{}) with logged warnings, added missing .webm detection logging.
-- [ ] **#46** Bug screenshots not attached — fix step index mismatch (engine)
+- [x] **#46** Bug screenshots not attached — fix step index mismatch (engine) — Fixed by keying screenshots by agent step.index in onStep callback (for navigator bugs) and by screenshotSeq in onScreenshot (for review bugs).
 - [ ] **#47** Run detail page lacks agent observability — per-step screenshots, a11y tree, LLM prompts, agent flow view (web)
 
 ## P2 — Medium
