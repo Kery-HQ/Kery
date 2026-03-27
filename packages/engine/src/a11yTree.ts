@@ -314,6 +314,31 @@ async function resolveBoundingBoxes(page: Page, elements: A11yElement[]): Promis
   }
 }
 
+// ─── Prompt Injection Sanitization ────────────────────────────────────────────
+
+/**
+ * Patterns that could hijack the LLM agent if present in page content.
+ * Strips instruction-like patterns from page text before including in prompts.
+ */
+const INJECTION_PATTERNS = [
+  /\b(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/gi,
+  /\b(system|assistant|admin)\s*:\s*/gi,
+  /```(system|prompt|instruction)/gi,
+  /<\/?(?:system|prompt|instruction|role|context)>/gi,
+  /\b(you\s+are\s+now|act\s+as|pretend\s+to\s+be|new\s+instructions?)\b/gi,
+  /<\/?(?:human|user|claude|gpt|ai|bot)>/gi,
+  /\[(?:INST|SYS|SYSTEM)\]/gi,
+];
+
+/** Sanitize text extracted from pages before including in LLM prompts. */
+export function sanitizeForPrompt(text: string): string {
+  let sanitized = text;
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, "[filtered]");
+  }
+  return sanitized;
+}
+
 // ─── Format for LLM ──────────────────────────────────────────────────────────
 
 export function formatA11yForLLM(elements: A11yElement[], textNodes?: A11yTextNode[]): string {
@@ -321,18 +346,19 @@ export function formatA11yForLLM(elements: A11yElement[], textNodes?: A11yTextNo
 
   if (textNodes && textNodes.length > 0) {
     const textLines = textNodes.map(tn => {
-      if (tn.role === "heading") return `# ${tn.name}`;
-      if (tn.role === "status" || tn.role === "alert") return `[${tn.role}] ${tn.name}`;
-      return tn.name;
+      const name = sanitizeForPrompt(tn.name);
+      if (tn.role === "heading") return `# ${name}`;
+      if (tn.role === "status" || tn.role === "alert") return `[${tn.role}] ${name}`;
+      return name;
     });
     sections.push(`Page content:\n${textLines.join("\n")}`);
   }
 
   if (elements.length > 0) {
     const lines = elements.map(el => {
-      const parts = [`[${el.id}] ${el.role} "${el.name}"`];
+      const parts = [`[${el.id}] ${el.role} "${sanitizeForPrompt(el.name)}"`];
       if (el.state.length > 0) parts.push(`- ${el.state.join(", ")}`);
-      if (el.value) parts.push(`value="${el.value}"`);
+      if (el.value) parts.push(`value="${sanitizeForPrompt(el.value)}"`);
       const hint = getInteractionHint(el);
       if (hint) parts.push(hint);
       return parts.join(" ");
@@ -371,7 +397,7 @@ export async function extractVisibleText(page: Page): Promise<string> {
     });
     if (!text) return "";
     const cleaned = text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ");
-    return cleaned.slice(0, MAX_PAGE_TEXT_CHARS);
+    return sanitizeForPrompt(cleaned.slice(0, MAX_PAGE_TEXT_CHARS));
   } catch {
     return "";
   }
