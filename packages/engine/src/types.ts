@@ -173,6 +173,10 @@ export type TestPlan = {
   edgeCases: PathStep[][];
   interactionFlows: PathStep[][];
   regressionChecks: PathStep[][];
+  authFlows: PathStep[][];
+  dataIntegrity: PathStep[][];
+  boundaryValues: PathStep[][];
+  crossPageFlows: PathStep[][];
 };
 
 /** Visual, UX, or behavioral bug from the Review Agent */
