@@ -13,7 +13,7 @@
 - [x] **#7** Memory save loops — multi-row INSERT (DB adapter) — Replaced per-entry INSERT loops with single multi-row INSERT and batch UPDATE with ANY($1) for boostConfidence.
 - [x] **#8** listBugs() fetches screenshot blobs — exclude column, add endpoint (DB adapter + API) — Excluded screenshot_base64 from listBugs SELECT, added getBugScreenshot() method and /api/bugs/:bugId/screenshot endpoint.
 - [x] **#9** Missing composite DB indexes — add 4 indexes (DB) — Added migration 003 with 4 composite indexes on test_runs, run_coverage, bugs, and memory_entries.
-- [ ] **#10** 401/403 not intercepted — auth-aware error classification (engine)
+- [x] **#10** 401/403 not intercepted — auth-aware error classification (engine) — Network monitor now detects token auth sessions and triggers refresh on first 401/403 before reporting as bug.
 - [ ] **#11** Stagehand circuit breaker no recovery — add half-open timer (engine)
 - [ ] **#12** Context amnesia — add rolling testing progress summary (engine)
 - [ ] **#13** No graceful shutdown — SIGTERM handler (API)
