@@ -85,45 +85,48 @@ export function createRunWorker(
 
         extractBugScreenshots(data.runId, enrichedBugs);
 
-        await storage.updateTestRun(data.runId, {
-          status: result.status, summary: result.summary,
-          steps_json: result.stepsDetail, bugs_json: enrichedBugs,
-          llm_calls_json: result.llmCalls, completed_at: completedAt,
-          video_url: result.videoUrl || null,
-        });
+        // Wrap all post-run DB writes in a transaction for atomicity
+        await storage.withTransaction(async (tx) => {
+          await tx.updateTestRun(data.runId, {
+            status: result.status, summary: result.summary,
+            steps_json: result.stepsDetail, bugs_json: enrichedBugs,
+            llm_calls_json: result.llmCalls, completed_at: completedAt,
+            video_url: result.videoUrl || null,
+          });
 
-        await storage.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);
+          await tx.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);
 
-        if (data.destinationId) {
-          await storage.upsertRunCoverage(data.runId, data.destinationId, enrichedBugs.length);
-          const healthData: any = { last_inspected_at: completedAt };
-          if (enrichedBugs.length > 0) {
-            healthData.health_status = "issues";
-            healthData.issues_count = enrichedBugs.length;
-          } else {
-            healthData.health_status = "clean";
-            healthData.issues_count = 0;
+          if (data.destinationId) {
+            await tx.upsertRunCoverage(data.runId, data.destinationId, enrichedBugs.length);
+            const healthData: any = { last_inspected_at: completedAt };
+            if (enrichedBugs.length > 0) {
+              healthData.health_status = "issues";
+              healthData.issues_count = enrichedBugs.length;
+            } else {
+              healthData.health_status = "clean";
+              healthData.issues_count = 0;
+            }
+            await tx.updateDestinationHealth(data.destinationId, healthData);
+
+            if ((result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
+              const regPlan = generateRegressionPlan(result.stepsDetail);
+              if (regPlan.length > 0) {
+                await tx.updateRegressionPlan("app_tree_destinations", data.destinationId, {
+                  regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
+                });
+              }
+            }
           }
-          await storage.updateDestinationHealth(data.destinationId, healthData);
 
-          if ((result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
+          if (data.testId && (result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
             const regPlan = generateRegressionPlan(result.stepsDetail);
             if (regPlan.length > 0) {
-              await storage.updateRegressionPlan("app_tree_destinations", data.destinationId, {
+              await tx.updateSavedTest(data.testId, {
                 regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
               });
             }
           }
-        }
-
-        if (data.testId && (result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
-          const regPlan = generateRegressionPlan(result.stepsDetail);
-          if (regPlan.length > 0) {
-            await storage.updateSavedTest(data.testId, {
-              regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
-            });
-          }
-        }
+        });
 
         const completedRun = await storage.getTestRun(data.runId);
         emitter.emit("done", completedRun ?? { runId: data.runId, status: result.status, summary: result.summary });
