@@ -129,6 +129,16 @@ function stepTimestamp(): number {
   return Date.now() + (perf % 1);
 }
 
+/** Simple hash for comparing DOM snapshots between steps. */
+function simpleDomHash(url: string, dom: string): string {
+  let h = 0;
+  const str = url + "|" + dom;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return String(h);
+}
+
 function isSamePage(currentUrl: string, targetUrl: string): boolean {
   try {
     const a = new URL(currentUrl);
@@ -1061,6 +1071,7 @@ export async function runAgent(
     let prevUrl = "";
     let currentElements: A11yElement[] | undefined;
     let currentObserved: ObservedElement[] | undefined;
+    let prevDomHash = "";  // Track DOM changes to skip redundant screenshots
 
     for (let i = 0; i < MAX_STEPS; i++) {
       // Refresh token if expiring soon (Clerk ~60s, Supabase ~3600s)
@@ -1090,7 +1101,12 @@ export async function runAgent(
       currentObserved = snapshot.observedElements;
 
       if (screenshot.length === 0 && dom === "(DOM extraction failed)") break;
-      if (screenshot.length > 0) onScreenshot?.(screenshot, cleanScreenshot);
+      // Skip sending screenshot when page content is unchanged (saves vision tokens)
+      const domHash = simpleDomHash(url, dom);
+      if (screenshot.length > 0 && domHash !== prevDomHash) {
+        onScreenshot?.(screenshot, cleanScreenshot);
+      }
+      prevDomHash = domHash;
       if (dom === "(DOM extraction failed)") continue;
 
       const loopResult = detectLoop(recentActions);
