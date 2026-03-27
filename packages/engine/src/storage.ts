@@ -20,6 +20,7 @@ export interface StorageAdapter {
     enrichedBugs: Bug[],
   ): Promise<{ inserted: number; skipped: number }>;
   listBugs(projectId: string): Promise<Bug[]>;
+  getBugScreenshot(bugId: string): Promise<string | null>;
 
   // Runs
   getTestRun(runId: string): Promise<any>;
