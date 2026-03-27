@@ -52,7 +52,7 @@
 - [x] **#36** Bug name dedup unreliable (engine) — Added trigram-based fuzzy name similarity (>0.7 threshold) alongside exact tuple dedup, with normalized name stripping punctuation, whitespace, and stop-words.
 - [x] **#37** No 2FA/MFA support (engine) — Added totp_secret to AuthConfig, TOTP code generation (RFC 6238 HMAC-SHA1), 2FA screen detection via page text indicators, and auto-fill handler.
 - [x] **#38** OAuth 2.0 unimplemented (engine) — Added injectOAuthToken() supporting pre-obtained access_token injection via cookie, localStorage, or header interception.
-- [ ] **#39** No cross-agent communication during run (engine)
+- [x] **#39** No cross-agent communication during run (engine) — Added getCompletedBugs() to ReviewProcessor and cross-agent feedback loop in orchestrator's onStep callback that feeds review bugs back to navigator context mid-run.
 - [ ] **#40** No prompt injection sanitization (engine)
 - [ ] **#41** Screenshot quality too low for review (engine)
 - [ ] **#42** No structured logging/observability (API/infra)
