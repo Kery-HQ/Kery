@@ -14,6 +14,10 @@ import { RunIdParams, RunFilenameParams } from "./params.js";
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
 
+// Idempotency dedup: key -> { runId, expiresAt }
+const idempotencyCache = new Map<string, { runId: string; expiresAt: number }>();
+const IDEMPOTENCY_TTL_MS = 30_000; // 30 seconds
+
 const RunSchema = z.object({
   projectId: z.string().uuid(),
   environmentId: z.string().uuid(),
@@ -26,6 +30,21 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
   const pool = (storage as any).pool as Pool;
 
   app.post("/api/projects/:projectId/run", async (req, reply) => {
+    // Idempotency key dedup
+    const idempotencyKey = req.headers["idempotency-key"] as string | undefined;
+    if (idempotencyKey) {
+      const now = Date.now();
+      // Evict expired entries lazily
+      for (const [k, v] of idempotencyCache) {
+        if (v.expiresAt < now) idempotencyCache.delete(k);
+      }
+      const existing = idempotencyCache.get(idempotencyKey);
+      if (existing && existing.expiresAt > now) {
+        reply.send({ runId: existing.runId, status: "running", deduplicated: true });
+        return;
+      }
+    }
+
     const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
     const parsed = RunSchema.safeParse({ ...(req.body as Record<string, unknown>), projectId });
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
@@ -84,6 +103,11 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
       recordVideo: process.env.RECORD_VIDEO !== "false",
       triggerRef: run.trigger_ref,
     } satisfies RunJobData);
+
+    // Cache idempotency key
+    if (idempotencyKey) {
+      idempotencyCache.set(idempotencyKey, { runId: run.id, expiresAt: Date.now() + IDEMPOTENCY_TTL_MS });
+    }
 
     reply.send({ runId: run.id, status: "running" });
   });
