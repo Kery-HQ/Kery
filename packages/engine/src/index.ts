@@ -3,7 +3,7 @@ export { rewriteForDocker } from "./dockerHost.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 export { initEngineConfig, getConfig, updateEngineConfig, type EngineConfig } from "./config.js";
-export { logger } from "./logger.js";
+export { logger, withRunCorrelation, getRunCorrelationId } from "./logger.js";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
 export type { StorageAdapter } from "./storage.js";

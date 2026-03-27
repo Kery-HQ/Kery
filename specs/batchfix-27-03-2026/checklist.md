@@ -55,7 +55,7 @@
 - [x] **#39** No cross-agent communication during run (engine) — Added getCompletedBugs() to ReviewProcessor and cross-agent feedback loop in orchestrator's onStep callback that feeds review bugs back to navigator context mid-run.
 - [x] **#40** No prompt injection sanitization (engine) — Added sanitizeForPrompt() that strips instruction-hijacking patterns from page text/a11y content before including in LLM prompts.
 - [x] **#41** Screenshot quality too low for review (engine) — Bumped cleanScreenshot quality to 90% for review agent; marked screenshot stays at 75% for navigator token efficiency.
-- [ ] **#42** No structured logging/observability (API/infra)
+- [x] **#42** No structured logging/observability (API/infra) — Added per-run correlation IDs via AsyncLocalStorage; logger.mixin() auto-includes runId in all log output; server extracts runId from URL params.
 
 ---
 

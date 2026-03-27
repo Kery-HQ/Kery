@@ -11,6 +11,7 @@ import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings } from "./routes/settings.js";
 import { createRunQueue, createRunWorker } from "./runQueue.js";
+import { withRunCorrelation } from "@kery/engine";
 
 // Initialize engine config from environment
 initEngineConfig({
@@ -42,6 +43,15 @@ const app = Fastify({ logger: true });
 await app.register(cors, {
   origin: [config.appUrl, "http://localhost:19834", "http://localhost:3000"],
   credentials: true,
+});
+
+// Per-request correlation ID: extract runId from URL params for run-scoped logging
+app.addHook("onRequest", (request, _reply, done) => {
+  const runIdMatch = request.url.match(/\/runs\/([a-f0-9-]+)/);
+  if (runIdMatch) {
+    (request as any).runCorrelationId = runIdMatch[1];
+  }
+  done();
 });
 
 // Apply any model overrides saved in the DB
