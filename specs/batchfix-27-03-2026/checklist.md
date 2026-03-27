@@ -44,7 +44,7 @@
 - [x] **#31** Login-page detection missing in crawler (engine) — Added URL-based and content-based login page detection; skips auth URLs and pages with password fields + login titles.
 - [x] **#32** Regression replay silent auth failure — retry auth (engine) — Added one auth retry before falling back to Navigator; improved error logging on auth failure.
 - [x] **#33** No test suite — focused tests for high-risk modules (engine) — Added test files for regressionEngine, bugEnrichment, and a11yTree (formatA11yForLLM + interaction hints); added test script to package.json.
-- [ ] **#34** Memory formatting weak signal-to-noise — temporal + usage context (engine)
+- [x] **#34** Memory formatting weak signal-to-noise — temporal + usage context (engine) — Added temporal labels ("learned 3 days ago"), confidence-based sorting within groups, and relevance prioritization hint in prompt header.
 
 ## P3 — Low
 
