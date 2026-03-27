@@ -111,10 +111,18 @@ export class PostgresAdapter implements StorageAdapter {
 
   async listBugs(projectId: string) {
     const { rows } = await this.db.query(
-      `SELECT * FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
+      `SELECT id, project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, created_at FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
       [projectId],
     );
     return rows;
+  }
+
+  async getBugScreenshot(bugId: string): Promise<string | null> {
+    const { rows } = await this.db.query(
+      `SELECT screenshot_base64 FROM bugs WHERE id = $1`,
+      [bugId],
+    );
+    return rows[0]?.screenshot_base64 ?? null;
   }
 
   // ─── Runs ───────────────────────────────────────────────────────────────────

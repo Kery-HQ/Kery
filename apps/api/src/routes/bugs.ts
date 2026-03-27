@@ -11,6 +11,13 @@ export function registerBugRoutes(app: FastifyInstance, storage: StorageAdapter)
     reply.send({ bugs });
   });
 
+  app.get("/api/bugs/:bugId/screenshot", async (req, reply) => {
+    const { bugId } = req.params as any;
+    const screenshot = await storage.getBugScreenshot(bugId);
+    if (!screenshot) { reply.code(404).send({ error: "screenshot not found" }); return; }
+    reply.send({ screenshot });
+  });
+
   app.patch("/api/projects/:projectId/bugs/:bugId", async (req, reply) => {
     const { bugId } = req.params as any;
     const body = req.body as any;
