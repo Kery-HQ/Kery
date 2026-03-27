@@ -291,7 +291,8 @@ async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
   const title = await page.title().catch(() => "");
 
   // Take clean screenshot (before any marker injection — for review agent)
-  const cleanScreenshot = await page.screenshot({ type: "jpeg", quality: 75 }).catch(() => Buffer.alloc(0));
+  // Higher quality (90%) for review agent accuracy; marked screenshot uses 75% to save navigator tokens
+  const cleanScreenshot = await page.screenshot({ type: "jpeg", quality: 90 }).catch(() => Buffer.alloc(0));
 
   // Try Stagehand observe first
   let observedElements: ObservedElement[] | undefined;
