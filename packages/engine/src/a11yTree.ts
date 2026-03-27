@@ -192,18 +192,37 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
 
     // Also extract from iframes (e.g. Clerk, Stripe, etc.)
     const iframeSnapshots: any[] = [];
+    let iframeCount = 0;
+    let iframeSuccessCount = 0;
+    let iframeFailCount = 0;
     try {
       for (const frame of page.frames()) {
         if (frame === page.mainFrame()) continue;
+        iframeCount++;
+        const frameUrl = frame.url();
         try {
           const frameRaw = await frame.evaluate(A11Y_EXTRACT_SCRIPT).catch(() => null) as string | null;
           if (frameRaw) {
             const parsed = JSON.parse(frameRaw);
-            if (parsed) iframeSnapshots.push(parsed);
+            if (parsed) {
+              iframeSnapshots.push(parsed);
+              iframeSuccessCount++;
+            }
+          } else {
+            iframeFailCount++;
+            logger.warn({ frameUrl: frameUrl?.slice(0, 120) }, "A11y iframe extraction returned null — frame may be cross-origin or empty");
           }
-        } catch { /* skip inaccessible frames */ }
+        } catch (frameErr) {
+          iframeFailCount++;
+          logger.warn({ frameUrl: frameUrl?.slice(0, 120), err: String(frameErr).slice(0, 150) }, "A11y iframe extraction failed — frame inaccessible");
+        }
       }
-    } catch { /* frames() may throw */ }
+    } catch (framesErr) {
+      logger.warn({ err: String(framesErr).slice(0, 150) }, "Failed to enumerate page frames");
+    }
+    if (iframeCount > 0) {
+      logger.info({ iframeCount, iframeSuccessCount, iframeFailCount }, "Iframe a11y extraction summary");
+    }
 
     if (!snapshot && iframeSnapshots.length === 0) return { elements, textNodes, tree: [] };
 
