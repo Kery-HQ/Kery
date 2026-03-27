@@ -19,7 +19,7 @@
 - [x] **#13** No graceful shutdown — SIGTERM handler (API) — Added in #1: SIGTERM/SIGINT handler closes BullMQ worker, queue, HTTP server, and DB pool.
 - [x] **#14** `as any` x46 in API routes — add Zod schemas (API) — Added shared Zod param schemas (params.ts), replaced all route param/body `as any` casts with validated parsing. Remaining 5 are pool access (#29) and Fastify SSE flush.
 - [x] **#15** API Token auth mode unimplemented — page.route() header injection (engine) — Implemented apiToken auth mode using page.route('**/*') header injection with configurable headerName and headerPrefix.
-- [ ] **#43** Bounding boxes miss interactive controls — expand roles + getImplicitRole (engine)
+- [x] **#43** Bounding boxes miss interactive controls — expand roles + getImplicitRole (engine) — Added 15 missing INTERACTIVE_ROLES and extended getImplicitRole to detect summary, contenteditable, onclick, tabindex elements as interactive.
 - [ ] **#44** Review agent sees green boxes as bugs — return clean screenshot separately (engine)
 - [ ] **#45** Video recording broken with Stagehand — explicit save, error handling (engine)
 - [ ] **#46** Bug screenshots not attached — fix step index mismatch (engine)
