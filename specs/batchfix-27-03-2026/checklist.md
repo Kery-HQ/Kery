@@ -33,7 +33,7 @@
 - [x] **#19** No memory pruning — TTL + confidence decay (engine) — Added decayAndPrune() with 14-day TTL decay and confidence floor of 10; entries below threshold are pruned.
 - [x] **#20** No video/screenshot cleanup — delete on run deletion (API) — Added DELETE /api/runs/:runId endpoint that removes video file, screenshot directory, bugs, and DB row.
 - [x] **#21** Weak iframe support — improve detection + reporting (engine) — Replaced silent catch-ignore with explicit per-iframe logging of success/failure counts and frame URLs.
-- [ ] **#22** No request idempotency — add idempotency key (API)
+- [x] **#22** No request idempotency — add idempotency key (API) — Added Idempotency-Key header support on POST /run with 30s TTL dedup cache.
 - [ ] **#24** Navigator prompt missing error recovery — add guidance (engine)
 - [ ] **#25** Navigator prompt missing form validation testing — add guidance (engine)
 - [ ] **#26** Review Agent narrow bug categories — add a11y, perf, data (engine)
