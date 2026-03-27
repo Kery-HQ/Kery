@@ -321,16 +321,25 @@ async function resolveBoundingBoxes(page: Page, elements: A11yElement[]): Promis
  * Strips instruction-like patterns from page text before including in prompts.
  */
 const INJECTION_PATTERNS = [
+  // Direct instruction patterns
   /\b(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/gi,
+  // System/assistant role impersonation
   /\b(system|assistant|admin)\s*:\s*/gi,
+  // Prompt boundary markers
   /```(system|prompt|instruction)/gi,
   /<\/?(?:system|prompt|instruction|role|context)>/gi,
+  // "You are now" / "Act as" hijacking
   /\b(you\s+are\s+now|act\s+as|pretend\s+to\s+be|new\s+instructions?)\b/gi,
+  // XML-style injection
   /<\/?(?:human|user|claude|gpt|ai|bot)>/gi,
+  // Multi-turn injection
   /\[(?:INST|SYS|SYSTEM)\]/gi,
 ];
 
-/** Sanitize text extracted from pages before including in LLM prompts. */
+/**
+ * Sanitize text extracted from pages before including in LLM prompts.
+ * Strips patterns that could be used for prompt injection.
+ */
 export function sanitizeForPrompt(text: string): string {
   let sanitized = text;
   for (const pattern of INJECTION_PATTERNS) {
