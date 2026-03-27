@@ -40,6 +40,11 @@ const INTERACTIVE_ROLES = new Set([
   "checkbox", "radio", "switch", "slider", "spinbutton",
   "tab", "menuitem", "menuitemcheckbox", "menuitemradio",
   "option", "treeitem", "cell", "gridcell",
+  // Previously missing roles
+  "listbox", "menu", "menubar", "toolbar", "tree",
+  "dialog", "alertdialog", "progressbar", "meter",
+  "scrollbar", "separator", "tablist", "tabpanel",
+  "application", "document", "form",
 ]);
 
 const TEXT_ROLES = new Set([
@@ -74,6 +79,22 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     if (tag === "LI") return "listitem";
     if (tag === "BLOCKQUOTE") return "blockquote";
     if (tag === "FIGCAPTION") return "caption";
+    if (tag === "SUMMARY") return "button";
+    if (tag === "DETAILS") return "group";
+    if (tag === "DIALOG") return "dialog";
+    if (tag === "METER") return "meter";
+    if (tag === "PROGRESS") return "progressbar";
+    if (tag === "NAV") return "navigation";
+    // Custom interactive elements: onclick, tabindex, contenteditable
+    if (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false") return "textbox";
+    if (el.hasAttribute("onclick") || (el.hasAttribute("tabindex") && parseInt(el.getAttribute("tabindex")) >= 0)) {
+      // Check for cursor:pointer as additional clickability signal
+      try {
+        var style = window.getComputedStyle(el);
+        if (style.cursor === "pointer" || el.hasAttribute("onclick")) return "button";
+      } catch(e) {}
+      return "button";
+    }
     return "";
   }
 
