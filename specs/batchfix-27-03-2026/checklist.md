@@ -41,7 +41,7 @@
 - [x] **#28** Path Generator not prioritized — happy paths first (engine) — Added explicit prioritization instruction and ordered formatTestPlanForNavigator output.
 - [x] **#29** StorageAdapter bypassed — add missing methods (DB adapter) — Added getPool() to StorageAdapter interface and PostgresAdapter; replaced all `(storage as any).pool` casts across 5 route files.
 - [x] **#30** Summarizer lacks actionability — structured recommendations (engine) — Added structured recommendation types (FIX, FLAKY, COVERAGE, PERF, CONFIG) to summarizer prompt template.
-- [ ] **#31** Login-page detection missing in crawler (engine)
+- [x] **#31** Login-page detection missing in crawler (engine) — Added URL-based and content-based login page detection; skips auth URLs and pages with password fields + login titles.
 - [ ] **#32** Regression replay silent auth failure — retry auth (engine)
 - [ ] **#33** No test suite — focused tests for high-risk modules (engine)
 - [ ] **#34** Memory formatting weak signal-to-noise — temporal + usage context (engine)
