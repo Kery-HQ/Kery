@@ -95,6 +95,17 @@ const TYPE_LABELS: Record<MemoryEntryType, string> = {
   tip:           "Tips and hints",
 };
 
+/** Compute a human-readable temporal label for a memory entry. */
+function temporalLabel(entry: MemoryEntry): string {
+  const ageMs = Date.now() - new Date(entry.updated_at).getTime();
+  const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+  if (ageDays === 0) return "today";
+  if (ageDays === 1) return "yesterday";
+  if (ageDays <= 7) return `${ageDays} days ago`;
+  if (ageDays <= 30) return `${Math.floor(ageDays / 7)} weeks ago`;
+  return `${Math.floor(ageDays / 30)} months ago`;
+}
+
 export function formatMemoryForPrompt(entries: MemoryEntry[]): string {
   if (entries.length === 0) return "";
 
@@ -105,20 +116,26 @@ export function formatMemoryForPrompt(entries: MemoryEntry[]): string {
     grouped.set(e.type, arr);
   }
 
+  // Sort each group by confidence (highest first) for relevance prioritization
+  for (const [, items] of grouped) {
+    items.sort((a, b) => b.confidence - a.confidence);
+  }
+
   const sections: string[] = [];
   const typeOrder: MemoryEntryType[] = ["learned_path", "tip", "ignore_region", "avoid_region", "bug_pattern"];
   for (const t of typeOrder) {
     const items = grouped.get(t);
     if (!items || items.length === 0) continue;
     const lines = items.map((e) => {
-      const conf = e.confidence >= 80 ? " [high confidence]" : e.confidence <= 30 ? " [low confidence]" : "";
+      const conf = e.confidence >= 80 ? " [HIGH confidence]" : e.confidence <= 30 ? " [low confidence]" : "";
       const regionNote = e.region?.description ? ` (region: ${e.region.description})` : "";
-      return `  - ${e.summary}: ${e.content}${regionNote}${conf}`;
+      const temporal = ` (learned ${temporalLabel(e)})`;
+      return `  - ${e.summary}: ${e.content}${regionNote}${conf}${temporal}`;
     });
     sections.push(`${TYPE_LABELS[t]}:\n${lines.join("\n")}`);
   }
 
-  return `AGENT MEMORY (from previous runs — use this to guide your actions):\n${sections.join("\n\n")}`;
+  return `AGENT MEMORY (from previous runs — use this to guide your actions, prioritize high-confidence recent entries):\n${sections.join("\n\n")}`;
 }
 
 // ─── Propose memories from run results ────────────────────────────────────────
