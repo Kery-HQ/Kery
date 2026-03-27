@@ -1,5 +1,6 @@
 import { Pool, PoolClient } from "pg";
 import type { StorageAdapter } from "@kery/engine";
+import { decryptConfigJson } from "./crypto.js";
 
 /** Queryable — either the Pool or a PoolClient (transaction) */
 type Queryable = Pool | PoolClient;
@@ -227,7 +228,12 @@ export class PostgresAdapter implements StorageAdapter {
       `SELECT * FROM auth_configs WHERE project_id = $1 AND environment_id = $2`,
       [projectId, environmentId],
     );
-    return rows[0] ?? null;
+    if (!rows[0]) return null;
+    // Decrypt sensitive fields on read
+    if (rows[0].config_json && typeof rows[0].config_json === "object") {
+      rows[0].config_json = decryptConfigJson(rows[0].config_json);
+    }
+    return rows[0];
   }
 
   async buildAppTree(projectId: string, crawlRunId: string, sitemap: any[]) {

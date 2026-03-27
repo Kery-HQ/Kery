@@ -4,7 +4,7 @@
 
 - [x] **#1** No run queue — add BullMQ + Redis, auto-detect concurrency (API/infra) — Added BullMQ worker with auto-detected concurrency based on available memory, Redis service in docker-compose, and queue-based run dispatch replacing setImmediate.
 - [x] **#3** No transaction safety on run completion — wrap in BEGIN/COMMIT (DB adapter) — Added withTransaction() helper to StorageAdapter/PostgresAdapter, wrapped all post-run writes in atomic transaction.
-- [ ] **#4** Credentials stored in plaintext — AES-256-GCM with ENCRYPTION_KEY env var (DB adapter)
+- [x] **#4** Credentials stored in plaintext — AES-256-GCM with ENCRYPTION_KEY env var (DB adapter) — Added AES-256-GCM encrypt/decrypt for sensitive auth fields (password, token, apiKey), backwards-compatible when ENCRYPTION_KEY unset.
 - [ ] **#5** No token refresh — add refreshIfNeeded() for Clerk/Supabase (engine)
 
 ## P1 — High
