@@ -12,7 +12,7 @@ export const config = {
   agentModel: process.env.AGENT_MODEL || "openai/gpt-4.1-mini",
   summaryModel: process.env.SUMMARY_MODEL || "gemini-2.5-flash-lite",
   reviewModel: process.env.REVIEW_MODEL || "gemini-2.5-flash-lite",
-  reviewAgentModel: process.env.REVIEW_AGENT_MODEL || "anthropic/claude-sonnet-4.6",
+  reviewAgentModel: process.env.REVIEW_AGENT_MODEL || "gemini-2.5-flash",
   scriptModel: process.env.SCRIPT_MODEL || "gemini-2.5-flash",
   stagehandEnabled: process.env.STAGEHAND_ENABLED !== "false",
   stagehandModel: process.env.STAGEHAND_MODEL || "google/gemini-2.0-flash",

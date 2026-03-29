@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS bugs (
   reported_at       timestamptz NOT NULL,
   environment       text,
   step_index        int,
-  screenshot_base64 text,
+  screenshot_path   text,
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 

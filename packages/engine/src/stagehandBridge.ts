@@ -122,7 +122,7 @@ export async function destroyStagehandSession(session: StagehandSession): Promis
 export async function stagehandObserve(
   page: StagehandPage,
 ): Promise<ObservedElement[]> {
-  if (_circuitOpen) return [];
+  if (isObserveCircuitOpen()) return [];
 
   try {
     const results: ObserveResult[] = await page.observe(
@@ -139,7 +139,10 @@ export async function stagehandObserve(
     }));
   } catch (err) {
     recordObserveFailure();
-    logger.warn({ err: String(err).slice(0, 200), failures: _observeFailures, circuitOpen: _circuitOpen }, "Stagehand observe failed");
+    logger.warn(
+      { err: String(err).slice(0, 200), failures: _observeFailures, circuitState: _circuitState },
+      "Stagehand observe failed",
+    );
     return [];
   }
 }

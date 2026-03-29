@@ -26,14 +26,15 @@ export class KeryClient {
   // ── Helpers ──────────────────────────────────────────────────────────
 
   private async fetch<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> ?? {}),
-    };
-    if (this.apiKey) {
-      headers["Authorization"] = `Bearer ${this.apiKey}`;
+    const h = new Headers(init.headers as HeadersInit);
+    const body = init.body;
+    if (typeof body === "string" && body.length > 0 && !h.has("Content-Type")) {
+      h.set("Content-Type", "application/json");
     }
-    const res = await fetch(`${this.apiUrl}${path}`, { ...init, headers });
+    if (this.apiKey) {
+      h.set("Authorization", `Bearer ${this.apiKey}`);
+    }
+    const res = await fetch(`${this.apiUrl}${path}`, { ...init, headers: h });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`Kery API ${res.status}: ${text}`);

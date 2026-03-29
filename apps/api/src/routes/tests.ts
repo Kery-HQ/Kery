@@ -27,7 +27,7 @@ export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter
     const parsed = TestSchema.safeParse(req.body);
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
     const { rows } = await pool.query(
-      "INSERT INTO saved_tests (project_id, name, intent, context) VALUES ($1, $2, $3, $4) RETURNING *",
+      "INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots) VALUES ($1, $2, $3, $4, true) RETURNING *",
       [projectId, parsed.data.name, parsed.data.intent, parsed.data.context ?? null],
     );
     reply.send({ test: rows[0] });

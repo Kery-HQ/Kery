@@ -1,6 +1,10 @@
+import * as fs from "fs";
+import * as path from "path";
 import { Pool, PoolClient } from "pg";
 import type { StorageAdapter } from "@kery/engine";
 import { decryptConfigJson } from "./crypto.js";
+
+const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
 
 /** Queryable — either the Pool or a PoolClient (transaction) */
 type Queryable = Pool | PoolClient;
@@ -105,8 +109,8 @@ export class PostgresAdapter implements StorageAdapter {
       if (existing.length > 0) { skipped++; continue; }
 
       await this.db.query(
-        `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, screenshot_base64) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-        [projectId, runId, environmentId, bug.name, bug.description, bug.category, bug.severity, bug.status ?? "open", JSON.stringify(bug.stepsToReproduce ?? []), bug.url, runLabel, reportedAt, environmentName, bug.index ?? null, bug.screenshotBase64 ?? null],
+        `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, screenshot_path, region) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+        [projectId, runId, environmentId, bug.name, bug.description, bug.category, bug.severity, bug.status ?? "open", JSON.stringify(bug.stepsToReproduce ?? []), bug.url, runLabel, reportedAt, environmentName, bug.index ?? null, bug.screenshotPath ?? null, bug.region ?? null],
       );
       inserted++;
     }
@@ -115,7 +119,7 @@ export class PostgresAdapter implements StorageAdapter {
 
   async listBugs(projectId: string) {
     const { rows } = await this.db.query(
-      `SELECT id, project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, created_at FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
+      `SELECT id, project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, created_at, screenshot_path, region FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
       [projectId],
     );
     return rows;
@@ -123,10 +127,18 @@ export class PostgresAdapter implements StorageAdapter {
 
   async getBugScreenshot(bugId: string): Promise<string | null> {
     const { rows } = await this.db.query(
-      `SELECT screenshot_base64 FROM bugs WHERE id = $1`,
+      `SELECT run_id, screenshot_path FROM bugs WHERE id = $1`,
       [bugId],
     );
-    return rows[0]?.screenshot_base64 ?? null;
+    const r = rows[0];
+    if (!r?.screenshot_path) return null;
+    const fp = path.join(SCREENSHOTS_DIR, r.run_id, path.basename(r.screenshot_path));
+    try {
+      if (!fs.existsSync(fp)) return null;
+      return fs.readFileSync(fp).toString("base64");
+    } catch {
+      return null;
+    }
   }
 
   // ─── Runs ───────────────────────────────────────────────────────────────────

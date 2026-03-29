@@ -2,8 +2,9 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun } from "@/projectApi";
-import { API_BASE } from "@/api";
+import { apiMediaUrl, runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -49,6 +50,12 @@ import {
   ExternalLink,
   Hash,
   FileText,
+  Workflow,
+  Layers,
+  Search,
+  ListFilter,
+  Copy,
+  GitBranch,
 } from "lucide-react";
 
 // --- Types ---
@@ -67,15 +74,34 @@ type RunStep = {
   bugType?: "visual" | "functional" | "ux" | "other";
   severity?: "low" | "medium" | "high";
   at?: number;
-  source?: "navigator" | "review" | "pathgen";
+  source?: "navigator" | "review" | "pathgen" | "filmstrip" | "network";
   screenshot?: string;
+  /** On-disk JPEG name under run folder (preferred). */
+  screenshotPath?: string | null;
+  screenshot_path?: string | null;
+  /** Legacy: base64 or `/api/bugs/...` */
+  screenshotBase64?: string | null;
+  screenshot_base64?: string | null;
   stepsToReproduce?: string[];
   name?: string;
   description?: string;
   category?: string;
+  /** Navigator observation (a11y / element list) for this step */
+  domContext?: string;
+  executionMethod?: "stagehand" | "playwright" | "coordinates";
+  reviewFeedback?: { type: string; severity: string; description: string }[];
 };
 
-type LLMAgentType = "navigator" | "review" | "pathgen" | "summary";
+type LLMAgentType = "navigator" | "review" | "pathgen" | "summary" | "filmstrip";
+
+type LLMStoredContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; imageIndex: number; label?: string };
+
+type LLMStoredMessage = {
+  role: string;
+  content: string | LLMStoredContentPart[];
+};
 
 type LLMCallRecord = {
   seq: number;
@@ -89,7 +115,11 @@ type LLMCallRecord = {
   durationMs: number;
   costUsd: number;
   query?: string;
+  requestMessages?: LLMStoredMessage[];
   imageBase64?: string;
+  imageBase64s?: string[];
+  imagePath?: string;
+  imagePaths?: string[];
   response: string;
   role?: "action" | "dom-scan";
   agent?: LLMAgentType;
@@ -120,7 +150,7 @@ type Run = {
   source_back_path?: string | null;
   steps_json?: RunStep[];
   memory_loaded?: MemoryEntryBrief[];
-  bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "pathgen" })[];
+  bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "pathgen" | "filmstrip" })[];
   llm_calls_json?: LLMCallRecord[];
 };
 
@@ -136,6 +166,113 @@ function severityBorder(severity?: string) {
   }
 }
 
+/** Vision frame for this step: file ref or legacy inline base64. */
+function visionImageRefForStep(llmCalls: LLMCallRecord[], stepIndex: number, runId: string): string | undefined {
+  const hit = llmCalls.find(
+    (c) =>
+      c.stepIndex === stepIndex &&
+      c.hasVision &&
+      (c.imageBase64 || c.imagePath || (c.imagePaths && c.imagePaths.length > 0) || (c.imageBase64s && c.imageBase64s.length > 0)) &&
+      (c.agent === "navigator" || c.agent == null),
+  );
+  if (!hit) return undefined;
+  const path = hit.imagePaths?.[0] ?? hit.imagePath;
+  if (path) return runScreenshotFileUrl(runId, path);
+  return hit.imageBase64 ?? hit.imageBase64s?.[0];
+}
+
+function llmCallImageSrc(call: LLMCallRecord, runId: string): string | undefined {
+  return llmCallImageSrcByIndex(call, runId, 0);
+}
+
+function llmCallImageSrcByIndex(call: LLMCallRecord, runId: string, imageIndex: number): string | undefined {
+  const path = call.imagePaths?.[imageIndex];
+  if (path) {
+    const raw = runScreenshotFileUrl(runId, path);
+    if (raw != null && raw !== "") return screenshotRefToSrc(raw) ?? raw;
+  }
+  const b64 = call.imageBase64s?.[imageIndex] ?? (imageIndex === 0 ? call.imageBase64 : undefined);
+  if (b64 == null || b64 === "") return undefined;
+  return screenshotRefToSrc(b64) ?? (b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`);
+}
+
+/** URLs from filmstrip user prompt lines like `0. https://...` */
+function filmstripFrameUrlsFromCall(call: LLMCallRecord): string[] {
+  const msgs = call.requestMessages;
+  const user = msgs?.find((m) => m.role === "user");
+  if (!user || typeof user.content === "string") return [];
+  const textPart = user.content.find((p): p is { type: "text"; text: string } => p.type === "text");
+  if (!textPart?.text) return [];
+  const urls: string[] = [];
+  for (const line of textPart.text.split("\n")) {
+    const m = /^\s*\d+\.\s+(\S+)/.exec(line.trim());
+    if (m?.[1]) urls.push(m[1]);
+  }
+  return urls;
+}
+
+/** Horizontal filmstrip of frames exactly as sent to the filmstrip LLM (visit order). */
+function FilmstripSentToModel({ call, runId }: { call: LLMCallRecord; runId: string }) {
+  const nPath = call.imagePaths?.length ?? 0;
+  const nB64 = call.imageBase64s?.length ?? 0;
+  const legacy = call.imagePath || call.imageBase64 ? 1 : 0;
+  const frameCount = Math.max(nPath, nB64, legacy);
+  const urls = filmstripFrameUrlsFromCall(call);
+
+  if (frameCount === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-fuchsia-500/25 bg-fuchsia-500/5 px-3 py-2 text-[11px] text-muted-foreground">
+        No filmstrip images stored for this call.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/[0.04] px-3 py-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Layers className="h-3.5 w-3.5 text-fuchsia-400/90 flex-shrink-0" />
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400/80">
+          Filmstrip sent to model ({frameCount} frame{frameCount !== 1 ? "s" : ""}, visit order →)
+        </p>
+      </div>
+      <div className="flex gap-2 overflow-x-auto overflow-y-hidden pb-1 pt-0.5 [scrollbar-gutter:stable] scroll-smooth">
+        {Array.from({ length: frameCount }, (_, i) => {
+          const src = llmCallImageSrcByIndex(call, runId, i);
+          const url = urls[i];
+          return (
+            <div
+              key={i}
+              className="flex-shrink-0 w-[min(200px,72vw)] rounded-md border border-border bg-card overflow-hidden shadow-sm"
+            >
+              <div className="px-2 py-1 border-b border-border/60 bg-muted/30">
+                <p className="text-[9px] font-mono text-fuchsia-400/90 tabular-nums">#{i + 1}</p>
+                {url ? (
+                  <p className="text-[9px] font-mono text-muted-foreground truncate" title={url}>
+                    {url}
+                  </p>
+                ) : (
+                  <p className="text-[9px] text-muted-foreground/60">—</p>
+                )}
+              </div>
+              {src ? (
+                <img
+                  src={src}
+                  alt={`Filmstrip frame ${i + 1}`}
+                  className="w-full h-28 object-cover object-top bg-black"
+                />
+              ) : (
+                <div className="h-28 flex items-center justify-center text-[10px] text-muted-foreground bg-muted/20">
+                  No image
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function formatStepTime(at: number): string {
   const epochMs = Math.floor(at);
   const d = new Date(epochMs);
@@ -146,19 +283,175 @@ function formatStepTime(at: number): string {
   return `${h}:${m}:${s}.${ms}`;
 }
 
-function ActionIcon({ action }: { action: string }) {
-  const cls = "h-3.5 w-3.5 flex-shrink-0";
-  switch (action) {
-    case "fill":     return <Keyboard          className={cn(cls, "text-blue-400")} />;
-    case "click":    return <MousePointerClick className={cn(cls, "text-emerald-400")} />;
-    case "navigate": return <Navigation        className={cn(cls, "text-violet-400")} />;
-    case "assert":   return <CheckCircle2      className={cn(cls, "text-amber-400")} />;
-    case "auth":     return <LogIn             className={cn(cls, "text-cyan-400")} />;
-    case "wait":     return <Timer             className={cn(cls, "text-muted-foreground")} />;
-    case "bug":      return <Bug               className={cn(cls, "text-red-400")} />;
-    case "done":     return <CheckCircle2      className={cn(cls, "text-emerald-400")} />;
-    default:         return <Globe             className={cn(cls, "text-muted-foreground")} />;
+function llmRoleLabel(role: string): string {
+  const r = role.toLowerCase();
+  if (r === "system") return "System";
+  if (r === "user") return "User";
+  if (r === "assistant") return "Assistant";
+  if (r === "tool") return "Tool";
+  return role;
+}
+
+function LLMRequestInspector({
+  call,
+  runId,
+  compact,
+}: {
+  call: LLMCallRecord;
+  runId: string;
+  /** Smaller scroll areas for nested step cards */
+  compact?: boolean;
+}) {
+  const scrollReq = compact ? "max-h-36" : "max-h-[min(56vh,520px)]";
+  const scrollFallback = compact ? "max-h-28" : "max-h-[min(40vh,360px)]";
+
+  const msgs = call.requestMessages;
+  if (msgs && msgs.length > 0) {
+    return (
+      <div
+        className={cn(
+          "rounded-md border border-border bg-muted/20 overflow-y-auto overflow-x-auto overscroll-contain",
+          scrollReq,
+        )}
+      >
+        <div className="p-3 space-y-4">
+          {msgs.map((m, mi) => (
+            <div key={mi} className="space-y-2">
+              <Badge variant="outline" className="text-[10px] font-mono uppercase h-5">
+                {llmRoleLabel(m.role)}
+              </Badge>
+              {typeof m.content === "string" ? (
+                <pre className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/80 leading-relaxed">
+                  {m.content}
+                </pre>
+              ) : (
+                <div className="space-y-3">
+                  {m.content.map((part, pi) =>
+                    part.type === "text" ? (
+                      <pre
+                        key={pi}
+                        className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/80 leading-relaxed"
+                      >
+                        {part.text}
+                      </pre>
+                    ) : (
+                      <div key={pi} className="space-y-1">
+                        {part.label && (
+                          <p className="text-[10px] text-muted-foreground">{part.label}</p>
+                        )}
+                        {(() => {
+                          const src = llmCallImageSrcByIndex(call, runId, part.imageIndex);
+                          return src ? (
+                            <div className="rounded border border-border bg-black overflow-hidden">
+                              <img
+                                src={src}
+                                alt={`Model input image ${part.imageIndex + 1}`}
+                                className={cn("w-full object-contain object-top", compact ? "max-h-32" : "max-h-72")}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground italic">
+                              Image {part.imageIndex + 1} not available on disk
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
+
+  const pathLen = call.imagePaths?.length ?? 0;
+  const b64Len = call.imageBase64s?.length ?? 0;
+  const legacyOne = call.imagePath || call.imageBase64 ? 1 : 0;
+  const imageSlots = Math.max(pathLen, b64Len, legacyOne);
+
+  return (
+    <div className="space-y-3">
+      {call.query ? (
+        <div
+          className={cn(
+            "rounded-md border border-border bg-muted/20 overflow-y-auto overflow-x-auto overscroll-contain",
+            scrollFallback,
+          )}
+        >
+          <pre className="text-[11px] font-mono whitespace-pre-wrap break-words p-3 text-foreground/80 leading-relaxed">
+            {call.query}
+          </pre>
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground italic">No request text stored for this call.</p>
+      )}
+      {imageSlots > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {Array.from({ length: imageSlots }, (_, i) => {
+            const src = llmCallImageSrcByIndex(call, runId, i);
+            return src ? (
+              <div key={i} className="rounded border border-border bg-black overflow-hidden">
+                <p className="text-[9px] font-mono text-muted-foreground px-2 py-1 border-b border-border/50">
+                  Image {i + 1}
+                </p>
+                <img
+                  src={src}
+                  alt={`Screenshot ${i + 1}`}
+                  className={cn("w-full object-contain object-top", compact ? "max-h-28" : "max-h-56")}
+                />
+              </div>
+            ) : null;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type StepsGlyphIcon = React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
+
+/** Action glyphs use theme tokens (primary, status-*, destructive) — matches app palette. */
+function getActionGlyph(action: string): { Icon: StepsGlyphIcon; tile: string } {
+  switch (action) {
+    case "fill":
+      return { Icon: Keyboard, tile: "bg-primary/12 text-primary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]" };
+    case "click":
+      return { Icon: MousePointerClick, tile: "bg-status-pass/12 text-status-pass shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]" };
+    case "navigate":
+      return { Icon: Navigation, tile: "bg-status-running/12 text-status-running shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]" };
+    case "assert":
+      return { Icon: CheckCircle2, tile: "bg-status-warn/12 text-status-warn shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]" };
+    case "auth":
+      return { Icon: LogIn, tile: "bg-secondary text-secondary-foreground" };
+    case "wait":
+      return { Icon: Timer, tile: "bg-muted text-muted-foreground" };
+    case "bug":
+      return { Icon: Bug, tile: "bg-destructive/12 text-destructive shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]" };
+    case "done":
+      return { Icon: CheckCircle2, tile: "bg-status-pass/12 text-status-pass shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]" };
+    default:
+      return { Icon: Globe, tile: "bg-muted/90 text-muted-foreground" };
+  }
+}
+
+function StepActionGlyph({ action, className }: { action: string; className?: string }) {
+  const { Icon, tile } = getActionGlyph(action);
+  return (
+    <span className={cn("inline-flex h-7 w-7 items-center justify-center rounded-md", tile, className)}>
+      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+    </span>
+  );
+}
+
+function timelineNodeRing(step: RunStep): string {
+  const isBug = step.action === "bug";
+  if (isBug) return "border-destructive/50";
+  if (step.status === "failed") return "border-status-fail/55";
+  if (step.status === "skipped") return "border-muted-foreground/35 bg-muted/20";
+  return "border-status-pass/45";
 }
 
 function badgeVariantForStatus(status: string): "success" | "destructive" | "warning" | "neutral" | "running" {
@@ -171,6 +464,7 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
   review:    { label: "Review",    color: "text-violet-400",  Icon: Eye },
   pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Route },
   summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
+  filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Layers },
 };
 
 // --- Main component ---
@@ -411,7 +705,7 @@ export const RunDetail: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="llm" className="mt-0">
-            <LLMTab llmCalls={llmCalls} totalCost={totalCost} />
+            <LLMTab runId={run.id} llmCalls={llmCalls} totalCost={totalCost} />
           </TabsContent>
 
           <TabsContent value="memory" className="mt-0">
@@ -422,6 +716,100 @@ export const RunDetail: React.FC = () => {
     </div>
   );
 };
+
+function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]; stepsCount: number }) {
+  const hasPathGen = llmCalls.some((c) => c.agent === "pathgen");
+  const hasReview = llmCalls.some((c) => c.agent === "review");
+  const hasFilmstrip = llmCalls.some((c) => c.agent === "filmstrip");
+  const hasSummary = llmCalls.some((c) => c.agent === "summary");
+  const navCalls = llmCalls.filter((c) => (c.agent ?? "navigator") === "navigator").length;
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <SectionLabel icon={<Workflow className="h-3.5 w-3.5" />} text="Agent pipeline" />
+        <ol className="text-[12px] text-muted-foreground space-y-1.5 list-decimal list-inside">
+          <li>
+            <span className="text-foreground/90">Auth &amp; navigation</span> — session and target URL
+          </li>
+          {hasPathGen && (
+            <li>
+              <span className="text-foreground/90">Path Generator</span> — test plan text injected into Navigator context
+            </li>
+          )}
+          <li>
+            <span className="text-foreground/90">Navigator loop</span> — {stepsCount} step{stepsCount !== 1 ? "s" : ""} recorded,{" "}
+            {navCalls} LLM decision{navCalls !== 1 ? "s" : ""}
+          </li>
+          {hasReview && (
+            <li>
+              <span className="text-foreground/90">Review agent</span> — parallel screenshot analysis
+            </li>
+          )}
+          {hasFilmstrip && (
+            <li>
+              <span className="text-foreground/90">Filmstrip</span> — post-run journey review across visited pages
+            </li>
+          )}
+          {hasSummary && (
+            <li>
+              <span className="text-foreground/90">Summary</span> — run report
+            </li>
+          )}
+          <li className="text-muted-foreground/90">
+            <span className="text-foreground/90">Network monitor</span> — optional HTTP/console signals (merge into bugs when enabled on the page)
+          </li>
+        </ol>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PathGeneratorCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
+  const call = llmCalls.find((c) => c.agent === "pathgen");
+  if (!call?.response) return null;
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <SectionLabel icon={<Route className="h-3.5 w-3.5" />} text="Path Generator plan" />
+        <p className="text-[11px] text-muted-foreground">
+          Plan passed to the Navigator (model: <span className="font-mono">{call.model}</span>
+          {call.costUsd > 0 ? `, ${formatCost(call.costUsd)}` : ""}).
+        </p>
+        <pre className="text-[11px] font-mono bg-muted/50 rounded-md p-3 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-foreground/80 border border-border/50">
+          {call.response}
+        </pre>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
+  const agents = ["navigator", "review", "filmstrip", "pathgen", "summary"] as const;
+  const rows = agents
+    .map((a) => ({
+      agent: a,
+      cost: llmCalls.filter((c) => (c.agent ?? "navigator") === a).reduce((s, c) => s + c.costUsd, 0),
+      calls: llmCalls.filter((c) => (c.agent ?? "navigator") === a).length,
+    }))
+    .filter((r) => r.calls > 0);
+  if (rows.length === 0) return null;
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-2">
+        <SectionLabel icon={<DollarSign className="h-3.5 w-3.5" />} text="Cost by agent" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {rows.map((r) => (
+            <div key={r.agent} className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{r.agent}</p>
+              <p className="text-[13px] font-mono text-foreground">{formatCost(r.cost)}</p>
+              <p className="text-[10px] text-muted-foreground/70">{r.calls} call{r.calls !== 1 ? "s" : ""}</p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // ============================================================
 // Overview tab
@@ -490,6 +878,10 @@ function OverviewTab({
         <MetricCard label="LLM Calls" value={String(llmCalls.length)} />
       </div>
 
+      <AgentPipelineCard llmCalls={llmCalls} stepsCount={steps.length} />
+      <PathGeneratorCard llmCalls={llmCalls} />
+      <AgentCostBreakdownCard llmCalls={llmCalls} />
+
       {/* Detail metadata */}
       <Card>
         <CardContent className="p-4 space-y-2">
@@ -517,7 +909,7 @@ function OverviewTab({
           {run.video_url && (
             <MetaRow label="Recording">
               <a
-                href={run.video_url}
+                href={apiMediaUrl(run.video_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-[12px] text-primary hover:underline"
@@ -551,7 +943,7 @@ function OverviewTab({
         <div>
           <SectionLabel icon={<Video className="h-3.5 w-3.5" />} text="Recording" />
           <div className="rounded-lg border border-border bg-black overflow-hidden">
-            <video src={run.video_url} controls className="w-full max-h-[480px]" preload="metadata" />
+            <video src={apiMediaUrl(run.video_url)} controls className="w-full max-h-[480px]" preload="metadata" />
           </div>
         </div>
       )}
@@ -565,7 +957,7 @@ function OverviewTab({
           />
           <div className="space-y-2">
             {bugsFound.map((bug: any, i: number) => (
-              <BugCard key={i} bug={bug} index={i} runBugs={runBugs} />
+              <BugCard key={i} bug={bug} index={i} runBugs={runBugs} runId={run.id} />
             ))}
           </div>
         </div>
@@ -591,10 +983,12 @@ function BugCard({
   bug,
   index,
   runBugs,
+  runId,
 }: {
   bug: any;
   index: number;
   runBugs: { id?: string; name: string; description: string; url?: string | null }[];
+  runId: string;
 }) {
   const [expanded, setExpanded] = React.useState(false);
 
@@ -633,7 +1027,7 @@ function BugCard({
           </span>
           {bug.source && (
             <span className="text-[10px] text-muted-foreground/50">
-              {bug.source === "review" ? "Review" : bug.source === "navigator" ? "Nav" : bug.source === "pathgen" ? "Path" : bug.source}
+              {bug.source === "review" ? "Review" : bug.source === "navigator" ? "Nav" : bug.source === "pathgen" ? "Path" : bug.source === "filmstrip" ? "Filmstrip" : bug.source}
             </span>
           )}
           <Badge variant={isTracked ? "success" : "neutral"} className="text-[10px] ml-1">
@@ -664,19 +1058,28 @@ function BugCard({
             </div>
           )}
 
-          {/* Screenshot */}
-          {bug.screenshot && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Screenshot</p>
-              <div className="rounded border border-border bg-black overflow-hidden">
-                <img
-                  src={bug.screenshot.startsWith("/api/") ? `${API_BASE}${bug.screenshot}` : bug.screenshot.startsWith("data:") ? bug.screenshot : `data:image/png;base64,${bug.screenshot}`}
-                  alt="Bug screenshot"
-                  className="w-full block max-h-64 object-contain object-top"
-                />
+          {/* Screenshot: file on volume (screenshotPath) or legacy inline / URL */}
+          {(() => {
+            const fileUrl = runScreenshotFileUrl(runId, bug.screenshotPath ?? bug.screenshot_path);
+            const legacyRef =
+              bug.screenshotBase64 ??
+              bug.screenshot_base64 ??
+              bug.screenshot;
+            const src = fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined);
+            if (!src) return null;
+            return (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Screenshot</p>
+                <div className="rounded border border-border bg-black overflow-hidden">
+                  <img
+                    src={src}
+                    alt="Bug screenshot"
+                    className="w-full block max-h-64 object-contain object-top"
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Full step JSON */}
           <div>
@@ -695,8 +1098,9 @@ function BugCard({
 // Steps tab -- vertical timeline
 // ============================================================
 
+type StepsFilter = "all" | "issues" | "bugs" | "memory";
+
 function StepsTab({ steps, run, liveScreenshot, llmCalls }: { steps: RunStep[]; run: Run; liveScreenshot: string | null; llmCalls: LLMCallRecord[] }) {
-  // Build step-to-LLM-calls index for per-step observability
   const llmCallsByStep = React.useMemo(() => {
     const map = new Map<number, LLMCallRecord[]>();
     for (const call of llmCalls) {
@@ -708,165 +1112,493 @@ function StepsTab({ steps, run, liveScreenshot, llmCalls }: { steps: RunStep[]; 
     return map;
   }, [llmCalls]);
 
-  return (
-    <div className="px-6 py-5 max-w-4xl w-full mx-auto space-y-4 animate-fade-in">
+  const [filter, setFilter] = React.useState<StepsFilter>("all");
+  const [query, setQuery] = React.useState("");
 
-      {/* Live screenshot */}
+  const stats = React.useMemo(() => {
+    const ok = steps.filter((s) => s.status === "ok" && s.action !== "bug").length;
+    const failed = steps.filter((s) => s.status === "failed").length;
+    const skipped = steps.filter((s) => s.status === "skipped").length;
+    const bugs = steps.filter((s) => s.action === "bug").length;
+    const memory = steps.filter((s) => s.fromMemory).length;
+    const times = steps.map((s) => s.at).filter((a): a is number => typeof a === "number");
+    const spanMs = times.length >= 2 ? Math.max(...times) - Math.min(...times) : null;
+    return { ok, failed, skipped, bugs, memory, spanMs };
+  }, [steps]);
+
+  const filteredSteps = React.useMemo(() => {
+    let list = steps;
+    if (filter === "issues") list = list.filter((s) => s.status === "failed");
+    if (filter === "bugs") list = list.filter((s) => s.action === "bug");
+    if (filter === "memory") list = list.filter((s) => s.fromMemory);
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((s) => {
+        const hay = [
+          s.action,
+          s.target,
+          s.value,
+          s.reasoning,
+          s.url,
+          s.error,
+          s.assertion,
+          String(s.index),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    return list;
+  }, [steps, filter, query]);
+
+  const scrollToStep = React.useCallback((idx: number) => {
+    document.getElementById(`run-step-${idx}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  const filterBtn = (id: StepsFilter, label: string, count?: number) => (
+    <button
+      type="button"
+      onClick={() => setFilter(id)}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors",
+        filter === id
+          ? "border-primary/50 bg-primary/10 text-foreground"
+          : "border-border/80 bg-background/50 text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+      )}
+    >
+      {label}
+      {count != null && count > 0 && (
+        <span className="tabular-nums text-muted-foreground/80">{count}</span>
+      )}
+    </button>
+  );
+
+  return (
+    <div className="px-4 sm:px-6 py-5 max-w-5xl w-full mx-auto space-y-5 animate-fade-in">
+
       {run.status === "running" && liveScreenshot && (
-        <div className="mb-4">
-          <SectionLabel icon={<Monitor className="h-3.5 w-3.5" />} text="Live View">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-semibold text-red-500 uppercase tracking-wider">Live</span>
-            </span>
-          </SectionLabel>
-          <div className="rounded-lg border border-border bg-black overflow-hidden">
-            <img src={`data:image/jpeg;base64,${liveScreenshot}`} alt="Live browser" className="w-full block" />
-          </div>
-        </div>
+        <Card className="overflow-hidden border-red-500/20 bg-gradient-to-br from-red-500/[0.06] to-transparent">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border/60 bg-black/20">
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4 text-muted-foreground" />
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Live browser</span>
+              </div>
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-500">
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                Live
+              </span>
+            </div>
+            <div className="bg-black">
+              <img src={`data:image/jpeg;base64,${liveScreenshot}`} alt="Live browser" className="w-full block max-h-[min(52vh,420px)] object-contain object-top" />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {steps.length === 0 ? (
         run.status === "running" ? (
-          <div className="flex flex-col items-center py-12 gap-2">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/40" />
-            <p className="text-[13px] text-muted-foreground">Waiting for first step...</p>
-          </div>
+          <Card>
+            <CardContent className="flex flex-col items-center py-16 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+              <p className="text-sm font-medium text-foreground">Waiting for the first step</p>
+              <p className="text-[13px] text-muted-foreground text-center max-w-sm">
+                The agent is exploring your app. Navigator actions will appear here as they complete.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <EmptyState
             icon={<Hash className="h-5 w-5" />}
             title="No steps recorded"
-            description="This run has no step data."
+            description="This run has no step data. Try re-running the test or check the run summary for errors."
           />
         )
       ) : (
-        /* Vertical timeline */
-        <div className="relative">
-          {/* Connecting line */}
-          <div className="absolute left-[19px] top-3 bottom-3 w-px bg-border" />
+        <>
+          {/* Summary + controls */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              <MetricCard label="Total steps" value={String(steps.length)} sub={`${stats.ok} succeeded`} />
+              <MetricCard
+                label="Issues"
+                value={String(stats.failed + stats.bugs)}
+                sub={stats.failed ? `${stats.failed} failed` : stats.bugs ? `${stats.bugs} bug reports` : "None"}
+                variant={stats.failed + stats.bugs > 0 ? "destructive" : undefined}
+              />
+              <MetricCard label="From memory" value={String(stats.memory)} sub={stats.memory ? "Used cached context" : "—"} />
+              <MetricCard
+                label="Step span"
+                value={stats.spanMs != null ? formatMs(stats.spanMs) : "—"}
+                sub={stats.spanMs != null ? "First → last timestamp" : "No timestamps"}
+                mono
+              />
+            </div>
 
-          <div className="space-y-0">
-            {steps.map((step, i) => (
-              <StepTimelineRow key={i} step={step} isLast={i === steps.length - 1 && run.status !== "running"} stepLLMCalls={llmCallsByStep.get(step.index) ?? []} />
-            ))}
-
-            {/* Running indicator at end */}
-            {run.status === "running" && (
-              <div className="relative flex items-center gap-3 pl-2 py-2">
-                <div className="relative z-10 flex items-center justify-center h-[22px] w-[22px]">
-                  <Loader2 className="h-3.5 w-3.5 text-status-running animate-spin" />
-                </div>
-                <span className="text-[12px] text-muted-foreground">Agent is working...</span>
+            <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search actions, targets, URLs, errors…"
+                  className="h-9 pl-8 text-[13px] bg-background/80"
+                />
               </div>
-            )}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                  <ListFilter className="h-3 w-3" />
+                  Show
+                </span>
+                {filterBtn("all", "All", steps.length)}
+                {filterBtn("issues", "Failed", stats.failed)}
+                {filterBtn("bugs", "Bugs", stats.bugs)}
+                {filterBtn("memory", "Memory", stats.memory)}
+              </div>
+            </div>
+
+            {/* Timeline scrubber — theme-aligned status ticks */}
+            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card to-muted/25 p-4 shadow-sm">
+              <div className="mb-3 flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <GitBranch className="h-4 w-4" strokeWidth={2} />
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <p className="text-[12px] font-semibold tracking-tight text-foreground">Run timeline</p>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Same order as the spine below. Each tick matches step outcome (pass, fail, bug).
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 [scrollbar-gutter:stable]">
+                {steps.map((s) => {
+                  const isBug = s.action === "bug";
+                  const failed = s.status === "failed";
+                  const skipped = s.status === "skipped";
+                  const tick =
+                    isBug ? "bg-destructive"
+                      : failed ? "bg-status-fail"
+                        : skipped ? "bg-muted-foreground/45"
+                          : "bg-status-pass";
+                  return (
+                    <button
+                      key={s.index}
+                      type="button"
+                      onClick={() => scrollToStep(s.index)}
+                      title={`Step ${s.index}`}
+                      className={cn(
+                        "group flex min-w-[2.75rem] flex-col items-center gap-1.5 rounded-xl border px-2 py-2 transition-all",
+                        "border-border/70 bg-background/40 hover:border-primary/30 hover:bg-primary/[0.06] hover:shadow-sm",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        isBug && "border-destructive/20 hover:border-destructive/35",
+                        failed && !isBug && "border-status-fail/15 hover:border-status-fail/35",
+                      )}
+                    >
+                      <span className={cn("h-1 w-full max-w-[2rem] rounded-full opacity-90", tick)} />
+                      <span className="text-[11px] font-mono font-semibold tabular-nums text-foreground/90 group-hover:text-foreground">
+                        {s.index}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+
+          {filteredSteps.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <p className="text-sm font-medium text-foreground">No steps match</p>
+                <p className="text-[13px] text-muted-foreground mt-1">
+                  Try clearing the search or switching the filter.
+                </p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={() => { setQuery(""); setFilter("all"); }}>
+                  Reset filters
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                Showing <span className="font-mono text-foreground">{filteredSteps.length}</span> of{" "}
+                <span className="font-mono text-foreground">{steps.length}</span> steps
+              </p>
+
+              <div className="relative">
+                {/* Vertical spine — theme gradient, sits behind nodes */}
+                <div
+                  className="pointer-events-none absolute left-[22px] top-2 bottom-2 w-px bg-gradient-to-b from-primary/40 via-border/90 to-muted-foreground/20"
+                  aria-hidden
+                />
+                <div className="space-y-0">
+                  {filteredSteps.map((step, i) => (
+                    <StepTimelineRow
+                      key={`${step.index}-${i}`}
+                      step={step}
+                      isLast={i === filteredSteps.length - 1 && run.status !== "running"}
+                      stepLLMCalls={llmCallsByStep.get(step.index) ?? []}
+                      llmCalls={llmCalls}
+                      runId={run.id}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {run.status === "running" && (
+                <Card className="border-dashed border-primary/25 bg-primary/[0.03]">
+                  <CardContent className="flex items-center gap-3 py-4 px-4">
+                    <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Agent is working</p>
+                      <p className="text-[12px] text-muted-foreground">More steps will appear here as the run progresses.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function StepTimelineRow({ step, isLast, stepLLMCalls }: { step: RunStep; isLast: boolean; stepLLMCalls: LLMCallRecord[] }) {
+function executionMethodLabel(m?: RunStep["executionMethod"]): string {
+  switch (m) {
+    case "stagehand":
+      return "Stagehand act";
+    case "coordinates":
+      return "Coordinates / fallback";
+    case "playwright":
+      return "Playwright locator";
+    default:
+      return "";
+  }
+}
+
+function StepTimelineRow({
+  step,
+  isLast: _isLast,
+  stepLLMCalls,
+  llmCalls,
+  runId,
+}: {
+  step: RunStep;
+  isLast: boolean;
+  stepLLMCalls: LLMCallRecord[];
+  llmCalls: LLMCallRecord[];
+  runId: string;
+}) {
   const [expanded, setExpanded] = React.useState(false);
-  const isBug   = step.action === "bug";
-  const hasDetail = !!(step.reasoning || step.error || step.url || stepLLMCalls.length > 0);
+  const isBug = step.action === "bug";
+  const visionRef = visionImageRefForStep(llmCalls, step.index, runId);
+  const visionSrc = visionRef ? (screenshotRefToSrc(visionRef) ?? visionRef) : undefined;
+  const hasDetail = !!(
+    step.reasoning ||
+    step.error ||
+    step.url ||
+    stepLLMCalls.length > 0 ||
+    step.domContext ||
+    (step.reviewFeedback && step.reviewFeedback.length > 0) ||
+    step.executionMethod ||
+    visionSrc
+  );
   const stepCost = stepLLMCalls.reduce((sum, c) => sum + c.costUsd, 0);
   const stepTokens = stepLLMCalls.reduce((sum, c) => sum + c.totalTokens, 0);
 
+  const primaryLine = isBug
+    ? [
+        step.bugType && `${step.bugType}`,
+        step.severity && `(${step.severity})`,
+        step.reasoning,
+      ].filter(Boolean).join(" ")
+    : [
+        step.target && `${step.target}`,
+        step.value && `= "${step.value}"`,
+        step.assertion && `assert "${step.assertion}"`,
+      ].filter(Boolean).join(" ")
+    || step.reasoning
+    || (step.action === "navigate" && step.url ? step.url : "—");
+
   return (
-    <div className="relative">
-      <button
+    <div
+      className="relative z-10 flex scroll-mt-28 gap-3 pb-8 last:pb-2"
+      id={`run-step-${step.index}`}
+    >
+      {/* Timeline node — rings use status tokens; glyph uses action tokens */}
+      <div className="flex w-11 shrink-0 justify-center pt-4">
+        <div
+          className={cn(
+            "flex h-10 w-10 items-center justify-center rounded-full border-2 bg-card ring-4 ring-background",
+            "shadow-sm",
+            timelineNodeRing(step),
+            isBug && "bg-destructive/[0.04]",
+          )}
+        >
+          <StepActionGlyph action={step.action} />
+        </div>
+      </div>
+
+      <Card
         className={cn(
-          "w-full flex items-center gap-3 pl-2 pr-3 py-2 text-left transition-colors rounded-md",
-          hasDetail && "hover:bg-accent/30 cursor-pointer",
-          !hasDetail && "cursor-default",
+          "min-w-0 flex-1 overflow-hidden border-border/60 bg-card/95 shadow-sm transition-shadow backdrop-blur-sm",
+          hasDetail && "hover:shadow-md",
+          isBug && "border-destructive/20 bg-destructive/[0.035]",
         )}
-        onClick={() => hasDetail && setExpanded(!expanded)}
       >
-        {/* Index circle on timeline */}
-        <div className={cn(
-          "relative z-10 flex items-center justify-center h-[22px] w-[22px] rounded-full text-[10px] font-mono font-medium flex-shrink-0 border",
-          isBug
-            ? "border-red-500/40 bg-red-500/10 text-red-400"
-            : step.status === "failed"
-              ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : step.status === "ok"
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-                : "border-border bg-card text-muted-foreground",
-        )}>
-          {step.index}
-        </div>
-
-        {/* Icon + action */}
-        <ActionIcon action={step.action} />
-        <span className={cn(
-          "text-[12px] font-mono font-medium flex-shrink-0 w-16",
-          isBug ? "text-red-400" : step.status === "failed" ? "text-destructive" : "text-foreground",
-        )}>
-          {step.action}
-        </span>
-
-        {/* Description */}
-        <span className="flex-1 min-w-0 truncate text-[12px] text-muted-foreground">
-          {isBug ? (
-            <>
-              {step.bugType && <span className="capitalize">{step.bugType}</span>}
-              {step.severity && <span className="ml-1 capitalize text-muted-foreground/60">({step.severity})</span>}
-              {step.reasoning && <span className="ml-1.5">{step.reasoning}</span>}
-            </>
-          ) : (
-            <>
-              {step.target && (
-                <>
-                  <span className="font-mono">{step.target}</span>
-                  {step.value && <span className="text-foreground/80"> = "{step.value}"</span>}
-                  {step.assertion && <span className="text-amber-400"> assert "{step.assertion}"</span>}
-                </>
+        <button
+          type="button"
+          className={cn(
+            "w-full text-left px-4 py-3.5 sm:py-4 transition-colors",
+            hasDetail && "hover:bg-accent/20 cursor-pointer",
+            !hasDetail && "cursor-default",
+          )}
+          onClick={() => hasDetail && setExpanded(!expanded)}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[10px] font-mono font-semibold tabular-nums text-muted-foreground">
+                  #{step.index}
+                </span>
+                <span
+                  className={cn(
+                    "text-[13px] font-mono font-semibold tracking-tight",
+                    isBug ? "text-destructive" : step.status === "failed" ? "text-status-fail" : "text-foreground",
+                  )}
+                >
+                  {step.action}
+                </span>
+                {step.source && (
+                  <Badge variant="outline" className="h-5 text-[10px] font-normal capitalize">
+                    {step.source}
+                  </Badge>
+                )}
+                {!isBug && step.status === "ok" && (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-status-pass" strokeWidth={2} />
+                )}
+                {step.status === "failed" && <XCircle className="h-3.5 w-3.5 text-status-fail" strokeWidth={2} />}
+                {step.status === "skipped" && (
+                  <Badge variant="neutral" className="text-[10px]">
+                    skipped
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[13px] leading-relaxed text-muted-foreground line-clamp-3 break-words">
+                {primaryLine}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {step.executionMethod && !isBug && (
+                  <Badge variant="outline" className="h-5 text-[10px] font-mono uppercase" title="How the action was executed">
+                    {step.executionMethod === "stagehand" ? "Stagehand" : step.executionMethod === "coordinates" ? "Coordinates" : "Playwright"}
+                  </Badge>
+                )}
+                {step.fromMemory && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    <Zap className="h-3 w-3" strokeWidth={2} />
+                    Memory
+                  </span>
+                )}
+                {stepLLMCalls.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Brain className="h-3 w-3" strokeWidth={2} />
+                    {stepLLMCalls.length} LLM call{stepLLMCalls.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {stepCost > 0 && (
+                  <span className="text-[10px] font-mono tabular-nums text-muted-foreground/90">{formatCost(stepCost)}</span>
+                )}
+              </div>
+              {step.url && !isBug && (
+                <p className="text-[11px] font-mono text-muted-foreground/70 truncate" title={step.url}>
+                  {step.url.replace(/^https?:\/\//, "")}
+                </p>
               )}
-            </>
-          )}
-        </span>
+            </div>
 
-        {/* URL */}
-        {step.url && !isBug && (
-          <span className="text-[10px] font-mono text-muted-foreground/40 truncate max-w-[140px] hidden sm:inline flex-shrink-0">
-            {step.url.replace(/^https?:\/\//, "")}
-          </span>
-        )}
+            <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-border/40 pt-3 sm:flex-col sm:border-t-0 sm:pt-0 sm:items-end sm:justify-start sm:pl-2">
+              {step.at != null && (
+                <span className="text-[11px] font-mono tabular-nums text-muted-foreground">{formatStepTime(step.at)}</span>
+              )}
+              {hasDetail && (
+                <span className="text-muted-foreground/60">
+                  {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
 
-        {/* Right side: memory badge, status, duration */}
-        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-          {step.fromMemory && (
-            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5">
-              <Zap className="h-2.5 w-2.5" />
-              memory
-            </span>
-          )}
-          {stepCost > 0 && (
-            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums hidden sm:inline">
-              {formatCost(stepCost)}
-            </span>
-          )}
-          {step.at != null && (
-            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums hidden sm:inline">
-              {formatStepTime(step.at)}
-            </span>
-          )}
-          {!isBug && step.status === "ok"  && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-          {step.status === "failed"         && <XCircle className="h-3.5 w-3.5 text-destructive" />}
-          {hasDetail && (
-            expanded
-              ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
-              : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
-          )}
-        </div>
-      </button>
-
-      {/* Expanded detail */}
       {expanded && (
-        <div className="ml-[34px] mr-3 mb-2 px-3 py-2.5 rounded-md bg-muted/30 border border-border/50 space-y-2">
+        <div className="border-t border-border/60 bg-muted/25 px-4 py-4 space-y-3">
+          <details className="rounded-md border border-border/40 bg-background/20 px-2 py-1.5">
+            <summary className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 cursor-pointer flex items-center gap-1.5">
+              <Workflow className="h-3 w-3 shrink-0" />
+              Agent trace — view, execution, review, DOM
+            </summary>
+            <div className="mt-2 space-y-2 border-l-2 border-primary/25 pl-2 ml-0.5">
+              {step.executionMethod && !isBug && (
+                <p className="text-[11px] text-muted-foreground">
+                  <span className="text-foreground/80 font-medium">Execution:</span>{" "}
+                  {executionMethodLabel(step.executionMethod)}
+                </p>
+              )}
+              {visionSrc && !isBug && (
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50 mb-1">View sent to Navigator</p>
+                  <div className="rounded border border-border overflow-hidden max-w-md bg-black/40">
+                    <img
+                      src={visionSrc}
+                      alt="Navigator view"
+                      className="w-full max-h-48 object-contain object-top"
+                    />
+                  </div>
+                </div>
+              )}
+              {step.reviewFeedback && step.reviewFeedback.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50 mb-1">Review agent</p>
+                  <ul className="space-y-1">
+                    {step.reviewFeedback.map((rf, ri) => (
+                      <li key={ri} className="text-[11px] text-violet-300/90 bg-violet-500/5 border border-violet-500/15 rounded px-2 py-1">
+                        <span className="font-mono text-[10px] text-violet-400/80">{rf.type}</span>
+                        {rf.severity && <span className="text-muted-foreground/60 ml-1">({rf.severity})</span>}
+                        <span className="block text-muted-foreground mt-0.5">{rf.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {step.domContext && !isBug && (
+                <details>
+                  <summary className="text-[10px] font-medium text-muted-foreground cursor-pointer flex items-center gap-1">
+                    <Layers className="h-3 w-3" />
+                    Element list / a11y context ({step.domContext.length.toLocaleString()} chars)
+                  </summary>
+                  <pre className="mt-1 text-[10px] font-mono text-muted-foreground/80 bg-background/50 rounded p-2 max-h-56 overflow-y-auto whitespace-pre-wrap break-words border border-border/40">
+                    {step.domContext}
+                  </pre>
+                </details>
+              )}
+            </div>
+          </details>
+
           {step.url && (
-            <p className="text-[11px] font-mono text-muted-foreground/60 truncate">{step.url}</p>
+            <div className="flex items-start gap-2 rounded-md border border-border/50 bg-background/40 px-2 py-1.5">
+              <p className="text-[11px] font-mono text-muted-foreground/80 break-all flex-1 min-w-0 leading-relaxed">{step.url}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                title="Copy URL"
+                onClick={() => void navigator.clipboard.writeText(step.url!)}
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           )}
           {step.reasoning && !isBug && (
             <p className="text-[12px] text-muted-foreground">{step.reasoning}</p>
@@ -897,22 +1629,14 @@ function StepTimelineRow({ step, isLast, stepLLMCalls }: { step: RunStep; isLast
                     {call.hasVision && <Eye className="h-3 w-3 text-blue-400" />}
                     <span className="ml-auto tabular-nums">{formatMs(call.durationMs)}</span>
                   </summary>
-                  <div className="mt-1 ml-2 space-y-1 text-[10px] font-mono text-muted-foreground/60">
-                    {call.imageBase64 && (
-                      <div className="rounded border border-border overflow-hidden max-w-xs">
-                        <img src={`data:image/jpeg;base64,${call.imageBase64}`} alt="Screenshot sent to LLM" className="max-h-32 object-contain" />
-                      </div>
-                    )}
-                    {call.query && (
-                      <details>
-                        <summary className="cursor-pointer hover:text-muted-foreground">Prompt</summary>
-                        <pre className="whitespace-pre-wrap break-all max-h-40 overflow-y-auto mt-0.5">{call.query}</pre>
-                      </details>
-                    )}
+                  <div className="mt-1 ml-2 space-y-2 text-[10px] text-muted-foreground/80">
+                    <LLMRequestInspector call={call} runId={runId} compact />
                     {call.response && (
                       <details>
-                        <summary className="cursor-pointer hover:text-muted-foreground">Response</summary>
-                        <pre className="whitespace-pre-wrap break-all max-h-40 overflow-y-auto mt-0.5">{call.response}</pre>
+                        <summary className="cursor-pointer hover:text-muted-foreground font-mono">Response</summary>
+                        <div className="h-36 min-h-0 overflow-y-auto overflow-x-auto overscroll-contain mt-1 rounded border border-border/50 bg-muted/10 [scrollbar-gutter:stable]">
+                          <pre className="block min-w-0 whitespace-pre-wrap break-words p-2 font-mono text-[10px]">{call.response}</pre>
+                        </div>
                       </details>
                     )}
                   </div>
@@ -931,6 +1655,7 @@ function StepTimelineRow({ step, isLast, stepLLMCalls }: { step: RunStep; isLast
           </details>
         </div>
       )}
+      </Card>
     </div>
   );
 }
@@ -939,7 +1664,7 @@ function StepTimelineRow({ step, isLast, stepLLMCalls }: { step: RunStep; isLast
 // LLM Calls tab
 // ============================================================
 
-function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost: number }) {
+function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCallRecord[]; totalCost: number }) {
   const [agentFilter, setAgentFilter] = React.useState<LLMAgentType | "all">("all");
 
   const totalInput  = llmCalls.reduce((s, c) => s + c.inputTokens, 0);
@@ -954,7 +1679,7 @@ function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost:
 
   const agentCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: llmCalls.length };
-    for (const a of ["navigator", "review", "pathgen", "summary"] as const) {
+    for (const a of ["navigator", "review", "filmstrip", "pathgen", "summary"] as const) {
       counts[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).length;
     }
     return counts;
@@ -962,13 +1687,13 @@ function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost:
 
   const agentCosts = React.useMemo(() => {
     const cost: Record<string, number> = {};
-    for (const a of ["navigator", "review", "pathgen", "summary"] as const) {
+    for (const a of ["navigator", "review", "filmstrip", "pathgen", "summary"] as const) {
       cost[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).reduce((s, c) => s + c.costUsd, 0);
     }
     return cost;
   }, [llmCalls]);
 
-  const agentsWithCalls = (["navigator", "review", "pathgen", "summary"] as const).filter((a) => agentCounts[a] > 0);
+  const agentsWithCalls = (["navigator", "review", "filmstrip", "pathgen", "summary"] as const).filter((a) => agentCounts[a] > 0);
 
   return (
     <div className="px-6 py-5 max-w-5xl w-full mx-auto space-y-4 animate-fade-in">
@@ -1053,7 +1778,7 @@ function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost:
           {/* Call list */}
           <div className="space-y-1">
             {filteredCalls.map((call) => (
-              <LLMCallRow key={call.seq} call={call} />
+              <LLMCallRow key={call.seq} call={call} runId={runId} />
             ))}
           </div>
         </>
@@ -1062,7 +1787,7 @@ function LLMTab({ llmCalls, totalCost }: { llmCalls: LLMCallRecord[]; totalCost:
   );
 }
 
-function LLMCallRow({ call }: { call: LLMCallRecord }) {
+function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
   const [expanded, setExpanded] = React.useState(false);
   const isScan = call.role === "dom-scan";
   const agent  = call.agent ?? "navigator";
@@ -1070,11 +1795,12 @@ function LLMCallRow({ call }: { call: LLMCallRecord }) {
 
   return (
     <Card className={cn(
-      "overflow-hidden transition-colors",
+      "overflow-visible transition-colors",
       agent === "navigator" && "border-l-2 border-l-emerald-500/30",
       agent === "review"    && "border-l-2 border-l-violet-500/30",
       agent === "pathgen"   && "border-l-2 border-l-amber-500/30",
       agent === "summary"   && "border-l-2 border-l-sky-500/30",
+      agent === "filmstrip" && "border-l-2 border-l-fuchsia-500/30",
     )}>
       <button
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
@@ -1142,38 +1868,26 @@ function LLMCallRow({ call }: { call: LLMCallRecord }) {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-border/50 space-y-3">
-          {/* Screenshot */}
-          {call.imageBase64 && (
-            <div className="pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Screenshot (sent to LLM)</p>
-              <div className="rounded border border-border bg-black overflow-hidden">
-                <img
-                  src={`data:image/jpeg;base64,${call.imageBase64}`}
-                  alt="Screenshot sent to LLM"
-                  className="w-full block max-h-64 object-contain object-top"
-                />
+        <div className="px-4 pb-4 pt-3 border-t border-border/50 space-y-4 min-h-0">
+          {call.agent === "filmstrip" && <FilmstripSentToModel call={call} runId={runId} />}
+          <div className="space-y-2 min-h-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+              Request (full payload)
+            </p>
+            <LLMRequestInspector call={call} runId={runId} />
+          </div>
+          {call.response ? (
+            <div className="space-y-2 min-h-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                Response
+              </p>
+              <div className="h-[min(48vh,420px)] min-h-[10rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-md border border-border bg-muted/20 [scrollbar-gutter:stable]">
+                <pre className="block w-full min-w-0 text-[11px] font-mono whitespace-pre-wrap break-words p-3 text-foreground/80 leading-relaxed">
+                  {call.response}
+                </pre>
               </div>
             </div>
-          )}
-          {/* Query / reasoning */}
-          {call.query && (
-            <div className={!call.imageBase64 ? "pt-3" : ""}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Query / Reasoning</p>
-              <pre className="text-[11px] font-mono bg-muted/40 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
-                {call.query}
-              </pre>
-            </div>
-          )}
-          {/* Response / content */}
-          {call.response && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Response / Content</p>
-              <pre className="text-[11px] font-mono bg-muted/40 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-64">
-                {call.response}
-              </pre>
-            </div>
-          )}
+          ) : null}
         </div>
       )}
     </Card>

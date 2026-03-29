@@ -12,8 +12,10 @@ export type { StorageAdapter } from "./storage.js";
 export * from "./types.js";
 
 // ─── Agent ───────────────────────────────────────────────────────────────────
-export { runAgent, handleAuth, waitForPageStable, executeAction } from "./agent.js";
-export type { AgentAction, RunStep, LLMCallRecord, AgentResult, LLMAgentType } from "./agent.js";
+export { runAgent, handleAuth, waitForPageStable, executeAction, serializeWireMessagesForStorage } from "./agent.js";
+export type {
+  AgentAction, RunStep, LLMCallRecord, AgentResult, LLMAgentType, LLMStoredMessage, LLMStoredContentPart,
+} from "./agent.js";
 
 // ─── Token Auth (Clerk, Supabase) ────────────────────────────────────────────
 export { handleTokenAuth, authenticateWithClerk, authenticateWithSupabase, refreshIfNeeded } from "./tokenAuth.js";
@@ -53,6 +55,8 @@ export type { PathGeneratorInput, GenerateTestPlanResult } from "./pathGenerator
 // ─── Review Agent ────────────────────────────────────────────────────────────
 export { createReviewProcessor } from "./reviewAgent.js";
 export type { ReviewRequest, ReviewProcessor } from "./reviewAgent.js";
+export { runFilmstripReview, capFilmstripFrames } from "./filmstripReview.js";
+export type { FilmstripFrame } from "./filmstripReview.js";
 
 // ─── Network Monitor ─────────────────────────────────────────────────────────
 export { attachNetworkMonitor } from "./networkMonitor.js";
@@ -60,6 +64,10 @@ export type { NetworkMonitorResult } from "./networkMonitor.js";
 
 // ─── Bug Enrichment ──────────────────────────────────────────────────────────
 export { enrichBugsForRun } from "./bugEnrichment.js";
+
+// ─── Bug screenshot markup (red box on saved JPEGs) ───────────────────────────
+export { drawRedBoundingBoxOnJpeg } from "./bugScreenshotMarkup.js";
+export type { BugRegion } from "./bugScreenshotMarkup.js";
 
 // ─── Summarizer ──────────────────────────────────────────────────────────────
 export { summarizeRun } from "./summarizer.js";

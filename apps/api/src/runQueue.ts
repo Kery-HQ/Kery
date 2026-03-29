@@ -4,13 +4,14 @@ import * as path from "path";
 import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun, generateRegressionPlan,
-  createEmitter, destroyEmitter, logger,
+  createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
 } from "@kery/engine";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
 
-export const RUN_QUEUE_NAME = "kery:runs";
+/** BullMQ forbids ':' in queue names (reserved for Redis Cluster key tags). */
+export const RUN_QUEUE_NAME = "kery-runs";
 
 export interface RunJobData {
   runId: string;
@@ -71,7 +72,7 @@ export function createRunWorker(
           testId: data.testId,
           destinationId: data.destinationId,
           context: data.context,
-          saveScreenshots: data.saveScreenshots,
+          saveScreenshots: data.saveScreenshots ?? true,
           maxSteps: data.maxSteps,
           recordVideo: data.recordVideo,
           videosDir: VIDEOS_DIR,
@@ -81,9 +82,8 @@ export function createRunWorker(
         });
 
         const completedAt = new Date().toISOString();
+        await materializeRunScreenshotFiles(data.runId, result.llmCalls, result.bugsFound);
         const enrichedBugs = enrichBugsForRun(data.runId, completedAt, data.triggerRef, result.bugsFound, result.stepsDetail);
-
-        extractBugScreenshots(data.runId, enrichedBugs);
 
         // Wrap all post-run DB writes in a transaction for atomicity
         await storage.withTransaction(async (tx) => {
@@ -153,24 +153,116 @@ export function createRunWorker(
 
 import * as fs from "fs";
 
-function extractBugScreenshots(runId: string, bugs: any[]): void {
+/** Write vision/bug JPEGs to SCREENSHOTS_DIR; replace inline base64 with filename-only refs (nothing large in DB). */
+async function materializeRunScreenshotFiles(runId: string, llmCalls: any[], bugSteps: any[]): Promise<void> {
   const dir = path.join(SCREENSHOTS_DIR, runId);
-  let dirCreated = false;
+  let dirReady = false;
+  const ensureDir = () => {
+    if (!dirReady) {
+      fs.mkdirSync(dir, { recursive: true });
+      dirReady = true;
+    }
+  };
 
-  for (const bug of bugs) {
-    if (!bug.screenshotBase64) continue;
-
+  let bugFileIdx = 0;
+  for (const step of bugSteps) {
+    const raw = step.screenshotBase64;
+    if (raw == null || raw === "") {
+      delete step.screenshotBase64;
+      continue;
+    }
+    if (typeof raw !== "string") {
+      delete step.screenshotBase64;
+      continue;
+    }
+    if (raw.startsWith("/api/") || raw.startsWith("http")) {
+      const tail = raw.split("/").filter(Boolean).pop() ?? "";
+      step.screenshotPath = path.basename(tail.split("?")[0]);
+      delete step.screenshotBase64;
+      continue;
+    }
     try {
-      if (!dirCreated) {
-        fs.mkdirSync(dir, { recursive: true });
-        dirCreated = true;
+      ensureDir();
+      const filename = `bug-${bugFileIdx++}.jpg`;
+      // Uint8Array avoids Buffer<ArrayBuffer> vs Buffer<ArrayBufferLike> mismatch (sharp / @types/node).
+      let buf: Uint8Array = Buffer.from(raw, "base64");
+      const reg = step.region;
+      if (
+        reg &&
+        typeof reg === "object" &&
+        typeof reg.x === "number" &&
+        typeof reg.y === "number" &&
+        typeof reg.w === "number" &&
+        typeof reg.h === "number"
+      ) {
+        buf = await drawRedBoundingBoxOnJpeg(Buffer.from(buf), { x: reg.x, y: reg.y, w: reg.w, h: reg.h });
       }
-      const filename = `bug-${bug.index ?? 0}.jpg`;
-      const filePath = path.join(dir, filename);
-      fs.writeFileSync(filePath, Buffer.from(bug.screenshotBase64, "base64"));
-      bug.screenshotBase64 = `/api/bugs/${runId}/${filename}`;
-    } catch {
-      // Keep original base64 if write fails
+      fs.writeFileSync(path.join(dir, filename), buf);
+      step.screenshotPath = filename;
+      delete step.screenshotBase64;
+    } catch (err) {
+      logger.warn({ runId, err: String(err) }, "Bug screenshot write failed");
+      delete step.screenshotBase64;
+    }
+  }
+
+  for (const call of llmCalls) {
+    const seq = typeof call.seq === "number" ? call.seq : 0;
+    const list = call.imageBase64s;
+    if (Array.isArray(list) && list.length > 0) {
+      const paths: string[] = [];
+      try {
+        ensureDir();
+        for (let i = 0; i < list.length; i++) {
+          const raw = list[i];
+          if (raw == null || raw === "" || typeof raw !== "string") continue;
+          if (raw.startsWith("/api/") || raw.startsWith("http")) {
+            const tail = raw.split("/").filter(Boolean).pop() ?? "";
+            paths.push(path.basename(tail.split("?")[0]));
+            continue;
+          }
+          const filename = list.length === 1 ? `llm-${seq}.jpg` : `llm-${seq}-${i}.jpg`;
+          fs.writeFileSync(path.join(dir, filename), Buffer.from(raw, "base64"));
+          paths.push(filename);
+        }
+        if (paths.length > 0) {
+          call.imagePaths = paths;
+          call.imagePath = paths[0];
+        }
+      } catch (err) {
+        logger.warn({ runId, seq, err: String(err) }, "LLM screenshot batch write failed");
+      }
+      delete call.imageBase64s;
+      delete call.imageBase64;
+      continue;
+    }
+
+    const raw = call.imageBase64;
+    if (raw == null || raw === "") {
+      delete call.imageBase64;
+      continue;
+    }
+    if (typeof raw !== "string") {
+      delete call.imageBase64;
+      continue;
+    }
+    if (raw.startsWith("/api/") || raw.startsWith("http")) {
+      const tail = raw.split("/").filter(Boolean).pop() ?? "";
+      call.imagePath = path.basename(tail.split("?")[0]);
+      call.imagePaths = [call.imagePath];
+      delete call.imageBase64;
+      continue;
+    }
+    try {
+      ensureDir();
+      const filename = `llm-${seq}.jpg`;
+      fs.writeFileSync(path.join(dir, filename), Buffer.from(raw, "base64"));
+      call.imagePath = filename;
+      call.imagePaths = [filename];
+      delete call.imageBase64;
+    } catch (err) {
+      logger.warn({ runId, seq, err: String(err) }, "LLM screenshot write failed");
+      delete call.imageBase64;
     }
   }
 }

@@ -60,6 +60,8 @@ export type Bug = {
   category: "visual" | "functional" | "ux" | "other";
   severity: "low" | "medium" | "high";
   status: "open" | "in_progress" | "resolved" | "wont_fix";
+  /** JPEG filename under run screenshot dir (bytes on disk). */
+  screenshotPath?: string | null;
   screenshotBase64?: string | null;
   stepsToReproduce: string[];
   url?: string | null;
@@ -68,7 +70,9 @@ export type Bug = {
   reportedAt: string;
   environment?: string | null;
   index?: number;
-  source?: "navigator" | "review" | "pathgen";
+  source?: "navigator" | "review" | "pathgen" | "filmstrip";
+  /** Bounding box when provided by review/filmstrip (also burned into screenshot file). */
+  region?: { x: number; y: number; w: number; h: number };
 };
 
 /** An LLM call record for cost tracking. */

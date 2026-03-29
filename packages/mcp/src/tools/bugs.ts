@@ -30,7 +30,7 @@ export function registerBugsTool(server: McpServer, client: KeryClient) {
           );
 
       // Strip screenshots
-      const bugs = filtered.map(({ screenshotBase64, ...rest }) => rest);
+      const bugs = filtered.map(({ screenshotBase64, screenshotPath, ...rest }) => rest);
 
       return {
         content: [{

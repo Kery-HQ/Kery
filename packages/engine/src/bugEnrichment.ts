@@ -8,9 +8,10 @@ type AgentBugStep = {
   url?: string;
   bugType?: "visual" | "functional" | "ux" | "other";
   severity?: "low" | "medium" | "high";
-  screenshotBase64?: string;
+  screenshotPath?: string;
   stepsToReproduce?: string[];
-  source?: "navigator" | "review" | "network" | "pathgen";
+  source?: "navigator" | "review" | "network" | "pathgen" | "filmstrip";
+  region?: { x: number; y: number; w: number; h: number };
   [k: string]: unknown;
 };
 
@@ -126,7 +127,7 @@ export function enrichBugsForRun(
       category,
       severity,
       status: "open" as const,
-      screenshotBase64: b.screenshotBase64 ?? null,
+      screenshotPath: b.screenshotPath ?? null,
       stepsToReproduce,
       url: b.url ?? null,
       runId,
@@ -134,7 +135,21 @@ export function enrichBugsForRun(
       reportedAt,
       environment: null,
       index: typeof b.index === "number" ? b.index : undefined,
-      source: (b.source === "navigator" || b.source === "review" || b.source === "pathgen") ? b.source : undefined,
+      source: (b.source === "navigator" || b.source === "review" || b.source === "pathgen" || b.source === "filmstrip") ? b.source : undefined,
+      region:
+        b.region &&
+        typeof b.region === "object" &&
+        typeof (b.region as { x?: number }).x === "number" &&
+        typeof (b.region as { y?: number }).y === "number" &&
+        typeof (b.region as { w?: number }).w === "number" &&
+        typeof (b.region as { h?: number }).h === "number"
+          ? {
+              x: (b.region as { x: number }).x,
+              y: (b.region as { y: number }).y,
+              w: (b.region as { w: number }).w,
+              h: (b.region as { h: number }).h,
+            }
+          : undefined,
     };
   });
 }

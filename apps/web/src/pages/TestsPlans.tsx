@@ -47,7 +47,6 @@ type SavedTest = {
   name: string;
   intent: string;
   context?: string | null;
-  save_screenshots?: boolean;
   max_steps?: number | null;
   created_at: string;
   run_count?: number;
@@ -76,7 +75,6 @@ export const TestsPlans: React.FC = () => {
   const [formName, setFormName] = React.useState("");
   const [formIntent, setFormIntent] = React.useState("");
   const [formContext, setFormContext] = React.useState("");
-  const [formSaveScreenshots, setFormSaveScreenshots] = React.useState(false);
   const [formMaxSteps, setFormMaxSteps] = React.useState<string>("");
   const [formSaving, setFormSaving] = React.useState(false);
 
@@ -174,7 +172,6 @@ export const TestsPlans: React.FC = () => {
     setFormName("");
     setFormIntent("");
     setFormContext("");
-    setFormSaveScreenshots(false);
     setFormMaxSteps("");
     setDialogOpen(true);
   }
@@ -184,7 +181,6 @@ export const TestsPlans: React.FC = () => {
     setFormName(test.name);
     setFormIntent(test.intent);
     setFormContext(test.context ?? "");
-    setFormSaveScreenshots(test.save_screenshots ?? false);
     setFormMaxSteps(test.max_steps != null ? String(test.max_steps) : "");
     setDialogOpen(true);
   }
@@ -198,7 +194,6 @@ export const TestsPlans: React.FC = () => {
         const res = await updateTest(currentProjectId, editing.id, {
           name: formName.trim(), intent: formIntent.trim(),
           context: formContext.trim() || undefined,
-          save_screenshots: formSaveScreenshots,
           max_steps: parsedMaxSteps ?? null,
         });
         const updated = res.test;
@@ -209,7 +204,6 @@ export const TestsPlans: React.FC = () => {
         const res = await createTest(currentProjectId, {
           name: formName.trim(), intent: formIntent.trim(),
           context: formContext.trim() || undefined,
-          save_screenshots: formSaveScreenshots,
           max_steps: parsedMaxSteps,
         });
         setTests((prev) => [res.test, ...prev]);
@@ -492,30 +486,6 @@ export const TestsPlans: React.FC = () => {
               />
             </div>
 
-            <Separator />
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[13px] font-medium text-foreground">Save screenshots</p>
-                <p className="text-[11px] text-muted-foreground/60">Store browser screenshot per LLM call</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={formSaveScreenshots}
-                onClick={() => setFormSaveScreenshots(!formSaveScreenshots)}
-                className={cn(
-                  "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-                  formSaveScreenshots ? "bg-primary" : "bg-muted",
-                )}
-              >
-                <span className={cn(
-                  "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
-                  formSaveScreenshots ? "translate-x-4" : "translate-x-0",
-                )} />
-              </button>
-            </div>
-
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[13px] font-medium text-foreground">Max steps</p>
@@ -693,12 +663,9 @@ function DetailsTab({ test }: { test: SavedTest }) {
 
       <div className="space-y-3">
         <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Settings</p>
-        <div className="flex items-center justify-between gap-4 py-1">
-          <span className="text-[13px] text-foreground">Save screenshots</span>
-          <Badge variant={test.save_screenshots ? "success" : "neutral"}>
-            {test.save_screenshots ? "On" : "Off"}
-          </Badge>
-        </div>
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
+          Full LLM request payloads and screenshots are always stored for every run (run detail → LLM tab).
+        </p>
         <div className="flex items-center justify-between gap-4 py-1">
           <span className="text-[13px] text-foreground">Max steps</span>
           <span className="text-[12px] font-mono text-muted-foreground tabular-nums">

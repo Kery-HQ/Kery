@@ -12,6 +12,7 @@ import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentTy
 import { waitForPageStable } from "./agent.js";
 import type { AuthConfig } from "./types.js";
 import { createReviewProcessor, type ReviewRequest } from "./reviewAgent.js";
+import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { isStopRequested } from "./runEvents.js";
 import { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
 import { calcCostUsd } from "./llmClient.js";
@@ -77,7 +78,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       if (dest) {
         targetUrl = buildTargetUrl(job.baseUrl, dest.normalized_route);
         const t0 = Date.now();
-        const { plan, usage } = await generateTestPlan(storage, {
+        const { plan, usage, prompt: pathPrompt, rawResponse } = await generateTestPlan(storage, {
           projectId: job.projectId, destinationId: job.destinationId,
           destination: dest, intent: job.intent,
         });
@@ -91,7 +92,10 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
             inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens, durationMs,
             costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens),
-            query: "Generate test plan for destination", response: planContext, agent: "pathgen",
+            query: pathPrompt ?? "Generate test plan for destination",
+            requestMessages: pathPrompt ? [{ role: "user", content: pathPrompt }] : undefined,
+            response: rawResponse ?? planContext ?? "",
+            agent: "pathgen",
           });
         }
       }
@@ -142,16 +146,30 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
   const shouldRecord = job.recordVideo !== false;
   const videoTmpDir = shouldRecord ? fs.mkdtempSync(path.join(os.tmpdir(), "kery-video-")) : undefined;
+  const recordW = 1920;
+  const recordH = 1080;
 
   try {
     if (config.stagehandEnabled) {
+      const videoOpts = videoTmpDir
+        ? ({ recordVideo: { dir: videoTmpDir, size: { width: recordW, height: recordH } } } as const)
+        : undefined;
       try {
-        shSession = await initStagehandSession(
-          videoTmpDir ? { recordVideo: { dir: videoTmpDir, size: { width: 1920, height: 1080 } } } : undefined,
-        );
+        shSession = await initStagehandSession(videoOpts);
       } catch (err) {
-        logger.warn({ err: String(err).slice(0, 200) }, "Stagehand session init failed — falling back to plain Playwright");
-        shSession = undefined;
+        const msg = String(err);
+        if (videoTmpDir && /ffmpeg/i.test(msg)) {
+          logger.warn({ err: msg.slice(0, 240) }, "Stagehand: ffmpeg/video init failed — retrying without recording");
+          try {
+            shSession = await initStagehandSession(undefined);
+          } catch (err2) {
+            logger.warn({ err: String(err2).slice(0, 200) }, "Stagehand session init failed — falling back to plain Playwright");
+            shSession = undefined;
+          }
+        } else {
+          logger.warn({ err: msg.slice(0, 200) }, "Stagehand session init failed — falling back to plain Playwright");
+          shSession = undefined;
+        }
       }
     }
 
@@ -159,15 +177,20 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     let videoEnabled = !!videoTmpDir;
     if (shSession) {
       page = shSession.page;
+      if (videoTmpDir) {
+        await page.setViewportSize({ width: recordW, height: recordH }).catch((e) =>
+          logger.warn({ err: String(e).slice(0, 160) }, "setViewportSize for recording (non-fatal)"),
+        );
+      }
     } else {
       browser = await chromium.launch({
         headless: true,
         executablePath: process.env.CHROMIUM_PATH || undefined,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
-      const contextOpts: any = { viewport: { width: 1920, height: 1080 } };
+      const contextOpts: any = { viewport: { width: recordW, height: recordH } };
       if (videoTmpDir) {
-        contextOpts.recordVideo = { dir: videoTmpDir, size: { width: 1920, height: 1080 } };
+        contextOpts.recordVideo = { dir: videoTmpDir, size: { width: recordW, height: recordH } };
       }
       try {
         browserContext = await browser.newContext(contextOpts);
@@ -233,8 +256,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
             severity: "medium" as const, source: "navigator" as const,
           }));
 
-          if (shSession) await destroyStagehandSession(shSession).catch(() => {});
-          else {
+          if (shSession) {
+            await finalizeStagehandRecording(shSession, videoTmpDir, job.runId);
+          } else {
             await browserContext?.close();
             await browser?.close();
           }
@@ -269,6 +293,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     let lastStep: RunStep | null = null;
     let screenshotSeq = 0; // Sequential counter for review agent
     let previousUrl = "";
+    let lastFilmstripUrl: string | null = null;
+    const filmstripFrames: FilmstripFrame[] = [];
+    const FILMSTRIP_MAX = 30;
     const screenshotsByStep = new Map<number, string>(); // Keyed by agent step.index
     const screenshotsBySeq = new Map<number, string>();  // Keyed by screenshotSeq (for review bugs)
     let latestCleanScreenshot: string | undefined;
@@ -279,7 +306,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
     const agentResult = await runAgent(
       page, job.intent, job.baseUrl, job.auth ?? null, allMemory,
-      context, job.saveScreenshots ?? false,
+      context,
       (step) => {
         // Associate the latest screenshot with this step's index
         if (latestCleanScreenshot) {
@@ -296,7 +323,11 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           }
           logger.info({ newBugs: newBugs.length, totalFedBack: reviewBugsFedBack }, "Cross-agent: review bugs fed back to navigator context");
           // Attach review feedback to the step so downstream consumers can see it
-          (step as any).reviewFeedback = newBugs.map(b => ({ type: b.type, severity: b.severity, description: b.description }));
+          step.reviewFeedback = newBugs.map((b) => ({
+            type: b.type,
+            severity: b.severity,
+            description: b.description,
+          }));
         }
         job.onStep?.(step);
       },
@@ -309,12 +340,21 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         if (cleanScreenshot.length > 0) {
           latestCleanScreenshot = cleanScreenshot.toString("base64");
           screenshotsBySeq.set(screenshotSeq, latestCleanScreenshot);
+          if (lastFilmstripUrl !== url) {
+            filmstripFrames.push({ url, base64: latestCleanScreenshot });
+            lastFilmstripUrl = url;
+            while (filmstripFrames.length > FILMSTRIP_MAX) {
+              filmstripFrames.shift();
+            }
+          }
         }
+        const isNavigationBoundary = previousUrl === "" || previousUrl !== url;
         const req: ReviewRequest = {
           screenshot: cleanScreenshot, url, title, stepIndex: screenshotSeq,
           action: lastStep ? `${lastStep.action} ${lastStep.target ?? ""}`.trim() : "initial",
           actionResult: lastStep?.status ?? "ok", expectation: lastStep?.reasoning,
           previousUrl: previousUrl || undefined,
+          isNavigationBoundary,
         };
         previousUrl = url;
         reviewProcessor.push(req);
@@ -324,43 +364,20 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     );
 
     const reviewBugs = await reviewProcessor.flush();
-    const bugsFound = mergeBugs(agentResult.stepsDetail, reviewBugs, screenshotsByStep, screenshotsBySeq);
-    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, reviewCalls);
+    const filmstripCalls: LLMCallRecord[] = [];
+    const { bugs: filmstripBugs } = await runFilmstripReview(filmstripFrames, {
+      onLLMCall: (call) => filmstripCalls.push({ ...call, seq: 0 }),
+    });
+    const bugsFound = mergeBugs(agentResult.stepsDetail, [...reviewBugs, ...filmstripBugs], screenshotsByStep, screenshotsBySeq);
+    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, reviewCalls, filmstripCalls);
 
     // Save memory
     const proposed = proposeMemoriesFromRun(agentResult.stepsDetail, job.intent);
     if (job.projectId && proposed.length > 0) await saveProjectMemoryEntries(storage, job.projectId, proposed);
     if (job.destinationId && proposed.length > 0) await savePageMemoryEntries(storage, job.destinationId, proposed);
 
-    // Finalize video before closing browser — explicit page.close() triggers video write
     if (shSession) {
-      try {
-        const shPage = shSession.page;
-        // Explicitly save video before Stagehand cleanup destroys the temp dir
-        if (videoTmpDir) {
-          try {
-            const video = (shPage as any).video?.();
-            if (video) {
-              const tmpPath = await video.path();
-              if (tmpPath) {
-                await (shPage as any).close();
-                // video.saveAs must be called after page.close()
-                const destPath = `${videoTmpDir}/${job.runId || "video"}.webm`;
-                const fs = await import("fs");
-                fs.mkdirSync(videoTmpDir, { recursive: true });
-                fs.copyFileSync(tmpPath, destPath);
-              }
-            }
-          } catch (videoErr) {
-            logger.warn({ err: String(videoErr).slice(0, 200) }, "Stagehand video save failed");
-          }
-        }
-        await destroyStagehandSession(shSession).catch((err) => {
-          logger.warn({ err: String(err).slice(0, 200) }, "Stagehand destroy error (non-fatal)");
-        });
-      } catch (err) {
-        logger.warn({ err: String(err).slice(0, 200) }, "Stagehand cleanup error");
-      }
+      await finalizeStagehandRecording(shSession, videoTmpDir, job.runId);
     } else {
       await browserContext?.close();
       await browser?.close();
@@ -387,6 +404,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const summarizeResult = await summarizeRun(summarizeInput);
 
     if (summarizeResult.usage && summarizeResult.model) {
+      const sumPrompt = summarizeResult.prompt;
       mergedCalls.push({
         seq: mergedCalls.length + 1,
         stepIndex: 0,
@@ -398,8 +416,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         totalTokens: summarizeResult.usage.totalTokens,
         durationMs: summarizeResult.durationMs ?? 0,
         costUsd: summarizeResult.costUsd ?? 0,
-        query: "Summarize test run",
-        response: summarizeResult.summary.slice(0, 2000),
+        query: sumPrompt ?? "Summarize test run",
+        requestMessages: sumPrompt ? [{ role: "user", content: sumPrompt }] : undefined,
+        response: summarizeResult.summary,
         agent: "summary",
       });
     }
@@ -411,7 +430,11 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     };
   } catch (err) {
     logger.error({ err: String(err) }, "Run failed");
-    if (shSession) await destroyStagehandSession(shSession).catch(() => {});
+    if (shSession) {
+      await destroyStagehandSession(shSession).catch((e) =>
+        logger.warn({ err: String(e).slice(0, 200) }, "Stagehand destroy after run error (non-fatal)"),
+      );
+    }
     else {
       await browserContext?.close().catch(() => {});
       if (browser) await browser.close().catch(() => {});
@@ -430,14 +453,36 @@ function buildTargetUrl(baseUrl: string, normalizedRoute: string): string {
   return `${base}${route}`;
 }
 
-function mergeLLMCalls(pathGen: LLMCallRecord[], navigator: LLMCallRecord[], review: LLMCallRecord[]): LLMCallRecord[] {
+function mergeLLMCalls(
+  pathGen: LLMCallRecord[],
+  navigator: LLMCallRecord[],
+  review: LLMCallRecord[],
+  filmstrip: LLMCallRecord[] = [],
+): LLMCallRecord[] {
   const merged: LLMCallRecord[] = [
     ...pathGen.map((c) => ({ ...c, agent: "pathgen" as LLMAgentType })),
     ...navigator.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
     ...review.map((c) => ({ ...c, agent: "review" as LLMAgentType })),
+    ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),
   ];
   merged.forEach((c, i) => { c.seq = i + 1; });
   return merged;
+}
+
+/** RunStep.bugType is a coarser UI taxonomy than ReviewBug.type */
+function reviewTypeToStepBugType(t: ReviewBug["type"]): NonNullable<RunStep["bugType"]> {
+  switch (t) {
+    case "visual":
+      return "visual";
+    case "ux":
+      return "ux";
+    case "behavioral":
+      return "functional";
+    case "a11y":
+    case "performance":
+    case "data":
+      return "other";
+  }
 }
 
 function mergeBugs(
@@ -458,13 +503,14 @@ function mergeBugs(
     }
   }
   for (const b of reviewBugs) {
-    const bugType = b.type === "behavioral" ? "functional" : b.type;
+    const bugType = reviewTypeToStepBugType(b.type);
+    const src = b.source === "filmstrip" ? "filmstrip" : "review";
     out.push({
       index: b.stepIndex, action: "bug", reasoning: b.description,
       status: "ok", fromMemory: false, bugType, severity: b.severity,
-      source: "review", at: b.at,
-      // Review bugs use screenshotSeq index, navigator bugs use step.index
-      screenshotBase64: screenshotsBySeq?.get(b.stepIndex),
+      source: src, at: b.at,
+      region: b.region,
+      screenshotBase64: b.screenshotBase64 ?? screenshotsBySeq?.get(b.stepIndex),
     });
   }
   out.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
@@ -473,6 +519,65 @@ function mergeBugs(
 
 // ─── Video helpers ──────────────────────────────────────────────────────────
 
+/** Close Stagehand page, write video with Playwright Video.saveAs, then destroy session. */
+async function finalizeStagehandRecording(
+  shSession: StagehandSession,
+  videoTmpDir: string | undefined,
+  runId: string | undefined,
+): Promise<void> {
+  try {
+    const shPage = shSession.page;
+    const videoHandle = videoTmpDir ? shPage.video() : null;
+    await shPage.close().catch((e) =>
+      logger.warn({ err: String(e).slice(0, 200) }, "Stagehand page.close (non-fatal)"),
+    );
+    if (videoTmpDir && videoHandle) {
+      try {
+        const name = runId ? `${runId}.webm` : "recording.webm";
+        const destPath = path.join(videoTmpDir, name);
+        fs.mkdirSync(videoTmpDir, { recursive: true });
+        await videoHandle.saveAs(destPath);
+        logger.info({ runId, destPath }, "Stagehand video saved via saveAs");
+      } catch (videoErr) {
+        logger.warn({ err: String(videoErr).slice(0, 280) }, "Stagehand video saveAs failed");
+      }
+    }
+    await destroyStagehandSession(shSession).catch((err) => {
+      logger.warn({ err: String(err).slice(0, 200) }, "Stagehand destroy error (non-fatal)");
+    });
+  } catch (err) {
+    logger.warn({ err: String(err).slice(0, 200) }, "Stagehand cleanup error");
+  }
+}
+
+function pickWebmSource(tmpDir: string, runId: string): string | undefined {
+  const allFiles = fs.readdirSync(tmpDir);
+  const webms = allFiles.filter((f) => f.endsWith(".webm"));
+  if (webms.length === 0) return undefined;
+
+  const named = `${runId}.webm`;
+  if (webms.includes(named)) {
+    try {
+      const p = path.join(tmpDir, named);
+      if (fs.statSync(p).size > 0) return p;
+    } catch {
+      /* fall through — empty or missing saveAs output */
+    }
+  }
+  // Playwright may also write a UUID.webm; pick the largest non-empty file (avoids stale/partial duplicates).
+  let best: { p: string; size: number } | undefined;
+  for (const f of webms) {
+    const p = path.join(tmpDir, f);
+    try {
+      const size = fs.statSync(p).size;
+      if (size > 0 && (!best || size > best.size)) best = { p, size };
+    } catch {
+      /* skip */
+    }
+  }
+  return best?.p;
+}
+
 async function finalizeVideo(
   tmpDir: string | undefined,
   videosDir: string | undefined,
@@ -480,23 +585,46 @@ async function finalizeVideo(
 ): Promise<string | undefined> {
   if (!tmpDir || !runId) return undefined;
   try {
-    const files = fs.readdirSync(tmpDir).filter(f => f.endsWith(".webm"));
-    if (files.length === 0) {
-      logger.warn({ tmpDir, allFiles: fs.readdirSync(tmpDir) }, "No .webm video files found in temp dir");
+    const srcPath = pickWebmSource(tmpDir, runId);
+    if (!srcPath) {
+      const allFiles = fs.readdirSync(tmpDir);
+      logger.warn(
+        { tmpDir, runId, fileCount: allFiles.length, names: allFiles.slice(0, 15) },
+        "Video finalize: no .webm in temp dir (verify recordVideo / ffmpeg / saveAs path)",
+      );
       return undefined;
     }
 
-    const srcPath = path.join(tmpDir, files[0]);
     const destDir = videosDir || path.join(process.cwd(), "data", "videos");
     fs.mkdirSync(destDir, { recursive: true });
 
     const destFile = `${runId}.webm`;
     const destPath = path.join(destDir, destFile);
     fs.copyFileSync(srcPath, destPath);
-    fs.unlinkSync(srcPath);
+
+    const outSize = fs.statSync(destPath).size;
+    if (outSize < 256) {
+      logger.warn({ runId, outSize, srcPath }, "Video finalize: output too small, discarding");
+      try {
+        fs.unlinkSync(destPath);
+      } catch {
+        /* ignore */
+      }
+      cleanupVideoTmpDir(tmpDir);
+      return undefined;
+    }
+
+    // Remove temp copy(ies) in the recording dir
+    for (const f of fs.readdirSync(tmpDir).filter((x) => x.endsWith(".webm"))) {
+      try {
+        fs.unlinkSync(path.join(tmpDir, f));
+      } catch {
+        /* ignore */
+      }
+    }
 
     cleanupVideoTmpDir(tmpDir);
-    logger.info({ runId, path: destPath }, "Video recording saved");
+    logger.info({ runId, path: destPath, bytes: outSize }, "Video recording saved");
     return `/api/runs/${runId}/video`;
   } catch (err) {
     logger.warn({ err: String(err) }, "Failed to finalize video recording");

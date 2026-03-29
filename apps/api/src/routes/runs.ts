@@ -52,7 +52,6 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
     const { environmentId, testId, destinationId } = parsed.data;
     let intent = parsed.data.intent;
     let context: string | undefined;
-    let saveScreenshots = false;
     let maxSteps: number | undefined;
 
     if (destinationId) {
@@ -66,7 +65,6 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
       if (!savedTest) { reply.code(404).send({ error: "test not found" }); return; }
       intent = savedTest.intent;
       context = savedTest.context ?? undefined;
-      saveScreenshots = savedTest.save_screenshots ?? false;
       maxSteps = savedTest.max_steps ?? undefined;
     }
 
@@ -98,7 +96,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
       testId,
       destinationId,
       context,
-      saveScreenshots,
+      saveScreenshots: true,
       maxSteps,
       recordVideo: process.env.RECORD_VIDEO !== "false",
       triggerRef: run.trigger_ref,
@@ -190,7 +188,7 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
     reply.send({ ok: true });
   });
 
-  // Serve run video recording
+  // Serve run video recording (Range support required for reliable <video> playback)
   app.get("/api/runs/:runId/video", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
     const videoPath = path.join(VIDEOS_DIR, `${runId}.webm`);
@@ -199,10 +197,38 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
       return;
     }
     const stat = fs.statSync(videoPath);
-    reply.header("Content-Type", "video/webm");
-    reply.header("Content-Length", stat.size);
+    const size = stat.size;
+    if (size === 0) {
+      logger.warn({ runId, videoPath }, "Video file is empty on disk");
+      reply.code(404).send({ error: "video empty" });
+      return;
+    }
+
+    const range = req.headers.range;
     reply.header("Accept-Ranges", "bytes");
-    reply.send(fs.createReadStream(videoPath));
+    reply.header("Content-Type", "video/webm");
+    reply.header("Cache-Control", "private, max-age=3600");
+
+    if (range) {
+      const m = /^bytes=(\d+)-(\d*)$/i.exec(String(range).trim());
+      if (m) {
+        const start = Number(m[1]);
+        let end = m[2] === "" ? size - 1 : Number(m[2]);
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) {
+          reply.code(416).header("Content-Range", `bytes */${size}`).send();
+          return;
+        }
+        end = Math.min(end, size - 1);
+        const chunkLength = end - start + 1;
+        reply.code(206);
+        reply.header("Content-Length", chunkLength);
+        reply.header("Content-Range", `bytes ${start}-${end}/${size}`);
+        return reply.send(fs.createReadStream(videoPath, { start, end }));
+      }
+    }
+
+    reply.header("Content-Length", size);
+    return reply.send(fs.createReadStream(videoPath));
   });
 
   // Delete a run and its associated video/screenshot files
@@ -229,20 +255,24 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
     reply.send({ ok: true });
   });
 
-  // Serve bug screenshot
+  // Serve bug screenshot (buffer, not stream + Content-Length — Fastify can emit an empty body otherwise)
   app.get("/api/bugs/:runId/:filename", async (req, reply) => {
     const { runId, filename } = RunFilenameParams.parse(req.params);
-    // Sanitize to prevent path traversal
     const safe = path.basename(filename);
     const filePath = path.join(SCREENSHOTS_DIR, runId, safe);
     if (!fs.existsSync(filePath)) {
       reply.code(404).send({ error: "screenshot not found" });
       return;
     }
-    const stat = fs.statSync(filePath);
-    reply.header("Content-Type", "image/jpeg");
-    reply.header("Content-Length", stat.size);
-    reply.header("Cache-Control", "public, max-age=31536000, immutable");
-    reply.send(fs.createReadStream(filePath));
+    try {
+      const buf = await fs.promises.readFile(filePath);
+      return reply
+        .header("Content-Type", "image/jpeg")
+        .header("Cache-Control", "public, max-age=31536000, immutable")
+        .send(buf);
+    } catch (err) {
+      logger.warn({ err: String(err), filePath }, "Bug screenshot read failed");
+      reply.code(404).send({ error: "screenshot not found" });
+    }
   });
 }
