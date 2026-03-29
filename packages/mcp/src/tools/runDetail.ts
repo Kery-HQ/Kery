@@ -20,7 +20,7 @@ export function registerRunDetailTool(server: McpServer, client: KeryClient) {
 
       try {
         const run = await client.getRun(runId);
-        const bugs = (run.bugs_json ?? []).map(({ screenshotBase64, ...rest }) => rest);
+        const bugs = (run.bugs_json ?? []).map(({ screenshotBase64, screenshotPath, ...rest }) => rest);
 
         return {
           content: [{

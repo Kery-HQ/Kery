@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 import type { NetworkBug } from "./types.js";
 import { logger } from "./logger.js";
+import { getTokenSession, refreshIfNeeded } from "./tokenAuth.js";
 
 const MAX_CRITICAL_CONSOLE = 5;
 const MAX_HTTP_ERRORS = 20;
@@ -106,6 +107,19 @@ export function attachNetworkMonitor(page: Page): NetworkMonitorResult {
       const is5xx = status >= 500;
       const isAuth = status === 401 || status === 403;
       const is4xxImportant = important && (status === 400 || status === 404 || status >= 405);
+
+      // Auth-aware: if using token auth and we get 401/403, attempt refresh
+      // before reporting as a bug
+      if (isAuth && getTokenSession(page)) {
+        refreshIfNeeded(page).catch(() => {});
+        // Suppress the first 401/403 — the refresh will fix subsequent requests
+        if (!seenKeys.has(`auth_refresh_attempted`)) {
+          seenKeys.add(`auth_refresh_attempted`);
+          logger.info({ status, url: url.slice(0, 100) }, "Auth error intercepted, token refresh triggered");
+          return;
+        }
+      }
+
       if (is5xx || isAuth || is4xxImportant) {
         const severity = is5xx ? "high" : isAuth ? "medium" : "low";
         addBug({

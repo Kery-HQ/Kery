@@ -2,12 +2,13 @@ import { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import type { StorageAdapter } from "@kery/engine";
 import { executeCrawlRun, logger } from "@kery/engine";
+import { ProjectIdParams } from "./params.js";
 
 export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapter) {
-  const pool = (storage as any).pool as Pool;
+  const pool = storage.getPool() as Pool;
 
   app.post("/api/projects/:projectId/crawl", async (req, reply) => {
-    const { projectId } = req.params as any;
+    const { projectId } = ProjectIdParams.parse(req.params);
     const { rows: envs } = await pool.query(
       "SELECT id FROM environments WHERE project_id = $1 AND allow_crawl = true LIMIT 1",
       [projectId],
@@ -28,7 +29,7 @@ export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapte
   });
 
   app.post("/api/projects/:projectId/scan", async (req, reply) => {
-    const { projectId } = req.params as any;
+    const { projectId } = ProjectIdParams.parse(req.params);
     const { rows: envs } = await pool.query(
       "SELECT id FROM environments WHERE project_id = $1 LIMIT 1",
       [projectId],
@@ -49,7 +50,7 @@ export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapte
   });
 
   app.get("/api/projects/:projectId/scan/status", async (req, reply) => {
-    const { projectId } = req.params as any;
+    const { projectId } = ProjectIdParams.parse(req.params);
     const { rows } = await pool.query(
       "SELECT id, status, pages_visited, started_at, completed_at, cost_usd FROM crawl_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 1",
       [projectId],
@@ -58,7 +59,7 @@ export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapte
   });
 
   app.get("/api/projects/:projectId/crawl/runs", async (req, reply) => {
-    const { projectId } = req.params as any;
+    const { projectId } = ProjectIdParams.parse(req.params);
     const { rows } = await pool.query(
       "SELECT * FROM crawl_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 20",
       [projectId],

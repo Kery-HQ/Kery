@@ -71,7 +71,7 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
         const run = await client.waitForRun(runId);
 
         // Strip screenshots from bugs (too large for LLM context)
-        const bugs = (run.bugs_json ?? []).map(({ screenshotBase64, ...rest }) => rest);
+        const bugs = (run.bugs_json ?? []).map(({ screenshotBase64, screenshotPath, ...rest }) => rest);
 
         return {
           content: [{

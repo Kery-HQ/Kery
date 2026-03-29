@@ -16,7 +16,14 @@ export type PathGeneratorInput = {
   intent?: string;
 };
 
-export type GenerateTestPlanResult = { plan: TestPlan; usage?: LLMUsage };
+export type GenerateTestPlanResult = {
+  plan: TestPlan;
+  usage?: LLMUsage;
+  /** Full user prompt sent to the path planner. */
+  prompt?: string;
+  /** Raw model output string. */
+  rawResponse?: string;
+};
 
 /**
  * Loads memory, past run results, and open bugs for the destination,
@@ -52,12 +59,18 @@ Generate a JSON object with exactly these keys:
 - edgeCases: paths for double-submit, back button, refresh, etc.
 - interactionFlows: paths for modals, drawers, tabs (open, interact, close)
 - regressionChecks: paths to re-verify known bugs from the bugs section above
+- authFlows: paths for login/logout, session expiry, protected page access
+- dataIntegrity: paths that verify data is correctly saved, updated, and displayed (create → verify → edit → verify)
+- boundaryValues: paths for min/max input lengths, special characters, unicode, empty strings
+- crossPageFlows: paths that span multiple pages (e.g., create on page A, verify on page B)
+
+PRIORITIZATION: Generate happy paths first, then sad paths, then edge cases, then the rest.
 
 Use human-readable targets (e.g. "Submit button", "Email field"). The Navigator will resolve them to coordinates. Include brief reasoning for each step. For fill steps, suggest concrete test values where relevant (e.g. invalid email "not-an-email").
-Keep each path to at most 5 steps. Keep each reasoning to one short sentence. This ensures the response completes in one go.`;
+Keep each reasoning to one short sentence. Use as many steps per path as needed to complete the scenario.`;
 
   const { content, usage } = await llmPathPlan(prompt);
-  return { plan: parseTestPlan(content), usage };
+  return { plan: parseTestPlan(content), usage, prompt, rawResponse: content };
 }
 
 async function getPastRunsSection(storage: StorageAdapter, destinationId: string): Promise<string> {
@@ -109,6 +122,10 @@ function parseTestPlan(raw: string): TestPlan {
     edgeCases: [],
     interactionFlows: [],
     regressionChecks: [],
+    authFlows: [],
+    dataIntegrity: [],
+    boundaryValues: [],
+    crossPageFlows: [],
   };
   let toParse = raw?.trim() ?? "";
   if (!toParse) return empty;
@@ -147,6 +164,10 @@ function parseTestPlan(raw: string): TestPlan {
       edgeCases: toPaths(parsed.edgeCases),
       interactionFlows: toPaths(parsed.interactionFlows),
       regressionChecks: toPaths(parsed.regressionChecks),
+      authFlows: toPaths(parsed.authFlows),
+      dataIntegrity: toPaths(parsed.dataIntegrity),
+      boundaryValues: toPaths(parsed.boundaryValues),
+      crossPageFlows: toPaths(parsed.crossPageFlows),
     };
   } catch (err) {
     logger.warn({ err: String(err), raw: raw?.slice(0, 300) }, "PathGenerator: failed to parse TestPlan");
@@ -169,11 +190,16 @@ export function formatTestPlanForNavigator(plan: TestPlan): string {
     sections.push(lines.join("\n\n"));
   };
 
+  // Prioritized order: happy paths first, then sad, then edge cases, then rest
   addSection("Happy", plan.happyPaths);
   addSection("Sad", plan.sadPaths);
   addSection("Edge case", plan.edgeCases);
   addSection("Interaction", plan.interactionFlows);
   addSection("Regression", plan.regressionChecks);
+  addSection("Auth flow", plan.authFlows);
+  addSection("Data integrity", plan.dataIntegrity);
+  addSection("Boundary value", plan.boundaryValues);
+  addSection("Cross-page", plan.crossPageFlows);
 
   if (sections.length === 0) return "";
   return `Test plan (execute in order, follow each path as listed):\n\n${sections.join("\n\n")}`;

@@ -10,6 +10,8 @@ export type AuthConfig = {
     username?: string;
     password?: string;
   };
+  /** TOTP secret for 2FA/MFA (base32-encoded). Used to generate one-time codes. */
+  totp_secret?: string;
   tokenProvider?: {
     type: "supabase" | "clerk" | "custom";
     apiUrl: string;
@@ -20,6 +22,11 @@ export type AuthConfig = {
     };
     appDomain?: string;
     refreshToken?: string;
+  };
+  apiTokenConfig?: {
+    token: string;
+    headerName?: string;  // Default: "Authorization"
+    headerPrefix?: string; // Default: "Bearer"
   };
   oauthProvider?: {
     name: string;
@@ -148,7 +155,7 @@ export type CrawlRun = {
 };
 
 /** Source of a bug in multi-agent runs */
-export type BugSource = "navigator" | "review" | "pathgen";
+export type BugSource = "navigator" | "review" | "pathgen" | "filmstrip";
 
 /** Single step in a path (human-readable target; Navigator resolves to coordinates) */
 export type PathStep = {
@@ -166,18 +173,24 @@ export type TestPlan = {
   edgeCases: PathStep[][];
   interactionFlows: PathStep[][];
   regressionChecks: PathStep[][];
+  authFlows: PathStep[][];
+  dataIntegrity: PathStep[][];
+  boundaryValues: PathStep[][];
+  crossPageFlows: PathStep[][];
 };
 
-/** Visual, UX, or behavioral bug from the Review Agent */
+/** Bug categories from the Review / Filmstrip agents (aligned with review prompt output) */
 export type ReviewBug = {
-  source: "review";
+  source: "review" | "filmstrip";
   stepIndex: number;
-  type: "visual" | "ux" | "behavioral";
+  type: "visual" | "ux" | "behavioral" | "a11y" | "performance" | "data";
   description: string;
   severity: "low" | "medium" | "high";
   /** Optional bounding box (0-1000 coords or pixels) */
   region?: { x: number; y: number; w: number; h: number };
   at?: number;
+  /** Filmstrip: screenshot to attach when stepIndex does not map to per-step review queue */
+  screenshotBase64?: string;
 };
 
 /** Network/console bug from the Network Monitor agent */
@@ -201,7 +214,8 @@ export type Bug = {
   category: "visual" | "functional" | "ux" | "other";
   severity: "low" | "medium" | "high";
   status: "open" | "in_progress" | "resolved" | "wont_fix";
-  screenshotBase64?: string | null;
+  /** Filename under SCREENSHOTS_DIR/<runId>/ (e.g. bug-0.jpg); bytes on disk only. */
+  screenshotPath?: string | null;
   stepsToReproduce: string[];
   url?: string | null;
   runId: string;
@@ -212,4 +226,6 @@ export type Bug = {
   index?: number;
   /** Which agent found this bug (multi-agent runs) */
   source?: BugSource;
+  /** Bounding box when the model provided one (same semantics as ReviewBug.region). */
+  region?: { x: number; y: number; w: number; h: number };
 };

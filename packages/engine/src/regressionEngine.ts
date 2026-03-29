@@ -42,6 +42,11 @@ const REPLAYABLE_ACTIONS = new Set([
   "click", "fill", "pressKey", "selectOption", "navigate", "assert", "scroll", "back",
 ]);
 
+/** Substring/case-friendly name match — strict default fails on sites like HN ("Submit" vs "submit"). */
+function getByRoleNamed(page: Page, role: string, name: string) {
+  return page.getByRole(role as any, { name, exact: false });
+}
+
 // ─── Completion Condition Evaluation ──────────────────────────────────────────
 
 export async function evaluateCondition(page: Page, condition: CompletionCondition): Promise<boolean> {
@@ -52,9 +57,9 @@ export async function evaluateCondition(page: Page, condition: CompletionConditi
       case "url_changed":
         return true;
       case "element_visible":
-        return await page.getByRole(condition.role as any, { name: condition.name }).isVisible({ timeout: 2000 });
+        return await getByRoleNamed(page, condition.role, condition.name).isVisible({ timeout: 2000 });
       case "element_gone":
-        return !(await page.getByRole(condition.role as any, { name: condition.name }).isVisible({ timeout: 1000 }).catch(() => false));
+        return !(await getByRoleNamed(page, condition.role, condition.name).isVisible({ timeout: 1000 }).catch(() => false));
       case "text_visible":
         return await page.getByText(condition.text, { exact: false }).isVisible({ timeout: 2000 });
       case "value_changed":
@@ -77,6 +82,26 @@ function isSamePage(a: string, b: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Element-index style "assertions" and tiny digits are not replayable as visible text. */
+function isWeakAssertText(s: string | undefined): boolean {
+  if (!s || !s.trim()) return true;
+  const t = s.trim();
+  if (/^\d{1,2}$/.test(t)) return true;
+  return false;
+}
+
+/**
+ * Some sites expose <select> as combobox with name = all <option> text concatenated.
+ * Playwright getByRole({ name }) then fails; use first combobox fallback in execute.
+ */
+function sanitizeComboboxName(role: string | undefined, name: string | undefined): string | undefined {
+  if (!name || role !== "combobox") return name;
+  if (name.length <= 80) return name;
+  const cut = name.indexOf("Name (A to Z)");
+  if (cut > 0 && cut < 60) return name.slice(0, cut).trim() || name.slice(0, 60).trim();
+  return name.slice(0, 60).trim();
 }
 
 export function generateRegressionPlan(stepsDetail: RunStep[]): RegressionStep[] {
@@ -108,13 +133,25 @@ export function generateRegressionPlan(stepsDetail: RunStep[]): RegressionStep[]
 
     if (step.elementRef) {
       regStep.role = step.elementRef.role;
-      regStep.name = step.elementRef.name;
+      regStep.name = sanitizeComboboxName(step.elementRef.role, step.elementRef.name);
     } else if (step.target) {
       regStep.name = step.target;
     }
 
-    if (step.value) regStep.value = step.value;
-    if (step.assertion) regStep.value = step.assertion;
+    if (step.action === "assert") {
+      const text = (step.assertion ?? step.target ?? "").trim();
+      if (isWeakAssertText(text)) continue;
+      regStep.value = text;
+      regStep.role = undefined;
+      regStep.name = undefined;
+    } else {
+      if (step.value) regStep.value = step.value;
+      if (step.assertion) regStep.value = step.assertion;
+    }
+
+    if (["click", "fill", "selectOption"].includes(step.action) && !regStep.role && !regStep.name) {
+      continue;
+    }
 
     regStep.doneWhen = inferDoneCondition(step, stepsDetail[i + 1]);
 
@@ -142,7 +179,8 @@ function inferDoneCondition(step: RunStep, nextStep?: RunStep): CompletionCondit
 
   if (step.action === "click" && nextStep && ["fill", "selectOption"].includes(nextStep.action)) {
     if (nextStep.elementRef) {
-      return { type: "element_visible", role: nextStep.elementRef.role, name: nextStep.elementRef.name };
+      const nm = sanitizeComboboxName(nextStep.elementRef.role, nextStep.elementRef.name);
+      return { type: "element_visible", role: nextStep.elementRef.role, name: nm ?? nextStep.elementRef.name };
     }
   }
 
@@ -170,6 +208,7 @@ export async function executeRegressionPlan(
   };
 
   let consecutiveStale = 0;
+  const staleStepIndices = new Set<number>();
 
   for (let i = 0; i < plan.length; i++) {
     const step = plan[i];
@@ -210,10 +249,14 @@ export async function executeRegressionPlan(
         consecutiveStale = 0;
       } else {
         result.staleSteps++;
+        staleStepIndices.add(i);
         consecutiveStale++;
 
-        if (consecutiveStale >= 3) {
-          logger.warn("3 consecutive stale steps \u2014 marking plan as stale");
+        // Only mark plan as stale after 5 consecutive stale steps (was 3),
+        // or if >50% of attempted steps are stale (plan is fundamentally outdated)
+        const staleRatio = staleStepIndices.size / (i + 1);
+        if (consecutiveStale >= 5 || (i >= 4 && staleRatio > 0.5)) {
+          logger.warn({ consecutiveStale, staleRatio: staleRatio.toFixed(2), staleSteps: staleStepIndices.size }, "Plan marked as stale — too many unresolvable steps");
           result.status = "stale";
           return result;
         }
@@ -266,20 +309,36 @@ async function executeRegressionStep(page: Page, step: RegressionStep): Promise<
     return;
   }
 
+  if (step.action === "selectOption" && step.value && step.role === "combobox") {
+    try {
+      const loc = step.name
+        ? page.getByRole("combobox", { name: step.name, exact: false })
+        : page.getByRole("combobox");
+      await loc.first().selectOption({ label: step.value }, { timeout: 5000 });
+    } catch {
+      await page.getByRole("combobox").first().selectOption({ label: step.value }, { timeout: 5000 });
+    }
+    return;
+  }
+
   if (!step.role && !step.name) {
     throw new Error(`Step missing role/name: ${JSON.stringify(step)}`);
   }
 
   const locator = step.role
-    ? page.getByRole(step.role as any, { name: step.name })
+    ? (step.name
+        ? getByRoleNamed(page, step.role, step.name)
+        : page.getByRole(step.role as any))
     : page.getByText(step.name!, { exact: false });
 
+  const actionTimeout = step.action === "click" ? 12_000 : 8_000;
+
   if (step.action === "click") {
-    await locator.first().click({ timeout: 5000 });
+    await locator.first().click({ timeout: actionTimeout });
   } else if (step.action === "fill" && step.value !== undefined) {
-    await locator.first().fill(step.value, { timeout: 5000 });
+    await locator.first().fill(step.value, { timeout: actionTimeout });
   } else if (step.action === "selectOption" && step.value) {
-    await locator.first().selectOption({ label: step.value }, { timeout: 5000 });
+    await locator.first().selectOption({ label: step.value }, { timeout: actionTimeout });
   }
 }
 
@@ -314,15 +373,31 @@ async function healStep(
     }
   }
 
+  if (step.role && step.name) {
+    try {
+      const byRole = getByRoleNamed(page, step.role, step.name);
+      if (await byRole.count() > 0) {
+        if (step.action === "click") {
+          await byRole.first().click({ timeout: 8000 });
+          return "healed";
+        }
+        if (step.action === "fill" && step.value !== undefined) {
+          await byRole.first().fill(step.value, { timeout: 8000 });
+          return "healed";
+        }
+      }
+    } catch {}
+  }
+
   if (step.name) {
     try {
       const byText = page.getByText(step.name, { exact: false });
       if (await byText.count() > 0) {
         if (step.action === "click") {
-          await byText.first().click({ timeout: 3000 });
+          await byText.first().click({ timeout: 8000 });
           return "healed";
         } else if (step.action === "fill" && step.value !== undefined) {
-          await byText.first().fill(step.value, { timeout: 3000 });
+          await byText.first().fill(step.value, { timeout: 8000 });
           return "healed";
         }
       }
@@ -340,8 +415,9 @@ async function healStep(
 }
 
 function buildHealInstruction(step: RegressionStep): string | null {
-  const target = step.name || "";
+  let target = step.name || "";
   if (!target) return null;
+  if (target.length > 100) target = `${target.slice(0, 97)}...`;
 
   switch (step.action) {
     case "click":

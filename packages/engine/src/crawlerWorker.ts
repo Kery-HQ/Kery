@@ -75,6 +75,22 @@ function normalizeRoute(url: string, baseOrigin: string): string {
   }
 }
 
+/** Check if a URL is a login/auth page that should be skipped during crawling. */
+function isLoginPage(url: string, loginUrl: string): boolean {
+  try {
+    const u = new URL(url);
+    const login = new URL(loginUrl);
+    // Exact path match
+    if (u.origin === login.origin && u.pathname === login.pathname) return true;
+    // Common login path patterns
+    const loginPatterns = ["/login", "/signin", "/sign-in", "/auth", "/authenticate", "/sso"];
+    const lowerPath = u.pathname.toLowerCase();
+    return loginPatterns.some(p => lowerPath === p || lowerPath.startsWith(p + "/"));
+  } catch {
+    return false;
+  }
+}
+
 function isAssetUrl(url: string): boolean {
   const extensions = [".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".map", ".json"];
   const lower = url.toLowerCase();
@@ -234,6 +250,36 @@ export async function runCrawl(
         await new Promise(r => setTimeout(r, CRAWL_DELAY_MS));
         const pageData = await extractPageData(page, page.url(), depth, baseOrigin);
         if (!pageData.route) continue;
+
+        // Skip pages that look like login forms (content-based detection)
+        // Also re-authenticate if an auth-expired redirect landed us on a login page
+        {
+          const hasPasswordField = pageData.forms.some((f: any) =>
+            f.fields?.some((fd: any) => fd.type === "password")
+          );
+          const titleLooksLogin = /log\s*in|sign\s*in|authenticate/i.test(pageData.title);
+          const urlLooksLogin = auth?.loginUrl ? isLoginPage(page.url(), auth.loginUrl) : false;
+          const looksLikeLogin = hasPasswordField || (titleLooksLogin && urlLooksLogin);
+          if (looksLikeLogin) {
+            // If we have auth config, this might be an expired session — try re-authenticating
+            if (auth) {
+              logger.info({ url: page.url() }, "Crawl: login page detected mid-crawl, re-authenticating");
+              try {
+                const { handleAuth } = await import("./agent.js");
+                await handleAuth(page, auth, undefined, baseUrl);
+                // Retry navigating to the original URL after re-auth
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+                await waitForPageStable(page, 4000);
+              } catch (authErr) {
+                logger.warn({ err: String(authErr).slice(0, 200) }, "Crawl: re-auth failed, skipping login page");
+                continue;
+              }
+            } else {
+              logger.debug({ url: page.url(), title: pageData.title }, "Crawl: skipping login page");
+              continue;
+            }
+          }
+        }
         await discoverInteractions(page, pageData);
         sitemap.push(pageData);
 
@@ -241,6 +287,11 @@ export async function runCrawl(
           const fullUrl = link.startsWith("http") ? link : `${baseOrigin}${link}`;
           const linkRoute = normalizeRoute(fullUrl, baseOrigin);
           if (linkRoute && !visitedPatterns.has(linkRoute)) {
+            // Skip login/auth pages to avoid crawling auth flows
+            if (auth?.loginUrl && isLoginPage(fullUrl, auth.loginUrl)) {
+              logger.debug({ url: fullUrl, loginUrl: auth.loginUrl }, "Crawl: skipping login page URL");
+              continue;
+            }
             queue.push({ url: fullUrl, depth: depth + 1 });
           }
         }
@@ -308,7 +359,7 @@ export async function generateIntentForNode(
 
   const prompt = `Generate a single test intent for this page starting from ${baseUrl}.\n\n${context.join("\n")}\n\nReply with ONLY the intent text.`;
   try {
-    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: 16384, temperature: 0.2 });
+    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 });
     if (costAccum) costAccum.usd += calcCostUsd(config.summaryModel, usage.inputTokens, usage.outputTokens);
     const intent = content.trim();
     return intent.length > 20 ? intent : null;

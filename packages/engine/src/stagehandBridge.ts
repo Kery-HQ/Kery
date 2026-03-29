@@ -26,32 +26,49 @@ export type StagehandSession = {
   page: StagehandPage;
 };
 
-// ─── Circuit Breaker ────────────────────────────────────────────────────────
+// ─── Circuit Breaker (with half-open recovery) ──────────────────────────────
 
 const CIRCUIT_BREAKER_THRESHOLD = 2;
+const HALF_OPEN_DELAY_MS = 30_000; // 30s before allowing a probe request
 let _observeFailures = 0;
-let _circuitOpen = false;
+let _circuitState: "closed" | "open" | "half-open" = "closed";
+let _circuitOpenedAt = 0;
 
 function recordObserveSuccess(): void {
   _observeFailures = 0;
-  _circuitOpen = false;
+  if (_circuitState !== "closed") {
+    logger.info("Stagehand circuit breaker CLOSED (recovered)");
+  }
+  _circuitState = "closed";
 }
 
 function recordObserveFailure(): void {
   _observeFailures++;
-  if (_observeFailures >= CIRCUIT_BREAKER_THRESHOLD) {
-    _circuitOpen = true;
+  if (_circuitState === "half-open") {
+    // Probe failed — back to open, reset timer
+    _circuitState = "open";
+    _circuitOpenedAt = Date.now();
+    logger.warn("Stagehand half-open probe failed, circuit OPEN again");
+  } else if (_observeFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+    _circuitState = "open";
+    _circuitOpenedAt = Date.now();
     logger.warn({ failures: _observeFailures }, "Stagehand observe circuit breaker OPEN");
   }
 }
 
 export function isObserveCircuitOpen(): boolean {
-  return _circuitOpen;
+  if (_circuitState === "open" && Date.now() - _circuitOpenedAt >= HALF_OPEN_DELAY_MS) {
+    _circuitState = "half-open";
+    logger.info("Stagehand circuit breaker HALF-OPEN (allowing probe)");
+    return false; // Allow one probe request
+  }
+  return _circuitState === "open";
 }
 
 function resetCircuitBreaker(): void {
   _observeFailures = 0;
-  _circuitOpen = false;
+  _circuitState = "closed";
+  _circuitOpenedAt = 0;
 }
 
 // ─── Init / Teardown ────────────────────────────────────────────────────────
@@ -105,7 +122,7 @@ export async function destroyStagehandSession(session: StagehandSession): Promis
 export async function stagehandObserve(
   page: StagehandPage,
 ): Promise<ObservedElement[]> {
-  if (_circuitOpen) return [];
+  if (isObserveCircuitOpen()) return [];
 
   try {
     const results: ObserveResult[] = await page.observe(
@@ -122,7 +139,10 @@ export async function stagehandObserve(
     }));
   } catch (err) {
     recordObserveFailure();
-    logger.warn({ err: String(err).slice(0, 200), failures: _observeFailures, circuitOpen: _circuitOpen }, "Stagehand observe failed");
+    logger.warn(
+      { err: String(err).slice(0, 200), failures: _observeFailures, circuitState: _circuitState },
+      "Stagehand observe failed",
+    );
     return [];
   }
 }

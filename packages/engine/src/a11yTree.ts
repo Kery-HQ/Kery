@@ -40,6 +40,11 @@ const INTERACTIVE_ROLES = new Set([
   "checkbox", "radio", "switch", "slider", "spinbutton",
   "tab", "menuitem", "menuitemcheckbox", "menuitemradio",
   "option", "treeitem", "cell", "gridcell",
+  // Previously missing roles
+  "listbox", "menu", "menubar", "toolbar", "tree",
+  "dialog", "alertdialog", "progressbar", "meter",
+  "scrollbar", "separator", "tablist", "tabpanel",
+  "application", "document", "form",
 ]);
 
 const TEXT_ROLES = new Set([
@@ -47,6 +52,22 @@ const TEXT_ROLES = new Set([
   "blockquote", "caption", "contentinfo", "definition",
   "note", "tooltip", "log",
 ]);
+
+// ─── A11y Tree Cache ─────────────────────────────────────────────────────────
+
+type A11yCacheEntry = {
+  elements: A11yElement[];
+  textNodes: A11yTextNode[];
+  tree: A11yNode[];
+};
+
+const a11yCache = new Map<string, A11yCacheEntry>();
+const A11Y_CACHE_MAX = 20;
+
+/** Clear the a11y cache (call between runs). */
+export function clearA11yCache(): void {
+  a11yCache.clear();
+}
 
 // ─── Extract A11y Tree ───────────────────────────────────────────────────────
 
@@ -74,6 +95,22 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     if (tag === "LI") return "listitem";
     if (tag === "BLOCKQUOTE") return "blockquote";
     if (tag === "FIGCAPTION") return "caption";
+    if (tag === "SUMMARY") return "button";
+    if (tag === "DETAILS") return "group";
+    if (tag === "DIALOG") return "dialog";
+    if (tag === "METER") return "meter";
+    if (tag === "PROGRESS") return "progressbar";
+    if (tag === "NAV") return "navigation";
+    // Custom interactive elements: onclick, tabindex, contenteditable
+    if (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false") return "textbox";
+    if (el.hasAttribute("onclick") || (el.hasAttribute("tabindex") && parseInt(el.getAttribute("tabindex")) >= 0)) {
+      // Check for cursor:pointer as additional clickability signal
+      try {
+        var style = window.getComputedStyle(el);
+        if (style.cursor === "pointer" || el.hasAttribute("onclick")) return "button";
+      } catch(e) {}
+      return "button";
+    }
     return "";
   }
 
@@ -139,7 +176,12 @@ export type A11yTextNode = {
   name: string;
 };
 
-export async function extractA11yTree(page: Page): Promise<{ elements: A11yElement[]; textNodes: A11yTextNode[]; tree: A11yNode[] }> {
+export async function extractA11yTree(page: Page, domHash?: string): Promise<{ elements: A11yElement[]; textNodes: A11yTextNode[]; tree: A11yNode[] }> {
+  // Return cached result when DOM hash is unchanged
+  if (domHash && a11yCache.has(domHash)) {
+    logger.debug({ domHash }, "A11y tree cache hit");
+    return a11yCache.get(domHash)!;
+  }
   const elements: A11yElement[] = [];
   const textNodes: A11yTextNode[] = [];
   let nextId = 1;
@@ -150,18 +192,37 @@ export async function extractA11yTree(page: Page): Promise<{ elements: A11yEleme
 
     // Also extract from iframes (e.g. Clerk, Stripe, etc.)
     const iframeSnapshots: any[] = [];
+    let iframeCount = 0;
+    let iframeSuccessCount = 0;
+    let iframeFailCount = 0;
     try {
       for (const frame of page.frames()) {
         if (frame === page.mainFrame()) continue;
+        iframeCount++;
+        const frameUrl = frame.url();
         try {
           const frameRaw = await frame.evaluate(A11Y_EXTRACT_SCRIPT).catch(() => null) as string | null;
           if (frameRaw) {
             const parsed = JSON.parse(frameRaw);
-            if (parsed) iframeSnapshots.push(parsed);
+            if (parsed) {
+              iframeSnapshots.push(parsed);
+              iframeSuccessCount++;
+            }
+          } else {
+            iframeFailCount++;
+            logger.warn({ frameUrl: frameUrl?.slice(0, 120) }, "A11y iframe extraction returned null — frame may be cross-origin or empty");
           }
-        } catch { /* skip inaccessible frames */ }
+        } catch (frameErr) {
+          iframeFailCount++;
+          logger.warn({ frameUrl: frameUrl?.slice(0, 120), err: String(frameErr).slice(0, 150) }, "A11y iframe extraction failed — frame inaccessible");
+        }
       }
-    } catch { /* frames() may throw */ }
+    } catch (framesErr) {
+      logger.warn({ err: String(framesErr).slice(0, 150) }, "Failed to enumerate page frames");
+    }
+    if (iframeCount > 0) {
+      logger.info({ iframeCount, iframeSuccessCount, iframeFailCount }, "Iframe a11y extraction summary");
+    }
 
     if (!snapshot && iframeSnapshots.length === 0) return { elements, textNodes, tree: [] };
 
@@ -223,7 +284,16 @@ export async function extractA11yTree(page: Page): Promise<{ elements: A11yEleme
       logger.debug({ total: elements.length, withBbox, withoutBbox: elements.length - withBbox }, "Bounding boxes resolved");
     }
 
-    return { elements, textNodes, tree: snapshot.children ?? [] };
+    const result = { elements, textNodes, tree: snapshot.children ?? [] };
+    // Cache result keyed by domHash
+    if (domHash) {
+      if (a11yCache.size >= A11Y_CACHE_MAX) {
+        const oldest = a11yCache.keys().next().value;
+        if (oldest !== undefined) a11yCache.delete(oldest);
+      }
+      a11yCache.set(domHash, result);
+    }
+    return result;
   } catch (err) {
     logger.warn({ err: String(err).slice(0, 200) }, "A11y tree extraction failed \u2014 will fall back to DOM");
     return { elements, textNodes, tree: [] };
@@ -244,6 +314,40 @@ async function resolveBoundingBoxes(page: Page, elements: A11yElement[]): Promis
   }
 }
 
+// ─── Prompt Injection Sanitization ────────────────────────────────────────────
+
+/**
+ * Patterns that could hijack the LLM agent if present in page content.
+ * Strips instruction-like patterns from page text before including in prompts.
+ */
+const INJECTION_PATTERNS = [
+  // Direct instruction patterns
+  /\b(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/gi,
+  // System/assistant role impersonation
+  /\b(system|assistant|admin)\s*:\s*/gi,
+  // Prompt boundary markers
+  /```(system|prompt|instruction)/gi,
+  /<\/?(?:system|prompt|instruction|role|context)>/gi,
+  // "You are now" / "Act as" hijacking
+  /\b(you\s+are\s+now|act\s+as|pretend\s+to\s+be|new\s+instructions?)\b/gi,
+  // XML-style injection
+  /<\/?(?:human|user|claude|gpt|ai|bot)>/gi,
+  // Multi-turn injection
+  /\[(?:INST|SYS|SYSTEM)\]/gi,
+];
+
+/**
+ * Sanitize text extracted from pages before including in LLM prompts.
+ * Strips patterns that could be used for prompt injection.
+ */
+export function sanitizeForPrompt(text: string): string {
+  let sanitized = text;
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, "[filtered]");
+  }
+  return sanitized;
+}
+
 // ─── Format for LLM ──────────────────────────────────────────────────────────
 
 export function formatA11yForLLM(elements: A11yElement[], textNodes?: A11yTextNode[]): string {
@@ -251,18 +355,19 @@ export function formatA11yForLLM(elements: A11yElement[], textNodes?: A11yTextNo
 
   if (textNodes && textNodes.length > 0) {
     const textLines = textNodes.map(tn => {
-      if (tn.role === "heading") return `# ${tn.name}`;
-      if (tn.role === "status" || tn.role === "alert") return `[${tn.role}] ${tn.name}`;
-      return tn.name;
+      const name = sanitizeForPrompt(tn.name);
+      if (tn.role === "heading") return `# ${name}`;
+      if (tn.role === "status" || tn.role === "alert") return `[${tn.role}] ${name}`;
+      return name;
     });
     sections.push(`Page content:\n${textLines.join("\n")}`);
   }
 
   if (elements.length > 0) {
     const lines = elements.map(el => {
-      const parts = [`[${el.id}] ${el.role} "${el.name}"`];
+      const parts = [`[${el.id}] ${el.role} "${sanitizeForPrompt(el.name)}"`];
       if (el.state.length > 0) parts.push(`- ${el.state.join(", ")}`);
-      if (el.value) parts.push(`value="${el.value}"`);
+      if (el.value) parts.push(`value="${sanitizeForPrompt(el.value)}"`);
       const hint = getInteractionHint(el);
       if (hint) parts.push(hint);
       return parts.join(" ");
@@ -301,7 +406,7 @@ export async function extractVisibleText(page: Page): Promise<string> {
     });
     if (!text) return "";
     const cleaned = text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ");
-    return cleaned.slice(0, MAX_PAGE_TEXT_CHARS);
+    return sanitizeForPrompt(cleaned.slice(0, MAX_PAGE_TEXT_CHARS));
   } catch {
     return "";
   }

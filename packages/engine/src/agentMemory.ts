@@ -95,6 +95,17 @@ const TYPE_LABELS: Record<MemoryEntryType, string> = {
   tip:           "Tips and hints",
 };
 
+/** Compute a human-readable temporal label for a memory entry. */
+function temporalLabel(entry: MemoryEntry): string {
+  const ageMs = Date.now() - new Date(entry.updated_at).getTime();
+  const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+  if (ageDays === 0) return "today";
+  if (ageDays === 1) return "yesterday";
+  if (ageDays <= 7) return `${ageDays} days ago`;
+  if (ageDays <= 30) return `${Math.floor(ageDays / 7)} weeks ago`;
+  return `${Math.floor(ageDays / 30)} months ago`;
+}
+
 export function formatMemoryForPrompt(entries: MemoryEntry[]): string {
   if (entries.length === 0) return "";
 
@@ -105,20 +116,26 @@ export function formatMemoryForPrompt(entries: MemoryEntry[]): string {
     grouped.set(e.type, arr);
   }
 
+  // Sort each group by confidence (highest first) for relevance prioritization
+  for (const [, items] of grouped) {
+    items.sort((a, b) => b.confidence - a.confidence);
+  }
+
   const sections: string[] = [];
   const typeOrder: MemoryEntryType[] = ["learned_path", "tip", "ignore_region", "avoid_region", "bug_pattern"];
   for (const t of typeOrder) {
     const items = grouped.get(t);
     if (!items || items.length === 0) continue;
     const lines = items.map((e) => {
-      const conf = e.confidence >= 80 ? " [high confidence]" : e.confidence <= 30 ? " [low confidence]" : "";
+      const conf = e.confidence >= 80 ? " [HIGH confidence]" : e.confidence <= 30 ? " [low confidence]" : "";
       const regionNote = e.region?.description ? ` (region: ${e.region.description})` : "";
-      return `  - ${e.summary}: ${e.content}${regionNote}${conf}`;
+      const temporal = ` (learned ${temporalLabel(e)})`;
+      return `  - ${e.summary}: ${e.content}${regionNote}${conf}${temporal}`;
     });
     sections.push(`${TYPE_LABELS[t]}:\n${lines.join("\n")}`);
   }
 
-  return `AGENT MEMORY (from previous runs — use this to guide your actions):\n${sections.join("\n\n")}`;
+  return `AGENT MEMORY (from previous runs — use this to guide your actions, prioritize high-confidence recent entries):\n${sections.join("\n\n")}`;
 }
 
 // ─── Propose memories from run results ────────────────────────────────────────
@@ -185,6 +202,58 @@ export function proposeMemoriesFromRun(
   }
 
   return proposals;
+}
+
+// ─── Confidence decay + pruning ──────────────────────────────────────────────
+
+const DECAY_THRESHOLD_DAYS = 14;
+const DECAY_AMOUNT = 10;
+const PRUNE_CONFIDENCE_MIN = 10;
+
+/**
+ * Apply confidence decay to entries older than DECAY_THRESHOLD_DAYS,
+ * and prune entries that fall below the minimum confidence threshold.
+ * Returns the list of IDs that were pruned (caller can delete from storage).
+ */
+export function decayAndPrune(entries: MemoryEntry[]): { surviving: MemoryEntry[]; prunedIds: string[] } {
+  const now = Date.now();
+  const surviving: MemoryEntry[] = [];
+  const prunedIds: string[] = [];
+
+  for (const entry of entries) {
+    const ageMs = now - new Date(entry.updated_at).getTime();
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+
+    // Decay confidence for old entries
+    let confidence = entry.confidence;
+    if (ageDays > DECAY_THRESHOLD_DAYS) {
+      const decayMultiplier = Math.floor(ageDays / DECAY_THRESHOLD_DAYS);
+      confidence = Math.max(0, confidence - DECAY_AMOUNT * decayMultiplier);
+    }
+
+    if (confidence < PRUNE_CONFIDENCE_MIN) {
+      prunedIds.push(entry.id);
+    } else {
+      surviving.push({ ...entry, confidence });
+    }
+  }
+
+  return { surviving, prunedIds };
+}
+
+/**
+ * Load memory with automatic decay and pruning applied.
+ */
+export async function loadProjectMemoryWithDecay(storage: StorageAdapter, projectId: string): Promise<MemoryEntry[]> {
+  const raw = await loadProjectMemory(storage, projectId);
+  const { surviving } = decayAndPrune(raw);
+  return surviving;
+}
+
+export async function loadPageMemoryWithDecay(storage: StorageAdapter, destinationId: string): Promise<MemoryEntry[]> {
+  const raw = await loadPageMemory(storage, destinationId);
+  const { surviving } = decayAndPrune(raw);
+  return surviving;
 }
 
 // ─── Legacy compat ─────────────────────────────────────────────────────────────
