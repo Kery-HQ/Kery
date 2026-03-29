@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Activity, AlertCircle, CheckCircle2, Loader2,
-  ChevronRight, Globe, Scan, FlaskConical, Play, Circle, Check,
+  ChevronRight, Globe, Scan, FlaskConical, Play, Circle, Check, X, Sparkles,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
@@ -68,23 +68,41 @@ const SETUP_STEPS: SetupStep[] = [
   },
 ];
 
+const setupDismissStorageKey = (projectId: string) =>
+  `kery_overview_setup_dismissed_${projectId}`;
+
 function SetupChecklist({
   completedSteps,
   navigate,
+  onDismiss,
 }: {
   completedSteps: Set<string>;
   navigate: (path: string) => void;
+  onDismiss: () => void;
 }) {
   let foundCurrent = false;
 
   return (
-    <div className="max-w-lg mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-xl font-semibold text-foreground">Get started with Kery</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">
-          Complete these steps to start testing your app.
-        </p>
+    <Card className="overflow-hidden border-border/80">
+      <div className="flex items-start justify-between gap-3 p-4 pb-2 border-b border-border/60 bg-muted/20">
+        <div className="min-w-0">
+          <h2 className="text-[14px] font-semibold text-foreground">Get started</h2>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            Optional — complete when you are ready.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 shrink-0 gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+          onClick={onDismiss}
+        >
+          <X className="h-3.5 w-3.5" />
+          Skip
+        </Button>
       </div>
+      <CardContent className="p-4 pt-4">
 
       {/* Stepper — fixed-width left column for dots + lines */}
       <div className="relative">
@@ -165,19 +183,20 @@ function SetupChecklist({
         })}
       </div>
 
-      {/* Progress */}
-      <div className="mt-8 flex items-center gap-3">
-        <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-500"
-            style={{ width: `${(completedSteps.size / SETUP_STEPS.length) * 100}%` }}
-          />
+        {/* Progress */}
+        <div className="mt-6 flex items-center gap-3">
+          <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${(completedSteps.size / SETUP_STEPS.length) * 100}%` }}
+            />
+          </div>
+          <span className="text-[11px] font-mono text-muted-foreground">
+            {completedSteps.size}/{SETUP_STEPS.length}
+          </span>
         </div>
-        <span className="text-[11px] font-mono text-muted-foreground">
-          {completedSteps.size}/{SETUP_STEPS.length}
-        </span>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -298,6 +317,24 @@ export const Overview: React.FC = () => {
   const [bugs, setBugs] = React.useState<any[]>([]);
   const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
   const [setupDone, setSetupDone] = React.useState(false);
+  const [setupDismissed, setSetupDismissed] = React.useState(false);
+
+  React.useLayoutEffect(() => {
+    if (!currentProjectId) return;
+    setSetupDismissed(localStorage.getItem(setupDismissStorageKey(currentProjectId)) === "true");
+  }, [currentProjectId]);
+
+  const dismissSetup = React.useCallback(() => {
+    if (!currentProjectId) return;
+    localStorage.setItem(setupDismissStorageKey(currentProjectId), "true");
+    setSetupDismissed(true);
+  }, [currentProjectId]);
+
+  const showSetupGuideAgain = React.useCallback(() => {
+    if (!currentProjectId) return;
+    localStorage.removeItem(setupDismissStorageKey(currentProjectId));
+    setSetupDismissed(false);
+  }, [currentProjectId]);
 
   React.useEffect(() => {
     if (!currentProjectId) return;
@@ -345,27 +382,64 @@ export const Overview: React.FC = () => {
     );
   }
 
+  const showSetupPanel = !setupDone && !setupDismissed;
+
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<LayoutDashboard className="h-4 w-4" />} title="Overview" />
+      <PageHeader icon={<LayoutDashboard className="h-4 w-4" />} title="Overview">
+        {!loading && !setupDone && setupDismissed && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-[11px]"
+            onClick={showSetupGuideAgain}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Show setup guide</span>
+            <span className="sm:hidden">Setup guide</span>
+          </Button>
+        )}
+      </PageHeader>
 
       <div className="p-6 animate-fade-in">
         {loading ? (
-          <div className="max-w-lg mx-auto space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-4 p-4">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-60" />
-                </div>
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full">
+            <div className="flex-1 min-w-0 space-y-6 w-full">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-[72px] rounded-lg" />
+                ))}
               </div>
-            ))}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Skeleton className="h-[220px] rounded-lg" />
+                <Skeleton className="h-[220px] rounded-lg" />
+              </div>
+            </div>
+            <aside className="hidden lg:block w-full lg:w-[min(100%,320px)] lg:flex-shrink-0">
+              <Skeleton className="h-[320px] rounded-lg" />
+            </aside>
           </div>
-        ) : setupDone ? (
-          <Dashboard overview={overview} runs={runs} bugs={bugs} navigate={navigate} />
         ) : (
-          <SetupChecklist completedSteps={completedSteps} navigate={navigate} />
+          <div
+            className={cn(
+              "flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full",
+              !showSetupPanel && "max-w-[1600px] mx-auto",
+            )}
+          >
+            <div className="flex-1 min-w-0 w-full space-y-6">
+              <Dashboard overview={overview} runs={runs} bugs={bugs} navigate={navigate} />
+            </div>
+            {showSetupPanel && (
+              <aside className="w-full lg:w-[min(100%,340px)] lg:max-w-[40%] lg:flex-shrink-0 lg:sticky lg:top-6 lg:self-start">
+                <SetupChecklist
+                  completedSteps={completedSteps}
+                  navigate={navigate}
+                  onDismiss={dismissSetup}
+                />
+              </aside>
+            )}
+          </div>
         )}
       </div>
     </div>
