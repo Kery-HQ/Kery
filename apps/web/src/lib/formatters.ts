@@ -35,6 +35,27 @@ export function formatCost(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
+/** Best-effort run cost: stored `cost_usd` or sum of `llm_calls_json[].costUsd`. */
+export function runCostUsd(run: { cost_usd?: number | null; llm_calls_json?: unknown }): number {
+  if (run.cost_usd != null) {
+    const n = Number(run.cost_usd);
+    if (!Number.isNaN(n)) return n;
+  }
+  const calls = run.llm_calls_json;
+  if (!Array.isArray(calls)) return 0;
+  return calls.reduce(
+    (s: number, c: unknown) =>
+      s + (typeof c === "object" && c !== null && "costUsd" in c && typeof (c as { costUsd?: number }).costUsd === "number"
+        ? (c as { costUsd: number }).costUsd
+        : 0),
+    0,
+  );
+}
+
+export function formatRunCost(run: { cost_usd?: number | null; llm_calls_json?: unknown }): string {
+  return formatCost(runCostUsd(run));
+}
+
 export function formatMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   return `${(ms / 1000).toFixed(1)}s`;

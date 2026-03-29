@@ -99,7 +99,28 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
     const failed = runs.filter(r => r.status === "failed").length;
     const running = runs.filter(r => r.status === "running").length;
     const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
-    reply.send({ totalRuns: total, passRate, passed, failed, running });
+    // Prefer stored cost_usd; for older runs fall back to summing costUsd from llm_calls_json.
+    const { rows: costRows } = await pool.query(
+      `SELECT
+        COALESCE((
+          SELECT SUM(
+            COALESCE(
+              tr.cost_usd::numeric,
+              (
+                SELECT COALESCE(SUM((e->>'costUsd')::numeric), 0)
+                FROM jsonb_array_elements(COALESCE(tr.llm_calls_json, '[]'::jsonb)) AS e
+              )
+            )
+          )
+          FROM test_runs tr
+          WHERE tr.project_id = $1
+        ), 0)
+        + COALESCE((SELECT SUM(cost_usd) FROM crawl_runs WHERE project_id = $1), 0)
+        AS total`,
+      [projectId],
+    );
+    const totalCostUsd = Number(costRows[0]?.total ?? 0);
+    reply.send({ totalRuns: total, passRate, passed, failed, running, totalCostUsd });
   });
 
   // Environments

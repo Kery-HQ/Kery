@@ -80,7 +80,8 @@ CREATE TABLE IF NOT EXISTS test_runs (
   source_label    text,
   source_back_path text,
   started_at      timestamptz,
-  completed_at    timestamptz
+  completed_at    timestamptz,
+  cost_usd        numeric(10,6)
 );
 
 CREATE INDEX IF NOT EXISTS test_runs_project_idx ON test_runs(project_id);

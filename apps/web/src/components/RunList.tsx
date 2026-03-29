@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { statusVariant, duration, relativeTime } from "@/lib/formatters";
+import { statusVariant, duration, relativeTime, formatRunCost } from "@/lib/formatters";
 
 type Run = {
   id: string;
@@ -14,6 +14,8 @@ type Run = {
   started_at?: string | null;
   completed_at?: string | null;
   bugs_json?: unknown[] | null;
+  cost_usd?: number | null;
+  llm_calls_json?: unknown;
 };
 
 export function RunList({
@@ -38,6 +40,8 @@ export function RunList({
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-5 w-16 rounded-md" />
             <Skeleton className="h-3 flex-1" />
+            <Skeleton className="h-3 w-14" />
+            <Skeleton className="h-3 w-12" />
             <Skeleton className="h-3 w-12" />
           </div>
         ))}
@@ -75,6 +79,9 @@ export function RunList({
             </Badge>
             <span className="flex-1 text-[13px] text-foreground truncate min-w-0">
               {r.summary?.split("\n")[0] ?? ""}
+            </span>
+            <span className="text-[11px] font-mono text-muted-foreground flex-shrink-0 w-[4.25rem] text-right tabular-nums">
+              {formatRunCost(r)}
             </span>
             <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
               {duration(r.started_at ?? undefined, r.completed_at ?? undefined)}

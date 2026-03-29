@@ -1,11 +1,16 @@
 import React from "react";
 import {
   Globe, Plus, Trash2, ShieldCheck, ChevronDown,
+  Ban, LogIn, UserCircle, Database, Key, KeyRound, Info,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,14 +28,168 @@ import {
   fetchAuth, saveAuth, updateEnvironment,
 } from "@/projectApi";
 
-const AUTH_MODES = [
-  { value: "none", label: "No auth" },
-  { value: "ui", label: "Form-based (UI login)" },
-  { value: "clerk", label: "Clerk" },
-  { value: "supabase", label: "Supabase" },
-  { value: "apiToken", label: "API token (custom)" },
-  { value: "oauthToken", label: "OAuth token (custom)" },
-] as const;
+const AUTH_MODES: readonly {
+  value: string;
+  label: string;
+  subtitle: string;
+  icon: LucideIcon;
+  setupHelp: string;
+}[] = [
+  {
+    value: "none",
+    label: "No auth",
+    subtitle: "Start on your base URL without logging in",
+    icon: Ban,
+    setupHelp:
+      "Pick this when the app under test is public or you do not need a logged-in session. Kery opens the environment URL directly and does not send credentials.",
+  },
+  {
+    value: "ui",
+    label: "Form-based (UI login)",
+    subtitle: "Playwright fills your login form before each run",
+    icon: LogIn,
+    setupHelp:
+      "Set the login page URL, CSS selectors for username, password, and submit, then enter test credentials. Kery navigates to the login URL, fills the fields, submits, and continues the run in that session.",
+  },
+  {
+    value: "clerk",
+    label: "Clerk",
+    subtitle: "Session token via Clerk Backend API",
+    icon: UserCircle,
+    setupHelp:
+      "Enter your Clerk secret key, Backend API base URL (e.g. https://api.clerk.com), and a test user email and password. Kery obtains a token from Clerk so the browser runs as that user.",
+  },
+  {
+    value: "supabase",
+    label: "Supabase",
+    subtitle: "Sign in with Supabase Auth and use the JWT",
+    icon: Database,
+    setupHelp:
+      "Provide your project URL, anon (or service) key, and a test user email and password. Kery signs in via Supabase Auth and attaches the returned JWT for the session.",
+  },
+  {
+    value: "apiToken",
+    label: "API token (custom)",
+    subtitle: "Bring your own JSON config for headers or bearer tokens",
+    icon: Key,
+    setupHelp:
+      "Use the JSON below to describe how Kery should obtain or send a static API token or custom headers. Shape the config to match what your backend expects for authenticated requests.",
+  },
+  {
+    value: "oauthToken",
+    label: "OAuth token (custom)",
+    subtitle: "Client credentials or other OAuth flows in JSON",
+    icon: KeyRound,
+    setupHelp:
+      "Paste a JSON config that defines token URL, client credentials, scopes, and how to read the access token. Kery uses it to fetch a fresh bearer token before runs when your API requires OAuth.",
+  },
+];
+
+function AuthModeSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const [contentWidth, setContentWidth] = React.useState<number>();
+  React.useLayoutEffect(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const update = () => setContentWidth(el.offsetWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const current = AUTH_MODES.find((m) => m.value === value) ?? AUTH_MODES[0];
+  const CurrentIcon = current.icon;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          ref={triggerRef}
+          type="button"
+          className={cn(
+            "relative flex h-8 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 pr-8 text-left text-[13px] text-foreground transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-primary/40",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+          )}
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <CurrentIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate">{current.label}</span>
+          </span>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        style={contentWidth ? { width: contentWidth } : undefined}
+        className="max-h-[min(60vh,320px)] overflow-y-auto p-1"
+      >
+        {AUTH_MODES.map((m) => {
+          const Icon = m.icon;
+          return (
+            <DropdownMenuItem
+              key={m.value}
+              onSelect={() => onChange(m.value)}
+              className={cn(
+                "flex h-auto cursor-pointer items-start gap-2.5 py-2.5",
+                value === m.value && "bg-accent/60",
+              )}
+            >
+              <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] leading-tight">{m.label}</span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                  {m.subtitle}
+                </span>
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function AuthModeField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const current = AUTH_MODES.find((m) => m.value === value) ?? AUTH_MODES[0];
+  return (
+    <div className="flex w-full items-stretch gap-1.5">
+      <div className="min-w-0 flex-1">
+        <AuthModeSelect value={value} onChange={onChange} />
+      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 shrink-0 border-input"
+            aria-label={`How to set up ${current.label}`}
+          >
+            <Info className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" sideOffset={6} className="w-[min(100vw-2rem,340px)]">
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium text-muted-foreground">Setup guide</p>
+            <p className="text-[12px] leading-relaxed text-foreground">{current.setupHelp}</p>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 type UiAuthForm = {
   loginUrl: string;
@@ -491,17 +650,9 @@ export const Environments: React.FC = () => {
                           </p>
                         </div>
 
-                        <div>
+                        <div className="w-full min-w-0">
                           <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Mode</label>
-                          <Select
-                            value={authMode}
-                            onChange={(e) => setAuthMode(e.target.value)}
-                            className="w-[220px]"
-                          >
-                            {AUTH_MODES.map((m) => (
-                              <option key={m.value} value={m.value}>{m.label}</option>
-                            ))}
-                          </Select>
+                          <AuthModeField value={authMode} onChange={setAuthMode} />
                         </div>
 
                         {authMode === "none" && (

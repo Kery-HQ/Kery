@@ -85,6 +85,13 @@ export function createRunWorker(
         await materializeRunScreenshotFiles(data.runId, result.llmCalls, result.bugsFound);
         const enrichedBugs = enrichBugsForRun(data.runId, completedAt, data.triggerRef, result.bugsFound, result.stepsDetail);
 
+        const costUsd = Array.isArray(result.llmCalls)
+          ? result.llmCalls.reduce(
+            (s: number, c: { costUsd?: number }) => s + (typeof c?.costUsd === "number" ? c.costUsd : 0),
+            0,
+          )
+          : 0;
+
         // Wrap all post-run DB writes in a transaction for atomicity
         await storage.withTransaction(async (tx) => {
           await tx.updateTestRun(data.runId, {
@@ -92,6 +99,7 @@ export function createRunWorker(
             steps_json: result.stepsDetail, bugs_json: enrichedBugs,
             llm_calls_json: result.llmCalls, completed_at: completedAt,
             video_url: result.videoUrl || null,
+            cost_usd: costUsd,
           });
 
           await tx.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);

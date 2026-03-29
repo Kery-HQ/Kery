@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { statusVariant, duration, relativeTime } from "@/lib/formatters";
+import { statusVariant, duration, relativeTime, formatRunCost } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchProjectRuns } from "@/projectApi";
 
@@ -68,6 +68,7 @@ export const Runs: React.FC = () => {
                     <Skeleton className="h-3 w-16" />
                     <Skeleton className="h-5 w-16 rounded-md" />
                     <Skeleton className="h-3 flex-1" />
+                    <Skeleton className="h-3 w-12" />
                     <Skeleton className="h-3 w-10" />
                     <Skeleton className="h-3 w-12" />
                   </div>
@@ -103,6 +104,9 @@ export const Runs: React.FC = () => {
                     <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
                       {r.status}
                     </Badge>
+                    <span className="text-[11px] font-mono text-muted-foreground flex-shrink-0 w-[4.25rem] text-right tabular-nums">
+                      {formatRunCost(r)}
+                    </span>
                     <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0 w-14 text-right">
                       {duration(r.started_at, r.completed_at)}
                     </span>

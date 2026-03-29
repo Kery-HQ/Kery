@@ -1,8 +1,9 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Activity, AlertCircle, CheckCircle2, Loader2,
+  LayoutDashboard, Activity, AlertCircle, Loader2,
   ChevronRight, Globe, Scan, FlaskConical, Play, Circle, Check, X, Sparkles,
+  PieChart, DollarSign,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
@@ -13,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { statusVariant, duration, relativeTime } from "@/lib/formatters";
+import { statusVariant, duration, relativeTime, formatCost, formatRunCost } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchProjectOverview, fetchProjectRuns, fetchProjectBugs,
@@ -36,8 +37,8 @@ interface SetupStep {
 const SETUP_STEPS: SetupStep[] = [
   {
     key: "environment",
-    label: "Add an environment",
-    description: "Set the base URL of the app you want to test.",
+    label: "Setup App Environment",
+    description: "Setup details of your website or webapp you want to test.",
     icon: Globe,
     href: "/environments",
     buttonLabel: "Add environment",
@@ -45,15 +46,17 @@ const SETUP_STEPS: SetupStep[] = [
   {
     key: "scan",
     label: "Scan your app",
-    description: "Discover all pages, forms, and interactions automatically.",
+    description:
+      "Kery scans your app and learns its pages, flows, and interactions so testing knows where to focus.",
     icon: Scan,
     href: "/pages",
     buttonLabel: "Scan pages",
   },
   {
     key: "flow",
-    label: "Create a test flow",
-    description: "Define what to test — or let the agent explore on its own.",
+    label: "Run your first test on app",
+    description:
+      "Create your first custom test, or let the agent explore without a script.",
     icon: FlaskConical,
     href: "/tests",
     buttonLabel: "Create flow",
@@ -61,7 +64,8 @@ const SETUP_STEPS: SetupStep[] = [
   {
     key: "run",
     label: "Run your first test",
-    description: "The AI agent will execute your test in a real browser.",
+    description:
+      "Execute tests in a real browser and surface bugs and issues you might have missed.",
     icon: Play,
     href: "/tests",
     buttonLabel: "Run test",
@@ -87,9 +91,6 @@ function SetupChecklist({
       <div className="flex items-start justify-between gap-3 p-4 pb-2 border-b border-border/60 bg-muted/20">
         <div className="min-w-0">
           <h2 className="text-[14px] font-semibold text-foreground">Get started</h2>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
-            Optional — complete when you are ready.
-          </p>
         </div>
         <Button
           type="button"
@@ -208,24 +209,111 @@ const SEVERITY_DOT: Record<string, string> = {
   low: "bg-muted-foreground/40",
 };
 
+type PageCoverageStats = {
+  total: number;
+  tested: number;
+  clean: number;
+  withIssues: number;
+  stale: number;
+  untested: number;
+};
+
+function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
+  const total = coverage?.total ?? 0;
+  const pass = coverage?.clean ?? 0;
+  const regress = coverage?.stale ?? 0;
+  const fail = coverage?.withIssues ?? 0;
+  const untested = coverage?.untested ?? 0;
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-2 min-h-[88px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Page coverage
+        </span>
+        <PieChart className="h-4 w-4 text-muted-foreground shrink-0" />
+      </div>
+      {total === 0 ? (
+        <p className="text-[12px] text-muted-foreground leading-snug">No scanned pages yet. Run a crawl to map your app.</p>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-semibold tabular-nums text-foreground">
+              {Math.round(((pass + regress + fail) / total) * 100)}
+            </span>
+            <span className="text-[12px] text-muted-foreground">% tested</span>
+          </div>
+          <div className="flex h-2 w-full rounded-full overflow-hidden gap-px bg-border/40">
+            {pass > 0 && (
+              <div
+                className="min-w-[3px] rounded-l-sm bg-status-pass"
+                style={{ flex: pass }}
+                title={`${pass} passing`}
+              />
+            )}
+            {regress > 0 && (
+              <div
+                className="min-w-[3px] bg-status-warn"
+                style={{ flex: regress }}
+                title={`${regress} regressing`}
+              />
+            )}
+            {fail > 0 && (
+              <div
+                className="min-w-[3px] bg-status-fail"
+                style={{ flex: fail }}
+                title={`${fail} failed`}
+              />
+            )}
+            {untested > 0 && (
+              <div
+                className="min-w-[3px] rounded-r-sm bg-muted-foreground/25"
+                style={{ flex: untested }}
+                title={`${untested} untested`}
+              />
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            <span className="text-status-pass">{pass} pass</span>
+            {" · "}
+            <span className="text-status-warn">{regress} regress</span>
+            {" · "}
+            <span className="text-status-fail">{fail} fail</span>
+            {" · "}
+            <span className="text-muted-foreground">{untested} untested</span>
+            <span className="text-muted-foreground/70"> · {total} pages</span>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({
   overview,
   runs,
   bugs,
+  coverage,
   navigate,
 }: {
   overview: any;
   runs: any[];
   bugs: any[];
+  coverage: PageCoverageStats | null;
   navigate: (path: string) => void;
 }) {
+  const totalCost = overview?.totalCostUsd ?? 0;
   return (
     <div className="space-y-6">
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Activity className="h-4 w-4" />} />
-        <KpiCard label="Pass Rate" value={overview?.passRate ?? 0} suffix="%" icon={<CheckCircle2 className="h-4 w-4" />} />
-        <KpiCard label="Open Issues" value={bugs.length} icon={<AlertCircle className="h-4 w-4" />} />
+        <PageCoverageKpi coverage={coverage} />
+        <KpiCard
+          label="Project spend"
+          value={formatCost(totalCost)}
+          icon={<DollarSign className="h-4 w-4" />}
+        />
         <KpiCard label="Running" value={overview?.running ?? 0} icon={<Loader2 className="h-4 w-4" />} />
       </div>
 
@@ -256,6 +344,9 @@ function Dashboard({
                     <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
                       {r.status}
                     </Badge>
+                    <span className="text-[11px] font-mono text-muted-foreground flex-shrink-0 tabular-nums">
+                      {formatRunCost(r)}
+                    </span>
                     <span className="text-[11px] font-mono text-muted-foreground flex-shrink-0">
                       {duration(r.started_at, r.completed_at)}
                     </span>
@@ -315,6 +406,7 @@ export const Overview: React.FC = () => {
   const [overview, setOverview] = React.useState<any>(null);
   const [runs, setRuns] = React.useState<any[]>([]);
   const [bugs, setBugs] = React.useState<any[]>([]);
+  const [pageCoverage, setPageCoverage] = React.useState<PageCoverageStats | null>(null);
   const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
   const [setupDone, setSetupDone] = React.useState(false);
   const [setupDismissed, setSetupDismissed] = React.useState(false);
@@ -363,6 +455,7 @@ export const Overview: React.FC = () => {
       setCompletedSteps(steps);
       setSetupDone(steps.size === 4);
       setOverview(ov);
+      setPageCoverage((pagesRes as { coverage?: PageCoverageStats }).coverage ?? null);
       setRuns(allRuns.slice(0, 10));
       setBugs(allBugs.slice(0, 10));
       setLoading(false);
@@ -428,7 +521,7 @@ export const Overview: React.FC = () => {
             )}
           >
             <div className="flex-1 min-w-0 w-full space-y-6">
-              <Dashboard overview={overview} runs={runs} bugs={bugs} navigate={navigate} />
+              <Dashboard overview={overview} runs={runs} bugs={bugs} coverage={pageCoverage} navigate={navigate} />
             </div>
             {showSetupPanel && (
               <aside className="w-full lg:w-[min(100%,340px)] lg:max-w-[40%] lg:flex-shrink-0 lg:sticky lg:top-6 lg:self-start">

@@ -138,6 +138,8 @@ export type OverviewStats = {
   passed: number;
   failed: number;
   running: number;
+  /** Sum of test run + crawl LLM costs (USD). */
+  totalCostUsd: number;
 };
 
 /** SSE event from run stream. */
