@@ -11,7 +11,7 @@ export function getLLMBase(): string {
     : "https://api.openai.com/v1";
 }
 
-/** Max output tokens allowed by providers (Gemini/OpenRouter); use for all LLM calls to avoid truncation. */
+/** Provider ceiling for completion length (OpenRouter/Gemini-style cap). Use everywhere we pass `max_tokens`. */
 export const MAX_OUTPUT_TOKENS = 65535;
 
 // ─── Structured output schemas ──────────────────────────────────────────────
@@ -132,7 +132,7 @@ export async function llmChat(
 
   if (config.openrouterApiKey && wireModel.startsWith("google/gemini-")) {
     body.reasoning = {
-      max_tokens: 20000,
+      max_tokens: MAX_OUTPUT_TOKENS,
       enabled: true,
       exclude: false,
     };
@@ -227,7 +227,7 @@ const REVIEW_BUG_SCHEMA = {
           items: {
             type: "object",
             properties: {
-              type: { type: "string", enum: ["visual", "ux", "behavioral"] },
+              type: { type: "string", enum: ["visual", "ux", "behavioral", "a11y", "performance", "data"] },
               description: { type: "string" },
               severity: { type: "string", enum: ["low", "medium", "high"] },
               region: {

@@ -3,7 +3,13 @@ import { z } from "zod";
 import type { StorageAdapter } from "@kery/engine";
 import { Pool } from "pg";
 import { encryptConfigJson } from "@kery/db";
-import { ProjectIdParams, ProjectEnvParams, ProjectDestParams, ProjectUpdateBody } from "./params.js";
+import {
+  ProjectIdParams,
+  ProjectEnvParams,
+  ProjectDestParams,
+  ProjectDestMemoryEntryParams,
+  ProjectUpdateBody,
+} from "./params.js";
 
 const ProjectSchema = z.object({
   name: z.string().min(2),
@@ -20,6 +26,33 @@ const AuthSchema = z.object({
   mode: z.enum(["ui", "apiToken", "oauthToken", "tokenProvider", "none"]),
   config: z.any().optional(),
 });
+
+const MemoryEntryTypeEnum = z.enum(["learned_path", "ignore_region", "avoid_region", "bug_pattern", "tip"]);
+
+const MemoryCreateBody = z.object({
+  type: MemoryEntryTypeEnum,
+  summary: z.string().min(1),
+  content: z.string().min(1),
+  region: z.object({ description: z.string() }).nullable().optional(),
+  confidence: z.number().int().min(0).max(100).optional(),
+});
+
+const MemoryPatchBody = z.object({
+  type: MemoryEntryTypeEnum.optional(),
+  summary: z.string().min(1).optional(),
+  content: z.string().min(1).optional(),
+  region: z.object({ description: z.string() }).nullable().optional(),
+  confidence: z.number().int().min(0).max(100).optional(),
+});
+
+async function assertDestinationInProject(
+  storage: StorageAdapter,
+  projectId: string,
+  destinationId: string,
+): Promise<boolean> {
+  const dest = await storage.getDestination(destinationId);
+  return !!(dest && String(dest.project_id) === projectId);
+}
 
 export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdapter) {
   const pool = storage.getPool() as Pool;
@@ -157,10 +190,125 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
     reply.send({ pages, coverage });
   });
 
+  // Page-scoped memory (must be registered before GET .../pages/:destinationId)
+  app.get("/api/projects/:projectId/pages/:destinationId/memory", async (req, reply) => {
+    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
+    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    const entries = await storage.loadPageMemory(destinationId);
+    reply.send({ entries });
+  });
+
+  app.post("/api/projects/:projectId/pages/:destinationId/memory", async (req, reply) => {
+    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
+    const parsed = MemoryCreateBody.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.issues });
+      return;
+    }
+    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    const { type, summary, content, region, confidence } = parsed.data;
+    const regionJson = region != null ? JSON.stringify(region) : null;
+    const { rows } = await pool.query(
+      `INSERT INTO memory_entries (scope, destination_id, type, summary, content, region, source, confidence)
+       VALUES ('page', $1, $2, $3, $4, $5::jsonb, 'user', $6) RETURNING *`,
+      [destinationId, type, summary, content, regionJson, confidence ?? 50],
+    );
+    reply.send({ entry: rows[0] });
+  });
+
+  app.patch("/api/projects/:projectId/pages/:destinationId/memory/:entryId", async (req, reply) => {
+    const { projectId, destinationId, entryId } = ProjectDestMemoryEntryParams.parse(req.params);
+    const parsed = MemoryPatchBody.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.issues });
+      return;
+    }
+    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    const p = parsed.data;
+    const parts: string[] = [];
+    const vals: unknown[] = [];
+    let n = 1;
+    if (p.type !== undefined) {
+      parts.push(`type = $${n++}`);
+      vals.push(p.type);
+    }
+    if (p.summary !== undefined) {
+      parts.push(`summary = $${n++}`);
+      vals.push(p.summary);
+    }
+    if (p.content !== undefined) {
+      parts.push(`content = $${n++}`);
+      vals.push(p.content);
+    }
+    if (p.region !== undefined) {
+      parts.push(`region = $${n++}::jsonb`);
+      vals.push(p.region === null ? null : JSON.stringify(p.region));
+    }
+    if (p.confidence !== undefined) {
+      parts.push(`confidence = $${n++}`);
+      vals.push(p.confidence);
+    }
+    if (parts.length === 0) {
+      reply.code(400).send({ error: "no fields to update" });
+      return;
+    }
+    parts.push("updated_at = now()");
+    vals.push(entryId, destinationId);
+    const { rows } = await pool.query(
+      `UPDATE memory_entries SET ${parts.join(", ")}
+       WHERE id = $${n++} AND scope = 'page' AND destination_id = $${n++} RETURNING *`,
+      vals,
+    );
+    if (rows.length === 0) {
+      reply.code(404).send({ error: "Memory entry not found" });
+      return;
+    }
+    reply.send({ entry: rows[0] });
+  });
+
+  app.delete("/api/projects/:projectId/pages/:destinationId/memory/:entryId", async (req, reply) => {
+    const { projectId, destinationId, entryId } = ProjectDestMemoryEntryParams.parse(req.params);
+    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    const { rowCount } = await pool.query(
+      `DELETE FROM memory_entries WHERE id = $1 AND scope = 'page' AND destination_id = $2`,
+      [entryId, destinationId],
+    );
+    if (!rowCount) {
+      reply.code(404).send({ error: "Memory entry not found" });
+      return;
+    }
+    reply.send({ ok: true });
+  });
+
+  app.delete("/api/projects/:projectId/pages/:destinationId/memory", async (req, reply) => {
+    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
+    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    await pool.query(`DELETE FROM memory_entries WHERE scope = 'page' AND destination_id = $1`, [destinationId]);
+    reply.send({ ok: true });
+  });
+
   app.get("/api/projects/:projectId/pages/:destinationId", async (req, reply) => {
-    const { destinationId } = ProjectDestParams.parse(req.params);
+    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
     const dest = await storage.getDestination(destinationId);
-    if (!dest) { reply.code(404).send({ error: "Page not found" }); return; }
+    if (!dest || String(dest.project_id) !== projectId) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
     reply.send({ page: dest, recentRuns: [] });
   });
 }

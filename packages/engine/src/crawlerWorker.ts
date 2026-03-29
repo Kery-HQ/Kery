@@ -359,7 +359,7 @@ export async function generateIntentForNode(
 
   const prompt = `Generate a single test intent for this page starting from ${baseUrl}.\n\n${context.join("\n")}\n\nReply with ONLY the intent text.`;
   try {
-    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: 16384, temperature: 0.2 });
+    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 });
     if (costAccum) costAccum.usd += calcCostUsd(config.summaryModel, usage.inputTokens, usage.outputTokens);
     const intent = content.trim();
     return intent.length > 20 ? intent : null;

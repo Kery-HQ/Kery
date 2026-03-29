@@ -1,7 +1,8 @@
 /**
  * Tests for a11yTree — formatA11yForLLM and INTERACTIVE_ROLES coverage
  */
-import { describe, it, assert } from "node:test";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { formatA11yForLLM, sanitizeForPrompt, type A11yElement, type A11yTextNode } from "../a11yTree.js";
 
 describe("formatA11yForLLM", () => {

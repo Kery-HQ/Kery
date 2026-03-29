@@ -1,10 +1,12 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:19833";
 
 async function apiFetch<T = any>(url: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
-  });
+  const h = new Headers(init.headers as HeadersInit);
+  const body = init.body;
+  if (typeof body === "string" && body.length > 0 && !h.has("Content-Type")) {
+    h.set("Content-Type", "application/json");
+  }
+  const res = await fetch(url, { ...init, headers: h });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -201,14 +203,14 @@ export async function fetchTests(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests`);
 }
 
-export async function createTest(projectId: string, payload: { name: string; intent: string; context?: string; save_screenshots?: boolean; max_steps?: number }) {
+export async function createTest(projectId: string, payload: { name: string; intent: string; context?: string; max_steps?: number }) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function updateTest(projectId: string, testId: string, payload: { name?: string; intent?: string; context?: string; save_screenshots?: boolean; max_steps?: number | null }) {
+export async function updateTest(projectId: string, testId: string, payload: { name?: string; intent?: string; context?: string; max_steps?: number | null }) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, {
     method: "PUT",
     body: JSON.stringify(payload),

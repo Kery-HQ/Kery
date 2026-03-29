@@ -54,12 +54,32 @@ export type RunStep = {
   bugType?: "visual" | "functional" | "ux" | "other";
   severity?: "low" | "medium" | "high";
   at?: number;
-  source?: "navigator" | "review" | "pathgen";
+  source?: "navigator" | "review" | "pathgen" | "filmstrip";
   elementRef?: { role: string; name: string };
   screenshotBase64?: string;
+  /** After materialize: JPEG filename under SCREENSHOTS_DIR/<runId>/ */
+  screenshotPath?: string;
+  /** Optional bounding box for review/filmstrip bugs (0–1000 normalized or pixels); burned into JPEG when materializing. */
+  region?: { x: number; y: number; w: number; h: number };
+  /** Formatted a11y / element list the Navigator saw before deciding this action */
+  domContext?: string;
+  /** How the action was executed */
+  executionMethod?: "stagehand" | "playwright" | "coordinates";
+  /** Review-agent bugs attached to this step (set by orchestrator) */
+  reviewFeedback?: { type: string; severity: string; description: string }[];
 };
 
-export type LLMAgentType = "navigator" | "review" | "pathgen" | "summary";
+export type LLMAgentType = "navigator" | "review" | "pathgen" | "summary" | "filmstrip";
+
+/** Serializable multimodal message for run-detail UI (no raw base64 — images are parallel `imageBase64s` / `imagePaths`). */
+export type LLMStoredContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; imageIndex: number; label?: string };
+
+export type LLMStoredMessage = {
+  role: string;
+  content: string | LLMStoredContentPart[];
+};
 
 export type LLMCallRecord = {
   seq: number;
@@ -72,12 +92,75 @@ export type LLMCallRecord = {
   totalTokens: number;
   durationMs: number;
   costUsd: number;
+  /** Primary user text from the last user turn (full; legacy search field). */
   query: string;
+  /** Exact messages sent to the provider (text + image index refs). */
+  requestMessages?: LLMStoredMessage[];
+  /** Raw base64 JPEG chunks for this call, before materialization to disk. */
+  imageBase64s?: string[];
+  /** After materialize: JPEG filenames under SCREENSHOTS_DIR/<runId>/ */
+  imagePaths?: string[];
   imageBase64?: string;
+  /** After materialize: first image filename (legacy). */
+  imagePath?: string;
   response: string;
   role?: "action" | "dom-scan";
   agent?: LLMAgentType;
 };
+
+function dataUrlToBase64(url: string): string | null {
+  const m = /^data:image\/[^;]+;base64,(.+)$/i.exec(url);
+  return m?.[1] ?? null;
+}
+
+/**
+ * Converts OpenAI-style wire messages into storable JSON + parallel base64 image list.
+ */
+export function serializeWireMessagesForStorage(messages: any[]): { messages: LLMStoredMessage[]; imageBase64s: string[] } {
+  const imageBase64s: string[] = [];
+  const out: LLMStoredMessage[] = [];
+  for (const m of messages) {
+    const role = m.role ?? "unknown";
+    if (typeof m.content === "string") {
+      out.push({ role, content: m.content });
+      continue;
+    }
+    if (!Array.isArray(m.content)) {
+      out.push({ role, content: typeof m.content === "object" ? JSON.stringify(m.content) : String(m.content) });
+      continue;
+    }
+    const parts: LLMStoredContentPart[] = [];
+    for (const p of m.content) {
+      if (p.type === "text") {
+        parts.push({ type: "text", text: p.text ?? "" });
+      } else if (p.type === "image_url" && p.image_url?.url) {
+        const url = p.image_url.url as string;
+        const b64 = dataUrlToBase64(url);
+        if (b64) {
+          const idx = imageBase64s.length;
+          imageBase64s.push(b64);
+          parts.push({ type: "image", imageIndex: idx });
+        }
+      }
+    }
+    out.push({ role, content: parts.length > 0 ? parts : [{ type: "text", text: "" }] });
+  }
+  return { messages: out, imageBase64s };
+}
+
+function concatLastUserTextFromWire(messages: any[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role !== "user") continue;
+    if (typeof msg.content === "string") return msg.content;
+    if (!Array.isArray(msg.content)) return "";
+    return msg.content
+      .filter((p: any) => p.type === "text")
+      .map((p: any) => p.text ?? "")
+      .join("\n\n");
+  }
+  return "";
+}
 
 export type AgentResult = {
   status: "passed" | "failed" | "partial";
@@ -91,6 +174,8 @@ export type AgentResult = {
 const DEFAULT_MAX_STEPS = 50;
 const MAX_STEPS_HARD_CAP = 250;
 const MAX_DOM_CHARS = 6000;
+/** Stored on each RunStep for run-detail observability (UI). */
+const MAX_STEP_DOM_CONTEXT = 12_000;
 const VIEWPORT_W = 1920;
 const VIEWPORT_H = 1080;
 const LOOP_WINDOW = 4;
@@ -271,6 +356,17 @@ async function extractDOM(page: Page): Promise<{ text: string; snapshot: DOMSnap
   let text = formatDOMForLLM(mainSnapshot);
   if (text.length > MAX_DOM_CHARS) text = text.slice(0, MAX_DOM_CHARS);
   return { text, snapshot: mainSnapshot };
+}
+
+function trimDomContext(dom: string | undefined): string | undefined {
+  if (!dom || dom === "(DOM extraction failed)") return undefined;
+  if (dom.length <= MAX_STEP_DOM_CONTEXT) return dom;
+  return `${dom.slice(0, MAX_STEP_DOM_CONTEXT)}\n\n...[truncated ${dom.length - MAX_STEP_DOM_CONTEXT} chars]`;
+}
+
+function executionUsesCoordinates(action: AgentAction): boolean {
+  if (action.x == null || action.y == null) return false;
+  return ["click", "fill", "hover", "selectOption", "scroll"].includes(action.action);
 }
 
 // ─── Stable snapshot (a11y + stagehand + DOM fallback) ───────────────────────
@@ -587,8 +683,6 @@ async function decideNextAction(params: {
   stepIndex: number;
   llmCallSeq: { current: number };
   onLLMCall: (call: LLMCallRecord) => void;
-  saveScreenshots: boolean;
-  screenshotBase64?: string;
 }): Promise<AgentAction> {
   pruneConversation(params.messages);
 
@@ -610,10 +704,8 @@ async function decideNextAction(params: {
     const durationMs = Date.now() - t0;
     const hasVision = attempt === 0;
 
-    const lastUser = params.messages[params.messages.length - 1];
-    const queryText = Array.isArray(lastUser?.content)
-      ? lastUser.content.find((p: any) => p.type === "text")?.text ?? "[multi-turn]"
-      : String(lastUser?.content ?? "[multi-turn]");
+    const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(callMessages);
+    const queryText = concatLastUserTextFromWire(callMessages) || "[multi-turn]";
 
     params.llmCallSeq.current++;
     params.onLLMCall({
@@ -627,8 +719,10 @@ async function decideNextAction(params: {
       totalTokens: usage.totalTokens,
       durationMs,
       costUsd: calcCostUsd(getConfig().agentModel, usage.inputTokens, usage.outputTokens),
-      query: queryText.slice(0, 2000),
-      imageBase64: hasVision && params.saveScreenshots ? params.screenshotBase64 : undefined,
+      query: queryText,
+      requestMessages,
+      imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
+      imageBase64: imageBase64s[0],
       response: raw,
       agent: "navigator",
     });
@@ -931,7 +1025,6 @@ async function tryAgentAuth(page: Page, auth: AuthConfig, context?: string): Pro
         stepIndex: i + 1,
         llmCallSeq: { current: 0 },
         onLLMCall: () => {},
-        saveScreenshots: false,
       });
       messages.push({ role: "assistant", content: JSON.stringify(action) });
     } catch {
@@ -977,7 +1070,6 @@ export async function runAgent(
   auth: AuthConfig | null,
   memoryEntries: MemoryEntry[] = [],
   context?: string,
-  saveScreenshots = false,
   onStep?: (step: RunStep) => void,
   onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer) => void,
   onLLMCall?: (call: LLMCallRecord) => void,
@@ -1165,14 +1257,11 @@ export async function runAgent(
         ? `${baseSystemPrompt}\n\n${progressText}`
         : baseSystemPrompt;
 
-      const screenshotBase64 = saveScreenshots && screenshot.length > 0
-        ? screenshot.toString("base64") : undefined;
-
       let action: AgentAction;
       try {
         action = await decideNextAction({
           messages, stepIndex: stepCounter + 1, llmCallSeq,
-          onLLMCall: handleLLMCall, saveScreenshots, screenshotBase64,
+          onLLMCall: handleLLMCall,
         });
         messages.push({ role: "assistant", content: JSON.stringify(action) });
       } catch (err) {
@@ -1190,7 +1279,7 @@ export async function runAgent(
           try {
             action = await decideNextAction({
               messages, stepIndex: stepCounter + 1, llmCallSeq,
-              onLLMCall: handleLLMCall, saveScreenshots, screenshotBase64,
+              onLLMCall: handleLLMCall,
             });
             messages.push({ role: "assistant", content: JSON.stringify(action) });
             if (!validateAction(action)) { fixed = true; break; }
@@ -1234,12 +1323,14 @@ export async function runAgent(
         return { status: "passed", steps, stepsDetail, bugsFound, llmCalls };
       }
 
+      let stepExecutionMethod: RunStep["executionMethod"] | undefined;
       try {
         // Stagehand execution path
         const shInstruction = (stagehandPage && currentObserved)
           ? actionToInstruction(action, currentObserved) : null;
 
         if (shInstruction && stagehandPage) {
+          stepExecutionMethod = "stagehand";
           await stagehandAct(stagehandPage, shInstruction);
           await waitForPageStable(page, 4000);
           prevResult = { action, status: "ok" };
@@ -1250,6 +1341,8 @@ export async function runAgent(
             target: action.target ?? observedEl?.description, value: action.value,
             assertion: action.assertion, reasoning: action.reasoning,
             url, status: "ok", fromMemory: false, at: stepTimestamp(),
+            domContext: trimDomContext(dom),
+            executionMethod: "stagehand",
           };
           stepsDetail.push(okStep);
           onStep?.(okStep);
@@ -1263,6 +1356,7 @@ export async function runAgent(
           if (resolvedA11yEl) {
             const locator = await resolveElement(page, resolvedA11yEl);
             if (locator) {
+              stepExecutionMethod = "playwright";
               if (action.action === "click") {
                 await locator.click({ timeout: 5000 });
                 await waitForPageStable(page, 4000);
@@ -1283,6 +1377,8 @@ export async function runAgent(
                 assertion: action.assertion, reasoning: action.reasoning,
                 url, status: "ok", fromMemory: false, at: stepTimestamp(),
                 elementRef: { role: resolvedA11yEl.role, name: resolvedA11yEl.name },
+                domContext: trimDomContext(dom),
+                executionMethod: "playwright",
               };
               stepsDetail.push(okStep);
               onStep?.(okStep);
@@ -1291,6 +1387,7 @@ export async function runAgent(
           }
         }
 
+        stepExecutionMethod = executionUsesCoordinates(action) ? "coordinates" : "playwright";
         const execResult = await executeAction(page, action);
         await new Promise((r) => setTimeout(r, 150));
         prevResult = {
@@ -1308,6 +1405,8 @@ export async function runAgent(
           assertion: action.assertion, reasoning: action.reasoning,
           url, status: "ok", fromMemory: false, at: stepTimestamp(),
           elementRef: resolvedA11yEl ? { role: resolvedA11yEl.role, name: resolvedA11yEl.name } : undefined,
+          domContext: trimDomContext(dom),
+          executionMethod: stepExecutionMethod,
         };
         stepsDetail.push(okStep);
         progress.recordStep(okStep);
@@ -1323,6 +1422,8 @@ export async function runAgent(
           x: action.x, y: action.y,
           assertion: action.assertion, reasoning: action.reasoning,
           url, status: "failed", error: errMsg, fromMemory: false, at: stepTimestamp(),
+          domContext: trimDomContext(dom),
+          executionMethod: stepExecutionMethod ?? "playwright",
         };
         stepsDetail.push(failedStep);
         progress.recordStep(failedStep);

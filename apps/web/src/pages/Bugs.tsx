@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { formatReportedAt } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchProjectBugs } from "@/projectApi";
-import { API_BASE } from "@/api";
+import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 
 export type BugRecord = {
   name: string;
@@ -25,8 +25,14 @@ export type BugRecord = {
   category: "visual" | "functional" | "ux" | "other";
   severity: "low" | "medium" | "high";
   status: "open" | "in_progress" | "resolved" | "wont_fix";
+  screenshotPath?: string | null;
+  screenshot_path?: string | null;
   screenshotBase64?: string | null;
-  stepsToReproduce: string[];
+  screenshot_base64?: string | null;
+  run_id?: string;
+  stepsToReproduce?: string[];
+  /** API returns snake_case from DB rows */
+  steps_to_reproduce?: string[] | null;
   url?: string | null;
   runId: string;
   runLabel?: string | null;
@@ -189,7 +195,8 @@ export const Bugs: React.FC = () => {
               {/* Bug list */}
               <div className="space-y-1.5">
                 {filteredBugs.map((bug, i) => {
-                  const id = `${bug.runId}-${bug.index ?? i}`;
+                  const steps = bug.stepsToReproduce ?? bug.steps_to_reproduce ?? [];
+                  const id = `${bug.run_id ?? bug.runId}-${bug.index ?? i}`;
                   const isExpanded = expandedId === id;
                   return (
                     <div
@@ -236,49 +243,58 @@ export const Bugs: React.FC = () => {
                             </div>
                           )}
 
-                          {bug.stepsToReproduce.length > 0 && (
+                          {steps.length > 0 && (
                             <div>
                               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
                                 <ListOrdered className="h-3 w-3" />
                                 Steps to reproduce
                               </p>
                               <ol className="list-decimal list-inside space-y-1 text-[13px] text-foreground">
-                                {bug.stepsToReproduce.map((step, j) => (
+                                {steps.map((step, j) => (
                                   <li key={j}>{step}</li>
                                 ))}
                               </ol>
                             </div>
                           )}
 
-                          {bug.screenshotBase64 && (
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
-                                <ImageIcon className="h-3 w-3" />
-                                Screenshot
-                              </p>
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <button className="rounded-lg border border-border overflow-hidden hover:ring-1 hover:ring-primary/30 transition-all cursor-zoom-in">
+                          {(() => {
+                            const runKey = bug.run_id ?? bug.runId;
+                            const fileUrl = runScreenshotFileUrl(runKey, bug.screenshot_path ?? bug.screenshotPath);
+                            const legacy = screenshotRefToSrc(
+                              bug.screenshot_base64 ?? bug.screenshotBase64 ?? undefined,
+                            );
+                            const src = fileUrl ?? legacy;
+                            if (!src) return null;
+                            return (
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
+                                  <ImageIcon className="h-3 w-3" />
+                                  Screenshot
+                                </p>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <button className="rounded-lg border border-border overflow-hidden hover:ring-1 hover:ring-primary/30 transition-all cursor-zoom-in">
+                                      <img
+                                        src={src}
+                                        alt="Bug screenshot"
+                                        className="max-w-full max-h-[200px] object-contain bg-black/5"
+                                      />
+                                    </button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-3xl">
+                                    <DialogHeader>
+                                      <DialogTitle>Screenshot</DialogTitle>
+                                    </DialogHeader>
                                     <img
-                                      src={bug.screenshotBase64.startsWith("/api/") ? `${API_BASE}${bug.screenshotBase64}` : `data:image/jpeg;base64,${bug.screenshotBase64}`}
+                                      src={src}
                                       alt="Bug screenshot"
-                                      className="max-w-full max-h-[200px] object-contain bg-black/5"
+                                      className="w-full rounded-lg border border-border object-contain bg-black/5"
                                     />
-                                  </button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl">
-                                  <DialogHeader>
-                                    <DialogTitle>Screenshot</DialogTitle>
-                                  </DialogHeader>
-                                  <img
-                                    src={bug.screenshotBase64.startsWith("/api/") ? `${API_BASE}${bug.screenshotBase64}` : `data:image/jpeg;base64,${bug.screenshotBase64}`}
-                                    alt="Bug screenshot"
-                                    className="w-full rounded-lg border border-border object-contain bg-black/5"
-                                  />
-                                </DialogContent>
-                              </Dialog>
-                            </div>
-                          )}
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
+                            );
+                          })()}
 
                           <div className="flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
                             {bug.environment && (
@@ -309,7 +325,7 @@ export const Bugs: React.FC = () => {
                               className="h-6 text-[11px] gap-1 ml-auto"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/runs/${bug.runId}`);
+                                navigate(`/runs/${bug.run_id ?? bug.runId}`);
                               }}
                             >
                               View Run

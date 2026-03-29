@@ -1,7 +1,8 @@
 /**
  * Tests for regressionEngine — generateRegressionPlan()
  */
-import { describe, it, assert } from "node:test";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { generateRegressionPlan } from "../regressionEngine.js";
 import type { RunStep } from "../agent.js";
 

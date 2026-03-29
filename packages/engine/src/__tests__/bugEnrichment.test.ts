@@ -1,7 +1,8 @@
 /**
  * Tests for bugEnrichment — enrichBugsForRun()
  */
-import { describe, it, assert } from "node:test";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { enrichBugsForRun } from "../bugEnrichment.js";
 
 describe("enrichBugsForRun", () => {

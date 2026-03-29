@@ -5,6 +5,8 @@ import type { MemoryEntry } from "./agentMemory.js";
 
 export type SummarizeResult = {
   summary: string;
+  /** Full prompt sent to the summarizer model. */
+  prompt?: string;
   usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
   costUsd?: number;
   model?: string;
@@ -34,9 +36,9 @@ export async function summarizeRun(input: SummarizeInput): Promise<SummarizeResu
     const { content, usage } = await llmSummarize(prompt);
     const durationMs = Date.now() - t0;
     const costUsd = calcCostUsd(model, usage.inputTokens, usage.outputTokens);
-    return { summary: content, usage, costUsd, model, durationMs };
+    return { summary: content, prompt, usage, costUsd, model, durationMs };
   } catch {
-    return { summary: buildFallbackSummary(input) };
+    return { summary: buildFallbackSummary(input), prompt };
   }
 }
 
@@ -54,10 +56,12 @@ function buildPrompt(input: SummarizeInput): string {
 
   const navigatorBugs = bugsFound.filter(b => b.source === "navigator");
   const reviewBugs = bugsFound.filter(b => b.source === "review");
+  const filmstripBugs = bugsFound.filter(b => b.source === "filmstrip");
 
   const navigatorCalls = llmCalls.filter(c => c.agent === "navigator");
   const reviewCalls = llmCalls.filter(c => c.agent === "review");
   const pathgenCalls = llmCalls.filter(c => c.agent === "pathgen");
+  const filmstripCalls = llmCalls.filter(c => c.agent === "filmstrip");
 
   const totalCost = llmCalls.reduce((s, c) => s + c.costUsd, 0);
   const totalTokens = llmCalls.reduce((s, c) => s + c.totalTokens, 0);
@@ -102,6 +106,7 @@ function buildPrompt(input: SummarizeInput): string {
   const costBreakdown = [
     navigatorCalls.length > 0 ? `Navigator: ${navigatorCalls.length} calls, $${navigatorCalls.reduce((s, c) => s + c.costUsd, 0).toFixed(4)}` : null,
     reviewCalls.length > 0 ? `Review: ${reviewCalls.length} calls, $${reviewCalls.reduce((s, c) => s + c.costUsd, 0).toFixed(4)}` : null,
+    filmstripCalls.length > 0 ? `Filmstrip: ${filmstripCalls.length} calls, $${filmstripCalls.reduce((s, c) => s + c.costUsd, 0).toFixed(4)}` : null,
     pathgenCalls.length > 0 ? `Path Gen: ${pathgenCalls.length} calls, $${pathgenCalls.reduce((s, c) => s + c.costUsd, 0).toFixed(4)}` : null,
   ].filter(Boolean).join("\n");
 
@@ -121,7 +126,7 @@ Video: ${videoUrl || "not recorded"}
 Total steps: ${stepsDetail.length} (${okSteps.length} passed, ${failedSteps.length} failed, ${skippedSteps.length} skipped)
 Authentication steps: ${authSteps.length}
 Unique URLs visited: ${uniqueUrls.length}
-Bugs found: ${bugsFound.length} (${navigatorBugs.length} by navigator, ${reviewBugs.length} by review agent)
+Bugs found: ${bugsFound.length} (${navigatorBugs.length} navigator, ${reviewBugs.length} review, ${filmstripBugs.length} filmstrip)
 LLM calls: ${llmCalls.length} (${totalTokens.toLocaleString()} tokens, $${totalCost.toFixed(4)})
 Memory entries loaded: ${memoryLoaded.length}
 Memory entries proposed: ${memoryProposed}

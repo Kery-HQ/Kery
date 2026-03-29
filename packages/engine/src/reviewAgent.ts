@@ -1,8 +1,9 @@
 import type { ReviewBug } from "./types.js";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { llmChat, calcCostUsd } from "./llmClient.js";
+import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 import type { LLMCallRecord } from "./agent.js";
+import { serializeWireMessagesForStorage } from "./agent.js";
 
 export type ReviewRequest = {
   screenshot: Buffer;
@@ -15,6 +16,8 @@ export type ReviewRequest = {
   previousUrl?: string;
   clickedElement?: string;
   coordinates?: { x: number; y: number };
+  /** First paint after navigation or initial load — prefer keeping these when queue overflows */
+  isNavigationBoundary: boolean;
 };
 
 const SYSTEM_PROMPT = `You are an expert QA review agent analyzing screenshots of a web application under automated testing.
@@ -22,6 +25,15 @@ const SYSTEM_PROMPT = `You are an expert QA review agent analyzing screenshots o
 IMPORTANT CONTEXT: Another AI agent (the "Navigator") is driving the browser. You are reviewing what the Navigator sees. The Navigator sometimes makes mistakes — clicking wrong elements, misidentifying buttons, getting stuck in loops. These are NOT bugs in the application.
 
 YOUR JOB: Find REAL bugs in the APPLICATION, not problems caused by the Navigator.
+
+## Visual checklist (look for these on THIS screenshot):
+- Alignment and grid: misaligned columns, uneven spacing, elements breaking a clear layout rhythm
+- Text: truncation with ellipsis where it hides meaning, overflow/clipping, overlapping text
+- Images/icons: broken images, wrong aspect ratio, icons clipped or mis-sized
+- Stacking: modals/dropdowns behind other layers, overlapping interactive controls
+- Components: buttons/inputs inconsistent height or padding vs neighbors
+- Contrast: text hard to read on background (accessibility)
+- When you report a visual bug, include a \`region\` object: { x, y, w, h } as approximate 0-1000 normalized box on the image (or pixel coords if clearer)
 
 ## What IS a bug (report these):
 - Visual defects: overlapping elements, broken layouts, truncated text, broken images, z-index issues
@@ -50,7 +62,7 @@ If the answer is "no, this is just the automation struggling," return NO bugs.
 - Data integrity: wrong counts or totals, duplicate entries, mismatched data between sections
 
 ## Response format:
-Return a JSON object with a "bugs" array. Each bug: { type: "visual" | "ux" | "behavioral" | "a11y" | "performance" | "data", description: string (max 80 chars), severity: "low" | "medium" | "high" }.
+Return a JSON object with a "bugs" array. Each bug: { type: "visual" | "ux" | "behavioral" | "a11y" | "performance" | "data", description: string (max 80 chars), severity: "low" | "medium" | "high", region?: { x: number, y: number, w: number, h: number } }.
 If no bugs found, return { "bugs": [] }.
 
 Be VERY selective. 0 bugs is a perfectly good answer. Only report issues you're confident about.`;
@@ -102,8 +114,11 @@ function parseReviewResponse(raw: string, stepIndex: number, at: number): Review
     const parsed = JSON.parse(body) as { bugs?: Array<{ type?: string; description?: string; severity?: string; region?: { x: number; y: number; w: number; h: number } }> };
     const list = Array.isArray(parsed?.bugs) ? parsed.bugs : [];
     for (const b of list) {
-      const validTypes = ["visual", "ux", "behavioral", "a11y", "performance", "data"];
-      const type = validTypes.includes(b.type ?? "") ? b.type! : "visual";
+      const t = (b.type ?? "").trim();
+      const type: ReviewBug["type"] =
+        t === "visual" || t === "ux" || t === "behavioral" || t === "a11y" || t === "performance" || t === "data"
+          ? t
+          : "visual";
       const severity = b.severity === "low" || b.severity === "medium" || b.severity === "high" ? b.severity : "medium";
       bugs.push({
         source: "review",
@@ -130,7 +145,7 @@ function isLikelyUnstable(req: ReviewRequest): boolean {
 async function callReviewLLM(messages: any[]): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   const config = getConfig();
   const { content, usage } = await llmChat(messages, config.reviewAgentModel, {
-    maxTokens: 1024,
+    maxTokens: MAX_OUTPUT_TOKENS,
     temperature: 0.1,
     timeoutMs: config.reviewTimeoutMs,
   });
@@ -160,6 +175,7 @@ async function processOne(
     const { content, inputTokens, outputTokens } = await callReviewLLM(messages);
     const durationMs = Date.now() - at;
     const model = getConfig().reviewAgentModel;
+    const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(messages);
     onLLMCall?.({
       stepIndex: req.stepIndex,
       model,
@@ -171,7 +187,10 @@ async function processOne(
       durationMs,
       costUsd: calcCostUsd(model, inputTokens, outputTokens),
       query: `Review step ${req.stepIndex}: ${req.action} \u2192 ${req.actionResult}`,
-      response: content.slice(0, 2000),
+      requestMessages,
+      imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
+      imageBase64: imageBase64s[0],
+      response: content,
       agent: "review",
     });
     return parseReviewResponse(content, req.stepIndex, at);
@@ -223,10 +242,16 @@ export function createReviewProcessor(opts?: { concurrency?: number; onLLMCall?:
   return {
     push(request: ReviewRequest) {
       queue.push(request);
-      // Backpressure: drop oldest queued entries when buffer exceeds threshold
+      // Backpressure: prefer dropping mid-page screenshots; keep navigation-boundary frames
       while (queue.length > REVIEW_BUFFER_MAX) {
-        const dropped = queue.shift();
-        if (dropped) logger.debug({ stepIndex: dropped.stepIndex }, "ReviewAgent: dropped oldest queued item (backpressure)");
+        const dropIdx = queue.findIndex((r) => !r.isNavigationBoundary);
+        if (dropIdx >= 0) {
+          const dropped = queue.splice(dropIdx, 1)[0];
+          logger.debug({ stepIndex: dropped.stepIndex }, "ReviewAgent: dropped mid-page queued item (backpressure)");
+        } else {
+          const dropped = queue.shift();
+          if (dropped) logger.debug({ stepIndex: dropped.stepIndex }, "ReviewAgent: dropped oldest queued item (backpressure)");
+        }
       }
       drain();
     },

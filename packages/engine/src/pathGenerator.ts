@@ -16,7 +16,14 @@ export type PathGeneratorInput = {
   intent?: string;
 };
 
-export type GenerateTestPlanResult = { plan: TestPlan; usage?: LLMUsage };
+export type GenerateTestPlanResult = {
+  plan: TestPlan;
+  usage?: LLMUsage;
+  /** Full user prompt sent to the path planner. */
+  prompt?: string;
+  /** Raw model output string. */
+  rawResponse?: string;
+};
 
 /**
  * Loads memory, past run results, and open bugs for the destination,
@@ -63,7 +70,7 @@ Use human-readable targets (e.g. "Submit button", "Email field"). The Navigator 
 Keep each reasoning to one short sentence. Use as many steps per path as needed to complete the scenario.`;
 
   const { content, usage } = await llmPathPlan(prompt);
-  return { plan: parseTestPlan(content), usage };
+  return { plan: parseTestPlan(content), usage, prompt, rawResponse: content };
 }
 
 async function getPastRunsSection(storage: StorageAdapter, destinationId: string): Promise<string> {

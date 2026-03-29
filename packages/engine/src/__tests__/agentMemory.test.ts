@@ -1,7 +1,8 @@
 /**
  * Tests for agentMemory — formatMemoryForPrompt and proposeMemoriesFromRun
  */
-import { describe, it, assert } from "node:test";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { formatMemoryForPrompt, proposeMemoriesFromRun } from "../agentMemory.js";
 import type { MemoryEntry } from "../agentMemory.js";
 
