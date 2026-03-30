@@ -108,6 +108,12 @@ export type AppTreeDestination = {
   last_crawled_at: string;
 };
 
+/** LLM cost breakdown for a crawl (USD). */
+export type CrawlLlmCostBreakdownJson = {
+  linkFilterUsd: number;
+  suggestedFlowsUsd: number;
+};
+
 /** A crawl/scan run. */
 export type CrawlRun = {
   id: string;
@@ -119,6 +125,12 @@ export type CrawlRun = {
   destinations_built: number | null;
   started_at: string;
   completed_at: string | null;
+  cost_usd: number | null;
+  llm_cost_breakdown_json: CrawlLlmCostBreakdownJson | null;
+  /** Full LLM audit (when migration 010 applied). */
+  llm_calls_json?: unknown[] | null;
+  crawl_metadata_json?: Record<string, unknown> | null;
+  sitemap_json?: unknown;
 };
 
 /** Coverage statistics for a project. */

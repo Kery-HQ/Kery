@@ -208,7 +208,13 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
       formCount: (d.forms_json || []).length, interactionCount: (d.interactions_json || []).length,
     }));
     const coverage = await storage.getProjectCoverage(projectId);
-    reply.send({ pages, coverage });
+    const { rows: lastScanRows } = await pool.query(
+      `SELECT id, status, pages_visited, nodes_found, started_at, completed_at, cost_usd,
+              llm_cost_breakdown_json, crawl_metadata_json
+       FROM crawl_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 1`,
+      [projectId],
+    );
+    reply.send({ pages, coverage, lastScan: lastScanRows[0] ?? null });
   });
 
   // Page-scoped memory (must be registered before GET .../pages/:destinationId)

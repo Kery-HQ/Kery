@@ -1,10 +1,14 @@
 import { readFileSync, readdirSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+import { config as loadEnv } from "dotenv";
 import { Pool } from "pg";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
+
+// Repo root .env (packages/db/src -> ../../../.env)
+loadEnv({ path: resolve(__dirname, "../../../.env") });
 
 async function run() {
   const connectionString = process.env.DATABASE_URL;

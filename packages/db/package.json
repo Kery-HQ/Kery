@@ -10,6 +10,7 @@
     "migrate": "tsx src/migrate.ts"
   },
   "dependencies": {
+    "dotenv": "^16.4.0",
     "pg": "^8.13.0",
     "@kery/engine": "*"
   },

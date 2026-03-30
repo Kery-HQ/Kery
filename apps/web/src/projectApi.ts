@@ -237,6 +237,10 @@ export async function fetchCrawlRuns(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/runs`);
 }
 
+export async function fetchCrawlRun(projectId: string, crawlRunId: string) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/runs/${crawlRunId}`);
+}
+
 export async function fetchCrawlNodes(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/nodes`);
 }

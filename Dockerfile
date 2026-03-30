@@ -17,14 +17,17 @@ ENV KERY_DOCKER=1
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (all workspace package.json files; no source yet)
+# Skip lifecycle scripts: root postinstall runs build:libs before COPY of TS sources.
 COPY package.json package-lock.json* ./
 COPY packages/engine/package.json packages/engine/
 COPY packages/db/package.json packages/db/
+COPY packages/client/package.json packages/client/
+COPY packages/mcp/package.json packages/mcp/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 
-RUN npm install --workspaces --include-workspace-root 2>/dev/null || npm install
+RUN npm install --ignore-scripts --workspaces --include-workspace-root
 RUN npx playwright install ffmpeg
 
 # Copy source

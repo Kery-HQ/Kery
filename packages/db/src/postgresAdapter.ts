@@ -278,38 +278,77 @@ export class PostgresAdapter implements StorageAdapter {
     const validPages = sitemap.filter(p => p.route);
     if (validPages.length === 0) return { added: 0, updated: 0 };
 
-    // Batch upsert: single INSERT ... ON CONFLICT DO UPDATE
-    const values: any[] = [];
-    const placeholders: string[] = [];
-    let idx = 1;
-    for (const page of validPages) {
-      placeholders.push(`($${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6}, $${idx+7}, $${idx+8}, true)`);
-      values.push(
-        projectId, page.route, page.title,
-        JSON.stringify(page.forms), JSON.stringify(page.buttons),
-        JSON.stringify(page.interactions), JSON.stringify(page.navLinks),
-        now, crawlRunId,
-      );
-      idx += 9;
-    }
+    const routesThisRun = validPages.map((p: any) => p.route);
 
-    const { rows } = await this.db.query(
-      `INSERT INTO app_tree_destinations (project_id, normalized_route, title, forms_json, buttons_json, interactions_json, nav_links, last_crawled_at, crawl_run_id, enabled)
-       VALUES ${placeholders.join(", ")}
-       ON CONFLICT (project_id, normalized_route) DO UPDATE SET
-         title = EXCLUDED.title,
-         forms_json = EXCLUDED.forms_json,
-         buttons_json = EXCLUDED.buttons_json,
-         interactions_json = EXCLUDED.interactions_json,
-         nav_links = EXCLUDED.nav_links,
-         last_crawled_at = EXCLUDED.last_crawled_at,
-         crawl_run_id = EXCLUDED.crawl_run_id,
-         updated_at = EXCLUDED.last_crawled_at
-       RETURNING (xmax = 0) AS inserted`,
-      values,
-    );
-    const added = rows.filter((r: any) => r.inserted).length;
-    return { added, updated: rows.length - added };
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Batch upsert: single INSERT ... ON CONFLICT DO UPDATE
+      const values: any[] = [];
+      const placeholders: string[] = [];
+      let idx = 1;
+      for (const page of validPages) {
+        placeholders.push(
+          `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, 0, true)`,
+        );
+        values.push(
+          projectId, page.route, page.title,
+          JSON.stringify(page.forms), JSON.stringify(page.buttons),
+          JSON.stringify(page.interactions), JSON.stringify(page.navLinks),
+          now, crawlRunId,
+        );
+        idx += 9;
+      }
+
+      const { rows } = await client.query(
+        `INSERT INTO app_tree_destinations (project_id, normalized_route, title, forms_json, buttons_json, interactions_json, nav_links, last_crawled_at, crawl_run_id, crawl_miss_streak, enabled)
+         VALUES ${placeholders.join(", ")}
+         ON CONFLICT (project_id, normalized_route) DO UPDATE SET
+           title = EXCLUDED.title,
+           forms_json = EXCLUDED.forms_json,
+           buttons_json = EXCLUDED.buttons_json,
+           interactions_json = EXCLUDED.interactions_json,
+           nav_links = EXCLUDED.nav_links,
+           last_crawled_at = EXCLUDED.last_crawled_at,
+           crawl_run_id = EXCLUDED.crawl_run_id,
+           crawl_miss_streak = 0,
+           health_status = CASE
+             WHEN app_tree_destinations.health_status = 'stale' THEN 'untested'
+             ELSE app_tree_destinations.health_status
+           END,
+           updated_at = EXCLUDED.last_crawled_at
+         RETURNING (xmax = 0) AS inserted`,
+        values,
+      );
+      const added = rows.filter((r: any) => r.inserted).length;
+
+      await client.query(
+        `UPDATE app_tree_destinations
+         SET crawl_miss_streak = crawl_miss_streak + 1,
+             updated_at = now()
+         WHERE project_id = $1
+           AND NOT (normalized_route = ANY($2::text[]))`,
+        [projectId, routesThisRun],
+      );
+
+      await client.query(
+        `UPDATE app_tree_destinations
+         SET health_status = 'stale',
+             updated_at = now()
+         WHERE project_id = $1
+           AND crawl_miss_streak >= 3`,
+        [projectId],
+      );
+
+      await client.query("COMMIT");
+      return { added, updated: rows.length - added };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async upsertCrawlNodes(_projectId: string, _crawlRunId: string, _result: any) {

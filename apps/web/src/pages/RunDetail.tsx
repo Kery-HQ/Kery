@@ -92,7 +92,14 @@ type RunStep = {
   reviewFeedback?: { type: string; severity: string; description: string }[];
 };
 
-type LLMAgentType = "navigator" | "review" | "pathgen" | "summary" | "filmstrip";
+type LLMAgentType =
+  | "navigator"
+  | "review"
+  | "pathgen"
+  | "summary"
+  | "filmstrip"
+  | "crawl_link_filter"
+  | "crawl_suggested_flows";
 
 type LLMStoredContentPart =
   | { type: "text"; text: string }
@@ -123,6 +130,7 @@ type LLMCallRecord = {
   response: string;
   role?: "action" | "dom-scan";
   agent?: LLMAgentType;
+  crawlContext?: Record<string, unknown>;
 };
 
 type MemoryEntryBrief = {
@@ -465,7 +473,14 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
   pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Route },
   summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
   filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Layers },
+  crawl_link_filter:       { label: "Crawl links", color: "text-teal-400",    Icon: ListFilter },
+  crawl_suggested_flows: { label: "Crawl flows", color: "text-amber-400",   Icon: Workflow },
 };
+
+const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
+  "navigator", "review", "filmstrip", "pathgen", "summary",
+  "crawl_link_filter", "crawl_suggested_flows",
+];
 
 // --- Main component ---
 
@@ -1679,7 +1694,7 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
 
   const agentCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: llmCalls.length };
-    for (const a of ["navigator", "review", "filmstrip", "pathgen", "summary"] as const) {
+    for (const a of LLM_TAB_AGENT_ORDER) {
       counts[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).length;
     }
     return counts;
@@ -1687,13 +1702,13 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
 
   const agentCosts = React.useMemo(() => {
     const cost: Record<string, number> = {};
-    for (const a of ["navigator", "review", "filmstrip", "pathgen", "summary"] as const) {
+    for (const a of LLM_TAB_AGENT_ORDER) {
       cost[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).reduce((s, c) => s + c.costUsd, 0);
     }
     return cost;
   }, [llmCalls]);
 
-  const agentsWithCalls = (["navigator", "review", "filmstrip", "pathgen", "summary"] as const).filter((a) => agentCounts[a] > 0);
+  const agentsWithCalls = LLM_TAB_AGENT_ORDER.filter((a) => (agentCounts[a] ?? 0) > 0);
 
   return (
     <div className="px-6 py-5 max-w-5xl w-full mx-auto space-y-4 animate-fade-in">
@@ -1801,6 +1816,8 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
       agent === "pathgen"   && "border-l-2 border-l-amber-500/30",
       agent === "summary"   && "border-l-2 border-l-sky-500/30",
       agent === "filmstrip" && "border-l-2 border-l-fuchsia-500/30",
+      agent === "crawl_link_filter" && "border-l-2 border-l-teal-500/30",
+      agent === "crawl_suggested_flows" && "border-l-2 border-l-amber-500/30",
     )}>
       <button
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"

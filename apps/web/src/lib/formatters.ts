@@ -35,6 +35,16 @@ export function formatCost(usd: number): string {
   return `$${usd.toFixed(2)}`;
 }
 
+/** Crawl LLM cost as a single total (USD). */
+export function formatCrawlLlmCostLine(run: {
+  cost_usd?: number | null;
+  llm_cost_breakdown_json?: { linkFilterUsd?: number; suggestedFlowsUsd?: number } | null;
+}): string | null {
+  const total = run.cost_usd != null ? Number(run.cost_usd) : NaN;
+  if (Number.isNaN(total) || total <= 0) return null;
+  return formatCost(total);
+}
+
 /** Best-effort run cost: stored `cost_usd` or sum of `llm_calls_json[].costUsd`. */
 export function runCostUsd(run: { cost_usd?: number | null; llm_calls_json?: unknown }): number {
   if (run.cost_usd != null) {

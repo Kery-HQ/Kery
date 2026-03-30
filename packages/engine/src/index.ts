@@ -78,7 +78,10 @@ export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested
 
 // ─── Crawler ─────────────────────────────────────────────────────────────────
 export { runCrawl, executeCrawlRun, generateIntentForNode } from "./crawlerWorker.js";
-export type { CrawlPageData, CrawlResult, CrawlSuggestedFlow } from "./crawlerWorker.js";
+export type {
+  CrawlPageData, CrawlResult, CrawlSuggestedFlow, CrawlLlmCostBreakdown, CrawlMetadata,
+  CrawlProgressPhase, CrawlProgressMetadata, CrawlProgressSnapshot, RunCrawlOptions,
+} from "./crawlerWorker.js";
 
 // ─── Run Orchestrator ────────────────────────────────────────────────────────
 export { runOrchestratedJob } from "./runOrchestrator.js";

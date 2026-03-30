@@ -26,6 +26,11 @@ export const ProjectDestParams = z.object({
   destinationId: z.string().uuid(),
 });
 
+export const ProjectCrawlRunParams = z.object({
+  projectId: z.string().uuid(),
+  crawlRunId: z.string().uuid(),
+});
+
 export const ProjectDestMemoryEntryParams = z.object({
   projectId: z.string().uuid(),
   destinationId: z.string().uuid(),

@@ -69,7 +69,14 @@ export type RunStep = {
   reviewFeedback?: { type: string; severity: string; description: string }[];
 };
 
-export type LLMAgentType = "navigator" | "review" | "pathgen" | "summary" | "filmstrip";
+export type LLMAgentType =
+  | "navigator"
+  | "review"
+  | "pathgen"
+  | "summary"
+  | "filmstrip"
+  | "crawl_link_filter"
+  | "crawl_suggested_flows";
 
 /** Serializable multimodal message for run-detail UI (no raw base64 — images are parallel `imageBase64s` / `imagePaths`). */
 export type LLMStoredContentPart =
@@ -106,6 +113,8 @@ export type LLMCallRecord = {
   response: string;
   role?: "action" | "dom-scan";
   agent?: LLMAgentType;
+  /** Crawl runs: batch index, source page route, outcome notes, etc. */
+  crawlContext?: Record<string, unknown>;
 };
 
 function dataUrlToBase64(url: string): string | null {
