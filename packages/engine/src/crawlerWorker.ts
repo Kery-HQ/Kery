@@ -422,7 +422,7 @@ ${lines}`;
       { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.1 },
     );
     const durationMs = Date.now() - t0;
-    const delta = calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens);
+    const delta = calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens, "scriptModel");
     costAccum.usd += delta;
     costAccum.linkFilterUsd += delta;
     const fromModel = tryParse(raw);
@@ -811,7 +811,7 @@ Return ONLY a JSON array: [{"name":"Short name","intent":"Step-by-step instructi
       { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3 },
     );
     const durationMs = Date.now() - t0;
-    const delta = calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens);
+    const delta = calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens, "scriptModel");
     costAccum.usd += delta;
     costAccum.suggestedFlowsUsd += delta;
 
@@ -871,7 +871,7 @@ export async function generateIntentForNode(
   const prompt = `Generate a single test intent for this page starting from ${baseUrl}.\n\n${context.join("\n")}\n\nReply with ONLY the intent text.`;
   try {
     const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 });
-    if (costAccum) costAccum.usd += calcCostUsd(config.summaryModel, usage.inputTokens, usage.outputTokens);
+    if (costAccum) costAccum.usd += calcCostUsd(config.summaryModel, usage.inputTokens, usage.outputTokens, "summaryModel");
     const intent = content.trim();
     return intent.length > 20 ? intent : null;
   } catch { return null; }

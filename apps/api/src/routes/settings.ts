@@ -1,7 +1,13 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { StorageAdapter } from "@kery/engine";
-import { updateEngineConfig, getConfig } from "@kery/engine";
+import {
+  updateEngineConfig,
+  getConfig,
+  getLlmKeyPresence,
+  isModelRunnableWithConfig,
+  type ModelConfigKey,
+} from "@kery/engine";
 import { config as envConfig } from "../config.js";
 
 /** The model keys we allow setting via the API. */
@@ -16,6 +22,8 @@ const MODEL_KEYS = [
 
 type ModelKey = (typeof MODEL_KEYS)[number];
 
+const priceEntry = z.object({ input: z.number(), output: z.number() });
+
 const ModelSettingsSchema = z.object({
   agentModel: z.string().optional(),
   summaryModel: z.string().optional(),
@@ -23,6 +31,10 @@ const ModelSettingsSchema = z.object({
   reviewAgentModel: z.string().optional(),
   scriptModel: z.string().optional(),
   stagehandModel: z.string().optional(),
+  /** Per-slot custom $/1M token (USD). `null` clears stored pricing for that slot. */
+  modelPrices: z
+    .record(z.union([priceEntry, z.null()]))
+    .optional(),
 });
 
 /** Read DB settings and merge into the running engine config. */
@@ -30,13 +42,26 @@ export async function applyDbModelSettings(storage: StorageAdapter): Promise<voi
   try {
     const all = await storage.getSettings();
     const overrides: Record<string, string> = {};
+    const prices: Partial<Record<ModelConfigKey, { input: number; output: number }>> = {};
     for (const key of MODEL_KEYS) {
       const dbKey = `model.${key}`;
       if (all[dbKey]) overrides[key] = all[dbKey];
+      const pKey = `modelPrice.${key}`;
+      if (all[pKey]) {
+        try {
+          const j = JSON.parse(all[pKey]) as { input?: unknown; output?: unknown };
+          if (typeof j.input === "number" && typeof j.output === "number") {
+            prices[key as ModelConfigKey] = { input: j.input, output: j.output };
+          }
+        } catch {
+          /* skip bad JSON */
+        }
+      }
     }
-    if (Object.keys(overrides).length > 0) {
-      updateEngineConfig(overrides);
-    }
+    updateEngineConfig({
+      ...(Object.keys(overrides).length > 0 ? overrides : {}),
+      modelPriceUsdPerMillion: prices,
+    });
   } catch {
     // settings table may not exist yet (migration not run) — skip silently
   }
@@ -73,7 +98,14 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       };
     }
 
-    reply.send({ models });
+    const mp = getConfig().modelPriceUsdPerMillion ?? {};
+    const modelPrices: Partial<Record<ModelKey, { input: number; output: number }>> = {};
+    for (const key of MODEL_KEYS) {
+      const v = mp[key as ModelConfigKey];
+      if (v) modelPrices[key] = v;
+    }
+
+    reply.send({ models, llmKeys: getLlmKeyPresence(getConfig()), modelPrices });
   });
 
   /** PUT /api/settings/models — save model overrides */
@@ -94,8 +126,30 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
           // Empty string = reset to default
           await storage.deleteSettings([dbKey]);
         } else {
+          if (!isModelRunnableWithConfig(value, getConfig())) {
+            reply.code(400).send({ error: "model_unavailable", message: `No API key configured for model "${value}".` });
+            return;
+          }
           await storage.saveSetting(dbKey, value);
           overrides[key] = value;
+        }
+      }
+    }
+
+    const rawPrices = parsed.data.modelPrices;
+    if (rawPrices) {
+      for (const k of Object.keys(rawPrices)) {
+        if (!MODEL_KEYS.includes(k as ModelKey)) continue;
+        const dbPriceKey = `modelPrice.${k}`;
+        const v = rawPrices[k];
+        if (v === null) {
+          await storage.deleteSettings([dbPriceKey]);
+        } else if (v && typeof v.input === "number" && typeof v.output === "number") {
+          if (v.input < 0 || v.output < 0) {
+            reply.code(400).send({ error: "invalid_price", message: "Model prices must be non-negative numbers." });
+            return;
+          }
+          await storage.saveSetting(dbPriceKey, JSON.stringify({ input: v.input, output: v.output }));
         }
       }
     }
@@ -109,7 +163,8 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
   /** DELETE /api/settings/models — reset all model settings to env defaults */
   app.delete("/api/settings/models", async (_req, reply) => {
     const dbKeys = MODEL_KEYS.map((k) => `model.${k}`);
-    await storage.deleteSettings(dbKeys);
+    const priceKeys = MODEL_KEYS.map((k) => `modelPrice.${k}`);
+    await storage.deleteSettings([...dbKeys, ...priceKeys]);
 
     // Re-init from env defaults
     updateEngineConfig({
@@ -119,6 +174,7 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       reviewAgentModel: envConfig.reviewAgentModel,
       scriptModel: envConfig.scriptModel,
       stagehandModel: envConfig.stagehandModel,
+      modelPriceUsdPerMillion: {},
     });
 
     reply.send({ ok: true });

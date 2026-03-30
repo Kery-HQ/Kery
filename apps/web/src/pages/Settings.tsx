@@ -16,7 +16,18 @@ import { useProject } from "@/lib/projectContext";
 import {
   updateProject, deleteProject,
   fetchModelSettings, saveModelSettings, resetModelSettings,
+  type LlmKeyPresence,
+  type ModelPriceUsd,
+  type ModelSlotKey,
+  type SaveModelSettingsPayload,
 } from "@/projectApi";
+import {
+  isModelSelectable,
+  modelMissingKeyLabel,
+  composeCustomModel,
+  parseStoredModelForCustomUi,
+  type CustomProviderId,
+} from "@/lib/llmModelAvailability";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +44,8 @@ export const Settings: React.FC = () => {
   const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   const [modelSettings, setModelSettings] = React.useState<Record<string, { current: string; default: string; customized: boolean }>>({});
+  const [llmKeys, setLlmKeys] = React.useState<LlmKeyPresence | null>(null);
+  const [modelPrices, setModelPrices] = React.useState<Partial<Record<ModelSlotKey, ModelPriceUsd>>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
 
@@ -46,17 +59,27 @@ export const Settings: React.FC = () => {
 
   React.useEffect(() => {
     fetchModelSettings()
-      .then((r) => setModelSettings(r.models))
+      .then((r) => {
+        setModelSettings(r.models);
+        setLlmKeys(r.llmKeys);
+        setModelPrices(r.modelPrices ?? {});
+      })
       .catch(() => {});
   }, []);
 
-  async function handleModelChange(key: string, value: string) {
+  async function handleModelChange(key: ModelSlotKey, value: string, modelPrice?: ModelPriceUsd | null) {
     setModelSaving(key);
     setModelStatus("");
     try {
-      await saveModelSettings({ [key]: value });
+      const payload: SaveModelSettingsPayload = { [key]: value };
+      if (modelPrice !== undefined) {
+        payload.modelPrices = { [key]: modelPrice };
+      }
+      await saveModelSettings(payload);
       const r = await fetchModelSettings();
       setModelSettings(r.models);
+      setLlmKeys(r.llmKeys);
+      setModelPrices(r.modelPrices ?? {});
       setModelStatus(value ? "Model updated." : "Reset to default.");
     } catch {
       setModelStatus("Failed to save model setting.");
@@ -72,6 +95,8 @@ export const Settings: React.FC = () => {
       await resetModelSettings();
       const r = await fetchModelSettings();
       setModelSettings(r.models);
+      setLlmKeys(r.llmKeys);
+      setModelPrices(r.modelPrices ?? {});
       setModelStatus("All models reset to defaults.");
     } catch {
       setModelStatus("Failed to reset.");
@@ -214,7 +239,8 @@ export const Settings: React.FC = () => {
                   <React.Fragment key={key}>
                     {idx > 0 && <Separator />}
                     <ModelSelect
-                      modelKey={key}
+                      key={key}
+                      modelKey={key as ModelSlotKey}
                       label={label}
                       description={description}
                       options={options}
@@ -223,6 +249,8 @@ export const Settings: React.FC = () => {
                       customized={setting.customized}
                       saving={modelSaving === key || modelSaving === "__all__"}
                       onChange={handleModelChange}
+                      llmKeys={llmKeys}
+                      modelPrice={modelPrices[key as ModelSlotKey]}
                     />
                   </React.Fragment>
                 );
@@ -310,48 +338,73 @@ const AGENT_OPTIONS: ModelOption[] = [
   { value: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano", price: "$0.10 / $0.40" },
   { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
+  { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
+  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$15.00 / $75.00" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
 ];
 
 const TEXT_OPTIONS: ModelOption[] = [
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", price: "$0.10 / $0.40" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", price: "$0.08 / $0.30" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
   { value: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano", price: "$0.10 / $0.40" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
   { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
+  { value: "openai/o3-mini", label: "o3-mini", price: "$1.10 / $4.40" },
   { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", price: "$0.26 / $0.38" },
+  { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", price: "varies" },
 ];
 
 const VISION_OPTIONS: ModelOption[] = [
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", price: "$0.10 / $0.40" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", price: "$0.08 / $0.30" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
   { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
+  { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
 ];
 
 const REASONING_VISION_OPTIONS: ModelOption[] = [
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
+  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$15.00 / $75.00" },
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  { value: "openai/o3", label: "o3", price: "$2.00 / $8.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
 ];
 
 const CODE_OPTIONS: ModelOption[] = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "openai/gpt-4.1", label: "GPT-4.1", price: "$2.00 / $8.00" },
   { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
+  { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
+  { value: "openai/o3-mini", label: "o3-mini", price: "$1.10 / $4.40" },
   { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", price: "$0.26 / $0.38" },
+  { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", price: "varies" },
 ];
 
 const STAGEHAND_OPTIONS: ModelOption[] = [
   { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (short id)", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
+];
+
+const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [
+  { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "gemini", label: "Google Gemini" },
+  { value: "openrouter", label: "OpenRouter (any id)" },
 ];
 
 const MODEL_CONFIG: { key: string; label: string; description: string; options: ModelOption[] }[] = [
@@ -393,6 +446,19 @@ const MODEL_CONFIG: { key: string; label: string; description: string; options: 
   },
 ];
 
+function customModelPlaceholder(provider: CustomProviderId): string {
+  switch (provider) {
+    case "openai":
+      return "e.g. gpt-4o-mini";
+    case "anthropic":
+      return "e.g. claude-3-5-haiku-20241022";
+    case "gemini":
+      return "e.g. gemini-2.0-flash";
+    case "openrouter":
+      return "e.g. mistralai/mistral-small-3.1-24b-instruct";
+  }
+}
+
 function ModelSelect({
   modelKey,
   label,
@@ -403,8 +469,10 @@ function ModelSelect({
   customized,
   saving,
   onChange,
+  llmKeys,
+  modelPrice,
 }: {
-  modelKey: string;
+  modelKey: ModelSlotKey;
   label: string;
   description: string;
   options: ModelOption[];
@@ -412,13 +480,77 @@ function ModelSelect({
   defaultValue: string;
   customized: boolean;
   saving: boolean;
-  onChange: (key: string, value: string) => void;
+  onChange: (key: ModelSlotKey, value: string, modelPrice?: ModelPriceUsd | null) => void;
+  llmKeys: LlmKeyPresence | null;
+  modelPrice?: ModelPriceUsd;
 }) {
-  const allOptions = options.some((o) => o.value === current)
-    ? options
-    : [{ value: current, label: current }, ...options];
+  const presetValues = React.useMemo(() => new Set(options.map((o) => o.value)), [options]);
+  const isPresetCurrent = presetValues.has(current);
 
-  const currentOption = allOptions.find((o) => o.value === current);
+  const [customOpen, setCustomOpen] = React.useState(!isPresetCurrent && current.length > 0);
+  const [customProvider, setCustomProvider] = React.useState<CustomProviderId>("openai");
+  const [customRaw, setCustomRaw] = React.useState("");
+  const [customError, setCustomError] = React.useState("");
+  const [priceIn, setPriceIn] = React.useState("");
+  const [priceOut, setPriceOut] = React.useState("");
+
+  React.useEffect(() => {
+    if (!presetValues.has(current) && current.length > 0) setCustomOpen(true);
+    if (presetValues.has(current)) setCustomOpen(false);
+  }, [current, presetValues]);
+
+  React.useEffect(() => {
+    const p = parseStoredModelForCustomUi(current);
+    setCustomProvider(p.provider);
+    setCustomRaw(p.raw);
+  }, [current, modelKey]);
+
+  React.useEffect(() => {
+    if (modelPrice) {
+      setPriceIn(String(modelPrice.input));
+      setPriceOut(String(modelPrice.output));
+    } else {
+      setPriceIn("");
+      setPriceOut("");
+    }
+  }, [modelPrice, modelKey]);
+
+  function optionSelectable(optValue: string): boolean {
+    if (!llmKeys) return true;
+    if (optValue === current) return true;
+    return isModelSelectable(optValue, llmKeys);
+  }
+
+  function handlePresetChange(value: string) {
+    if (!value) return;
+    setCustomOpen(false);
+    setCustomError("");
+    onChange(modelKey, value, null);
+  }
+
+  function handleApplyCustom() {
+    setCustomError("");
+    const composed = composeCustomModel(customProvider, customRaw);
+    if (!composed) {
+      setCustomError("Enter a model id.");
+      return;
+    }
+    const pi = parseFloat(priceIn);
+    const po = parseFloat(priceOut);
+    if (!Number.isFinite(pi) || !Number.isFinite(po) || pi < 0 || po < 0) {
+      setCustomError("Enter USD per 1M input tokens and per 1M output tokens (non-negative numbers).");
+      return;
+    }
+    if (llmKeys && !isModelSelectable(composed, llmKeys)) {
+      const hint = modelMissingKeyLabel(composed, llmKeys);
+      setCustomError(hint ?? "This model needs a different API key.");
+      return;
+    }
+    onChange(modelKey, composed, { input: pi, output: po });
+    setCustomOpen(false);
+  }
+
+  const presetSelectValue = isPresetCurrent ? current : "";
 
   return (
     <div>
@@ -431,7 +563,8 @@ function ModelSelect({
         </div>
         {customized && (
           <button
-            onClick={() => onChange(modelKey, "")}
+            type="button"
+            onClick={() => onChange(modelKey, "", null)}
             disabled={saving}
             className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-50"
           >
@@ -440,18 +573,154 @@ function ModelSelect({
           </button>
         )}
       </div>
-      <Select
-        value={current}
-        onChange={(e) => onChange(modelKey, e.target.value)}
-        disabled={saving}
-        className={cn(customized && "border-primary/40")}
-      >
-        {allOptions.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}{opt.price ? ` -- ${opt.price}` : ""}{opt.value === defaultValue ? " (default)" : ""}
-          </option>
-        ))}
-      </Select>
+
+      {!customOpen && (
+        <>
+          <Select
+            value={presetSelectValue}
+            onChange={(e) => handlePresetChange(e.target.value)}
+            disabled={saving}
+            className={cn(customized && "border-primary/40")}
+          >
+            <option value="">Choose a preset…</option>
+            {options.map((opt) => {
+              const sel = optionSelectable(opt.value);
+              const missing =
+                llmKeys && !sel && opt.value !== current ? modelMissingKeyLabel(opt.value, llmKeys) : null;
+              return (
+                <option key={opt.value} value={opt.value} disabled={!sel}>
+                  {opt.label}{opt.price ? ` -- ${opt.price}` : ""}{opt.value === defaultValue ? " (default)" : ""}
+                  {missing ? ` — ${missing}` : ""}
+                </option>
+              );
+            })}
+          </Select>
+          <button
+            type="button"
+            onClick={() => {
+              setCustomOpen(true);
+              setCustomError("");
+            }}
+            disabled={saving}
+            className="mt-1.5 text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            Custom model (provider + id)
+          </button>
+        </>
+      )}
+
+      {customOpen && (
+        <div className="rounded-md border border-border/80 bg-muted/20 p-3 space-y-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Select
+              value={customProvider}
+              onChange={(e) => {
+                setCustomProvider(e.target.value as CustomProviderId);
+                setCustomError("");
+              }}
+              disabled={saving}
+              className="sm:w-[180px] flex-shrink-0"
+              aria-label="Provider"
+            >
+              {CUSTOM_PROVIDER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+            <Input
+              value={customRaw}
+              onChange={(e) => {
+                setCustomRaw(e.target.value);
+                setCustomError("");
+              }}
+              disabled={saving}
+              placeholder={customModelPlaceholder(customProvider)}
+              className="font-mono text-[12px] flex-1"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
+          </div>
+          {customProvider === "openrouter" && (
+            <p className="text-[10px] text-muted-foreground/70 leading-snug">
+              Use the full OpenRouter slug (vendor/model). Requires OPENROUTER_API_KEY unless another rule matches.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-muted-foreground">Input $ / 1M tokens</label>
+              <Input
+                type="number"
+                step="any"
+                min={0}
+                value={priceIn}
+                onChange={(e) => {
+                  setPriceIn(e.target.value);
+                  setCustomError("");
+                }}
+                disabled={saving}
+                placeholder="0.40"
+                className="font-mono text-[12px] mt-0.5"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">Output $ / 1M tokens</label>
+              <Input
+                type="number"
+                step="any"
+                min={0}
+                value={priceOut}
+                onChange={(e) => {
+                  setPriceOut(e.target.value);
+                  setCustomError("");
+                }}
+                disabled={saving}
+                placeholder="1.60"
+                className="font-mono text-[12px] mt-0.5"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground/70 leading-snug">
+            Required for cost estimates. Use your provider’s published pricing (USD per million tokens).
+          </p>
+          {customError && (
+            <p className="text-[11px] text-destructive">{customError}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={handleApplyCustom} disabled={saving} loading={saving}>
+              Apply custom model
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setCustomOpen(false);
+                setCustomError("");
+                const p = parseStoredModelForCustomUi(current);
+                setCustomProvider(p.provider);
+                setCustomRaw(p.raw);
+              }}
+              disabled={saving}
+            >
+              {isPresetCurrent ? "Cancel" : "Use presets"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isPresetCurrent && !customOpen && current && (
+        <p className="text-[11px] font-mono text-muted-foreground/80 mt-1.5 break-all">
+          Active: {current}
+          {modelPrice?.input != null && modelPrice?.output != null && (
+            <span className="block text-muted-foreground/60 mt-0.5">
+              Cost: ${modelPrice.input}/M in, ${modelPrice.output}/M out
+            </span>
+          )}
+        </p>
+      )}
+
       <p className="text-[11px] text-muted-foreground/60 mt-1">{description}</p>
     </div>
   );

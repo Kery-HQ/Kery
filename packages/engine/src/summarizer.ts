@@ -35,7 +35,7 @@ export async function summarizeRun(input: SummarizeInput): Promise<SummarizeResu
     const t0 = Date.now();
     const { content, usage } = await llmSummarize(prompt);
     const durationMs = Date.now() - t0;
-    const costUsd = calcCostUsd(model, usage.inputTokens, usage.outputTokens);
+    const costUsd = calcCostUsd(model, usage.inputTokens, usage.outputTokens, "summaryModel");
     return { summary: content, prompt, usage, costUsd, model, durationMs };
   } catch {
     return { summary: buildFallbackSummary(input), prompt };

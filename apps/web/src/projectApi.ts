@@ -265,15 +265,39 @@ export async function saveCrawlSettings(projectId: string, settings: { crawlEnvi
 
 // --- Model settings (global) ---
 
+export type LlmKeyPresence = {
+  hasOpenRouter: boolean;
+  hasOpenAI: boolean;
+  hasAnthropic: boolean;
+  hasGemini: boolean;
+};
+
+/** USD per 1M tokens — used for run cost estimates when using a custom model id. */
+export type ModelPriceUsd = { input: number; output: number };
+
+export type ModelSlotKey =
+  | "agentModel"
+  | "summaryModel"
+  | "reviewModel"
+  | "reviewAgentModel"
+  | "scriptModel"
+  | "stagehandModel";
+
 export type ModelSettingsResponse = {
   models: Record<string, { current: string; default: string; customized: boolean }>;
+  llmKeys: LlmKeyPresence;
+  modelPrices: Partial<Record<ModelSlotKey, ModelPriceUsd>>;
+};
+
+export type SaveModelSettingsPayload = Partial<Record<ModelSlotKey, string>> & {
+  modelPrices?: Partial<Record<ModelSlotKey, ModelPriceUsd | null>>;
 };
 
 export async function fetchModelSettings(): Promise<ModelSettingsResponse> {
   return apiFetch(`${API_BASE}/api/settings/models`);
 }
 
-export async function saveModelSettings(settings: Record<string, string>) {
+export async function saveModelSettings(settings: SaveModelSettingsPayload) {
   return apiFetch(`${API_BASE}/api/settings/models`, {
     method: "PUT",
     body: JSON.stringify(settings),

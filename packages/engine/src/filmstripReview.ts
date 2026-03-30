@@ -154,7 +154,7 @@ async function analyzeChunk(
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       durationMs,
-      costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens),
+      costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel"),
       query: `Filmstrip journey review (chunk ${chunkIndex + 1}, ${chunk.length} frames)`,
       requestMessages,
       imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,

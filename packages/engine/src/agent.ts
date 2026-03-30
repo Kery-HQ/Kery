@@ -727,7 +727,7 @@ async function decideNextAction(params: {
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       durationMs,
-      costUsd: calcCostUsd(getConfig().agentModel, usage.inputTokens, usage.outputTokens),
+      costUsd: calcCostUsd(getConfig().agentModel, usage.inputTokens, usage.outputTokens, "agentModel"),
       query: queryText,
       requestMessages,
       imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,

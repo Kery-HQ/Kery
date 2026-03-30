@@ -8,6 +8,7 @@ export const config = {
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   agentModel: process.env.AGENT_MODEL || "openai/gpt-4.1-mini",
   summaryModel: process.env.SUMMARY_MODEL || "gemini-2.5-flash-lite",

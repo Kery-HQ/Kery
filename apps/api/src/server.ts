@@ -17,6 +17,7 @@ import { withRunCorrelation } from "@kery/engine";
 initEngineConfig({
   openaiApiKey: config.openaiApiKey,
   openrouterApiKey: config.openrouterApiKey,
+  anthropicApiKey: config.anthropicApiKey,
   geminiApiKey: config.geminiApiKey,
   agentModel: config.agentModel,
   summaryModel: config.summaryModel,
@@ -28,6 +29,7 @@ initEngineConfig({
   runTimeoutMinutes: config.runTimeoutMinutes,
   llmTimeoutMs: config.llmTimeoutMs,
   reviewTimeoutMs: config.reviewTimeoutMs,
+  modelPriceUsdPerMillion: {},
 });
 
 // Initialize database

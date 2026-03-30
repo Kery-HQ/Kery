@@ -185,7 +185,7 @@ async function processOne(
       outputTokens,
       totalTokens: inputTokens + outputTokens,
       durationMs,
-      costUsd: calcCostUsd(model, inputTokens, outputTokens),
+      costUsd: calcCostUsd(model, inputTokens, outputTokens, "reviewAgentModel"),
       query: `Review step ${req.stepIndex}: ${req.action} \u2192 ${req.actionResult}`,
       requestMessages,
       imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,

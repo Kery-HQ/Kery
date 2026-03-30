@@ -2,7 +2,14 @@
 export { rewriteForDocker } from "./dockerHost.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-export { initEngineConfig, getConfig, updateEngineConfig, type EngineConfig } from "./config.js";
+export {
+  initEngineConfig,
+  getConfig,
+  updateEngineConfig,
+  MODEL_CONFIG_KEYS,
+  type EngineConfig,
+  type ModelConfigKey,
+} from "./config.js";
 export { logger, withRunCorrelation, getRunCorrelationId } from "./logger.js";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
@@ -31,6 +38,13 @@ export type { MemoryEntry, MemoryEntryInsert, MemoryEntryType, MemorySource } fr
 // ─── LLM ─────────────────────────────────────────────────────────────────────
 export { llmChat, llmAgentChat, llmSummarize, llmReviewAnalysis, llmPathPlan, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 export type { LLMUsage } from "./llmClient.js";
+export {
+  inferModelProviderRequirement,
+  isModelRunnableWithConfig,
+  modelUnavailableReason,
+  getLlmKeyPresence,
+} from "./llmProviders.js";
+export type { DirectModelProvider, ModelProviderRequirement } from "./llmProviders.js";
 
 // ─── A11y Tree ───────────────────────────────────────────────────────────────
 export { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText } from "./a11yTree.js";

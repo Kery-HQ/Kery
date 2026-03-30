@@ -1,6 +1,18 @@
+/** Keys for per-role model + optional custom $/1M token pricing (USD). */
+export const MODEL_CONFIG_KEYS = [
+  "agentModel",
+  "summaryModel",
+  "reviewModel",
+  "reviewAgentModel",
+  "scriptModel",
+  "stagehandModel",
+] as const;
+export type ModelConfigKey = (typeof MODEL_CONFIG_KEYS)[number];
+
 export type EngineConfig = {
   openaiApiKey: string;
   openrouterApiKey: string;
+  anthropicApiKey: string;
   geminiApiKey: string;
   agentModel: string;
   summaryModel: string;
@@ -12,6 +24,8 @@ export type EngineConfig = {
   runTimeoutMinutes: number;
   llmTimeoutMs: number;
   reviewTimeoutMs: number;
+  /** When set for a role, cost estimates use these $/1M token rates instead of the built-in table. */
+  modelPriceUsdPerMillion?: Partial<Record<ModelConfigKey, { input: number; output: number }>>;
 };
 
 let _config: EngineConfig | null = null;
