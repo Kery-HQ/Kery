@@ -44,7 +44,7 @@ describe("formatMemoryForPrompt", () => {
       makeEntry({ confidence: 20, summary: "Low conf" }),
     ];
     const result = formatMemoryForPrompt(entries);
-    assert.ok(result.includes("[high confidence]"));
+    assert.ok(result.includes("[HIGH confidence]"));
     assert.ok(result.includes("[low confidence]"));
   });
 });

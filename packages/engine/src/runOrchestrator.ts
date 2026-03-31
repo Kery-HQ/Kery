@@ -11,12 +11,11 @@ import { logger } from "./logger.js";
 import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentType } from "./agent.js";
 import { waitForPageStable } from "./agent.js";
 import type { AuthConfig } from "./types.js";
-import { createReviewProcessor, type ReviewRequest } from "./reviewAgent.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
+import { runHolisticFlowReview } from "./holisticReviewAgent.js";
 import { isStopRequested } from "./runEvents.js";
 import { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
 import { calcCostUsd } from "./llmClient.js";
-import { summarizeRun, type SummarizeInput } from "./summarizer.js";
 import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, generateRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
 import {
@@ -26,6 +25,7 @@ import {
   type MemoryEntry,
 } from "./agentMemory.js";
 import { initStagehandSession, destroyStagehandSession, type StagehandSession } from "./stagehandBridge.js";
+import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
 import type { StorageAdapter } from "./storage.js";
 import { rewriteForDocker } from "./dockerHost.js";
 
@@ -43,12 +43,12 @@ export type RunJob = {
   recordVideo?: boolean;
   videosDir?: string;
   onStep?: (step: RunStep) => void;
-  onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer) => void;
+  onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer, domHash: string) => void;
   onLLMCall?: (call: LLMCallRecord) => void;
 };
 
 export type RunResult = {
-  status: "passed" | "failed" | "partial";
+  status: "passed" | "failed";
   steps: string[];
   stepsDetail: RunStep[];
   memoryLoaded: MemoryEntry[];
@@ -56,7 +56,6 @@ export type RunResult = {
   bugsFound: RunStep[];
   llmCalls: LLMCallRecord[];
   videoUrl?: string;
-  summary?: string;
   error?: string;
 };
 
@@ -209,15 +208,17 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
     await page.setDefaultTimeout(10000);
 
+    const netMonitor = attachNetworkMonitor(page);
+
     // Try regression replay
     if (regressionPlan && regressionPlan.length > 0) {
       try {
         if (job.auth) {
-          let authed = await handleAuth(page, job.auth, context, job.baseUrl);
+          let authed = (await handleAuth(page, job.auth, context, job.baseUrl)).ok;
           // Retry auth once before giving up
           if (!authed) {
             logger.warn("Regression replay: first auth attempt failed, retrying once");
-            authed = await handleAuth(page, job.auth, context, job.baseUrl);
+            authed = (await handleAuth(page, job.auth, context, job.baseUrl)).ok;
           }
           if (!authed) {
             logger.warn("Regression replay: auth failed after retry, falling back to Navigator");
@@ -284,92 +285,101 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
 
     // Full LLM exploration
-    const reviewCalls: LLMCallRecord[] = [];
-    const reviewProcessor = createReviewProcessor({
-      concurrency: 3,
-      onLLMCall: (call) => reviewCalls.push({ ...call, seq: 0 }),
-    });
-
-    let lastStep: RunStep | null = null;
-    let screenshotSeq = 0; // Sequential counter for review agent
-    let previousUrl = "";
-    let lastFilmstripUrl: string | null = null;
+    const holisticCalls: LLMCallRecord[] = [];
+    let lastFrameDomHash: string | null = null;
     const filmstripFrames: FilmstripFrame[] = [];
     const FILMSTRIP_MAX = 30;
     const screenshotsByStep = new Map<number, string>(); // Keyed by agent step.index
-    const screenshotsBySeq = new Map<number, string>();  // Keyed by screenshotSeq (for review bugs)
     let latestCleanScreenshot: string | undefined;
-
-    // Cross-agent communication: track review bugs fed back to navigator
-    let reviewBugsFedBack = 0;
-    const reviewBugFeedback: string[] = []; // Bug descriptions fed to navigator context
 
     const agentResult = await runAgent(
       page, job.intent, job.baseUrl, job.auth ?? null, allMemory,
       context,
       (step) => {
-        // Associate the latest screenshot with this step's index
         if (latestCleanScreenshot) {
           screenshotsByStep.set(step.index, latestCleanScreenshot);
         }
-        lastStep = step;
-        // Cross-agent feedback: check if review agent has found new bugs and attach to step metadata
-        const completedBugs = reviewProcessor.getCompletedBugs();
-        if (completedBugs.length > reviewBugsFedBack) {
-          const newBugs = completedBugs.slice(reviewBugsFedBack);
-          reviewBugsFedBack = completedBugs.length;
-          for (const bug of newBugs) {
-            reviewBugFeedback.push(bug.description);
-          }
-          logger.info({ newBugs: newBugs.length, totalFedBack: reviewBugsFedBack }, "Cross-agent: review bugs fed back to navigator context");
-          // Attach review feedback to the step so downstream consumers can see it
-          step.reviewFeedback = newBugs.map((b) => ({
-            type: b.type,
-            severity: b.severity,
-            description: b.description,
-          }));
-        }
         job.onStep?.(step);
       },
-      async (screenshot, cleanScreenshot) => {
-        job.onScreenshot?.(screenshot, cleanScreenshot);
+      async (screenshot, cleanScreenshot, domHash) => {
+        job.onScreenshot?.(screenshot, cleanScreenshot, domHash);
         const url = page.url();
-        const title = await page.title().catch(() => "");
-        screenshotSeq++;
-        // Track latest clean screenshot for step-aligned keying in onStep
         if (cleanScreenshot.length > 0) {
           latestCleanScreenshot = cleanScreenshot.toString("base64");
-          screenshotsBySeq.set(screenshotSeq, latestCleanScreenshot);
-          if (lastFilmstripUrl !== url) {
+          if (domHash !== lastFrameDomHash) {
             filmstripFrames.push({ url, base64: latestCleanScreenshot });
-            lastFilmstripUrl = url;
+            lastFrameDomHash = domHash;
             while (filmstripFrames.length > FILMSTRIP_MAX) {
               filmstripFrames.shift();
             }
           }
         }
-        const isNavigationBoundary = previousUrl === "" || previousUrl !== url;
-        const req: ReviewRequest = {
-          screenshot: cleanScreenshot, url, title, stepIndex: screenshotSeq,
-          action: lastStep ? `${lastStep.action} ${lastStep.target ?? ""}`.trim() : "initial",
-          actionResult: lastStep?.status ?? "ok", expectation: lastStep?.reasoning,
-          previousUrl: previousUrl || undefined,
-          isNavigationBoundary,
-        };
-        previousUrl = url;
-        reviewProcessor.push(req);
       },
       job.onLLMCall, job.maxSteps, targetUrl, shSession,
       job.runId ? () => isStopRequested(job.runId!) : undefined,
+      netMonitor,
     );
 
-    const reviewBugs = await reviewProcessor.flush();
+    // Capture the final page state so holistic/filmstrip review sees the end result
+    try {
+      const finalSS = await page.screenshot({ type: "jpeg", quality: 70 }).catch(() => Buffer.alloc(0));
+      if (finalSS.length > 0) {
+        const finalB64 = finalSS.toString("base64");
+        const finalUrl = page.url();
+        if (finalB64 !== latestCleanScreenshot) {
+          filmstripFrames.push({ url: finalUrl, base64: finalB64 });
+          latestCleanScreenshot = finalB64;
+        }
+      }
+    } catch { /* page may be closed */ }
+
+    netMonitor.stop();
+    const netSummary = netMonitor.formatForAgent() || undefined;
+    const netBugs = netMonitor.getBugs();
+
+    const { bugs: holisticBugs } = await runHolisticFlowReview(
+      {
+        intent: job.intent,
+        stepsDetail: agentResult.stepsDetail,
+        frames: filmstripFrames,
+        navigatorStatus: agentResult.status === "passed" ? "passed" : "failed",
+        networkSummary: netSummary,
+      },
+      {
+        onLLMCall: (call) => holisticCalls.push({ ...call, seq: 0 }),
+      },
+    );
+
     const filmstripCalls: LLMCallRecord[] = [];
     const { bugs: filmstripBugs } = await runFilmstripReview(filmstripFrames, {
       onLLMCall: (call) => filmstripCalls.push({ ...call, seq: 0 }),
     });
-    const bugsFound = mergeBugs(agentResult.stepsDetail, [...reviewBugs, ...filmstripBugs], screenshotsByStep, screenshotsBySeq);
-    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, reviewCalls, filmstripCalls);
+    let bugsFound = mergeBugs(
+      agentResult.stepsDetail,
+      [...holisticBugs, ...filmstripBugs],
+      screenshotsByStep,
+      agentResult.bugsFound,
+    );
+
+    // Merge action-correlated network bugs (capped, API-only, mutating-request errors)
+    if (netBugs.length > 0) {
+      const maxIdx = Math.max(0, ...agentResult.stepsDetail.map(s => s.index ?? 0));
+      for (const nb of netBugs) {
+        bugsFound.push({
+          index: maxIdx + 1,
+          action: "bug",
+          reasoning: `[Network] ${nb.description}`,
+          status: "ok" as const,
+          fromMemory: false,
+          bugType: "functional" as const,
+          severity: nb.severity as "low" | "medium" | "high",
+          source: "navigator" as const,
+          at: nb.at ?? Date.now(),
+        });
+      }
+      logger.info({ count: netBugs.length }, "Network monitor: action-correlated bugs merged");
+    }
+    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, holisticCalls, filmstripCalls);
 
     // Save memory
     const proposed = proposeMemoriesFromRun(agentResult.stepsDetail, job.intent);
@@ -385,48 +395,14 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
     const videoUrl = await finalizeVideo(videoTmpDir, job.videosDir, job.runId);
 
-    let finalStatus = agentResult.status;
-    const okSteps = agentResult.stepsDetail.filter(s => s.status === "ok" && !["done", "auth", "bug"].includes(s.action));
-    if (bugsFound.length > 0 && okSteps.length >= 3 && finalStatus === "failed") {
-      finalStatus = "partial";
-    }
+    const finalStatus = agentResult.status;
 
-    const runStartedAt = agentResult.stepsDetail[0]?.at;
-    const runEndedAt = agentResult.stepsDetail[agentResult.stepsDetail.length - 1]?.at;
-    const runDurationMs = runStartedAt && runEndedAt ? runEndedAt - runStartedAt : undefined;
-
-    const summarizeInput: SummarizeInput = {
-      intent: job.intent, status: finalStatus, baseUrl: job.baseUrl,
-      stepsDetail: agentResult.stepsDetail, bugsFound, llmCalls: mergedCalls,
-      memoryLoaded: allMemory, memoryProposed: proposed.length,
-      videoUrl, durationMs: runDurationMs,
-    };
-    const summarizeResult = await summarizeRun(summarizeInput);
-
-    if (summarizeResult.usage && summarizeResult.model) {
-      const sumPrompt = summarizeResult.prompt;
-      mergedCalls.push({
-        seq: mergedCalls.length + 1,
-        stepIndex: 0,
-        model: summarizeResult.model,
-        hasVision: false,
-        attempt: 1,
-        inputTokens: summarizeResult.usage.inputTokens,
-        outputTokens: summarizeResult.usage.outputTokens,
-        totalTokens: summarizeResult.usage.totalTokens,
-        durationMs: summarizeResult.durationMs ?? 0,
-        costUsd: summarizeResult.costUsd ?? 0,
-        query: sumPrompt ?? "Summarize test run",
-        requestMessages: sumPrompt ? [{ role: "user", content: sumPrompt }] : undefined,
-        response: summarizeResult.summary,
-        agent: "summary",
-      });
-    }
+    mergedCalls.forEach((c, i) => { c.seq = i + 1; });
 
     return {
       status: finalStatus, steps: agentResult.steps, stepsDetail: agentResult.stepsDetail,
       memoryLoaded: allMemory, memoryProposed: proposed.length,
-      bugsFound, llmCalls: mergedCalls, summary: summarizeResult.summary, videoUrl,
+      bugsFound, llmCalls: mergedCalls, videoUrl,
     };
   } catch (err) {
     logger.error({ err: String(err) }, "Run failed");
@@ -456,13 +432,13 @@ function buildTargetUrl(baseUrl: string, normalizedRoute: string): string {
 function mergeLLMCalls(
   pathGen: LLMCallRecord[],
   navigator: LLMCallRecord[],
-  review: LLMCallRecord[],
+  holistic: LLMCallRecord[],
   filmstrip: LLMCallRecord[] = [],
 ): LLMCallRecord[] {
   const merged: LLMCallRecord[] = [
     ...pathGen.map((c) => ({ ...c, agent: "pathgen" as LLMAgentType })),
     ...navigator.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
-    ...review.map((c) => ({ ...c, agent: "review" as LLMAgentType })),
+    ...holistic.map((c) => ({ ...c, agent: (c.agent ?? "holistic") as LLMAgentType })),
     ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),
   ];
   merged.forEach((c, i) => { c.seq = i + 1; });
@@ -488,10 +464,25 @@ function reviewTypeToStepBugType(t: ReviewBug["type"]): NonNullable<RunStep["bug
 function mergeBugs(
   stepsDetail: RunStep[], reviewBugs: ReviewBug[],
   screenshotsByStep?: Map<number, string>,
-  screenshotsBySeq?: Map<number, string>,
+  navigatorBugs?: RunStep[],
 ): RunStep[] {
   const out: RunStep[] = [];
+  for (const bug of navigatorBugs ?? []) {
+    if (bug.action !== "bug") continue;
+    out.push({
+      ...bug,
+      screenshotBase64: bug.screenshotBase64 ?? screenshotsByStep?.get(bug.index ?? 0),
+      source: "navigator",
+    });
+  }
   for (const step of stepsDetail) {
+    if (step.action === "bug" && step.source === "navigator") {
+      out.push({
+        ...step,
+        screenshotBase64: step.screenshotBase64 ?? screenshotsByStep?.get(step.index ?? 0),
+      });
+      continue;
+    }
     if (step.status === "failed" && step.action !== "bug") {
       out.push({
         index: step.index, action: "bug",
@@ -510,7 +501,7 @@ function mergeBugs(
       status: "ok", fromMemory: false, bugType, severity: b.severity,
       source: src, at: b.at,
       region: b.region,
-      screenshotBase64: b.screenshotBase64 ?? screenshotsBySeq?.get(b.stepIndex),
+      screenshotBase64: b.screenshotBase64,
     });
   }
   out.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));

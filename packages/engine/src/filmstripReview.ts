@@ -25,7 +25,7 @@ YOUR JOB: Find issues that only make sense ACROSS the journey or when comparing 
 - Data or state that should reset between pages but appears to leak incorrectly (when visible across frames)
 - Accessibility patterns that break only in multi-page context (e.g. focus order implied by flow)
 
-Do NOT report issues that are clearly about a single static frame only — the per-step reviewer already handles those.
+Do NOT report issues that are clearly about a single static frame only — the flow reviewer handles behavioral gaps from the trace.
 Do NOT blame the automation driver for wrong clicks.
 
 Return JSON: { "bugs": [ { "type": "visual"|"ux"|"behavioral"|"a11y"|"performance"|"data", "description": string (max 100 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
@@ -55,7 +55,7 @@ export function capFilmstripFrames(frames: FilmstripFrame[]): FilmstripFrame[] {
 function parseFilmstripResponse(
   raw: string,
   baseStepIndex: number,
-  defaultScreenshot: string,
+  chunk: FilmstripFrame[],
   at: number,
 ): ReviewBug[] {
   const bugs: ReviewBug[] = [];
@@ -88,6 +88,11 @@ function parseFilmstripResponse(
           : "visual";
       const severity = b.severity === "low" || b.severity === "medium" || b.severity === "high" ? b.severity : "medium";
       const stepIndex = baseStepIndex + i;
+      const fi =
+        typeof b.frameIndex === "number" && b.frameIndex >= 0 && b.frameIndex < chunk.length
+          ? b.frameIndex
+          : 0;
+      const screenshotBase64 = chunk[fi]?.base64 ?? chunk[0]?.base64 ?? "";
       bugs.push({
         source: "filmstrip",
         stepIndex,
@@ -96,7 +101,7 @@ function parseFilmstripResponse(
         severity,
         region: b.region,
         at,
-        screenshotBase64: defaultScreenshot,
+        screenshotBase64,
       });
     }
   } catch (err) {
@@ -113,7 +118,6 @@ async function analyzeChunk(
   const config = getConfig();
   const model = config.reviewAgentModel;
   const baseStepIndex = 50_000 + chunkIndex * 1_000;
-  const defaultScreenshot = chunk[0]?.base64 ?? "";
 
   const textIntro =
     `Batch ${chunkIndex + 1}. Images are in visit order (earlier = earlier in the test). ` +
@@ -162,7 +166,7 @@ async function analyzeChunk(
       response: raw,
       agent: "filmstrip",
     });
-    return parseFilmstripResponse(raw, baseStepIndex, defaultScreenshot, at);
+    return parseFilmstripResponse(raw, baseStepIndex, chunk, at);
   } catch (err) {
     logger.warn({ err: String(err), chunkIndex }, "FilmstripReview: LLM call failed");
     return [];

@@ -27,10 +27,31 @@ export function getLLMBase(): string {
 
 // ─── Structured output schemas ──────────────────────────────────────────────
 
-const ACTION_ENUM = ["fill", "click", "navigate", "assert", "wait", "done", "hover", "scroll", "pressKey", "selectOption", "back"];
+const ACTION_ENUM = [
+  "fill",
+  "click",
+  "navigate",
+  "assert",
+  "wait",
+  "done",
+  "hover",
+  "scroll",
+  "pressKey",
+  "selectOption",
+  "back",
+  "dragAndDrop",
+  "setDate",
+  "observe",
+  "plan",
+  "report_bug",
+];
 
 function isOpenAIModel(model: string): boolean {
   return model.startsWith("openai/") || model.startsWith("gpt-");
+}
+
+function isAnthropicModel(model: string): boolean {
+  return model.startsWith("anthropic/") || model.startsWith("claude-");
 }
 
 const OPENAI_AGENT_SCHEMA = {
@@ -47,10 +68,42 @@ const OPENAI_AGENT_SCHEMA = {
         value:     { anyOf: [{ type: "string" }, { type: "null" }] },
         x:         { anyOf: [{ type: "integer" }, { type: "null" }] },
         y:         { anyOf: [{ type: "integer" }, { type: "null" }] },
+        toX:       { anyOf: [{ type: "integer" }, { type: "null" }] },
+        toY:       { anyOf: [{ type: "integer" }, { type: "null" }] },
         assertion: { anyOf: [{ type: "string" }, { type: "null" }] },
+        observation: { anyOf: [{ type: "string" }, { type: "null" }] },
+        result:    { anyOf: [{ type: "string", enum: ["completed", "blocked"] }, { type: "null" }] },
+        planItems: {
+          anyOf: [
+            {
+              type: "array",
+              items: {
+                anyOf: [
+                  { type: "string" },
+                  {
+                    type: "object",
+                    properties: {
+                      text: { type: "string" },
+                      status: { type: "string", enum: ["pending", "done", "current", "failed"] },
+                    },
+                    required: ["text"],
+                    additionalProperties: false,
+                  },
+                ],
+              },
+            },
+            { type: "null" },
+          ],
+        },
+        bugDescription: { anyOf: [{ type: "string" }, { type: "null" }] },
+        bugType:    { anyOf: [{ type: "string", enum: ["visual", "functional", "ux", "other"] }, { type: "null" }] },
+        severity:   { anyOf: [{ type: "string", enum: ["low", "medium", "high"] }, { type: "null" }] },
         reasoning: { type: "string" },
       },
-      required: ["action", "element", "target", "value", "x", "y", "assertion", "reasoning"],
+      required: [
+        "action", "element", "target", "value", "x", "y", "toX", "toY",
+        "assertion", "observation", "result", "planItems", "bugDescription", "bugType", "severity", "reasoning",
+      ],
       additionalProperties: false,
     },
   },
@@ -70,7 +123,31 @@ const GEMINI_AGENT_SCHEMA = {
         value:     { type: "string" },
         x:         { type: "integer", description: "Optional x coordinate (0-1000) for scroll/hover fallback" },
         y:         { type: "integer", description: "Optional y coordinate (0-1000) for scroll/hover fallback" },
+        toX:       { type: "integer", description: "Destination x for dragAndDrop (0-1000)" },
+        toY:       { type: "integer", description: "Destination y for dragAndDrop (0-1000)" },
         assertion: { type: "string" },
+        observation: { type: "string" },
+        result:    { type: "string", enum: ["completed", "blocked"] },
+        planItems: {
+          type: "array",
+          items: {
+            anyOf: [
+              { type: "string" },
+              {
+                type: "object",
+                properties: {
+                  text: { type: "string" },
+                  status: { type: "string", enum: ["pending", "done", "current", "failed"] },
+                },
+                required: ["text"],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+        bugDescription: { type: "string" },
+        bugType:    { type: "string", enum: ["visual", "functional", "ux", "other"] },
+        severity:   { type: "string", enum: ["low", "medium", "high"] },
         reasoning: { type: "string" },
       },
       required: ["action", "reasoning"],
@@ -79,8 +156,10 @@ const GEMINI_AGENT_SCHEMA = {
   },
 };
 
-function getAgentSchema(model: string) {
-  return isOpenAIModel(model) ? OPENAI_AGENT_SCHEMA : GEMINI_AGENT_SCHEMA;
+function getAgentSchema(model: string): any | undefined {
+  if (isOpenAIModel(model)) return OPENAI_AGENT_SCHEMA;
+  if (isAnthropicModel(model)) return undefined;
+  return GEMINI_AGENT_SCHEMA;
 }
 
 // ─── Usage / pricing ─────────────────────────────────────────────────────────
@@ -233,58 +312,99 @@ async function llmChatOpenRouter(
   );
 }
 
+function llmProviderLabel(model: string): string {
+  const config = getConfig();
+  if (config.openrouterApiKey) return "openrouter";
+  if (!isModelRunnableWithConfig(model, config)) return "unconfigured";
+  const req = inferModelProviderRequirement(model);
+  if (req.kind !== "direct") return "openrouter-required";
+  return req.provider;
+}
+
 export async function llmChat(
   messages: any[],
   model: string,
   opts: { maxTokens?: number; temperature?: number; responseFormat?: any; timeoutMs?: number } = {}
 ): Promise<{ content: string; usage: LLMUsage }> {
   const config = getConfig();
-
-  if (config.openrouterApiKey) {
-    return llmChatOpenRouter(messages, model, opts);
-  }
-
-  if (!isModelRunnableWithConfig(model, config)) {
-    throw new Error(
-      modelUnavailableReason(model, config) ??
-        'No LLM API key configured. Set OPENROUTER_API_KEY or the provider key (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY).'
-    );
-  }
-
-  const req = inferModelProviderRequirement(model);
-  if (req.kind !== "direct") {
-    throw new Error(`Model "${model}" requires OPENROUTER_API_KEY.`);
-  }
-
   const timeoutMs = opts.timeoutMs ?? config.llmTimeoutMs;
-
-  if (req.provider === "anthropic") {
-    return anthropicMessagesChat(messages, model, config.anthropicApiKey, { ...opts, timeoutMs });
-  }
-
-  if (req.provider === "openai") {
-    const wireModel = wireModelForOpenAIDirect(model);
-    return openAICompatibleChat(
-      OPENAI_API_BASE,
-      config.openaiApiKey,
-      {},
-      wireModel,
-      messages,
-      opts,
-      { reasoningGemini: false }
-    );
-  }
-
-  const wireGemini = wireModelForGeminiDirect(model);
-  return openAICompatibleChat(
-    GEMINI_OPENAI_BASE,
-    config.geminiApiKey,
-    {},
-    wireGemini,
-    messages,
-    opts,
-    { reasoningGemini: false }
+  const provider = llmProviderLabel(model);
+  const structured = Boolean(opts.responseFormat);
+  const t0 = Date.now();
+  logger.info(
+    { provider, model, timeoutMs, structured, messageCount: messages.length },
+    "LLM request start",
   );
+
+  try {
+    let result: { content: string; usage: LLMUsage };
+
+    if (config.openrouterApiKey) {
+      result = await llmChatOpenRouter(messages, model, opts);
+    } else if (!isModelRunnableWithConfig(model, config)) {
+      throw new Error(
+        modelUnavailableReason(model, config) ??
+          'No LLM API key configured. Set OPENROUTER_API_KEY or the provider key (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY).'
+      );
+    } else {
+      const req = inferModelProviderRequirement(model);
+      if (req.kind !== "direct") {
+        throw new Error(`Model "${model}" requires OPENROUTER_API_KEY.`);
+      }
+
+      if (req.provider === "anthropic") {
+        result = await anthropicMessagesChat(messages, model, config.anthropicApiKey, { ...opts, timeoutMs });
+      } else if (req.provider === "openai") {
+        const wireModel = wireModelForOpenAIDirect(model);
+        result = await openAICompatibleChat(
+          OPENAI_API_BASE,
+          config.openaiApiKey,
+          {},
+          wireModel,
+          messages,
+          opts,
+          { reasoningGemini: false }
+        );
+      } else {
+        const wireGemini = wireModelForGeminiDirect(model);
+        result = await openAICompatibleChat(
+          GEMINI_OPENAI_BASE,
+          config.geminiApiKey,
+          {},
+          wireGemini,
+          messages,
+          opts,
+          { reasoningGemini: false }
+        );
+      }
+    }
+
+    const durationMs = Date.now() - t0;
+    logger.info(
+      {
+        provider,
+        model,
+        durationMs,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        totalTokens: result.usage.totalTokens,
+        responseChars: result.content?.length ?? 0,
+      },
+      "LLM request complete",
+    );
+    return result;
+  } catch (err) {
+    logger.warn(
+      {
+        provider,
+        model,
+        durationMs: Date.now() - t0,
+        err: err instanceof Error ? err.message : String(err),
+      },
+      "LLM request failed",
+    );
+    throw err;
+  }
 }
 
 // ─── Agent decisions (vision + text) ─────────────────────────────────────────

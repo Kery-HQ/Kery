@@ -652,7 +652,7 @@ export async function runCrawl(
   }
 
   try {
-    const authed = await handleAuth(page, auth, undefined, baseUrl);
+    const { ok: authed } = await handleAuth(page, auth, undefined, baseUrl);
     if (authed) {
       await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     } else {
@@ -697,8 +697,11 @@ export async function runCrawl(
               logger.info({ url: page.url() }, "Crawl: login page detected mid-crawl, re-authenticating");
               try {
                 const { handleAuth } = await import("./agent.js");
-                await handleAuth(page, auth, undefined, baseUrl);
-                // Retry navigating to the original URL after re-auth
+                const authResult = await handleAuth(page, auth, undefined, baseUrl);
+                if (!authResult.ok) {
+                  logger.warn("Crawl: re-auth returned not ok, skipping login page");
+                  continue;
+                }
                 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
                 await waitForPageStable(page, 4000);
               } catch (authErr) {

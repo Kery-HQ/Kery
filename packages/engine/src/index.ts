@@ -22,6 +22,7 @@ export * from "./types.js";
 export { runAgent, handleAuth, waitForPageStable, executeAction, serializeWireMessagesForStorage } from "./agent.js";
 export type {
   AgentAction, RunStep, LLMCallRecord, AgentResult, LLMAgentType, LLMStoredMessage, LLMStoredContentPart,
+  AuthHandleResult, DoneResult,
 } from "./agent.js";
 
 // ─── Token Auth (Clerk, Supabase) ────────────────────────────────────────────
@@ -66,9 +67,9 @@ export type { CompletionCondition, RegressionStep, RegressionResult } from "./re
 export { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
 export type { PathGeneratorInput, GenerateTestPlanResult } from "./pathGenerator.js";
 
-// ─── Review Agent ────────────────────────────────────────────────────────────
-export { createReviewProcessor } from "./reviewAgent.js";
-export type { ReviewRequest, ReviewProcessor } from "./reviewAgent.js";
+// ─── Flow & visual review (post-run) ───────────────────────────────────────
+export { runHolisticFlowReview } from "./holisticReviewAgent.js";
+export type { HolisticReviewInput } from "./holisticReviewAgent.js";
 export { runFilmstripReview, capFilmstripFrames } from "./filmstripReview.js";
 export type { FilmstripFrame } from "./filmstripReview.js";
 
@@ -82,10 +83,6 @@ export { enrichBugsForRun } from "./bugEnrichment.js";
 // ─── Bug screenshot markup (red box on saved JPEGs) ───────────────────────────
 export { drawRedBoundingBoxOnJpeg } from "./bugScreenshotMarkup.js";
 export type { BugRegion } from "./bugScreenshotMarkup.js";
-
-// ─── Summarizer ──────────────────────────────────────────────────────────────
-export { summarizeRun } from "./summarizer.js";
-export type { SummarizeInput, SummarizeResult } from "./summarizer.js";
 
 // ─── Run Events ──────────────────────────────────────────────────────────────
 export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested } from "./runEvents.js";
