@@ -29,7 +29,7 @@ export type TestRun = {
   destination_id?: string | null;
   trigger_type: string;
   trigger_ref: string;
-  status: "queued" | "running" | "passed" | "failed" | "partial";
+  status: "queued" | "running" | "passed" | "failed";
   summary?: string | null;
   started_at?: string | null;
   completed_at?: string | null;

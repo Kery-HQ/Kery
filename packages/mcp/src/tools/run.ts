@@ -5,7 +5,7 @@ import type { KeryClient } from "@kery/client";
 export function registerRunTestTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_run_test",
-    `Run a test against a web application. Provide an intent (what to test) OR a testId (saved test) OR a pageRoute (specific page to inspect). The test runs in a real browser with an AI agent navigating and detecting bugs. Returns pass/fail status, summary, and any bugs found. Typically takes 1-5 minutes.`,
+    `Run a test against a web application. Provide an intent (what to test) OR a testId (saved test) OR a pageRoute (specific page to inspect). The test runs in a real browser with an AI agent navigating and detecting bugs. Returns pass/fail status and any bugs found. Typically takes 1-5 minutes.`,
     {
       projectId: z.string().uuid().describe("The Kery project ID"),
       intent: z.string().optional().describe("What to test, e.g. 'verify the signup flow works' or 'check that the settings page loads correctly'"),
@@ -79,7 +79,6 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
             text: JSON.stringify({
               runId: run.id,
               status: run.status,
-              summary: run.summary,
               stepsCount: run.steps_json?.length ?? 0,
               bugsFound: bugs.map((b) => ({
                 name: b.name,

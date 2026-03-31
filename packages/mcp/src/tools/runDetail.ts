@@ -5,7 +5,7 @@ import type { KeryClient } from "@kery/client";
 export function registerRunDetailTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_get_run",
-    `Get detailed results of a specific test run. Includes status, summary, steps taken, and bugs found.`,
+    `Get detailed results of a specific test run. Includes status, steps taken, and bugs found.`,
     {
       runId: z.string().uuid().describe("The run ID to look up"),
     },
@@ -28,7 +28,6 @@ export function registerRunDetailTool(server: McpServer, client: KeryClient) {
             text: JSON.stringify({
               runId: run.id,
               status: run.status,
-              summary: run.summary,
               startedAt: run.started_at,
               completedAt: run.completed_at,
               steps: (run.steps_json ?? []).map((s) => ({

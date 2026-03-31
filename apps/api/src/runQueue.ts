@@ -95,7 +95,7 @@ export function createRunWorker(
         // Wrap all post-run DB writes in a transaction for atomicity
         await storage.withTransaction(async (tx) => {
           await tx.updateTestRun(data.runId, {
-            status: result.status, summary: result.summary,
+            status: result.status, summary: null,
             steps_json: result.stepsDetail, bugs_json: enrichedBugs,
             llm_calls_json: result.llmCalls, completed_at: completedAt,
             video_url: result.videoUrl || null,
@@ -116,7 +116,7 @@ export function createRunWorker(
             }
             await tx.updateDestinationHealth(data.destinationId, healthData);
 
-            if ((result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
+            if (result.status === "passed" && result.stepsDetail?.length > 0) {
               const regPlan = generateRegressionPlan(result.stepsDetail);
               if (regPlan.length > 0) {
                 await tx.updateRegressionPlan("app_tree_destinations", data.destinationId, {
@@ -126,7 +126,7 @@ export function createRunWorker(
             }
           }
 
-          if (data.testId && (result.status === "passed" || result.status === "partial") && result.stepsDetail?.length > 0) {
+          if (data.testId && result.status === "passed" && result.stepsDetail?.length > 0) {
             const regPlan = generateRegressionPlan(result.stepsDetail);
             if (regPlan.length > 0) {
               await tx.updateSavedTest(data.testId, {
@@ -137,7 +137,7 @@ export function createRunWorker(
         });
 
         const completedRun = await storage.getTestRun(data.runId);
-        emitter.emit("done", completedRun ?? { runId: data.runId, status: result.status, summary: result.summary });
+        emitter.emit("done", completedRun ?? { runId: data.runId, status: result.status, summary: null });
       } catch (err) {
         logger.error({ runId: data.runId, err: String(err) }, "Run job error");
         await storage.updateTestRun(data.runId, {

@@ -1,5 +1,4 @@
 import React from "react";
-import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun } from "@/projectApi";
 import { apiMediaUrl, runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
@@ -95,6 +94,7 @@ type RunStep = {
 type LLMAgentType =
   | "navigator"
   | "review"
+  | "holistic"
   | "pathgen"
   | "summary"
   | "filmstrip"
@@ -470,6 +470,7 @@ function badgeVariantForStatus(status: string): "success" | "destructive" | "war
 const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Icon: React.ComponentType<{ className?: string }> }> = {
   navigator: { label: "Navigator", color: "text-emerald-400", Icon: Compass },
   review:    { label: "Review",    color: "text-violet-400",  Icon: Eye },
+  holistic:  { label: "Flow review", color: "text-violet-300", Icon: GitBranch },
   pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Route },
   summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
   filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Layers },
@@ -478,7 +479,7 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
-  "navigator", "review", "filmstrip", "pathgen", "summary",
+  "navigator", "holistic", "filmstrip", "pathgen", "summary",
   "crawl_link_filter", "crawl_suggested_flows",
 ];
 
@@ -734,9 +735,8 @@ export const RunDetail: React.FC = () => {
 
 function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]; stepsCount: number }) {
   const hasPathGen = llmCalls.some((c) => c.agent === "pathgen");
-  const hasReview = llmCalls.some((c) => c.agent === "review");
+  const hasHolistic = llmCalls.some((c) => c.agent === "holistic");
   const hasFilmstrip = llmCalls.some((c) => c.agent === "filmstrip");
-  const hasSummary = llmCalls.some((c) => c.agent === "summary");
   const navCalls = llmCalls.filter((c) => (c.agent ?? "navigator") === "navigator").length;
   return (
     <Card>
@@ -755,19 +755,14 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
             <span className="text-foreground/90">Navigator loop</span> — {stepsCount} step{stepsCount !== 1 ? "s" : ""} recorded,{" "}
             {navCalls} LLM decision{navCalls !== 1 ? "s" : ""}
           </li>
-          {hasReview && (
+          {hasHolistic && (
             <li>
-              <span className="text-foreground/90">Review agent</span> — parallel screenshot analysis
+              <span className="text-foreground/90">Flow review</span> — post-run analysis of trace + key page screenshots (functional / navigation)
             </li>
           )}
           {hasFilmstrip && (
             <li>
-              <span className="text-foreground/90">Filmstrip</span> — post-run journey review across visited pages
-            </li>
-          )}
-          {hasSummary && (
-            <li>
-              <span className="text-foreground/90">Summary</span> — run report
+              <span className="text-foreground/90">Filmstrip</span> — post-run visual journey across visited pages
             </li>
           )}
           <li className="text-muted-foreground/90">
@@ -799,7 +794,7 @@ function PathGeneratorCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
 }
 
 function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
-  const agents = ["navigator", "review", "filmstrip", "pathgen", "summary"] as const;
+  const agents = ["navigator", "holistic", "filmstrip", "pathgen", "summary"] as const;
   const rows = agents
     .map((a) => ({
       agent: a,
@@ -855,33 +850,6 @@ function OverviewTab({
             Running -- {steps.length} step{steps.length !== 1 ? "s" : ""} -- {llmCalls.length} LLM call{llmCalls.length !== 1 ? "s" : ""} -- {formatCost(totalCost)}
           </span>
         </div>
-      )}
-
-      {/* Summary */}
-      {run.summary && (
-        <Card>
-          <CardContent className="p-4 prose prose-sm dark:prose-invert max-w-none
-            prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
-            prose-h2:text-[16px] prose-h2:mt-0 prose-h2:mb-3 prose-h2:border-b prose-h2:border-border prose-h2:pb-2
-            prose-h3:text-[14px] prose-h3:mt-4 prose-h3:mb-2
-            prose-h4:text-[13px] prose-h4:mt-3 prose-h4:mb-1
-            prose-p:text-[13px] prose-p:text-foreground/90 prose-p:leading-relaxed prose-p:my-1.5
-            prose-li:text-[13px] prose-li:text-foreground/90 prose-li:my-0.5
-            prose-ul:my-1 prose-ol:my-1
-            prose-strong:text-foreground prose-strong:font-medium
-            prose-code:text-[12px] prose-code:font-mono prose-code:bg-muted prose-code:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
-            prose-table:text-[12px] prose-table:w-full
-            prose-thead:border-b prose-thead:border-border
-            prose-th:text-[11px] prose-th:font-medium prose-th:uppercase prose-th:tracking-wider prose-th:text-muted-foreground prose-th:text-left
-            prose-th:py-2 prose-th:px-3
-            prose-td:py-2 prose-td:px-3 prose-td:text-foreground/90
-            prose-tr:border-b prose-tr:border-border/50
-            prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-            prose-hr:border-border
-          ">
-            <ReactMarkdown>{run.summary}</ReactMarkdown>
-          </CardContent>
-        </Card>
       )}
 
       {/* Stat row */}
@@ -1813,6 +1781,7 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
       "overflow-visible transition-colors",
       agent === "navigator" && "border-l-2 border-l-emerald-500/30",
       agent === "review"    && "border-l-2 border-l-violet-500/30",
+      agent === "holistic"  && "border-l-2 border-l-violet-400/30",
       agent === "pathgen"   && "border-l-2 border-l-amber-500/30",
       agent === "summary"   && "border-l-2 border-l-sky-500/30",
       agent === "filmstrip" && "border-l-2 border-l-fuchsia-500/30",
