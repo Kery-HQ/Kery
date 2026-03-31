@@ -32,6 +32,7 @@ type A11yNode = {
   required?: boolean;
   pressed?: boolean | "mixed";
   level?: number;
+  bbox?: { x: number; y: number; width: number; height: number };
   children?: A11yNode[];
 };
 
@@ -75,7 +76,7 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
   function getImplicitRole(el) {
     var tag = el.tagName;
     if (tag === "BUTTON") return "button";
-    if (tag === "A" && el.hasAttribute("href")) return "link";
+    if (tag === "A") return "link";
     if (tag === "INPUT") {
       var type = el.type || "text";
       if (type === "checkbox") return "checkbox";
@@ -137,7 +138,22 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
       return (el.value || "Submit").slice(0, 60);
     }
     var text = (el.textContent || "").trim().replace(/\\s+/g, " ");
-    return text.slice(0, 60);
+    if (text) return text.slice(0, 60);
+    var title = el.getAttribute("title");
+    if (title && title.trim()) return title.trim().slice(0, 60);
+    var img = el.querySelector("img[alt]");
+    if (img) {
+      var alt = (img.getAttribute("alt") || "").trim();
+      if (alt) return alt.slice(0, 60);
+    }
+    var svgTitle = el.querySelector("svg title");
+    if (svgTitle) {
+      var svgText = (svgTitle.textContent || "").trim();
+      if (svgText) return svgText.slice(0, 60);
+    }
+    var testAttr = el.getAttribute("data-test") || el.getAttribute("data-testid") || el.getAttribute("data-test-id");
+    if (testAttr) return testAttr.replace(/[-_]+/g, " ").trim().slice(0, 60);
+    return "";
   }
 
   function buildTree(el) {
@@ -155,6 +171,15 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     if (el.getAttribute("aria-pressed") === "true") node.pressed = true;
     if (el.value && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
       node.value = el.value.slice(0, 50);
+    }
+
+    if (role) {
+      try {
+        var rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          node.bbox = { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+        }
+      } catch(e) {}
     }
 
     var children = [];
@@ -226,12 +251,14 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
 
     if (!snapshot && iframeSnapshots.length === 0) return { elements, textNodes, tree: [] };
 
+    const ALLOW_UNNAMED = new Set(["button", "link", "textbox", "checkbox", "radio", "switch", "slider", "tab"]);
+
     const walk = (node: any) => {
       if (!node) return;
       const role = node.role ?? "";
       const name = (node.name ?? "").trim();
 
-      if (INTERACTIVE_ROLES.has(role) && (name || role === "textbox")) {
+      if (INTERACTIVE_ROLES.has(role) && (name || ALLOW_UNNAMED.has(role))) {
         const state: string[] = [];
         if (node.disabled) state.push("disabled");
         if (node.required) state.push("required");
@@ -249,6 +276,7 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
           name: name || `(unnamed ${role})`,
           state,
           value: node.valuetext ?? node.valuestring ?? node.value ?? undefined,
+          bbox: node.bbox ?? undefined,
         };
         elements.push(el);
       } else if (TEXT_ROLES.has(role) && name && name.length >= 3) {
@@ -301,16 +329,34 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
 }
 
 async function resolveBoundingBoxes(page: Page, elements: A11yElement[]): Promise<void> {
-  for (const el of elements) {
+  const needsBbox = elements.filter(el => !el.bbox);
+  if (needsBbox.length === 0) return;
+
+  const groups = new Map<string, A11yElement[]>();
+  for (const el of needsBbox) {
+    const key = `${el.role}::${el.name}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(el);
+  }
+
+  for (const key of Array.from(groups.keys())) {
+    const group = groups.get(key)!;
     try {
-      const locator = await resolveElement(page, el);
-      if (locator) {
-        const box = await locator.boundingBox({ timeout: 1000 });
-        if (box) el.bbox = box;
+      const first = group[0];
+      if (first.name.startsWith("(unnamed ")) continue;
+
+      const locator = page.getByRole(first.role as any, { name: first.name });
+      const count = await locator.count();
+      if (count === 0) continue;
+
+      const limit = Math.min(group.length, count);
+      for (let i = 0; i < limit; i++) {
+        try {
+          const box = await locator.nth(i).boundingBox({ timeout: 1000 });
+          if (box) group[i].bbox = box;
+        } catch { /* best-effort */ }
       }
-    } catch {
-      // Best-effort
-    }
+    } catch { /* best-effort */ }
   }
 }
 
@@ -421,6 +467,11 @@ export function hasSufficientA11y(elements: A11yElement[]): boolean {
 // ─── Element Resolution to Playwright Locators ───────────────────────────────
 
 export async function resolveElement(page: Page, element: A11yElement): Promise<Locator | null> {
+  if (!element.name || element.name.startsWith("(unnamed ")) {
+    logger.debug({ id: element.id, role: element.role }, "Unnamed element — skipping locator resolution, will use coordinates");
+    return null;
+  }
+
   try {
     const locator = page.getByRole(element.role as any, { name: element.name });
     const count = await locator.count();
@@ -456,6 +507,15 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
           logger.debug({ id: element.id, name: element.name, strategy: "getByText" }, "Element resolved via text fallback");
           return byText.first();
         }
+      }
+      // Fallback: data-test / data-testid CSS selector
+      const sanitizedName = element.name.replace(/\s+/g, "-");
+      const byDataTest = page.locator(
+        `[data-test="${sanitizedName}"], [data-testid="${sanitizedName}"], [data-test-id="${sanitizedName}"]`
+      );
+      if (await byDataTest.count() > 0) {
+        logger.debug({ id: element.id, name: element.name, strategy: "data-test" }, "Element resolved via data-test attribute");
+        return byDataTest.first();
       }
       // Search inside iframes as a last resort
       for (const frame of page.frames()) {
