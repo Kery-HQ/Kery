@@ -60,6 +60,20 @@ export async function patchProjectBug(
   });
 }
 
+export async function deleteProjectBug(projectId: string, bugId: string) {
+  return apiFetch<{ ok: boolean; deleted: number }>(
+    `${API_BASE}/api/projects/${projectId}/bugs/${bugId}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function deleteAllProjectBugs(projectId: string) {
+  return apiFetch<{ ok: boolean; deleted: number }>(
+    `${API_BASE}/api/projects/${projectId}/bugs`,
+    { method: "DELETE" },
+  );
+}
+
 // --- Environments ---
 
 export async function fetchEnvironments(projectId: string) {

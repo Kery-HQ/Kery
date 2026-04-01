@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   ComputerTower,
   Calendar,
+  Trash,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,13 +18,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
-import {
-  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatReportedAt } from "@/lib/formatters";
+import { BUG_SEVERITY_STATUS_DOT, bugCategoryTagClass, projectBugDetailDescription } from "@/lib/bug-issue-display";
+import { BugCategoryTag } from "@/components/bug-category-tag";
+import { BugScreenshotZoomDialog } from "@/components/bug-screenshot-zoom-dialog";
 import { useProject } from "@/lib/projectContext";
-import { fetchProjectBugs, patchProjectBug, createMemoryEntry } from "@/projectApi";
+import {
+  fetchProjectBugs,
+  patchProjectBug,
+  createMemoryEntry,
+  deleteProjectBug,
+  deleteAllProjectBugs,
+} from "@/projectApi";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 
 export type BugRecord = {
@@ -56,12 +71,6 @@ type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-const SEVERITY_DOT: Record<string, string> = {
-  high: "error",
-  medium: "warning",
-  low: "low",
-};
-
 const SEVERITY_VARIANT: Record<string, "destructive" | "warning" | "neutral"> = {
   high: "destructive",
   medium: "warning",
@@ -75,13 +84,6 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destru
   wont_fix: "neutral",
 };
 
-const CATEGORY_VARIANT: Record<string, "default" | "neutral" | "outline"> = {
-  visual: "outline",
-  functional: "default",
-  ux: "neutral",
-  other: "neutral",
-};
-
 export const Bugs: React.FC = () => {
   const navigate = useNavigate();
   const { currentProjectId } = useProject();
@@ -91,6 +93,11 @@ export const Bugs: React.FC = () => {
   const [severityFilter, setSeverityFilter] = React.useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("all");
   const [actionBusy, setActionBusy] = React.useState<string | null>(null);
+  const [showRawId, setShowRawId] = React.useState<string | null>(null);
+  const [deletePrompt, setDeletePrompt] = React.useState<
+    null | { kind: "all" } | { kind: "one"; bug: BugRecord }
+  >(null);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
 
   async function load() {
     if (!currentProjectId) return;
@@ -101,6 +108,23 @@ export const Bugs: React.FC = () => {
   }
 
   React.useEffect(() => { load(); }, [currentProjectId]);
+
+  async function executeDelete() {
+    if (!currentProjectId || !deletePrompt) return;
+    setDeleteBusy(true);
+    try {
+      if (deletePrompt.kind === "all") {
+        await deleteAllProjectBugs(currentProjectId);
+      } else if (deletePrompt.bug.id) {
+        await deleteProjectBug(currentProjectId, deletePrompt.bug.id);
+      }
+      setExpandedId(null);
+      setDeletePrompt(null);
+      await load();
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   async function resolveBug(bug: BugRecord) {
     if (!currentProjectId || !bug.id) return;
@@ -163,6 +187,17 @@ export const Bugs: React.FC = () => {
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
         )}
+        {!loading && bugs.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive border-destructive/30 hover:bg-destructive/10"
+            onClick={() => setDeletePrompt({ kind: "all" })}
+          >
+            <Trash className="h-3.5 w-3.5" />
+            Delete all
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={load}>
           <ArrowsClockwise className="h-3.5 w-3.5" />
           Refresh
@@ -220,7 +255,9 @@ export const Bugs: React.FC = () => {
                       className={cn(
                         "h-7 px-2.5 text-[11px] capitalize",
                         categoryFilter === c
-                          ? "bg-accent text-foreground"
+                          ? c === "all"
+                            ? "bg-accent text-foreground"
+                            : cn("bg-accent font-medium", bugCategoryTagClass(c))
                           : "text-muted-foreground"
                       )}
                     >
@@ -248,19 +285,17 @@ export const Bugs: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setExpandedId(isExpanded ? null : id)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors min-w-0"
                       >
                         {isExpanded
                           ? <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                           : <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                         }
-                        <StatusDot status={SEVERITY_DOT[bug.severity] ?? "stale"} />
+                        <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
                           {bug.name}
                         </span>
-                        <Badge variant={CATEGORY_VARIANT[bug.category] ?? "neutral"} className="capitalize flex-shrink-0">
-                          {bug.category}
-                        </Badge>
+                        <BugCategoryTag category={bug.category} />
                         <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize flex-shrink-0">
                           {bug.status.replace("_", " ")}
                         </Badge>
@@ -272,14 +307,18 @@ export const Bugs: React.FC = () => {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <div className="border-t border-border px-4 py-4 space-y-4 bg-muted/10 animate-fade-in">
-                          {bug.description && (
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
-                                Description
-                              </p>
-                              <p className="text-[13px] text-foreground whitespace-pre-wrap">{bug.description}</p>
-                            </div>
-                          )}
+                          {(() => {
+                            const detail = projectBugDetailDescription(bug);
+                            if (!detail) return null;
+                            return (
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
+                                  Description
+                                </p>
+                                <p className="text-[13px] text-foreground whitespace-pre-wrap">{detail}</p>
+                              </div>
+                            );
+                          })()}
 
                           {(() => {
                             const runKey = bug.run_id ?? bug.runId;
@@ -295,27 +334,7 @@ export const Bugs: React.FC = () => {
                                   <ImageIcon className="h-3 w-3" />
                                   Screenshot
                                 </p>
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <button className="rounded-lg border border-border overflow-hidden hover:ring-1 hover:ring-primary/30 transition-all cursor-zoom-in">
-                                      <img
-                                        src={src}
-                                        alt="Bug screenshot"
-                                        className="max-w-full max-h-[200px] object-contain bg-black/5"
-                                      />
-                                    </button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-3xl">
-                                    <DialogHeader>
-                                      <DialogTitle>Screenshot</DialogTitle>
-                                    </DialogHeader>
-                                    <img
-                                      src={src}
-                                      alt="Bug screenshot"
-                                      className="w-full rounded-lg border border-border object-contain bg-black/5"
-                                    />
-                                  </DialogContent>
-                                </Dialog>
+                                <BugScreenshotZoomDialog src={src} />
                               </div>
                             );
                           })()}
@@ -384,7 +403,40 @@ export const Bugs: React.FC = () => {
                                 View Run
                                 <ArrowSquareOut className="h-3 w-3" />
                               </Button>
+                              {bug.id && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                                  disabled={actionBusy === bug.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletePrompt({ kind: "one", bug });
+                                  }}
+                                >
+                                  <Trash className="h-3 w-3" />
+                                  Delete
+                                </Button>
+                              )}
                             </div>
+                          </div>
+
+                          <div className="border-t border-border pt-3">
+                            <button
+                              type="button"
+                              className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 hover:text-foreground/70"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowRawId(showRawId === id ? null : id);
+                              }}
+                            >
+                              Show raw data {showRawId === id ? "▼" : "▶"}
+                            </button>
+                            {showRawId === id && (
+                              <pre className="mt-2 text-[11px] font-mono bg-muted/50 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
+                                {JSON.stringify(bug, null, 2)}
+                              </pre>
+                            )}
                           </div>
                         </div>
                       )}
@@ -402,6 +454,51 @@ export const Bugs: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={deletePrompt !== null}
+        onOpenChange={(o) => {
+          if (!o && !deleteBusy) setDeletePrompt(null);
+        }}
+      >
+        <DialogContent className="max-w-md" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Delete issues</DialogTitle>
+            <DialogDescription className="text-[13px]">
+              {deletePrompt?.kind === "all" && (
+                <>
+                  Permanently delete all <strong>{bugs.length}</strong> issues for this project? This cannot be undone.
+                </>
+              )}
+              {deletePrompt?.kind === "one" && (
+                <>
+                  Permanently delete &ldquo;{deletePrompt.bug.name}&rdquo;? This cannot be undone.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={deleteBusy}
+              onClick={() => setDeletePrompt(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={deleteBusy}
+              onClick={() => executeDelete()}
+            >
+              {deleteBusy ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -51,6 +51,10 @@ export const BugPatchBody = z.object({
   status: z.enum(["open", "in_progress", "resolved", "wont_fix"]),
 });
 
+export const BugBulkDeleteBody = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+});
+
 export const TestUpdateBody = z.object({
   name: z.string().min(2).optional(),
   intent: z.string().min(3).optional(),
