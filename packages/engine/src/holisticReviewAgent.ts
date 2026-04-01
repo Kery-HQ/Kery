@@ -44,7 +44,7 @@ Return JSON only:
 { "bugs": [ { "type": "visual"|"ux"|"behavioral"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
 Use frameIndex to tie a bug to the screenshot that best shows the issue.
-If you include "region", coordinates MUST be on a 0–1000 scale relative to the screenshot image: (0,0) is the top-left corner and (1000,1000) is the bottom-right, matching the same pixel aspect ratio as the image (not the live browser chrome).`;
+If you include "region", coordinates MUST be on a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.`;
 
 function buildTrace(stepsDetail: RunStep[]): string {
   const lines: string[] = [];

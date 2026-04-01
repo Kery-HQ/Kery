@@ -31,7 +31,7 @@ Do NOT blame the automation driver for wrong clicks.
 Return JSON: { "bugs": [ { "type": "visual"|"ux"|"behavioral"|"a11y"|"performance"|"data", "description": string (max 100 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
 Be selective. 0 bugs is fine.
-If you include "region", coordinates MUST use a 0–1000 scale on the screenshot image: (0,0) top-left, (1000,1000) bottom-right, same aspect ratio as the image.`;
+If you include "region", coordinates MUST use a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.`;
 
 function chunkFrames(frames: FilmstripFrame[], size: number): FilmstripFrame[][] {
   const out: FilmstripFrame[][] = [];
