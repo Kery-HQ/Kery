@@ -98,6 +98,7 @@ export type LLMAgentType =
   | "summary"
   | "filmstrip"
   | "crawl_link_filter"
+  | "crawl_route_filter"
   | "crawl_suggested_flows"
   | "memory_curator";
 

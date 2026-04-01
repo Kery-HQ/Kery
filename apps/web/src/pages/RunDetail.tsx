@@ -106,6 +106,7 @@ type LLMAgentType =
   | "summary"
   | "filmstrip"
   | "crawl_link_filter"
+  | "crawl_route_filter"
   | "crawl_suggested_flows";
 
 type LLMStoredContentPart =
@@ -438,12 +439,13 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
   summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
   filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Stack },
   crawl_link_filter:       { label: "Crawl links", color: "text-teal-400",    Icon: Funnel },
+  crawl_route_filter:    { label: "Crawl routes", color: "text-teal-300",   Icon: Funnel },
   crawl_suggested_flows: { label: "Crawl flows", color: "text-amber-400",   Icon: FlowArrow },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
   "navigator", "holistic", "filmstrip", "pathgen", "summary",
-  "crawl_link_filter", "crawl_suggested_flows",
+  "crawl_link_filter", "crawl_route_filter", "crawl_suggested_flows",
 ];
 
 // --- Main component ---
@@ -1476,6 +1478,7 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
       agent === "summary"   && "border-l-2 border-l-sky-500/30",
       agent === "filmstrip" && "border-l-2 border-l-fuchsia-500/30",
       agent === "crawl_link_filter" && "border-l-2 border-l-teal-500/30",
+      agent === "crawl_route_filter" && "border-l-2 border-l-teal-500/30",
       agent === "crawl_suggested_flows" && "border-l-2 border-l-amber-500/30",
     )}>
       <button

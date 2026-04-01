@@ -366,7 +366,12 @@ export async function togglePage(projectId: string, pageId: string, enabled: boo
 }
 
 export async function triggerScan(projectId: string, force = false) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/scan${force ? "?force=true" : ""}`, { method: "POST" });
+  const url = `${API_BASE}/api/projects/${projectId}/scan${force ? "?force=true" : ""}`;
+  const res = await fetch(url, { method: "POST" });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (res.status === 429) return { _status: 429 as const, ...body };
+  if (!res.ok) throw new Error(`API ${res.status}: ${JSON.stringify(body)}`);
+  return body;
 }
 
 export async function fetchScanStatus(projectId: string) {

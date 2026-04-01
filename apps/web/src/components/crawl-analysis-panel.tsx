@@ -1,5 +1,6 @@
 import React from "react";
 import { CaretDown, CaretRight, Funnel, FlowArrow, ArrowLeft } from "@phosphor-icons/react";
+import { CrawlRunStatusPanel } from "@/components/crawl-run-status-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,36 +36,46 @@ export type CrawlLlmCallRecord = {
 };
 
 export type CrawlMetadataJson = {
-  baseUrl: string;
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  limits: {
-    maxPages: number;
-    maxDepth: number;
-    crawlDelayMs: number;
-    linkFilterBatchSize: number;
-    maxInteractionsPerPage: number;
+  baseUrl?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMs?: number;
+  limits?: {
+    maxCrawlPages?: number;
+    maxAppRoutes?: number;
+    maxDepth?: number;
+    crawlDelayMs?: number;
+    routeFilterBatchSize?: number;
+    maxInteractionsPerPage?: number;
   };
-  stats: {
-    pagesVisited: number;
-    nodesFound: number;
-    suggestedFlowsCount: number;
-    llmCallCount: number;
+  stats?: {
+    pagesVisited?: number;
+    nodesFound?: number;
+    suggestedFlowsCount?: number;
+    llmCallCount?: number;
   };
+  error?: string;
+  diagnostics?: {
+    bfsPagesDiscovered: number;
+    afterShallowTrim: number;
+    afterRouteFilter: number;
+    hints: string[];
+  };
+  phase?: string;
+  inProgress?: boolean;
 };
 
 function CrawlLlmCallCard({ call }: { call: CrawlLlmCallRecord }) {
   const [expanded, setExpanded] = React.useState(false);
   const agent = call.agent ?? "";
-  const isLink = agent === "crawl_link_filter";
+  const isRouteFilter = agent === "crawl_route_filter" || agent === "crawl_link_filter";
   const isFlows = agent === "crawl_suggested_flows";
 
   return (
     <Card
       className={cn(
         "overflow-visible transition-colors",
-        isLink && "border-l-2 border-l-teal-500/40",
+        isRouteFilter && "border-l-2 border-l-teal-500/40",
         isFlows && "border-l-2 border-l-amber-500/40",
       )}
     >
@@ -74,10 +85,10 @@ function CrawlLlmCallCard({ call }: { call: CrawlLlmCallRecord }) {
         onClick={() => setExpanded(!expanded)}
       >
         <span className="text-[10px] font-mono text-muted-foreground/50 w-5 text-right flex-shrink-0">{call.seq}</span>
-        {isLink && <Funnel className="h-3 w-3 text-teal-400 flex-shrink-0" />}
+        {isRouteFilter && <Funnel className="h-3 w-3 text-teal-400 flex-shrink-0" />}
         {isFlows && <FlowArrow className="h-3 w-3 text-amber-400 flex-shrink-0" />}
         <span className="text-[10px] font-medium text-muted-foreground uppercase flex-shrink-0">
-          {isLink ? "Link filter" : isFlows ? "Suggested flows" : agent}
+          {isRouteFilter ? "Route filter" : isFlows ? "Suggested flows" : agent}
         </span>
         <span className="text-[11px] text-foreground truncate flex-1 min-w-0">{call.model}</span>
         <span className="text-[11px] font-mono tabular-nums text-muted-foreground w-14 text-right flex-shrink-0">
@@ -161,6 +172,7 @@ type CrawlAnalysisPanelProps = {
 
 export function CrawlAnalysisPanel({ metadata, llmCalls, onBack }: CrawlAnalysisPanelProps) {
   const calls = Array.isArray(llmCalls) ? llmCalls : [];
+  const llmTotalUsd = calls.reduce((s, c) => s + (typeof c.costUsd === "number" ? c.costUsd : 0), 0);
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -177,11 +189,32 @@ export function CrawlAnalysisPanel({ metadata, llmCalls, onBack }: CrawlAnalysis
             LLM ({calls.length})
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="flex-1 min-h-0 overflow-y-auto mt-0 pt-3 data-[state=inactive]:hidden">
+        <TabsContent value="overview" className="flex-1 min-h-0 overflow-y-auto mt-0 pt-3 space-y-3 data-[state=inactive]:hidden">
           {metadata ? (
-            <pre className="text-[11px] font-mono whitespace-pre-wrap break-words rounded-md border border-border bg-muted/15 p-3 text-foreground/85 leading-relaxed">
-              {JSON.stringify(metadata, null, 2)}
-            </pre>
+            <>
+              <CrawlRunStatusPanel
+                variant="summary"
+                title="Run overview"
+                run={{
+                  status: metadata.error ? "failed" : "completed",
+                  started_at: metadata.startedAt ?? metadata.finishedAt ?? "",
+                  completed_at: metadata.finishedAt ?? null,
+                  pages_visited: metadata.stats?.pagesVisited ?? null,
+                  nodes_found: metadata.stats?.nodesFound ?? null,
+                  cost_usd: llmTotalUsd > 0 ? llmTotalUsd : null,
+                  llm_cost_breakdown_json: null,
+                  crawl_metadata_json: metadata,
+                }}
+              />
+              <details className="text-[11px] text-muted-foreground">
+                <summary className="cursor-pointer font-medium text-foreground/80 hover:text-foreground">
+                  Raw crawl_metadata_json
+                </summary>
+                <pre className="mt-2 text-[11px] font-mono whitespace-pre-wrap break-words rounded-md border border-border bg-muted/15 p-3 text-foreground/85 leading-relaxed">
+                  {JSON.stringify(metadata, null, 2)}
+                </pre>
+              </details>
+            </>
           ) : (
             <p className="text-[12px] text-muted-foreground">No metadata for this run.</p>
           )}

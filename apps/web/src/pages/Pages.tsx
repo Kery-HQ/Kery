@@ -27,6 +27,7 @@ import {
   type CrawlLlmCallRecord,
   type CrawlMetadataJson,
 } from "@/components/crawl-analysis-panel";
+import { CrawlRunStatusPanel } from "@/components/crawl-run-status-panel";
 
 type Page = {
   id: string;
@@ -63,6 +64,8 @@ type CrawlRunRow = {
 type CrawlLiveMeta = {
   phase?: string;
   durationMs?: number;
+  baseUrl?: string;
+  limits?: Record<string, unknown>;
   live?: {
     queueDepth: number;
     currentUrl: string | null;
@@ -70,14 +73,17 @@ type CrawlLiveMeta = {
   };
   stats?: { pagesVisited?: number; nodesFound?: number; llmCallCount?: number };
   inProgress?: boolean;
+  error?: string;
+  finishedAt?: string;
+  diagnostics?: {
+    bfsPagesDiscovered: number;
+    afterShallowTrim: number;
+    afterRouteFilter: number;
+    hints: string[];
+  };
 };
 
 type LastScan = CrawlRunRow;
-
-function formatCrawlPhase(phase?: string): string {
-  if (phase === "suggested_flows") return "Suggesting test flows (LLM)";
-  return "Crawling pages";
-}
 
 const HEALTH_FILTERS = ["all", "clean", "issues", "stale", "untested"] as const;
 type HealthFilter = (typeof HEALTH_FILTERS)[number];
@@ -89,6 +95,9 @@ const HEALTH_LABEL: Record<string, string> = {
   stale: "Stale",
   untested: "Untested",
 };
+
+/** After this, the scan button stays clickable and sends `force` to abort a stuck server-side `running` row. */
+const SCAN_FORCE_REPLACE_AFTER_MS = 2 * 60 * 1000;
 
 export function Pages() {
   const navigate = useNavigate();
@@ -107,6 +116,9 @@ export function Pages() {
   const [liveScan, setLiveScan] = React.useState<LastScan | null>(null);
   /** After POST /scan, ignore stale "completed" until this time (race with DB insert). */
   const scanExpectUntilRef = React.useRef<number | null>(null);
+  /** Client clock for "stuck" detection when `started_at` is missing (race before first poll). */
+  const [scanSessionStartedAt, setScanSessionStartedAt] = React.useState<number | null>(null);
+  const [scanUiTick, setScanUiTick] = React.useState(0);
   const [rateLimited, setRateLimited] = React.useState(false);
   const [filter, setFilter] = React.useState("");
   const [healthFilter, setHealthFilter] = React.useState<HealthFilter>("all");
@@ -159,6 +171,17 @@ export function Pages() {
 
   React.useEffect(() => { loadData(); }, [loadData]);
 
+  React.useEffect(() => {
+    if (scanActive) setScanSessionStartedAt((s) => s ?? Date.now());
+    else setScanSessionStartedAt(null);
+  }, [scanActive]);
+
+  React.useEffect(() => {
+    if (!scanActive) return;
+    const iv = window.setInterval(() => setScanUiTick((t) => t + 1), 10_000);
+    return () => window.clearInterval(iv);
+  }, [scanActive]);
+
   // Refresh-safe: if user reloads while a crawl is running, resume polling.
   React.useEffect(() => {
     if (!pid) return;
@@ -208,6 +231,15 @@ export function Pages() {
     };
   }, [pid, scanActive, loadData]);
 
+  const canForceReplaceScan = React.useMemo(() => {
+    if (!scanActive) return false;
+    const t0 = liveScan?.started_at
+      ? new Date(liveScan.started_at).getTime()
+      : (scanSessionStartedAt ?? Date.now());
+    const elapsed = Date.now() - t0 + scanUiTick * 0;
+    return elapsed > SCAN_FORCE_REPLACE_AFTER_MS;
+  }, [scanActive, liveScan?.started_at, scanSessionStartedAt, scanUiTick]);
+
   const filteredPages = React.useMemo(() => {
     let result = pages;
     if (healthFilter !== "all") {
@@ -238,7 +270,8 @@ export function Pages() {
     if (!pid) return;
     setRateLimited(false);
     try {
-      const res = await triggerScan(pid, force);
+      const useForce = force || (scanActive && canForceReplaceScan);
+      const res = (await triggerScan(pid, useForce)) as { _status?: number };
       if (res?._status === 429) {
         setRateLimited(true);
         return;
@@ -246,7 +279,9 @@ export function Pages() {
       scanExpectUntilRef.current = Date.now() + 20_000;
       setScanActive(true);
       setLiveScan(null);
-    } catch {
+    } catch (e: unknown) {
+      const msg = String((e as Error)?.message ?? e);
+      if (msg.includes("API 409")) return;
       setScanActive(false);
       scanExpectUntilRef.current = null;
     }
@@ -370,10 +405,16 @@ export function Pages() {
           size="sm"
           variant={pages.length === 0 ? "default" : "outline"}
           onClick={() => handleScan()}
-          loading={scanActive}
+          loading={scanActive && !canForceReplaceScan}
         >
-          {!scanActive && <ArrowsClockwise className="h-3.5 w-3.5" />}
-          {scanActive ? "Scanning..." : pages.length === 0 ? "Scan my app" : "Re-scan"}
+          {!(scanActive && !canForceReplaceScan) && <ArrowsClockwise className="h-3.5 w-3.5" />}
+          {scanActive
+            ? canForceReplaceScan
+              ? "Replace stuck scan"
+              : "Scanning..."
+            : pages.length === 0
+              ? "Scan my app"
+              : "Re-scan"}
         </Button>
       </PageHeader>
 
@@ -382,50 +423,37 @@ export function Pages() {
 
           {/* Scanning progress (persisted server-side; safe to refresh) */}
           {scanActive && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
-              <Spinner className="h-4 w-4 animate-spin text-primary flex-shrink-0 mt-0.5" />
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-[13px] font-medium text-foreground">Scan in progress</p>
-                {!liveScan?.id ? (
-                  <p className="text-[11px] text-muted-foreground">Starting…</p>
-                ) : (
-                  <>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatCrawlPhase(liveScan.crawl_metadata_json?.phase)}
-                      {typeof liveScan.pages_visited === "number" && (
-                        <>
-                          {" "}
-                          · {liveScan.pages_visited} page{liveScan.pages_visited !== 1 ? "s" : ""}
-                          {typeof liveScan.nodes_found === "number" && (
-                            <> · {liveScan.nodes_found} nodes</>
-                          )}
-                        </>
-                      )}
-                      {liveScan.started_at && (
-                        <> · {duration(liveScan.started_at)} elapsed</>
-                      )}
-                    </p>
-                    {liveScan.crawl_metadata_json?.live?.currentRoute && (
-                      <p className="text-[11px] font-mono text-foreground/80 truncate" title={liveScan.crawl_metadata_json.live.currentUrl ?? undefined}>
-                        {liveScan.crawl_metadata_json.live.currentRoute}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground font-mono tabular-nums">
-                      {typeof liveScan.crawl_metadata_json?.live?.queueDepth === "number" && (
-                        <span>Queue {liveScan.crawl_metadata_json.live.queueDepth}</span>
-                      )}
-                      {typeof liveScan.crawl_metadata_json?.stats?.llmCallCount === "number" && liveScan.crawl_metadata_json.stats.llmCallCount > 0 && (
-                        <span>LLM calls {liveScan.crawl_metadata_json.stats.llmCallCount}</span>
-                      )}
-                      {formatCrawlLlmCostLine(liveScan) && (
-                        <span>LLM {formatCrawlLlmCostLine(liveScan)}</span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+            <div className="space-y-2">
+              <CrawlRunStatusPanel
+                variant="live"
+                run={
+                  liveScan ??
+                  ({
+                    status: "running",
+                    started_at: scanSessionStartedAt
+                      ? new Date(scanSessionStartedAt).toISOString()
+                      : new Date().toISOString(),
+                  } as LastScan)
+                }
+              />
+              {canForceReplaceScan && (
+                <p className="text-[11px] text-muted-foreground px-1">
+                  No progress? Use <span className="font-medium text-foreground">Replace stuck scan</span> in the
+                  header to abort this run and start a new one.
+                </p>
+              )}
             </div>
           )}
+
+          {/* Latest finished scan — full detail when outcome looks wrong */}
+          {!scanActive &&
+            lastScan &&
+            (lastScan.status === "failed" ||
+              lastScan.pages_visited === 0 ||
+              lastScan.crawl_metadata_json?.error ||
+              (lastScan.crawl_metadata_json?.diagnostics?.hints?.length ?? 0) > 0) && (
+              <CrawlRunStatusPanel variant="summary" run={lastScan} title="Latest scan (detail)" />
+            )}
 
           {/* Rate limit */}
           {rateLimited && (

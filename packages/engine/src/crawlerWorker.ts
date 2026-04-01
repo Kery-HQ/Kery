@@ -2,8 +2,8 @@
  * App-level crawl discovery + progressive app tree builder.
  *
  * BFS link traversal with route normalization, interaction-driven pass,
- * rule-based + batched LLM link filtering (content/noise), LLM clustering
- * for suggested test flows, and app tree construction.
+ * rule-only queue expansion during crawl, then shallow-route cap + parallel
+ * batched LLM route filtering (webapp-focused), suggested flows, app tree.
  *
  * Refactored for OSS: accepts StorageAdapter instead of direct Supabase calls.
  */
@@ -20,12 +20,15 @@ import { rewriteForDocker } from "./dockerHost.js";
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const CRAWL_DELAY_MS = 800;
-const MAX_PAGES = 80;
+/** Hard cap on Playwright visits during BFS (safety). */
+const MAX_CRAWL_PAGES = 500;
+/** After crawl: max normalized routes kept for the app tree (shallow routes win if over cap). */
+const MAX_APP_ROUTES = 80;
 const MAX_DEPTH = 4;
 const MAX_INTERACTIONS_PER_PAGE = 8;
 const INTERACTION_SETTLE_MS = 1000;
-/** Max links per LLM call; larger lists are split into sequential batches so every candidate is classified. */
-const LINK_FILTER_LLM_BATCH_SIZE = 40;
+/** Routes per parallel LLM batch in the post-crawl filter pass. */
+const ROUTE_FILTER_LLM_BATCH_SIZE = 40;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,10 +63,11 @@ export type CrawlMetadata = {
   finishedAt: string;
   durationMs: number;
   limits: {
-    maxPages: number;
+    maxCrawlPages: number;
+    maxAppRoutes: number;
     maxDepth: number;
     crawlDelayMs: number;
-    linkFilterBatchSize: number;
+    routeFilterBatchSize: number;
     maxInteractionsPerPage: number;
   };
   stats: {
@@ -71,6 +75,15 @@ export type CrawlMetadata = {
     nodesFound: number;
     suggestedFlowsCount: number;
     llmCallCount: number;
+  };
+  /** Set when the crawl throws before finishing normally. */
+  error?: string;
+  /** Pipeline counts and user-facing hints (e.g. why 0 pages). */
+  diagnostics?: {
+    bfsPagesDiscovered: number;
+    afterShallowTrim: number;
+    afterRouteFilter: number;
+    hints: string[];
   };
 };
 
@@ -84,7 +97,7 @@ export type CrawlResult = {
   /** Total LLM cost (USD); equals linkFilterUsd + suggestedFlowsUsd when only those stages run. */
   costUsd: number;
   llmCostBreakdown: CrawlLlmCostBreakdown;
-  /** Full LLM audit (same shape as test runs; agent crawl_link_filter | crawl_suggested_flows). */
+  /** Full LLM audit (same shape as test runs; crawl_route_filter | crawl_suggested_flows). */
   llmCalls: LLMCallRecord[];
   crawlMetadata: CrawlMetadata;
   error?: string;
@@ -106,16 +119,17 @@ function breakdownFromAccum(acc: CrawlCostAccum): CrawlLlmCostBreakdown {
 
 function crawlMetadataLimits(): CrawlMetadata["limits"] {
   return {
-    maxPages: MAX_PAGES,
+    maxCrawlPages: MAX_CRAWL_PAGES,
+    maxAppRoutes: MAX_APP_ROUTES,
     maxDepth: MAX_DEPTH,
     crawlDelayMs: CRAWL_DELAY_MS,
-    linkFilterBatchSize: LINK_FILTER_LLM_BATCH_SIZE,
+    routeFilterBatchSize: ROUTE_FILTER_LLM_BATCH_SIZE,
     maxInteractionsPerPage: MAX_INTERACTIONS_PER_PAGE,
   };
 }
 
 /** Phase label for live crawl progress (persisted in crawl_metadata_json while status is running). */
-export type CrawlProgressPhase = "crawling" | "suggested_flows";
+export type CrawlProgressPhase = "crawling" | "route_filter" | "suggested_flows";
 
 /** Partial metadata written during a run so the UI can show progress after refresh. */
 export type CrawlProgressMetadata = {
@@ -192,9 +206,10 @@ function buildCrawlMetadata(
   sitemap: CrawlPageData[],
   suggestedFlows: CrawlSuggestedFlow[],
   llmCalls: LLMCallRecord[],
+  extras?: { error?: string; diagnostics?: CrawlMetadata["diagnostics"] },
 ): CrawlMetadata {
   const finishedAt = Date.now();
-  return {
+  const meta: CrawlMetadata = {
     baseUrl,
     startedAt: new Date(startedAtMs).toISOString(),
     finishedAt: new Date(finishedAt).toISOString(),
@@ -207,13 +222,46 @@ function buildCrawlMetadata(
       llmCallCount: llmCalls.length,
     },
   };
+  if (extras?.error) meta.error = extras.error;
+  if (extras?.diagnostics) meta.diagnostics = extras.diagnostics;
+  return meta;
+}
+
+function minimalFailedCrawlMetadata(
+  baseUrl: string,
+  startedAtIso: string,
+  completedAtIso: string,
+  err: string,
+): CrawlMetadata {
+  const t0 = new Date(startedAtIso).getTime();
+  const t1 = new Date(completedAtIso).getTime();
+  return {
+    baseUrl,
+    startedAt: startedAtIso,
+    finishedAt: completedAtIso,
+    durationMs: Number.isFinite(t1 - t0) ? Math.max(0, t1 - t0) : 0,
+    limits: crawlMetadataLimits(),
+    stats: {
+      pagesVisited: 0,
+      nodesFound: 0,
+      suggestedFlowsCount: 0,
+      llmCallCount: 0,
+    },
+    error: err,
+    diagnostics: {
+      bfsPagesDiscovered: 0,
+      afterShallowTrim: 0,
+      afterRouteFilter: 0,
+      hints: ["The scan failed before recording pages. See the error above."],
+    },
+  };
 }
 
 function recordCrawlLlmCall(
   calls: LLMCallRecord[],
   seqRef: { current: number },
   args: {
-    agent: "crawl_link_filter" | "crawl_suggested_flows";
+    agent: "crawl_route_filter" | "crawl_suggested_flows";
     model: string;
     query: string;
     requestMessages: LLMStoredMessage[];
@@ -335,162 +383,214 @@ function toFullUrl(pathOrUrl: string, baseOrigin: string): string {
   return pathOrUrl.startsWith("http") ? pathOrUrl : `${baseOrigin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
-/**
- * Rule-based filter, then batched LLM: each batch is one call; all batches run so no candidate is skipped.
- * On LLM parse failure, keeps the whole batch (fail-open) so we do not drop unclassified links.
- */
-async function filterNavLinksForQueue(
-  navLinks: string[],
-  baseOrigin: string,
-  baseUrl: string,
-  pageRoute: string,
-  pageTitle: string,
-  auth: AuthConfig | null,
-  costAccum: CrawlCostAccum,
-  llmCalls: LLMCallRecord[],
-  seqRef: { current: number },
-): Promise<string[]> {
+/** During BFS: enqueue same-origin links that pass the rule-based filter only (no LLM). */
+function ruleOnlyEnqueueLinks(navLinks: string[], baseOrigin: string, auth: AuthConfig | null): string[] {
   const fullUrls = [...new Set(navLinks.map(l => toFullUrl(l, baseOrigin)))];
-  const afterRules = fullUrls.filter(u => !ruleBasedRejectLink(u, baseOrigin, auth));
-  if (afterRules.length === 0) return [];
-
-  const totalBatches = Math.max(1, Math.ceil(afterRules.length / LINK_FILTER_LLM_BATCH_SIZE));
-  const kept: string[] = [];
-  let batchIndex = 0;
-  for (let i = 0; i < afterRules.length; i += LINK_FILTER_LLM_BATCH_SIZE) {
-    batchIndex += 1;
-    const batch = afterRules.slice(i, i + LINK_FILTER_LLM_BATCH_SIZE);
-    const batchKept = await llmVerifyLinksKeep(
-      batch,
-      { pageRoute, pageTitle, baseUrl, baseOrigin },
-      costAccum,
-      llmCalls,
-      seqRef,
-      { batchIndex, totalBatches },
-    );
-    kept.push(...batchKept);
-  }
-  return kept;
+  return fullUrls.filter(u => !ruleBasedRejectLink(u, baseOrigin, auth));
 }
 
-async function llmVerifyLinksKeep(
-  batch: string[],
-  ctx: { pageRoute: string; pageTitle: string; baseUrl: string; baseOrigin: string },
-  costAccum: CrawlCostAccum,
-  llmCalls: LLMCallRecord[],
-  seqRef: { current: number },
-  batchMeta: { batchIndex: number; totalBatches: number },
-): Promise<string[]> {
-  if (batch.length === 0) return [];
-  const config = getConfig();
-  const lines = batch.map((u, i) => `${i + 1}. ${u}`).join("\n");
-  const prompt = `You filter crawl queue candidates for automated QA of a web application (discovering UI, forms, workflows, dashboards — not indexing blog/content).
+function routeSegmentDepth(route: string): number {
+  return route.split("/").filter(Boolean).length;
+}
 
-Context — page being crawled: route=${ctx.pageRoute}
-Page title: ${JSON.stringify(ctx.pageTitle)}
-Site base: ${ctx.baseUrl}
+/** If more than `maxRoutes` pages, keep those with the shallowest normalized routes (fewest path segments). */
+function trimSitemapToShallowestRoutes(pages: CrawlPageData[], maxRoutes: number): CrawlPageData[] {
+  // Always return a copy: callers do `sitemap.length = 0; sitemap.push(...trimmed)`. Returning `pages` when
+  // `pages === sitemap` would clear the same array reference and wipe the crawl before route-filter / LLM.
+  if (pages.length <= maxRoutes) return [...pages];
+  return [...pages]
+    .sort((a, b) => {
+      const da = routeSegmentDepth(a.route);
+      const db = routeSegmentDepth(b.route);
+      if (da !== db) return da - db;
+      return a.route.length - b.route.length;
+    })
+    .slice(0, maxRoutes);
+}
 
-For each URL below (same-origin), decide whether crawling it is likely useful for **functional/product QA**. REJECT (do not include in keep): individual blog posts, news articles, help doc pages, tag/category/author archives, feeds, legal/marketing-only pages, and similar content-driven URLs when the site also has an app. KEEP: app areas, settings, dashboards, onboarding, feature pages with interactive UI.
+function parseKeepRoutesJson(raw: string): string[] | null {
+  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  const start = stripped.indexOf("{");
+  const end = stripped.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(stripped.slice(start, end + 1)) as { keep?: unknown };
+    if (!Array.isArray(parsed.keep)) return null;
+    return parsed.keep.filter((x): x is string => typeof x === "string");
+  } catch {
+    return null;
+  }
+}
 
-Return ONLY valid JSON, no markdown: {"keep":["url1","url2"]}
-The strings in "keep" MUST be copied exactly from the list below (full URL after the number.).
+type RouteFilterBatchResult = {
+  batchIndex: number;
+  totalBatches: number;
+  keptRoutes: string[];
+  raw: string;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  durationMs: number;
+  requestMessages: LLMStoredMessage[];
+  querySummary: string;
+  outcome: "ok" | "parse_failed" | "route_mismatch" | "empty_keep" | "error";
+  error?: string;
+};
 
-${lines}`;
+async function classifyRoutesWebappBatch(
+  batch: CrawlPageData[],
+  baseUrl: string,
+  batchIndex: number,
+  totalBatches: number,
+  model: string,
+): Promise<RouteFilterBatchResult> {
+  const routeSet = new Set(batch.map(p => p.route));
+  const lines = batch
+    .map((p, i) => {
+      const hints = [p.forms.length > 0 ? "FORM" : "", p.interactions.length > 0 ? "MODAL" : ""].filter(Boolean).join(",") || "—";
+      return `${i + 1}. ${p.route} | ${JSON.stringify(p.title || "")} | ${hints}`;
+    })
+    .join("\n");
 
-  const tryParse = (raw: string): string[] | null => {
-    const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-    const start = stripped.indexOf("{");
-    const end = stripped.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) return null;
-    try {
-      const parsed = JSON.parse(stripped.slice(start, end + 1)) as { keep?: unknown };
-      if (!Array.isArray(parsed.keep)) return null;
-      return parsed.keep.filter((x): x is string => typeof x === "string");
-    } catch {
-      return null;
-    }
-  };
+  const prompt = `You filter routes for **automated QA of a web application**.
+
+Kery is built for **interactive product UIs**: SaaS, internal tools, dashboards, authenticated apps — not blogs, news sites, marketing homepages, help centers, or read-only content hubs.
+
+For each line below, decide whether this route is worth keeping for **functional product QA** (settings, workflows, data screens, modals, forms in the app).
+
+**KEEP**: app surfaces the user operates in (CRUD, config, billing, team, integrations, etc.).
+**REJECT**: blog posts, articles, docs, press, careers landing, legal-only pages, tag/category archives, and similar non-app content.
+
+Site base: ${baseUrl}
+
+${lines}
+
+Return ONLY valid JSON, no markdown: {"keep":["/route1","/route2"]}
+Each string in "keep" MUST match a ROUTE from the list **exactly** (the path segment immediately after the number and period, before the first " | ").`;
 
   const requestMessages: LLMStoredMessage[] = [{ role: "user", content: prompt }];
-  const querySummary = `link-filter batch ${batchMeta.batchIndex}/${batchMeta.totalBatches} @ ${ctx.pageRoute} (${batch.length} URLs)`;
+  const querySummary = `route-filter batch ${batchIndex}/${totalBatches} (${batch.length} routes)`;
 
   try {
     const t0 = Date.now();
     const { content: raw, usage } = await llmChat(
       [{ role: "user", content: prompt }],
-      config.auxiliaryModel,
+      model,
       { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.1 },
     );
     const durationMs = Date.now() - t0;
-    const delta = calcCostUsd(config.auxiliaryModel, usage.inputTokens, usage.outputTokens, "auxiliaryModel");
-    costAccum.usd += delta;
-    costAccum.linkFilterUsd += delta;
-    const fromModel = tryParse(raw);
-    const batchSet = new Set(batch);
-    let outcome: "ok" | "parse_failed" | "url_mismatch";
-    let resultUrls: string[];
+    const fromModel = parseKeepRoutesJson(raw ?? "");
+    let outcome: RouteFilterBatchResult["outcome"];
+    let keptRoutes: string[];
     if (fromModel == null) {
-      logger.warn({ batchSize: batch.length }, "Crawl: link-filter LLM parse failed, keeping batch");
+      logger.warn({ batchSize: batch.length }, "Crawl: route-filter LLM parse failed, keeping batch");
       outcome = "parse_failed";
-      resultUrls = [...batch];
+      keptRoutes = [...routeSet];
     } else {
-      const filtered = fromModel.filter(u => batchSet.has(u));
-      if (filtered.length === 0 && fromModel.length > 0) {
-        logger.warn({ batchSize: batch.length }, "Crawl: link-filter LLM returned no exact URL matches, keeping batch");
-        outcome = "url_mismatch";
-        resultUrls = [...batch];
+      const filtered = fromModel.filter(r => routeSet.has(r));
+      // Fail-open the whole batch if the model keeps nothing: empty {"keep":[]} is valid JSON
+      // but would wipe the crawl (e.g. HN classified as "not a web app"). Same if strings don't match routes.
+      if (filtered.length === 0) {
+        if (fromModel.length > 0) {
+          logger.warn({ batchSize: batch.length }, "Crawl: route-filter LLM returned no exact route matches, keeping batch");
+          outcome = "route_mismatch";
+        } else {
+          logger.warn({ batchSize: batch.length }, "Crawl: route-filter LLM returned empty keep list, keeping batch");
+          outcome = "empty_keep";
+        }
+        keptRoutes = [...routeSet];
       } else {
         outcome = "ok";
-        resultUrls = filtered;
+        keptRoutes = filtered;
       }
     }
-
-    recordCrawlLlmCall(llmCalls, seqRef, {
-      agent: "crawl_link_filter",
-      model: config.auxiliaryModel,
-      query: querySummary,
-      requestMessages,
-      response: raw ?? "",
-      usage: usage,
+    return {
+      batchIndex,
+      totalBatches,
+      keptRoutes,
+      raw: raw ?? "",
+      usage,
       durationMs,
-      costUsd: delta,
-      stepIndex: batchMeta.batchIndex,
-      crawlContext: {
-        phase: "link_filter",
-        sourcePageRoute: ctx.pageRoute,
-        batchIndex: batchMeta.batchIndex,
-        totalBatches: batchMeta.totalBatches,
-        batchSize: batch.length,
-        outcome,
-        keptCount: resultUrls.length,
-      },
-    });
-    return resultUrls;
+      requestMessages,
+      querySummary,
+      outcome,
+    };
   } catch (err) {
     const msg = String(err);
-    logger.warn({ err: msg, batchSize: batch.length }, "Crawl: link-filter LLM failed, keeping batch");
-    recordCrawlLlmCall(llmCalls, seqRef, {
-      agent: "crawl_link_filter",
-      model: config.auxiliaryModel,
-      query: querySummary,
-      requestMessages,
-      response: `ERROR: ${msg}`,
+    logger.warn({ err: msg, batchSize: batch.length }, "Crawl: route-filter LLM failed, keeping batch");
+    return {
+      batchIndex,
+      totalBatches,
+      keptRoutes: [...routeSet],
+      raw: `ERROR: ${msg}`,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       durationMs: 0,
-      costUsd: 0,
-      stepIndex: batchMeta.batchIndex,
+      requestMessages,
+      querySummary,
+      outcome: "error",
+      error: msg,
+    };
+  }
+}
+
+/**
+ * Parallel LLM batches over visited routes; drops non-webapp / content noise. Fail-open if nothing left.
+ * Costs accrue under linkFilterUsd for persisted breakdown compatibility.
+ */
+async function filterSitemapRoutesWithLlmParallel(
+  pages: CrawlPageData[],
+  baseUrl: string,
+  costAccum: CrawlCostAccum,
+  llmCalls: LLMCallRecord[],
+  seqRef: { current: number },
+): Promise<CrawlPageData[]> {
+  if (pages.length === 0) return [];
+  const config = getConfig();
+  const batches: CrawlPageData[][] = [];
+  for (let i = 0; i < pages.length; i += ROUTE_FILTER_LLM_BATCH_SIZE) {
+    batches.push(pages.slice(i, i + ROUTE_FILTER_LLM_BATCH_SIZE));
+  }
+  const totalBatches = batches.length;
+  const settled = await Promise.all(
+    batches.map((batch, bi) => classifyRoutesWebappBatch(batch, baseUrl, bi + 1, totalBatches, config.auxiliaryModel)),
+  );
+  settled.sort((a, b) => a.batchIndex - b.batchIndex);
+
+  const allKept = new Set<string>();
+  for (const r of settled) {
+    const delta =
+      r.usage.totalTokens > 0
+        ? calcCostUsd(config.auxiliaryModel, r.usage.inputTokens, r.usage.outputTokens, "auxiliaryModel")
+        : 0;
+    costAccum.usd += delta;
+    costAccum.linkFilterUsd += delta;
+    recordCrawlLlmCall(llmCalls, seqRef, {
+      agent: "crawl_route_filter",
+      model: config.auxiliaryModel,
+      query: r.querySummary,
+      requestMessages: r.requestMessages,
+      response: r.raw,
+      usage: r.usage,
+      durationMs: r.durationMs,
+      costUsd: delta,
+      stepIndex: r.batchIndex,
       crawlContext: {
-        phase: "link_filter",
-        sourcePageRoute: ctx.pageRoute,
-        batchIndex: batchMeta.batchIndex,
-        totalBatches: batchMeta.totalBatches,
-        batchSize: batch.length,
-        outcome: "error",
-        error: msg,
+        phase: "route_filter",
+        batchIndex: r.batchIndex,
+        totalBatches: r.totalBatches,
+        batchSize: batches[r.batchIndex - 1]?.length ?? 0,
+        outcome: r.outcome,
+        keptCount: r.keptRoutes.length,
+        ...(r.error ? { error: r.error } : {}),
       },
     });
-    return [...batch];
+    for (const route of r.keptRoutes) allKept.add(route);
   }
+
+  const filtered = pages.filter(p => allKept.has(p.route));
+  if (filtered.length === 0) {
+    logger.warn({ pageCount: pages.length }, "Crawl: route filter kept zero pages, fail-open to trimmed set");
+    return pages;
+  }
+  return filtered;
 }
 
 // Page data extraction script - preserved from source
@@ -617,7 +717,17 @@ export async function runCrawl(
       status: "failed", pagesVisited: 0, nodesFound: 0, destinationsBuilt: 0,
       sitemap: [], suggestedFlows: [], costUsd: 0, llmCostBreakdown: emptyBreakdown(),
       llmCalls: [],
-      crawlMetadata: buildCrawlMetadata(baseUrl, crawlStartedAt, [], [], []),
+      crawlMetadata: buildCrawlMetadata(baseUrl, crawlStartedAt, [], [], [], {
+        error: "Invalid base URL",
+        diagnostics: {
+          bfsPagesDiscovered: 0,
+          afterShallowTrim: 0,
+          afterRouteFilter: 0,
+          hints: [
+            "The environment base URL could not be parsed. Use a full URL including scheme, e.g. https://your-app.com",
+          ],
+        },
+      }),
       error: "Invalid base URL",
     };
   }
@@ -664,7 +774,7 @@ export async function runCrawl(
     const queue: { url: string; depth: number }[] = [{ url: startUrl, depth: 0 }];
     if (startUrl !== baseUrl) queue.push({ url: baseUrl, depth: 1 });
 
-    while (queue.length > 0 && sitemap.length < MAX_PAGES) {
+    while (queue.length > 0 && sitemap.length < MAX_CRAWL_PAGES) {
       const { url, depth } = queue.shift()!;
       if (depth > MAX_DEPTH) continue;
       const route = normalizeRoute(url, baseOrigin);
@@ -721,17 +831,7 @@ export async function runCrawl(
           "Crawl: page visited",
         );
 
-        const filteredLinks = await filterNavLinksForQueue(
-          pageData.navLinks,
-          baseOrigin,
-          baseUrl,
-          pageData.route,
-          pageData.title,
-          auth,
-          costAccum,
-          llmCalls,
-          seqRef,
-        );
+        const filteredLinks = ruleOnlyEnqueueLinks(pageData.navLinks, baseOrigin, auth);
 
         for (const fullUrl of filteredLinks) {
           const linkRoute = normalizeRoute(fullUrl, baseOrigin);
@@ -754,6 +854,25 @@ export async function runCrawl(
       }
     }
 
+    const bfsPagesDiscovered = sitemap.length;
+    const trimmed = trimSitemapToShallowestRoutes(sitemap, MAX_APP_ROUTES);
+    const afterShallowTrim = trimmed.length;
+    sitemap.length = 0;
+    sitemap.push(...trimmed);
+
+    await emitProgress("route_filter", {
+      queueDepth: queue.length,
+      currentUrl: null,
+      currentRoute: null,
+    });
+
+    const afterRouteLlm = await filterSitemapRoutesWithLlmParallel(
+      [...sitemap], baseUrl, costAccum, llmCalls, seqRef,
+    );
+    const afterRouteFilter = afterRouteLlm.length;
+    sitemap.length = 0;
+    sitemap.push(...afterRouteLlm);
+
     await emitProgress("suggested_flows", {
       queueDepth: queue.length,
       currentUrl: null,
@@ -764,21 +883,65 @@ export async function runCrawl(
       sitemap, existingTestNames, baseUrl, costAccum, llmCalls, seqRef,
     );
 
+    const hints: string[] = [];
+    if (bfsPagesDiscovered === 0) {
+      try {
+        const loadedOrigin = new URL(page.url()).origin;
+        if (loadedOrigin !== baseOrigin) {
+          hints.push(
+            `Origin mismatch: after navigation the browser is on ${loadedOrigin}, but your environment base URL is ${baseOrigin}. ` +
+              "The crawler only keeps same-origin pages. Set the environment base URL to the final origin after redirects (for example https://news.ycombinator.com, not https://hackernews.com).",
+          );
+        } else {
+          hints.push(
+            "No pages were recorded during the browser crawl. Common causes: stuck on a login screen without auth configured, navigation timeouts, blocked requests in the crawler environment, or no in-scope links passed the rule filter.",
+          );
+        }
+      } catch {
+        hints.push("No pages were discovered during the browser crawl.");
+      }
+      hints.push(
+        "With zero pages, route filtering and suggested flows are skipped — so LLM cost stays at zero.",
+      );
+    } else if (afterRouteFilter === 0 && bfsPagesDiscovered > 0) {
+      hints.push(
+        "Every page was dropped after route filtering despite fail-open safeguards — check server logs and crawl_metadata LLM responses.",
+      );
+    }
+
+    const diagnostics: CrawlMetadata["diagnostics"] = {
+      bfsPagesDiscovered,
+      afterShallowTrim,
+      afterRouteFilter,
+      hints,
+    };
+
     return {
       status: "completed", pagesVisited: sitemap.length,
       nodesFound: sitemap.length + sitemap.reduce((acc, p) => acc + p.interactions.length, 0),
       destinationsBuilt: sitemap.length, sitemap, suggestedFlows,
       costUsd: costAccum.usd, llmCostBreakdown: breakdownFromAccum(costAccum),
       llmCalls,
-      crawlMetadata: buildCrawlMetadata(baseUrl, crawlStartedAt, sitemap, suggestedFlows, llmCalls),
+      crawlMetadata: buildCrawlMetadata(baseUrl, crawlStartedAt, sitemap, suggestedFlows, llmCalls, {
+        diagnostics,
+      }),
     };
   } catch (err) {
+    const msg = String(err);
     return {
       status: "failed", pagesVisited: sitemap.length, nodesFound: 0, destinationsBuilt: 0,
       sitemap, suggestedFlows: [], costUsd: costAccum.usd, llmCostBreakdown: breakdownFromAccum(costAccum),
       llmCalls,
-      crawlMetadata: buildCrawlMetadata(baseUrl, crawlStartedAt, sitemap, [], llmCalls),
-      error: String(err),
+      crawlMetadata: buildCrawlMetadata(baseUrl, crawlStartedAt, sitemap, [], llmCalls, {
+        error: msg,
+        diagnostics: {
+          bfsPagesDiscovered: sitemap.length,
+          afterShallowTrim: sitemap.length,
+          afterRouteFilter: sitemap.length,
+          hints: [`Crawl aborted with an error: ${msg.slice(0, 500)}`],
+        },
+      }),
+      error: msg,
     };
   }
 }
@@ -795,9 +958,11 @@ async function clusterIntoFlows(
   const config = getConfig();
   const sitemapText = sitemap.map(p => `${p.route} ${p.forms.length > 0 ? "FORM" : ""} ${p.interactions.length > 0 ? "MODAL" : ""} \u2192 ${p.title || "(no title)"}`).join("\n");
 
-  const prompt = `You are a QA engineer reviewing a sitemap. Suggest the most valuable test flows. Max 15 suggestions.
+  const prompt = `You are a QA engineer for **web applications** (SaaS, dashboards, product UIs — not content/marketing sites).
 
-Existing tests (skip these): ${existingTestNames.length > 0 ? existingTestNames.join(", ") : "(none)"}
+Review this sitemap of discovered **app routes** and suggest the most valuable **functional** test flows (user workflows, forms, critical paths). Max 15 suggestions.
+
+Existing tests (skip overlapping ideas): ${existingTestNames.length > 0 ? existingTestNames.join(", ") : "(none)"}
 
 Sitemap:
 ${sitemapText}
@@ -951,6 +1116,7 @@ export async function executeCrawlRun(
   } catch (err) {
     const completedAt = new Date().toISOString();
     const lastSnapshot = lastSnapshotRef.current;
+    const errStr = String(err);
     if (lastSnapshot) {
       await storage.updateCrawlRun(crawlRunId, {
         status: "failed",
@@ -964,10 +1130,27 @@ export async function executeCrawlRun(
         crawl_metadata_json: {
           ...lastSnapshot.crawlMetadataPartial,
           inProgress: false,
+          error: errStr,
+          finishedAt: completedAt,
         },
       }).catch(() => {});
     } else {
-      await storage.updateCrawlRun(crawlRunId, { status: "failed", completed_at: completedAt }).catch(() => {});
+      const startedAt =
+        typeof (runRow as { started_at?: string }).started_at === "string"
+          ? (runRow as { started_at: string }).started_at
+          : completedAt;
+      await storage
+        .updateCrawlRun(crawlRunId, {
+          status: "failed",
+          completed_at: completedAt,
+          crawl_metadata_json: minimalFailedCrawlMetadata(
+            rewriteForDocker(env.base_url),
+            startedAt,
+            completedAt,
+            errStr,
+          ),
+        })
+        .catch(() => {});
     }
     if (browser) await browser.close().catch(() => {});
     throw err;

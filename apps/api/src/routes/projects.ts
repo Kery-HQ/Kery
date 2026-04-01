@@ -39,6 +39,15 @@ const EnvironmentSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
+const EnvironmentUpdateSchema = z
+  .object({
+    name: z.string().min(2).optional(),
+    baseUrl: z.string().url().optional(),
+  })
+  .refine((b) => b.name !== undefined || b.baseUrl !== undefined, {
+    message: "at least one of name, baseUrl required",
+  });
+
 const AuthSchema = z.object({
   mode: z.enum(["ui", "apiToken", "oauthToken", "tokenProvider", "none"]),
   config: z.any().optional(),
@@ -162,6 +171,36 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
       "INSERT INTO environments (project_id, name, base_url, is_default) VALUES ($1, $2, $3, $4) RETURNING *",
       [projectId, parsed.data.name, parsed.data.baseUrl, parsed.data.isDefault ?? false],
     );
+    reply.send({ environment: rows[0] });
+  });
+
+  app.put("/api/projects/:projectId/environments/:environmentId", async (req, reply) => {
+    const { projectId, environmentId } = ProjectEnvParams.parse(req.params);
+    const parsed = EnvironmentUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.flatten() });
+      return;
+    }
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+    if (parsed.data.name !== undefined) {
+      sets.push(`name = $${i++}`);
+      vals.push(parsed.data.name);
+    }
+    if (parsed.data.baseUrl !== undefined) {
+      sets.push(`base_url = $${i++}`);
+      vals.push(parsed.data.baseUrl);
+    }
+    vals.push(environmentId, projectId);
+    const { rows } = await pool.query(
+      `UPDATE environments SET ${sets.join(", ")} WHERE id = $${i++} AND project_id = $${i++} RETURNING *`,
+      vals,
+    );
+    if (!rows[0]) {
+      reply.code(404).send({ error: "environment not found" });
+      return;
+    }
     reply.send({ environment: rows[0] });
   });
 
