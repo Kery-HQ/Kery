@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Flask,
   Plus,
@@ -71,6 +71,7 @@ type MemoryFact = { selector: string; purpose: string; action: string; hits: num
 
 export const TestsPlans: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentProjectId } = useProject();
 
   const [environments, setEnvironments] = React.useState<any[]>([]);
@@ -127,6 +128,18 @@ export const TestsPlans: React.FC = () => {
     const res = await fetchTests(currentProjectId);
     setTests((res.tests || []).filter(Boolean));
   }
+
+  // Open a specific flow when navigated from command palette (or similar).
+  React.useEffect(() => {
+    const id = (location.state as { selectTestId?: string } | null)?.selectTestId;
+    if (!id || tests.length === 0) return;
+    const match = tests.find((t) => t.id === id);
+    if (match) {
+      setSelectedTest(match);
+      setTestTab("runs");
+      navigate(".", { replace: true, state: {} });
+    }
+  }, [tests, location.state, navigate]);
 
   // ─── Load runs for selected test ─────────────────────────────────────────
 
