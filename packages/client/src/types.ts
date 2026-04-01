@@ -31,6 +31,8 @@ export type TestRun = {
   trigger_ref: string;
   status: "queued" | "running" | "passed" | "failed";
   summary?: string | null;
+  /** Resolved in list queries: flow name, page title/route, or adhoc label. */
+  display_name?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
   steps_json?: RunStep[] | null;

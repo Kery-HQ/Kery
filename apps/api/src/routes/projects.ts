@@ -12,6 +12,22 @@ import {
   ProjectUpdateBody,
 } from "./params.js";
 
+/** Join saved_tests + destinations so list views can show flow name, page title, or adhoc label. */
+const RUN_LIST_FROM = `
+  FROM test_runs tr
+  LEFT JOIN saved_tests st ON st.id = tr.test_id
+  LEFT JOIN app_tree_destinations d ON d.id = tr.destination_id
+`;
+
+const RUN_DISPLAY_NAME_SQL = `
+  COALESCE(
+    NULLIF(TRIM(tr.source_label), ''),
+    st.name,
+    NULLIF(TRIM(d.title), ''),
+    d.normalized_route
+  ) AS display_name
+`;
+
 const ProjectSchema = z.object({
   name: z.string().min(2),
   domain: z.string().optional().nullable(),
@@ -176,7 +192,8 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
   app.get("/api/projects/:projectId/runs", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
     const { rows } = await pool.query(
-      "SELECT * FROM test_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 100",
+      `SELECT tr.*, ${RUN_DISPLAY_NAME_SQL} ${RUN_LIST_FROM}
+       WHERE tr.project_id = $1 ORDER BY tr.started_at DESC NULLS LAST LIMIT 100`,
       [projectId],
     );
     reply.send({ runs: rows });
@@ -422,6 +439,12 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
       reply.code(404).send({ error: "Page not found" });
       return;
     }
-    reply.send({ page: dest, recentRuns: [] });
+    const { rows: recentRuns } = await pool.query(
+      `SELECT tr.*, ${RUN_DISPLAY_NAME_SQL} ${RUN_LIST_FROM}
+       WHERE tr.project_id = $1 AND tr.destination_id = $2
+       ORDER BY tr.started_at DESC NULLS LAST LIMIT 20`,
+      [projectId, destinationId],
+    );
+    reply.send({ page: dest, recentRuns });
   });
 }

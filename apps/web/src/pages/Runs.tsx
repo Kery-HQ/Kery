@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { statusVariant, duration, relativeTime, formatRunCost } from "@/lib/formatters";
+import { statusVariant, duration, relativeTime, formatRunCost, runListLabel } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchProjectRuns } from "@/projectApi";
 
@@ -99,7 +99,7 @@ export const Runs: React.FC = () => {
                       {r.id.slice(0, 8)}
                     </span>
                     <span className="flex-1 text-[13px] text-foreground truncate min-w-0">
-                      {r.summary?.split("\n")[0] ?? r.source_label ?? "--"}
+                      {runListLabel(r)}
                     </span>
                     <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
                       {r.status}

@@ -26,7 +26,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { statusVariant, duration, relativeTime, formatCost, formatRunCost } from "@/lib/formatters";
+import { statusVariant, duration, relativeTime, formatCost, formatRunCost, runListLabel } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchProjectOverview, fetchProjectRuns, fetchProjectBugs,
@@ -351,7 +351,7 @@ function Dashboard({
                   >
                     <StatusDot status={r.status} />
                     <span className="flex-1 text-[13px] text-foreground truncate">
-                      {r.summary?.split("\n")[0] ?? r.source_label ?? "--"}
+                      {runListLabel(r)}
                     </span>
                     <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
                       {r.status}

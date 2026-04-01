@@ -66,6 +66,19 @@ export function formatRunCost(run: { cost_usd?: number | null; llm_calls_json?: 
   return formatCost(runCostUsd(run));
 }
 
+/** Primary line for run lists: resolved test/page/adhoc name, else first summary line (e.g. errors). */
+export function runListLabel(run: {
+  summary?: string | null;
+  display_name?: string | null;
+  source_label?: string | null;
+}): string {
+  const named = (run.display_name ?? run.source_label ?? "").trim();
+  if (named) return named;
+  const summaryLine = run.summary?.split("\n")[0]?.trim();
+  if (summaryLine) return summaryLine;
+  return "—";
+}
+
 export function formatMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   return `${(ms / 1000).toFixed(1)}s`;

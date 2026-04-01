@@ -61,14 +61,16 @@ export function registerRunRoutes(
     let context: string | undefined;
     let maxSteps: number | undefined;
 
+    let dest: Awaited<ReturnType<StorageAdapter["getDestination"]>> = null;
     if (destinationId) {
-      const dest = await storage.getDestination(destinationId);
+      dest = await storage.getDestination(destinationId);
       if (!dest) { reply.code(404).send({ error: "destination not found" }); return; }
       intent = intent || `Inspect ${dest.normalized_route} ("${dest.title}") for bugs`;
     }
 
+    let savedTest: Awaited<ReturnType<StorageAdapter["getSavedTest"]>> = null;
     if (testId) {
-      const savedTest = await storage.getSavedTest(testId);
+      savedTest = await storage.getSavedTest(testId);
       if (!savedTest) { reply.code(404).send({ error: "test not found" }); return; }
       intent = savedTest.intent;
       context = savedTest.context ?? undefined;
@@ -76,6 +78,21 @@ export function registerRunRoutes(
     }
 
     if (!intent) { reply.code(400).send({ error: "intent is required" }); return; }
+
+    let sourceLabel: string;
+    let sourceType: "test" | "page" | "adhoc";
+    if (testId && savedTest) {
+      sourceLabel = String(savedTest.name ?? "").trim() || "Saved test";
+      sourceType = "test";
+    } else if (destinationId && dest) {
+      const title = String(dest.title ?? "").trim();
+      sourceLabel = title || String(dest.normalized_route ?? "");
+      sourceType = "page";
+    } else {
+      sourceLabel = intent.trim();
+      if (sourceLabel.length > 500) sourceLabel = `${sourceLabel.slice(0, 497)}...`;
+      sourceType = "adhoc";
+    }
 
     const { rows: [env] } = await pool.query("SELECT * FROM environments WHERE id = $1", [environmentId]);
     if (!env) { reply.code(404).send({ error: "environment not found" }); return; }
@@ -87,6 +104,8 @@ export function registerRunRoutes(
       test_id: testId ?? null, destination_id: destinationId ?? null,
       trigger_type: "manual", trigger_ref: "dashboard",
       status: "running", started_at: new Date().toISOString(),
+      source_type: sourceType,
+      source_label: sourceLabel,
     });
 
     const authConfig = authRow ? { mode: authRow.mode, ...authRow.config_json } : null;

@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot } from "@/components/status-dot";
 import { cn } from "@/lib/utils";
-import { relativeTime, duration, statusVariant } from "@/lib/formatters";
+import { relativeTime, duration, statusVariant, runListLabel } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchPageDetail, fetchPageMemory, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
 import type { MemoryEntry } from "@/projectApi";
@@ -46,6 +46,8 @@ type PageData = {
     id: string;
     status: string;
     summary?: string;
+    display_name?: string | null;
+    source_label?: string | null;
     started_at?: string;
     completed_at?: string | null;
     trigger_ref?: string;
@@ -449,7 +451,7 @@ export function PageDetail() {
                         {run.status}
                       </Badge>
                       <span className="text-[13px] text-muted-foreground truncate flex-1">
-                        {run.summary || run.id?.slice(0, 8)}
+                        {runListLabel(run)}
                       </span>
                       {run.started_at && (
                         <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
