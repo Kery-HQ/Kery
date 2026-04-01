@@ -44,8 +44,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       AGENT_MODEL: ${AGENT_MODEL:-openai/gpt-4.1-mini}
       REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-4.6}
-      CRAWL_MODEL: ${CRAWL_MODEL:-gemini-2.5-flash}
-      # Legacy fallbacks for crawl (optional; used if CRAWL_MODEL unset)
+      AUXILIARY_MODEL: ${AUXILIARY_MODEL:-${CRAWL_MODEL:-gemini-2.5-flash}}
+      # CRAWL_MODEL still works as fallback when AUXILIARY_MODEL is unset (deprecated alias)
       SCRIPT_MODEL: ${SCRIPT_MODEL:-}
       SUMMARY_MODEL: ${SUMMARY_MODEL:-}
       REVIEW_MODEL: ${REVIEW_MODEL:-}

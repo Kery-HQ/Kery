@@ -8,6 +8,11 @@ export interface StorageAdapter {
   saveProjectMemoryEntries(projectId: string, entries: MemoryEntryInsert[]): Promise<void>;
   savePageMemoryEntries(destinationId: string, entries: MemoryEntryInsert[]): Promise<void>;
   boostConfidence(ids: string[], amount?: number): Promise<void>;
+  deleteMemoryEntries(ids: string[]): Promise<void>;
+  updateMemoryEntry(
+    id: string,
+    data: { summary?: string; content?: string; confidence?: number },
+  ): Promise<void>;
 
   // Bugs
   persistBugsFromRun(

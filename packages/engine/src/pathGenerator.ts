@@ -1,4 +1,4 @@
-import { loadProjectMemory, loadPageMemory, formatMemoryForPrompt } from "./agentMemory.js";
+import { loadProjectMemoryWithDecay, loadPageMemoryWithDecay, formatMemoryForPrompt } from "./agentMemory.js";
 import { llmPathPlan } from "./llmClient.js";
 import type { LLMUsage } from "./llmClient.js";
 import { logger } from "./logger.js";
@@ -33,8 +33,8 @@ export async function generateTestPlan(storage: StorageAdapter, input: PathGener
   const { projectId, destinationId, destination, intent } = input;
 
   const [projectMemory, pageMemory] = await Promise.all([
-    loadProjectMemory(storage, projectId),
-    loadPageMemory(storage, destinationId),
+    loadProjectMemoryWithDecay(storage, projectId),
+    loadPageMemoryWithDecay(storage, destinationId),
   ]);
   const memoryEntries: MemoryEntry[] = [...pageMemory, ...projectMemory];
   const memorySection = formatMemoryForPrompt(memoryEntries);

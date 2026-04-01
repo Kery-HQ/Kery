@@ -31,14 +31,17 @@ export { handleTokenAuth, authenticateWithClerk, authenticateWithSupabase, refre
 // ─── Memory ──────────────────────────────────────────────────────────────────
 export {
   loadProjectMemory, loadPageMemory,
+  loadProjectMemoryWithDecay, loadPageMemoryWithDecay,
   saveProjectMemoryEntries, savePageMemoryEntries,
   formatMemoryForPrompt, proposeMemoriesFromRun, boostConfidence,
 } from "./agentMemory.js";
+export { curateMemoryAfterRun } from "./memoryCurator.js";
+export type { CurateMemoryInput, CurateMemoryResult } from "./memoryCurator.js";
 export type { MemoryEntry, MemoryEntryInsert, MemoryEntryType, MemorySource } from "./agentMemory.js";
 
 // ─── LLM ─────────────────────────────────────────────────────────────────────
-export { llmChat, llmAgentChat, llmSummarize, llmPathPlan, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
-export type { LLMUsage } from "./llmClient.js";
+export { llmChat, llmAgentChat, llmSummarize, llmPathPlan, llmMemoryCurate, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+export type { LLMUsage, MemoryCurationParsed } from "./llmClient.js";
 export {
   inferModelProviderRequirement,
   isModelRunnableWithConfig,

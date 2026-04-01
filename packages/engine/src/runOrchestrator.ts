@@ -19,11 +19,11 @@ import { calcCostUsd } from "./llmClient.js";
 import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, generateRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
 import {
-  loadProjectMemory, loadPageMemory,
-  saveProjectMemoryEntries, savePageMemoryEntries,
-  proposeMemoriesFromRun,
+  loadProjectMemoryWithDecay, loadPageMemoryWithDecay,
+  boostConfidence,
   type MemoryEntry,
 } from "./agentMemory.js";
+import { curateMemoryAfterRun } from "./memoryCurator.js";
 import { initStagehandSession, destroyStagehandSession, type StagehandSession } from "./stagehandBridge.js";
 import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
 import type { StorageAdapter } from "./storage.js";
@@ -89,12 +89,12 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         const planContext = formatTestPlanForNavigator(plan);
         if (planContext) context = context ? `${context}\n\n${planContext}` : planContext;
         if (usage) {
-          const model = config.crawlModel;
+          const model = config.auxiliaryModel;
           pathGenCalls.push({
             seq: 0, stepIndex: 0, model, hasVision: false, attempt: 1,
             inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens, durationMs,
-            costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "crawlModel"),
+            costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "auxiliaryModel"),
             query: pathPrompt ?? "Generate test plan for destination",
             requestMessages: pathPrompt ? [{ role: "user", content: pathPrompt }] : undefined,
             response: rawResponse ?? planContext ?? "",
@@ -131,9 +131,18 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     } catch {}
   }
 
-  // Load memory
-  const projectMemory = job.projectId ? await loadProjectMemory(storage, job.projectId) : [];
-  const pageMemory = job.destinationId ? await loadPageMemory(storage, job.destinationId) : [];
+  // Load memory (with in-memory decay for prompt; DB rows unchanged until curator/boost)
+  let destinationRoute: string | undefined;
+  if (job.destinationId) {
+    try {
+      const d = await storage.getDestination(job.destinationId);
+      destinationRoute = d?.normalized_route;
+    } catch {
+      /* ignore */
+    }
+  }
+  const projectMemory = job.projectId ? await loadProjectMemoryWithDecay(storage, job.projectId) : [];
+  const pageMemory = job.destinationId ? await loadPageMemoryWithDecay(storage, job.destinationId) : [];
   const allMemory = [...pageMemory, ...projectMemory];
 
   // Launch browser
@@ -385,12 +394,28 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       }
       logger.info({ count: netBugs.length }, "Network monitor: action-correlated bugs merged");
     }
-    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, holisticCalls, filmstripCalls);
+    const memoryCuratorCalls: LLMCallRecord[] = [];
 
-    // Save memory
-    const proposed = proposeMemoriesFromRun(agentResult.stepsDetail, job.intent);
-    if (job.projectId && proposed.length > 0) await saveProjectMemoryEntries(storage, job.projectId, proposed);
-    if (job.destinationId && proposed.length > 0) await savePageMemoryEntries(storage, job.destinationId, proposed);
+    if (agentResult.status === "passed" && allMemory.length > 0) {
+      await boostConfidence(storage, allMemory.map((e) => e.id), 3);
+    }
+
+    const { proposed: memoryProposed } = await curateMemoryAfterRun(storage, {
+      intent: job.intent,
+      runStatus: agentResult.status === "passed" ? "passed" : "failed",
+      stepsDetail: agentResult.stepsDetail,
+      projectId: job.projectId,
+      destinationId: job.destinationId,
+      destinationRoute,
+      projectMemory,
+      pageMemory,
+      onLLMCall: (call) => {
+        memoryCuratorCalls.push(call);
+        job.onLLMCall?.(call);
+      },
+    });
+
+    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, holisticCalls, filmstripCalls, memoryCuratorCalls);
 
     if (shSession) {
       await finalizeStagehandRecording(shSession, videoTmpDir, job.runId);
@@ -407,7 +432,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
     return {
       status: finalStatus, steps: agentResult.steps, stepsDetail: agentResult.stepsDetail,
-      memoryLoaded: allMemory, memoryProposed: proposed.length,
+      memoryLoaded: allMemory, memoryProposed: memoryProposed,
       bugsFound, llmCalls: mergedCalls, videoUrl,
     };
   } catch (err) {
@@ -440,12 +465,14 @@ function mergeLLMCalls(
   navigator: LLMCallRecord[],
   holistic: LLMCallRecord[],
   filmstrip: LLMCallRecord[] = [],
+  memoryCurator: LLMCallRecord[] = [],
 ): LLMCallRecord[] {
   const merged: LLMCallRecord[] = [
     ...pathGen.map((c) => ({ ...c, agent: "pathgen" as LLMAgentType })),
     ...navigator.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
     ...holistic.map((c) => ({ ...c, agent: (c.agent ?? "holistic") as LLMAgentType })),
     ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),
+    ...memoryCurator.map((c) => ({ ...c, agent: (c.agent ?? "memory_curator") as LLMAgentType })),
   ];
   merged.forEach((c, i) => { c.seq = i + 1; });
   return merged;

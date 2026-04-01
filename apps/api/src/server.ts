@@ -21,7 +21,7 @@ initEngineConfig({
   anthropicApiKey: config.anthropicApiKey,
   geminiApiKey: config.geminiApiKey,
   agentModel: config.agentModel,
-  crawlModel: config.crawlModel,
+  auxiliaryModel: config.auxiliaryModel,
   reviewAgentModel: config.reviewAgentModel,
   stagehandEnabled: config.stagehandEnabled,
   stagehandModel: config.stagehandModel,

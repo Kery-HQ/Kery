@@ -392,9 +392,10 @@ const MODEL_CONFIG: { key: string; label: string; description: string; options: 
     options: AGENT_OPTIONS,
   },
   {
-    key: "crawlModel",
-    label: "Crawl Model",
-    description: "Crawl tasks, destination path / test plan generation, per-page intents -- text & JSON",
+    key: "auxiliaryModel",
+    label: "Auxiliary Model",
+    description:
+      "Text/JSON work: crawl, path & test plans, memory curation, page intents, summarization — not the main browser agent",
     options: CODE_OPTIONS,
   },
   {

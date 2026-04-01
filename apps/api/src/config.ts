@@ -11,8 +11,9 @@ export const config = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   agentModel: process.env.AGENT_MODEL || "openai/gpt-4.1-mini",
-  /** Crawl, path plans, auxiliary text. Legacy env keys still apply if `CRAWL_MODEL` is unset. */
-  crawlModel:
+  /** Crawl, path plans, memory curation, intents, summarization — text/JSON auxiliary stack. `CRAWL_MODEL` is a deprecated alias. */
+  auxiliaryModel:
+    process.env.AUXILIARY_MODEL ||
     process.env.CRAWL_MODEL ||
     process.env.SCRIPT_MODEL ||
     process.env.SUMMARY_MODEL ||

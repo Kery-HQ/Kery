@@ -98,7 +98,8 @@ export type LLMAgentType =
   | "summary"
   | "filmstrip"
   | "crawl_link_filter"
-  | "crawl_suggested_flows";
+  | "crawl_suggested_flows"
+  | "memory_curator";
 
 /** Serializable multimodal message for run-detail UI (no raw base64 — images are parallel `imageBase64s` / `imagePaths`). */
 export type LLMStoredContentPart =

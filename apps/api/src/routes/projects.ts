@@ -8,6 +8,7 @@ import {
   ProjectEnvParams,
   ProjectDestParams,
   ProjectDestMemoryEntryParams,
+  ProjectMemoryEntryParams,
   ProjectUpdateBody,
 } from "./params.js";
 
@@ -186,6 +187,91 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
     const { projectId } = ProjectIdParams.parse(req.params);
     const entries = await storage.loadProjectMemory(projectId);
     reply.send({ entries });
+  });
+
+  app.post("/api/projects/:projectId/memory", async (req, reply) => {
+    const { projectId } = ProjectIdParams.parse(req.params);
+    const parsed = MemoryCreateBody.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.issues });
+      return;
+    }
+    const { type, summary, content, region, confidence } = parsed.data;
+    const regionJson = region != null ? JSON.stringify(region) : null;
+    const { rows } = await pool.query(
+      `INSERT INTO memory_entries (scope, project_id, type, summary, content, region, source, confidence)
+       VALUES ('project', $1, $2, $3, $4, $5::jsonb, 'user', $6) RETURNING *`,
+      [projectId, type, summary, content, regionJson, confidence ?? 50],
+    );
+    reply.send({ entry: rows[0] });
+  });
+
+  app.patch("/api/projects/:projectId/memory/:entryId", async (req, reply) => {
+    const { projectId, entryId } = ProjectMemoryEntryParams.parse(req.params);
+    const parsed = MemoryPatchBody.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.issues });
+      return;
+    }
+    const p = parsed.data;
+    const parts: string[] = [];
+    const vals: unknown[] = [];
+    let n = 1;
+    if (p.type !== undefined) {
+      parts.push(`type = $${n++}`);
+      vals.push(p.type);
+    }
+    if (p.summary !== undefined) {
+      parts.push(`summary = $${n++}`);
+      vals.push(p.summary);
+    }
+    if (p.content !== undefined) {
+      parts.push(`content = $${n++}`);
+      vals.push(p.content);
+    }
+    if (p.region !== undefined) {
+      parts.push(`region = $${n++}::jsonb`);
+      vals.push(p.region === null ? null : JSON.stringify(p.region));
+    }
+    if (p.confidence !== undefined) {
+      parts.push(`confidence = $${n++}`);
+      vals.push(p.confidence);
+    }
+    if (parts.length === 0) {
+      reply.code(400).send({ error: "no fields to update" });
+      return;
+    }
+    parts.push("updated_at = now()");
+    vals.push(entryId, projectId);
+    const { rows } = await pool.query(
+      `UPDATE memory_entries SET ${parts.join(", ")}
+       WHERE id = $${n++} AND scope = 'project' AND project_id = $${n++} RETURNING *`,
+      vals,
+    );
+    if (rows.length === 0) {
+      reply.code(404).send({ error: "Memory entry not found" });
+      return;
+    }
+    reply.send({ entry: rows[0] });
+  });
+
+  app.delete("/api/projects/:projectId/memory/:entryId", async (req, reply) => {
+    const { projectId, entryId } = ProjectMemoryEntryParams.parse(req.params);
+    const { rowCount } = await pool.query(
+      `DELETE FROM memory_entries WHERE id = $1 AND scope = 'project' AND project_id = $2`,
+      [entryId, projectId],
+    );
+    if (!rowCount) {
+      reply.code(404).send({ error: "Memory entry not found" });
+      return;
+    }
+    reply.send({ ok: true });
+  });
+
+  app.delete("/api/projects/:projectId/memory", async (req, reply) => {
+    const { projectId } = ProjectIdParams.parse(req.params);
+    await pool.query(`DELETE FROM memory_entries WHERE scope = 'project' AND project_id = $1`, [projectId]);
+    reply.send({ ok: true });
   });
 
   // Coverage

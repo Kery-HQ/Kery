@@ -277,7 +277,7 @@ export type ModelPriceUsd = { input: number; output: number };
 
 export type ModelSlotKey =
   | "agentModel"
-  | "crawlModel"
+  | "auxiliaryModel"
   | "reviewAgentModel"
   | "stagehandModel";
 

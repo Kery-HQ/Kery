@@ -95,6 +95,39 @@ export class PostgresAdapter implements StorageAdapter {
     );
   }
 
+  async deleteMemoryEntries(ids: string[]) {
+    if (ids.length === 0) return;
+    await this.db.query(`DELETE FROM memory_entries WHERE id = ANY($1)`, [ids]);
+  }
+
+  async updateMemoryEntry(
+    id: string,
+    data: { summary?: string; content?: string; confidence?: number },
+  ) {
+    const parts: string[] = [];
+    const vals: unknown[] = [];
+    let n = 1;
+    if (data.summary !== undefined) {
+      parts.push(`summary = $${n++}`);
+      vals.push(data.summary);
+    }
+    if (data.content !== undefined) {
+      parts.push(`content = $${n++}`);
+      vals.push(data.content);
+    }
+    if (data.confidence !== undefined) {
+      parts.push(`confidence = $${n++}`);
+      vals.push(data.confidence);
+    }
+    if (parts.length === 0) return;
+    parts.push("updated_at = now()");
+    vals.push(id);
+    await this.db.query(
+      `UPDATE memory_entries SET ${parts.join(", ")} WHERE id = $${n}`,
+      vals,
+    );
+  }
+
   // ─── Bugs ───────────────────────────────────────────────────────────────────
 
   async persistBugsFromRun(projectId: string, runId: string, runLabel: string | null, reportedAt: string, environmentId: string | null, environmentName: string | null, enrichedBugs: any[]) {

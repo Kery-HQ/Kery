@@ -50,7 +50,7 @@ npm run dev:api
 | `OPENROUTER_API_KEY` | | OpenRouter API key (recommended — routes to all models) |
 | `OPENAI_API_KEY` | | Direct OpenAI API key (fallback) |
 | `AGENT_MODEL` | `openai/gpt-4.1-mini` | Model for browser automation decisions |
-| `CRAWL_MODEL` | `gemini-2.5-flash` | Crawl, destination path / test plans, page intents (`SCRIPT_MODEL` / `SUMMARY_MODEL` / `REVIEW_MODEL` still work as fallbacks if `CRAWL_MODEL` is unset) |
+| `AUXILIARY_MODEL` | `gemini-2.5-flash` | Text/JSON auxiliary work: crawl, path & test plans, memory curation, intents, summarization. `CRAWL_MODEL` is a deprecated alias; `SCRIPT_MODEL` / `SUMMARY_MODEL` / `REVIEW_MODEL` still work as further fallbacks |
 | `REVIEW_AGENT_MODEL` | `gemini-2.5-flash` | Post-run holistic & filmstrip screenshot analysis |
 | `STAGEHAND_ENABLED` | `true` | Enable Stagehand for smart element finding |
 | `RUN_TIMEOUT_MINUTES` | `15` | Max wall-clock time per test run |

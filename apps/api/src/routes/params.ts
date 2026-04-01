@@ -37,6 +37,11 @@ export const ProjectDestMemoryEntryParams = z.object({
   entryId: z.string().uuid(),
 });
 
+export const ProjectMemoryEntryParams = z.object({
+  projectId: z.string().uuid(),
+  entryId: z.string().uuid(),
+});
+
 export const ProjectBugParams = z.object({
   projectId: z.string().uuid(),
   bugId: z.string().uuid(),

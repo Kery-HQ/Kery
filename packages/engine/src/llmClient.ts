@@ -424,7 +424,7 @@ export async function llmAgentChat(messages: any[]): Promise<{ content: string; 
 export async function llmSummarize(prompt: string): Promise<{ content: string; usage: { inputTokens: number; outputTokens: number; totalTokens: number } }> {
   const { content, usage } = await llmChat(
     [{ role: "user", content: prompt }],
-    getConfig().crawlModel,
+    getConfig().auxiliaryModel,
     { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 }
   );
   return { content, usage };
@@ -466,10 +466,88 @@ const TEST_PLAN_SCHEMA = {
 };
 
 export async function llmPathPlan(prompt: string): Promise<{ content: string; usage: LLMUsage }> {
-  const model = getConfig().crawlModel;
+  const model = getConfig().auxiliaryModel;
   return llmChat(
     [{ role: "user", content: prompt }],
     model,
     { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3, responseFormat: TEST_PLAN_SCHEMA }
+  );
+}
+
+// ─── Memory curator (text only, structured JSON) ───────────────────────────────
+
+const MEMORY_ADD_ITEM_SCHEMA = {
+  type: "object",
+  properties: {
+    type: {
+      type: "string",
+      enum: ["learned_path", "ignore_region", "avoid_region", "bug_pattern", "tip"],
+    },
+    summary: { type: "string" },
+    content: { type: "string" },
+    scope: { type: "string", enum: ["project", "page"] },
+    confidence: { type: "integer" },
+    regionDescription: { type: ["string", "null"] },
+  },
+  required: ["type", "summary", "content", "scope", "confidence", "regionDescription"],
+  additionalProperties: false,
+};
+
+const MEMORY_UPDATE_ITEM_SCHEMA = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    summary: { type: ["string", "null"] },
+    content: { type: ["string", "null"] },
+    confidence: { type: ["integer", "null"] },
+  },
+  required: ["id", "summary", "content", "confidence"],
+  additionalProperties: false,
+};
+
+const MEMORY_CURATION_SCHEMA = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "memory_curation",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        add: { type: "array", items: MEMORY_ADD_ITEM_SCHEMA },
+        boost: { type: "array", items: { type: "string" } },
+        delete: { type: "array", items: { type: "string" } },
+        update: { type: "array", items: MEMORY_UPDATE_ITEM_SCHEMA },
+      },
+      required: ["add", "boost", "delete", "update"],
+      additionalProperties: false,
+    },
+  },
+};
+
+export type MemoryCurationParsed = {
+  add: Array<{
+    type: "learned_path" | "ignore_region" | "avoid_region" | "bug_pattern" | "tip";
+    summary: string;
+    content: string;
+    scope: "project" | "page";
+    confidence: number;
+    regionDescription: string | null;
+  }>;
+  boost: string[];
+  delete: string[];
+  update: Array<{
+    id: string;
+    summary: string | null;
+    content: string | null;
+    confidence: number | null;
+  }>;
+};
+
+export async function llmMemoryCurate(prompt: string): Promise<{ content: string; usage: LLMUsage }> {
+  const model = getConfig().auxiliaryModel;
+  return llmChat(
+    [{ role: "user", content: prompt }],
+    model,
+    { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2, responseFormat: MEMORY_CURATION_SCHEMA }
   );
 }
