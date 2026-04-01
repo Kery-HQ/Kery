@@ -2,7 +2,7 @@
 
 ## Aesthetic
 
-Linear-style dark-first developer tool. Dense, keyboard-first, subtle animations. Mango/amber accent on blue-gray backgrounds.
+Calm developer tool. Pale sage green surfaces in light mode, deep forest sage in dark mode. Muted terracotta/amber accent (the mango brand) pops against the sage. Dense but breathable, keyboard-first, subtle animations. Inspired by Claude.ai's restraint applied to a dev tool context.
 
 ## Imports
 
@@ -10,11 +10,18 @@ Always use `@/` path aliases: `@/components/ui/button`, `@/lib/utils`, `@/pages/
 
 ## Colors
 
-OKLCH-based with blue-gray tint in dark mode. Never use raw hex/rgb — use CSS variables or Tailwind tokens.
+OKLCH-based. Light mode: pale sage (hue ~148, very low chroma). Dark mode: deep forest sage (same hue, low lightness). Never use raw hex/rgb — use CSS variables or Tailwind tokens.
 
-- **Accent**: mango/amber gold (`--primary`). Used for active states, focus rings, primary buttons.
-- **Status**: semantic only — `status-pass` (green), `status-fail` (red), `status-running` (blue), `status-warn` (yellow). Available as `bg-status-pass`, `text-status-pass`, etc.
-- **Elevation**: brightness stepping, not box-shadows. Each layer is 2-3% lighter in OKLCH.
+- **Accent**: muted terracotta (`--primary`). Used for active states, focus rings, primary buttons. Not saturated amber — deliberately quiet.
+- **Status**: all muted pastels — sage green, brick red, soft periwinkle, straw yellow. Available as `bg-status-pass`, `text-status-pass`, etc.
+- **Elevation**: `surface-1` → `surface-2` → `surface-3`, stepping in brightness. Use `bg-surface-2` on cards, `bg-surface-3` for raised panels.
+
+## Icons
+
+- **Library**: [Phosphor Icons](https://phosphoricons.com/) (`@phosphor-icons/react`) — consistent stroke, multiple weights (`weight` prop), large catalog.
+- **Import**: named imports, e.g. `import { Pulse, Gear } from "@phosphor-icons/react"`.
+- **Sizing**: match existing patterns — `className="h-4 w-4"` on icons; spinners use `animate-spin` where needed.
+- **Types**: use `import type { Icon } from "@phosphor-icons/react"` when storing icon components (e.g. config arrays).
 
 ## Typography
 
@@ -27,9 +34,10 @@ OKLCH-based with blue-gray tint in dark mode. Never use raw hex/rgb — use CSS 
 | Uppercase labels | 11px | 500 | `text-[11px] font-medium uppercase tracking-wider` |
 | Code / IDs / durations / URLs / costs | 12-13px | 400 | `font-mono text-[13px]` |
 
-- **UI font**: Inter (loaded via Google Fonts)
-- **Monospace**: JetBrains Mono (loaded via Google Fonts) → SF Mono → system fallback
-- Dark mode bumps body weight to 450 automatically
+- **UI font**: Ubuntu (loaded via Google Fonts) — warm, rounded, highly legible
+- **Display font**: Space Grotesk (`font-display`) — used for page titles (`PageHeader`), nav wordmark "Kery", and section headings that need character
+- **Monospace**: Fira Code → Fira Mono → Ubuntu Mono → Menlo → Consolas. Use `font-mono` for code blocks, IDs, routes, costs, timestamps. Use `mono-ui` class for compact ID/slug fields.
+- Fira Code ligatures are enabled by default (`liga`, `calt` feature settings)
 
 ## Component Library
 
@@ -114,7 +122,8 @@ export function MyPage() {
 - **Do** use `Skeleton` for loading states (not spinners)
 - **Do** use `EmptyState` when a list has no data
 - **Don't** use raw hex/rgb colors — always CSS variables or Tailwind tokens
-- **Don't** use box-shadows for elevation in dark mode — use brightness stepping
+- **Don't** use box-shadows for elevation — use surface tokens (`bg-surface-2`, etc.)
+- **Don't** use cold blue-gray backgrounds — always use warm surface tokens
 - **Don't** use emojis in the UI
 - **Don't** add animations longer than 300ms
 - **Don't** import from relative paths — always use `@/` aliases

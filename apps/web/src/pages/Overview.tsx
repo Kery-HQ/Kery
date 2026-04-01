@@ -1,10 +1,22 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Activity, AlertCircle, Loader2,
-  ChevronRight, Globe, Scan, FlaskConical, Play, Circle, Check, X, Sparkles,
-  PieChart, DollarSign,
-} from "lucide-react";
+  SquaresFour,
+  Pulse,
+  WarningCircle,
+  Spinner,
+  CaretRight,
+  Globe,
+  Scan,
+  Flask,
+  Play,
+  Circle,
+  Check,
+  X,
+  Sparkle,
+  ChartPie,
+  CurrencyDollar,
+} from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { StatusDot } from "@/components/status-dot";
@@ -57,7 +69,7 @@ const SETUP_STEPS: SetupStep[] = [
     label: "Run your first test on app",
     description:
       "Create your first custom test, or let the agent explore without a script.",
-    icon: FlaskConical,
+    icon: Flask,
     href: "/tests",
     buttonLabel: "Create flow",
   },
@@ -173,7 +185,7 @@ function SetupChecklist({
                     <div className="ml-6 mt-3">
                       <Button size="sm" onClick={() => navigate(step.href)}>
                         {step.buttonLabel}
-                        <ChevronRight className="h-3 w-3" />
+                        <CaretRight className="h-3 w-3" />
                       </Button>
                     </div>
                   )}
@@ -231,7 +243,7 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Page coverage
         </span>
-        <PieChart className="h-4 w-4 text-muted-foreground shrink-0" />
+        <ChartPie className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
       {total === 0 ? (
         <p className="text-[12px] text-muted-foreground leading-snug">No scanned pages yet. Run a crawl to map your app.</p>
@@ -307,14 +319,14 @@ function Dashboard({
     <div className="space-y-6">
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Activity className="h-4 w-4" />} />
+        <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Pulse className="h-4 w-4" />} />
         <PageCoverageKpi coverage={coverage} />
         <KpiCard
           label="Project spend"
           value={formatCost(totalCost)}
-          icon={<DollarSign className="h-4 w-4" />}
+          icon={<CurrencyDollar className="h-4 w-4" />}
         />
-        <KpiCard label="Running" value={overview?.running ?? 0} icon={<Loader2 className="h-4 w-4" />} />
+        <KpiCard label="Running" value={overview?.running ?? 0} icon={<Spinner className="h-4 w-4 animate-spin" />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -323,12 +335,12 @@ function Dashboard({
           <div className="flex items-center justify-between p-4 pb-2">
             <span className="text-[14px] font-medium">Recent Runs</span>
             <Button variant="ghost" size="sm" onClick={() => navigate("/runs")} className="h-7 text-[12px] gap-1">
-              View all <ChevronRight className="h-3 w-3" />
+              View all <CaretRight className="h-3 w-3" />
             </Button>
           </div>
           <CardContent className="pt-0">
             {runs.length === 0 ? (
-              <EmptyState icon={<Activity className="h-5 w-5" />} title="No runs yet" className="py-8" />
+              <EmptyState icon={<Pulse className="h-5 w-5" />} title="No runs yet" className="py-8" />
             ) : (
               <div className="divide-y divide-border">
                 {runs.map((r: any) => (
@@ -365,12 +377,12 @@ function Dashboard({
           <div className="flex items-center justify-between p-4 pb-2">
             <span className="text-[14px] font-medium">Recent Issues</span>
             <Button variant="ghost" size="sm" onClick={() => navigate("/bugs")} className="h-7 text-[12px] gap-1">
-              View all <ChevronRight className="h-3 w-3" />
+              View all <CaretRight className="h-3 w-3" />
             </Button>
           </div>
           <CardContent className="pt-0">
             {bugs.length === 0 ? (
-              <EmptyState icon={<AlertCircle className="h-5 w-5" />} title="No issues found" className="py-8" />
+              <EmptyState icon={<WarningCircle className="h-5 w-5" />} title="No issues found" className="py-8" />
             ) : (
               <div className="divide-y divide-border">
                 {bugs.map((bug: any, i: number) => (
@@ -465,9 +477,9 @@ export const Overview: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<LayoutDashboard className="h-4 w-4" />} title="Overview" />
+        <PageHeader icon={<SquaresFour className="h-4 w-4" />} title="Overview" />
         <EmptyState
-          icon={<LayoutDashboard className="h-6 w-6" />}
+          icon={<SquaresFour className="h-6 w-6" />}
           title="No project selected"
           description="Create or select a project to get started."
         />
@@ -479,7 +491,7 @@ export const Overview: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<LayoutDashboard className="h-4 w-4" />} title="Overview">
+      <PageHeader icon={<SquaresFour className="h-4 w-4" />} title="Overview">
         {!loading && !setupDone && setupDismissed && (
           <Button
             type="button"
@@ -488,7 +500,7 @@ export const Overview: React.FC = () => {
             className="h-7 gap-1.5 text-[11px]"
             onClick={showSetupGuideAgain}
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <Sparkle className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Show setup guide</span>
             <span className="sm:hidden">Setup guide</span>
           </Button>

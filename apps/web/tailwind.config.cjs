@@ -15,6 +15,7 @@ module.exports = {
       fontFamily: {
         sans: ['var(--font-sans)'],
         mono: ['var(--font-mono)'],
+        display: ['var(--font-display)'],
       },
       colors: {
         background:  'var(--background)',
@@ -49,6 +50,11 @@ module.exports = {
         card: {
           DEFAULT:    'var(--card)',
           foreground: 'var(--card-foreground)',
+        },
+        surface: {
+          1: 'var(--surface-1)',
+          2: 'var(--surface-2)',
+          3: 'var(--surface-3)',
         },
         status: {
           pass:    'var(--status-pass)',

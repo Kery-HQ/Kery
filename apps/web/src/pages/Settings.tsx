@@ -1,5 +1,5 @@
 import React from "react";
-import { Settings as SettingsIcon, Trash2, RotateCcw, Copy, Check } from "lucide-react";
+import { Gear, Trash, ArrowCounterClockwise, Copy, Check } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -141,9 +141,9 @@ export const Settings: React.FC = () => {
   if (!currentProjectId || !currentProject) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<SettingsIcon className="h-4 w-4" />} title="Settings" />
+        <PageHeader icon={<Gear className="h-4 w-4" />} title="Settings" />
         <EmptyState
-          icon={<SettingsIcon className="h-8 w-8" />}
+          icon={<Gear className="h-8 w-8" />}
           title="No project selected"
           description="Select a project to view settings."
           className="flex-1"
@@ -152,21 +152,27 @@ export const Settings: React.FC = () => {
     );
   }
 
+  const hasCustomizedModels = Object.values(modelSettings).some((m) => m.customized);
+
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<SettingsIcon className="h-4 w-4" />} title="Settings" />
+      <PageHeader
+        icon={<Gear className="h-4 w-4" />}
+        title="Settings"
+        description="Project identity, model routing, and destructive actions."
+      />
 
-      <div className="px-6 py-5 animate-fade-in max-w-xl space-y-6 mx-auto w-full">
+      <div className="px-6 py-5 animate-fade-in max-w-3xl space-y-6 mx-auto w-full">
 
-        {/* General */}
         <section>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
-            General
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Project</p>
           <Card>
             <CardContent className="pt-4 space-y-4">
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Project name</label>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Display name</label>
+                <p className="text-[11px] text-muted-foreground/70 mb-2">
+                  Used in navigation, pages, and run summaries.
+                </p>
                 <div className="flex gap-2">
                   <Input
                     value={projectName}
@@ -195,8 +201,11 @@ export const Settings: React.FC = () => {
               <Separator />
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Project ID</label>
+                <p className="text-[11px] text-muted-foreground/70 mb-2">
+                  Stable internal identifier used by APIs and logs.
+                </p>
                 <div className="flex items-center gap-2">
-                  <p className="text-[12px] font-mono text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5 border border-border flex-1 select-all">
+                  <p className="text-[12px] mono-ui text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5 border border-border flex-1 select-all">
                     {currentProjectId}
                   </p>
                   <Button
@@ -213,19 +222,21 @@ export const Settings: React.FC = () => {
           </Card>
         </section>
 
-        {/* Models */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Models
-            </p>
-            {Object.values(modelSettings).some((m) => m.customized) && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Models</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-1">
+                Each slot powers a different part of the pipeline. Start with presets, then customize only if needed.
+              </p>
+            </div>
+            {hasCustomizedModels && (
               <button
                 onClick={handleResetAllModels}
                 disabled={modelSaving !== null}
                 className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-50"
               >
-                <RotateCcw className="h-3 w-3" />
+                <ArrowCounterClockwise className="h-3 w-3" />
                 Reset all
               </button>
             )}
@@ -267,11 +278,8 @@ export const Settings: React.FC = () => {
           </Card>
         </section>
 
-        {/* Danger zone */}
         <section>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive/60 mb-3">
-            Danger zone
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive/60 mb-3">Danger zone</p>
           <Card className="border-destructive/30">
             <CardContent className="pt-4">
               <p className="text-[13px] font-semibold text-foreground">Delete project</p>
@@ -281,7 +289,7 @@ export const Settings: React.FC = () => {
               <Dialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) setDeleteConfirm(""); }}>
                 <DialogTrigger asChild>
                   <Button variant="destructive" size="sm" className="gap-1.5">
-                    <Trash2 className="h-3 w-3" />
+                    <Trash className="h-3 w-3" />
                     Delete project
                   </Button>
                 </DialogTrigger>
@@ -294,7 +302,7 @@ export const Settings: React.FC = () => {
                   </DialogHeader>
                   <div>
                     <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                      Type <span className="font-mono font-semibold text-foreground">"{currentProject.name}"</span> to confirm
+                      Type <span className="mono-ui font-semibold text-foreground">"{currentProject.name}"</span> to confirm
                     </label>
                     <Input
                       value={deleteConfirm}
@@ -519,10 +527,10 @@ function ModelSelect({
   const presetSelectValue = isPresetCurrent ? current : "";
 
   return (
-    <div>
+    <div className="rounded-md border border-border/70 bg-surface-1/70 p-3">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <label className="text-[12px] font-medium text-foreground/80">{label}</label>
+          <label className="text-[12px] font-medium text-foreground">{label}</label>
           {customized && (
             <Badge variant="warning" className="text-[9px] px-1.5 py-0">customized</Badge>
           )}
@@ -534,11 +542,13 @@ function ModelSelect({
             disabled={saving}
             className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-50"
           >
-            <RotateCcw className="h-2.5 w-2.5" />
+            <ArrowCounterClockwise className="h-2.5 w-2.5" />
             Reset
           </button>
         )}
       </div>
+
+      <p className="text-[11px] text-muted-foreground/70 mb-2">{description}</p>
 
       {!customOpen && (
         <>
@@ -546,7 +556,7 @@ function ModelSelect({
             value={presetSelectValue}
             onChange={(e) => handlePresetChange(e.target.value)}
             disabled={saving}
-            className={cn(customized && "border-primary/40")}
+            className={cn("mono-ui text-[12px]", customized && "border-primary/40")}
           >
             <option value="">Choose a preset…</option>
             {options.map((opt) => {
@@ -602,7 +612,7 @@ function ModelSelect({
               }}
               disabled={saving}
               placeholder={customModelPlaceholder(customProvider)}
-              className="font-mono text-[12px] flex-1"
+              className="mono-ui text-[12px] flex-1"
               spellCheck={false}
               autoCapitalize="off"
               autoCorrect="off"
@@ -627,7 +637,7 @@ function ModelSelect({
                 }}
                 disabled={saving}
                 placeholder="0.40"
-                className="font-mono text-[12px] mt-0.5"
+                className="mono-ui text-[12px] mt-0.5"
               />
             </div>
             <div>
@@ -643,7 +653,7 @@ function ModelSelect({
                 }}
                 disabled={saving}
                 placeholder="1.60"
-                className="font-mono text-[12px] mt-0.5"
+                className="mono-ui text-[12px] mt-0.5"
               />
             </div>
           </div>
@@ -677,7 +687,7 @@ function ModelSelect({
       )}
 
       {!isPresetCurrent && !customOpen && current && (
-        <p className="text-[11px] font-mono text-muted-foreground/80 mt-1.5 break-all">
+        <p className="text-[11px] mono-ui text-muted-foreground/80 mt-1.5 break-all">
           Active: {current}
           {modelPrice?.input != null && modelPrice?.output != null && (
             <span className="block text-muted-foreground/60 mt-0.5">
@@ -687,7 +697,6 @@ function ModelSelect({
         </p>
       )}
 
-      <p className="text-[11px] text-muted-foreground/60 mt-1">{description}</p>
     </div>
   );
 }

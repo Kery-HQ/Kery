@@ -2,24 +2,30 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@phosphor-icons/react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 rounded-md text-[13px] font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none",
+  "inline-flex items-center justify-center gap-1.5 rounded-md text-[13px] font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none active:opacity-80",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        outline: "border border-border bg-transparent hover:bg-accent hover:text-accent-foreground",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        link: "text-primary underline-offset-4 hover:underline",
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary/85",
+        secondary:
+          "bg-secondary text-secondary-foreground border border-border hover:bg-accent",
+        outline:
+          "border border-border bg-transparent hover:bg-accent hover:text-accent-foreground",
+        ghost:
+          "hover:bg-accent hover:text-accent-foreground",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/85",
+        link:
+          "text-primary underline-offset-4 hover:underline",
       },
       size: {
         sm: "h-7 px-2.5 text-[12px]",
         md: "h-8 px-3",
-        lg: "h-9 px-4",
+        lg: "h-9 px-4 text-[14px]",
         icon: "h-8 w-8",
         "icon-sm": "h-7 w-7",
       },
@@ -45,7 +51,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        {loading && <Spinner className="h-3.5 w-3.5 animate-spin" />}
         {children}
       </Comp>
     );

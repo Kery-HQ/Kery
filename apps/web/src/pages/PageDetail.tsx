@@ -1,9 +1,17 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Play, Loader2, Trash2,
-  FileText, MousePointerClick, Layout, Link2, Brain, Clock, Repeat,
-} from "lucide-react";
+  ArrowLeft,
+  Play,
+  Trash,
+  FileText,
+  CursorClick,
+  Layout,
+  LinkSimple,
+  Brain,
+  Clock,
+  Repeat,
+} from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -207,7 +215,7 @@ export function PageDetail() {
                   onClick={() => setConfirmReset(true)}
                   className="text-destructive hover:text-destructive"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash className="h-3.5 w-3.5" />
                 </Button>
               )}
               <Button
@@ -337,7 +345,7 @@ export function PageDetail() {
                 {buttons.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <MousePointerClick className="h-3.5 w-3.5" />
+                      <CursorClick className="h-3.5 w-3.5" />
                       Buttons ({buttons.length})
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -378,7 +386,7 @@ export function PageDetail() {
                 {navLinks.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <Link2 className="h-3.5 w-3.5" />
+                      <LinkSimple className="h-3.5 w-3.5" />
                       Navigation links ({navLinks.length})
                     </div>
                     <div className="flex flex-wrap gap-1.5">

@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, ChevronRight, ListFilter, Workflow, ArrowLeft } from "lucide-react";
+import { CaretDown, CaretRight, Funnel, FlowArrow, ArrowLeft } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,8 +74,8 @@ function CrawlLlmCallCard({ call }: { call: CrawlLlmCallRecord }) {
         onClick={() => setExpanded(!expanded)}
       >
         <span className="text-[10px] font-mono text-muted-foreground/50 w-5 text-right flex-shrink-0">{call.seq}</span>
-        {isLink && <ListFilter className="h-3 w-3 text-teal-400 flex-shrink-0" />}
-        {isFlows && <Workflow className="h-3 w-3 text-amber-400 flex-shrink-0" />}
+        {isLink && <Funnel className="h-3 w-3 text-teal-400 flex-shrink-0" />}
+        {isFlows && <FlowArrow className="h-3 w-3 text-amber-400 flex-shrink-0" />}
         <span className="text-[10px] font-medium text-muted-foreground uppercase flex-shrink-0">
           {isLink ? "Link filter" : isFlows ? "Suggested flows" : agent}
         </span>
@@ -91,9 +91,9 @@ function CrawlLlmCallCard({ call }: { call: CrawlLlmCallRecord }) {
           {formatMs(call.durationMs)}
         </span>
         {expanded ? (
-          <ChevronDown className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
+          <CaretDown className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
+          <CaretRight className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
         )}
       </button>
       {expanded && (

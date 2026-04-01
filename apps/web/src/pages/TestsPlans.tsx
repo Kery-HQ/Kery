@@ -1,10 +1,20 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FlaskConical, Plus, Play, Pencil, Trash2,
-  Brain, Keyboard, MousePointerClick, Navigation, Globe,
-  Repeat, AlertTriangle, CheckCircle2, ChevronDown,
-} from "lucide-react";
+  Flask,
+  Plus,
+  Play,
+  Pencil,
+  Trash,
+  Brain,
+  Keyboard,
+  CursorClick,
+  NavigationArrow,
+  Globe,
+  Repeat,
+  CheckCircle,
+  CaretDown,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -261,7 +271,7 @@ export const TestsPlans: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        icon={<FlaskConical className="h-4 w-4" />}
+        icon={<Flask className="h-4 w-4" />}
         title="Flows"
         description={tests.length > 0 ? `${tests.length} flow${tests.length !== 1 ? "s" : ""}` : undefined}
       >
@@ -316,7 +326,7 @@ export const TestsPlans: React.FC = () => {
           <EmptyState title="Select a project" className="py-12" />
         ) : tests.length === 0 ? (
           <EmptyState
-            icon={<FlaskConical className="h-5 w-5" />}
+            icon={<Flask className="h-5 w-5" />}
             title="No flows yet"
             description="Create a test flow to get started."
             className="py-12"
@@ -335,7 +345,7 @@ export const TestsPlans: React.FC = () => {
                       isExpanded ? "bg-accent/50" : "hover:bg-accent/30",
                     )}
                   >
-                    <ChevronDown
+                    <CaretDown
                       className={cn(
                         "h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 transition-transform duration-150",
                         isExpanded ? "rotate-0" : "-rotate-90",
@@ -385,7 +395,7 @@ export const TestsPlans: React.FC = () => {
                         onClick={() => setDeleteTarget(test)}
                         className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash className="h-3 w-3" />
                       </Button>
                     </div>
                   </button>
@@ -696,8 +706,8 @@ function DetailsTab({ test }: { test: SavedTest }) {
 function MemIcon({ action }: { action: string }) {
   const cls = "h-3.5 w-3.5 flex-shrink-0";
   if (action === "fill")     return <Keyboard          className={cn(cls, "text-blue-500/70")} />;
-  if (action === "click")    return <MousePointerClick className={cn(cls, "text-emerald-500/70")} />;
-  if (action === "navigate") return <Navigation        className={cn(cls, "text-violet-500/70")} />;
+  if (action === "click")    return <CursorClick className={cn(cls, "text-emerald-500/70")} />;
+  if (action === "navigate") return <NavigationArrow        className={cn(cls, "text-violet-500/70")} />;
   return <Globe className={cn(cls, "text-muted-foreground/50")} />;
 }
 
@@ -718,9 +728,9 @@ const STEP_ACTION_COLORS: Record<string, string> = {
 function StepActionIcon({ action }: { action: string }) {
   const cls = "h-3.5 w-3.5 flex-shrink-0";
   if (action === "fill")          return <Keyboard          className={cn(cls, "text-blue-500")} />;
-  if (action === "click")         return <MousePointerClick className={cn(cls, "text-emerald-500")} />;
-  if (action === "navigate")      return <Navigation        className={cn(cls, "text-violet-500")} />;
-  if (action === "assert")        return <CheckCircle2      className={cn(cls, "text-amber-500")} />;
+  if (action === "click")         return <CursorClick className={cn(cls, "text-emerald-500")} />;
+  if (action === "navigate")      return <NavigationArrow        className={cn(cls, "text-violet-500")} />;
+  if (action === "assert")        return <CheckCircle      className={cn(cls, "text-amber-500")} />;
   return <Globe className={cn(cls, "text-muted-foreground/50")} />;
 }
 

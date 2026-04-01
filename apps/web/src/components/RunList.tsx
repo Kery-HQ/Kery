@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { CaretRight } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -89,7 +89,7 @@ export function RunList({
             <span className="text-[11px] font-mono text-muted-foreground/40 flex-shrink-0">
               {relativeTime(r.started_at ?? undefined)}
             </span>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-muted-foreground flex-shrink-0" />
+            <CaretRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-muted-foreground flex-shrink-0" />
           </button>
         ))}
       </div>

@@ -1,12 +1,24 @@
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  ChevronDown, Check, Plus,
-  LayoutDashboard, Globe, FlaskConical,
-  Activity, Brain, AlertTriangle, Settings,
-  Sun, Moon, Monitor,
-  Layers, PanelLeftClose, PanelLeft, Search,
-} from "lucide-react";
+  CaretDown,
+  Check,
+  Plus,
+  SquaresFour,
+  Globe,
+  Flask,
+  Pulse,
+  Brain,
+  Warning,
+  Gear,
+  Sun,
+  Moon,
+  Monitor,
+  Stack,
+  CaretDoubleLeft,
+  CaretDoubleRight,
+  MagnifyingGlass,
+} from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import { createProject } from "@/projectApi";
@@ -19,11 +31,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export type { Theme } from "@/lib/hooks";
 
 const CORE_ITEMS = [
-  { name: "Overview",     href: "/overview",      icon: LayoutDashboard },
-  { name: "Pages",        href: "/pages",         icon: Layers },
-  { name: "Flows",        href: "/tests",         icon: FlaskConical },
-  { name: "Runs",         href: "/runs",          icon: Activity },
-  { name: "Issues",       href: "/bugs",          icon: AlertTriangle },
+  { name: "Overview",     href: "/overview",      icon: SquaresFour },
+  { name: "Pages",        href: "/pages",         icon: Stack },
+  { name: "Flows",        href: "/tests",         icon: Flask },
+  { name: "Runs",         href: "/runs",          icon: Pulse },
+  { name: "Issues",       href: "/bugs",          icon: Warning },
 ];
 
 const TOOLS_ITEMS = [
@@ -32,7 +44,7 @@ const TOOLS_ITEMS = [
 ];
 
 const SETTINGS_ITEMS = [
-  { name: "Settings",     href: "/settings",      icon: Settings },
+  { name: "Settings",     href: "/settings",      icon: Gear },
 ];
 
 function Logo() {
@@ -40,7 +52,7 @@ function Logo() {
     <img
       src="/logo/kery.png"
       alt="Kery"
-      className="h-5 w-5 flex-shrink-0 object-contain [image-rendering:pixelated]"
+      className="h-[18px] w-[18px] flex-shrink-0 object-contain [image-rendering:pixelated]"
     />
   );
 }
@@ -142,18 +154,22 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
   return (
     <nav className={cn(
-      "flex flex-col min-h-screen border-r border-sidebar-border bg-sidebar flex-shrink-0 transition-all duration-200",
+      "flex flex-col min-h-screen border-r border-sidebar-border bg-sidebar/95 backdrop-blur-sm flex-shrink-0 transition-all duration-200",
       collapsed ? "w-12" : "w-[220px]",
     )}>
       {/* Brand */}
       <div className={cn("flex items-center h-12 border-b border-sidebar-border", collapsed ? "px-2 justify-center" : "px-3 justify-between")}>
         <NavLink to="/overview" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-foreground/90 transition-colors">
           <Logo />
-          {!collapsed && <span className="text-[14px] font-semibold tracking-tight font-mono">Kery</span>}
+          {!collapsed && (
+            <span className="font-display font-semibold tracking-tight text-[15px] leading-none">
+              Kery
+            </span>
+          )}
         </NavLink>
         {!collapsed && (
           <button onClick={toggleCollapsed} className="text-muted-foreground/40 hover:text-muted-foreground transition-colors p-1 rounded-md hover:bg-sidebar-accent">
-            <PanelLeftClose className="h-3.5 w-3.5" />
+            <CaretDoubleLeft className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
@@ -174,11 +190,11 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
                 <div className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-muted-foreground font-semibold text-[10px]">?</div>
               )}
               <span className="flex-1 text-left truncate text-[13px]">{currentProject?.name ?? "Select project"}</span>
-              <ChevronDown className={cn("h-3 w-3 text-muted-foreground/40 transition-transform", dropdownOpen && "rotate-180")} />
+              <CaretDown className={cn("h-3 w-3 text-muted-foreground/40 transition-transform", dropdownOpen && "rotate-180")} />
             </button>
 
             {dropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-border bg-popover shadow-lg overflow-hidden animate-fade-in">
+              <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-border bg-popover ring-1 ring-border/50 overflow-hidden animate-fade-in">
                 {projects.length > 0 && (
                   <div className="py-1 max-h-48 overflow-y-auto">
                     {projects.map((p) => (
@@ -238,7 +254,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
             onClick={onOpenCommandPalette}
             className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 mt-1 text-[12px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors"
           >
-            <Search className="h-3.5 w-3.5" />
+            <MagnifyingGlass className="h-3.5 w-3.5" />
             <span className="flex-1 text-left">Search...</span>
             <Kbd>⌘K</Kbd>
           </button>
@@ -249,10 +265,10 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
       {collapsed && (
         <div className="px-1.5 pt-2 pb-1 flex flex-col items-center gap-1">
           <button onClick={toggleCollapsed} className="p-1.5 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors">
-            <PanelLeft className="h-3.5 w-3.5" />
+            <CaretDoubleRight className="h-3.5 w-3.5" />
           </button>
           <button onClick={onOpenCommandPalette} className="p-1.5 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors">
-            <Search className="h-3.5 w-3.5" />
+            <MagnifyingGlass className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
@@ -264,7 +280,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
           {!collapsed && (
             <div className="mt-4 mb-1">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 px-2">Configure</span>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/35 px-2 font-display">Configure</span>
             </div>
           )}
           {collapsed && <div className="h-px bg-sidebar-border my-2 mx-1" />}
@@ -295,7 +311,9 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
               <button key={mode} onClick={() => setTheme(mode)} title={label}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1 rounded py-1 text-[11px] font-medium transition-colors",
-                  theme === mode ? "bg-card text-foreground" : "text-muted-foreground/50 hover:text-foreground",
+                  theme === mode
+                    ? "bg-sidebar-border/50 text-foreground"
+                    : "text-muted-foreground/45 hover:text-foreground",
                 )}>
                 <Icon className="h-3 w-3 flex-shrink-0" />
                 <span>{label}</span>
@@ -331,15 +349,17 @@ function NavItem({ item, active, collapsed }: { item: { name: string; href: stri
         "group flex items-center rounded-md text-[13px] font-medium transition-colors relative",
         collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2 py-[6px]",
         active
-          ? "bg-accent text-foreground"
-          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent",
+          ? "bg-primary/10 text-foreground"
+          : "text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-accent",
       )}
     >
-      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r bg-primary" />}
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r bg-primary" />
+      )}
       <item.icon className={cn(
-        "flex-shrink-0",
+        "flex-shrink-0 transition-colors",
         collapsed ? "h-4 w-4" : "h-[15px] w-[15px]",
-        active ? "text-primary" : "text-muted-foreground/60 group-hover:text-sidebar-foreground",
+        active ? "text-primary" : "text-muted-foreground/50 group-hover:text-sidebar-foreground",
       )} />
       {!collapsed && <span>{item.name}</span>}
     </NavLink>

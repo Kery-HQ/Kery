@@ -1,8 +1,13 @@
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  Layers, RefreshCw, ChevronRight, Search, Loader2, History,
-} from "lucide-react";
+  Stack,
+  ArrowsClockwise,
+  CaretRight,
+  MagnifyingGlass,
+  Spinner,
+  ClockCounterClockwise,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -252,9 +257,9 @@ export function Pages() {
   if (!pid) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Layers className="h-4 w-4" />} title="Pages" />
+        <PageHeader icon={<Stack className="h-4 w-4" />} title="Pages" />
         <EmptyState
-          icon={<Layers className="h-8 w-8" />}
+          icon={<Stack className="h-8 w-8" />}
           title="No project selected"
           description="Select a project to view pages."
         />
@@ -264,7 +269,7 @@ export function Pages() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Layers className="h-4 w-4" />} title="Pages">
+      <PageHeader icon={<Stack className="h-4 w-4" />} title="Pages">
         {lastScan?.completed_at && (
           <span className="text-[11px] text-muted-foreground/50">
             Scanned {relativeTime(lastScan.completed_at)}
@@ -281,7 +286,7 @@ export function Pages() {
           aria-label="Scan history"
           className="gap-1.5"
         >
-          <History className="h-3.5 w-3.5" />
+          <ClockCounterClockwise className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Scan history</span>
         </Button>
         <Sheet
@@ -367,7 +372,7 @@ export function Pages() {
           onClick={() => handleScan()}
           loading={scanActive}
         >
-          {!scanActive && <RefreshCw className="h-3.5 w-3.5" />}
+          {!scanActive && <ArrowsClockwise className="h-3.5 w-3.5" />}
           {scanActive ? "Scanning..." : pages.length === 0 ? "Scan my app" : "Re-scan"}
         </Button>
       </PageHeader>
@@ -378,7 +383,7 @@ export function Pages() {
           {/* Scanning progress (persisted server-side; safe to refresh) */}
           {scanActive && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
-              <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0 mt-0.5" />
+              <Spinner className="h-4 w-4 animate-spin text-primary flex-shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-[13px] font-medium text-foreground">Scan in progress</p>
                 {!liveScan?.id ? (
@@ -491,7 +496,7 @@ export function Pages() {
             </div>
           ) : pages.length === 0 ? (
             <EmptyState
-              icon={<Layers className="h-8 w-8" />}
+              icon={<Stack className="h-8 w-8" />}
               title="No pages discovered yet"
               description="Click 'Scan my app' to discover all pages, forms, and interactions."
               action={
@@ -505,7 +510,7 @@ export function Pages() {
               {/* Filter bar */}
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative flex-1 min-w-[180px] max-w-xs">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+                  <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
                   <Input
                     value={filter}
                     onChange={e => setFilter(e.target.value)}
@@ -579,7 +584,7 @@ export function Pages() {
                             </span>
                           )}
 
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-muted-foreground/50 flex-shrink-0" />
+                          <CaretRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-muted-foreground/50 flex-shrink-0" />
                         </Link>
                       ))}
                     </div>

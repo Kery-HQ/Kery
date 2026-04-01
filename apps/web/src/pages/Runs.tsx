@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, RefreshCw } from "lucide-react";
+import { Pulse, ArrowsClockwise } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -41,12 +41,12 @@ export const Runs: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Activity className="h-4 w-4" />} title="Runs">
+      <PageHeader icon={<Pulse className="h-4 w-4" />} title="Runs">
         {!loading && runs.length > 0 && (
           <span className="text-[11px] font-mono text-muted-foreground">{runs.length} runs</span>
         )}
         <Button variant="outline" size="sm" onClick={load} className="h-7 gap-1.5 text-[12px]">
-          <RefreshCw className="h-3 w-3" />
+          <ArrowsClockwise className="h-3 w-3" />
           Refresh
         </Button>
       </PageHeader>
@@ -54,7 +54,7 @@ export const Runs: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-6 py-6 animate-fade-in">
         {!currentProjectId ? (
           <EmptyState
-            icon={<Activity className="h-6 w-6" />}
+            icon={<Pulse className="h-6 w-6" />}
             title="No project selected"
             description="Select a project to view runs."
           />
@@ -78,7 +78,7 @@ export const Runs: React.FC = () => {
           </Card>
         ) : runs.length === 0 ? (
           <EmptyState
-            icon={<Activity className="h-6 w-6" />}
+            icon={<Pulse className="h-6 w-6" />}
             title="No runs yet"
             description="Trigger a run from the Flows page to get started."
             action={{ label: "Go to Flows", onClick: () => navigate("/tests") }}

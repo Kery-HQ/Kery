@@ -1,97 +1,117 @@
-/* Self-hosted JetBrains Mono — guarantees mono font works even without internet */
-@font-face {
-  font-family: "JetBrains Mono";
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
-}
-@font-face {
-  font-family: "JetBrains Mono";
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-  src: url("/fonts/JetBrainsMono-Medium.ttf") format("truetype");
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: oklch(0.985 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1.0 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1.0 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.77 0.13 78);
-    --primary-foreground: oklch(1.0 0 0);
-    --secondary: oklch(0.96 0.005 75);
-    --secondary-foreground: oklch(0.45 0.04 75);
-    --muted: oklch(0.965 0 0);
-    --muted-foreground: oklch(0.46 0 0);
-    --accent: oklch(0.96 0 0);
-    --accent-foreground: oklch(0.145 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(1.0 0 0);
-    --border: oklch(0.908 0 0);
-    --input: oklch(0.908 0 0);
-    --ring: oklch(0.77 0.13 78);
+    /* ── Surfaces — pale sage ─────────────────────────────────── */
+    --background: oklch(0.972 0.007 148);
+    --foreground: oklch(0.20 0.015 148);
+    --card: oklch(0.982 0.005 148);
+    --card-foreground: oklch(0.20 0.015 148);
+    --popover: oklch(0.982 0.005 148);
+    --popover-foreground: oklch(0.20 0.015 148);
 
-    --status-pass: oklch(0.72 0.17 150);
-    --status-fail: oklch(0.63 0.24 25);
-    --status-running: oklch(0.70 0.15 250);
-    --status-warn: oklch(0.80 0.15 85);
+    /* ── Brand — muted terracotta / mango whisper ─────────────── */
+    --primary: oklch(0.60 0.09 52);
+    --primary-foreground: oklch(0.990 0.004 148);
 
-    --sidebar: oklch(0.98 0 0);
-    --sidebar-foreground: oklch(0.20 0 0);
-    --sidebar-primary: oklch(0.30 0 0);
-    --sidebar-primary-foreground: oklch(0.98 0 0);
-    --sidebar-accent: oklch(0.955 0 0);
-    --sidebar-accent-foreground: oklch(0.30 0 0);
-    --sidebar-border: oklch(0.925 0 0);
-    --sidebar-ring: oklch(0.77 0 0);
+    /* ── Secondary / Muted / Accent ──────────────────────────── */
+    --secondary: oklch(0.955 0.009 148);
+    --secondary-foreground: oklch(0.36 0.014 148);
+    --muted: oklch(0.958 0.007 148);
+    --muted-foreground: oklch(0.50 0.010 148);
+    --accent: oklch(0.950 0.010 148);
+    --accent-foreground: oklch(0.22 0.014 148);
+
+    /* ── Destructive — muted brick ───────────────────────────── */
+    --destructive: oklch(0.56 0.15 25);
+    --destructive-foreground: oklch(0.990 0 0);
+
+    /* ── Chrome — barely there ───────────────────────────────── */
+    --border: oklch(0.886 0.009 148);
+    --input: oklch(0.886 0.009 148);
+    --ring: oklch(0.60 0.09 52);
+
+    /* ── Elevation surfaces ──────────────────────────────────── */
+    --surface-1: oklch(0.978 0.008 148);
+    --surface-2: oklch(0.963 0.009 148);
+    --surface-3: oklch(0.944 0.011 148);
+
+    /* ── Status — muted pastels, pass shifted teal to not blend ─ */
+    --status-pass:    oklch(0.62 0.13 162);
+    --status-fail:    oklch(0.57 0.13 25);
+    --status-running: oklch(0.61 0.10 250);
+    --status-warn:    oklch(0.68 0.12 80);
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    --sidebar: oklch(0.962 0.010 148);
+    --sidebar-foreground: oklch(0.22 0.014 148);
+    --sidebar-primary: oklch(0.60 0.09 52);
+    --sidebar-primary-foreground: oklch(0.990 0.004 148);
+    --sidebar-accent: oklch(0.944 0.012 148);
+    --sidebar-accent-foreground: oklch(0.22 0.014 148);
+    --sidebar-border: oklch(0.888 0.010 148);
+    --sidebar-ring: oklch(0.60 0.09 52);
+
+    /* ── System ──────────────────────────────────────────────── */
     --radius: 0.5rem;
-    --font-sans: "JetBrains Mono", "Inter", system-ui, -apple-system, sans-serif;
-    --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --font-sans: "Ubuntu", system-ui, -apple-system, sans-serif;
+    --font-mono: "Fira Code", "Fira Mono", "Ubuntu Mono", Menlo, Consolas, monospace;
+    --font-mono-ui: "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    --font-display: "Space Grotesk", "Ubuntu", system-ui, sans-serif;
   }
 
   .dark {
-    --background: oklch(0.16 0.01 260);
-    --foreground: oklch(0.93 0 0);
-    --card: oklch(0.19 0.01 260);
-    --card-foreground: oklch(0.93 0 0);
-    --popover: oklch(0.19 0.01 260);
-    --popover-foreground: oklch(0.93 0 0);
-    --primary: oklch(0.80 0.12 70);
-    --primary-foreground: oklch(0.16 0.02 70);
-    --secondary: oklch(0.23 0.012 260);
-    --secondary-foreground: oklch(0.80 0.12 70);
-    --muted: oklch(0.22 0.01 260);
-    --muted-foreground: oklch(0.58 0 0);
-    --accent: oklch(0.22 0.01 260);
-    --accent-foreground: oklch(0.93 0 0);
-    --destructive: oklch(0.60 0.22 25);
-    --destructive-foreground: oklch(1.0 0 0);
-    --border: oklch(0.27 0.01 260);
-    --input: oklch(0.27 0.01 260);
-    --ring: oklch(0.80 0.12 70);
+    /* ── Surfaces — deep forest sage ────────────────────────── */
+    --background: oklch(0.162 0.014 148);
+    --foreground: oklch(0.91 0.008 148);
+    --card: oklch(0.192 0.016 148);
+    --card-foreground: oklch(0.91 0.008 148);
+    --popover: oklch(0.208 0.018 148);
+    --popover-foreground: oklch(0.91 0.008 148);
 
-    --status-pass: oklch(0.72 0.17 150);
-    --status-fail: oklch(0.63 0.24 25);
-    --status-running: oklch(0.70 0.15 250);
-    --status-warn: oklch(0.80 0.15 85);
+    /* ── Brand — soft warm amber ─────────────────────────────── */
+    --primary: oklch(0.72 0.12 62);
+    --primary-foreground: oklch(0.14 0.015 148);
 
-    --sidebar: oklch(0.14 0.01 260);
-    --sidebar-foreground: oklch(0.88 0 0);
-    --sidebar-primary: oklch(0.80 0.12 70);
-    --sidebar-primary-foreground: oklch(0.14 0.01 260);
-    --sidebar-accent: oklch(0.20 0.01 260);
-    --sidebar-accent-foreground: oklch(0.88 0 0);
-    --sidebar-border: oklch(0.24 0.01 260);
-    --sidebar-ring: oklch(0.80 0.12 70);
+    /* ── Secondary / Muted / Accent ──────────────────────────── */
+    --secondary: oklch(0.228 0.018 148);
+    --secondary-foreground: oklch(0.72 0.12 62);
+    --muted: oklch(0.212 0.015 148);
+    --muted-foreground: oklch(0.60 0.012 148);
+    --accent: oklch(0.238 0.020 148);
+    --accent-foreground: oklch(0.91 0.008 148);
+
+    /* ── Destructive — muted brick ───────────────────────────── */
+    --destructive: oklch(0.60 0.14 25);
+    --destructive-foreground: oklch(0.99 0 0);
+
+    /* ── Chrome ──────────────────────────────────────────────── */
+    --border: oklch(0.278 0.018 148);
+    --input: oklch(0.278 0.018 148);
+    --ring: oklch(0.72 0.12 62);
+
+    /* ── Elevation surfaces ──────────────────────────────────── */
+    --surface-1: oklch(0.175 0.015 148);
+    --surface-2: oklch(0.202 0.017 148);
+    --surface-3: oklch(0.235 0.020 148);
+
+    /* ── Status — muted but readable on forest ───────────────── */
+    --status-pass:    oklch(0.68 0.13 162);
+    --status-fail:    oklch(0.62 0.14 25);
+    --status-running: oklch(0.65 0.11 250);
+    --status-warn:    oklch(0.74 0.14 80);
+
+    /* ── Sidebar — one step darker than bg ───────────────────── */
+    --sidebar: oklch(0.148 0.012 148);
+    --sidebar-foreground: oklch(0.87 0.008 148);
+    --sidebar-primary: oklch(0.72 0.12 62);
+    --sidebar-primary-foreground: oklch(0.14 0.015 148);
+    --sidebar-accent: oklch(0.212 0.018 148);
+    --sidebar-accent-foreground: oklch(0.87 0.008 148);
+    --sidebar-border: oklch(0.256 0.016 148);
+    --sidebar-ring: oklch(0.72 0.12 62);
   }
 }
 
@@ -103,60 +123,52 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    font-feature-settings: 'rlig' 1, 'calt' 1, 'cv11' 1, 'tnum' 1;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
   }
-
-  .dark body, .dark {
-    font-weight: 450;
-  }
-
-  ::selection {
-    background: var(--primary);
-    color: var(--primary-foreground);
-    opacity: 0.2;
-  }
-
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
   code, pre, kbd, samp {
     font-family: var(--font-mono);
+    font-feature-settings: 'liga' 1, 'calt' 1;
   }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+    color: var(--foreground);
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+  .mono-code { font-family: var(--font-mono); font-feature-settings: 'liga' 1, 'calt' 1; }
+  .mono-ui   { font-family: var(--font-mono-ui); }
 }
 
 @layer utilities {
-  .animate-fade-in {
-    animation: fade-in 0.15s ease-out both;
-  }
 
-  .animate-slide-up {
-    animation: slide-up 0.2s ease-out both;
-  }
+  /* ── Animations ────────────────────────────────────────────── */
 
-  .animate-scale-in {
-    animation: scale-in 0.15s ease-out both;
-  }
-
-  .animate-slide-in-right {
-    animation: slide-in-right 0.15s ease-out both;
-  }
+  .animate-fade-in        { animation: fade-in 0.15s ease-out both; }
+  .animate-slide-up       { animation: slide-up 0.18s ease-out both; }
+  .animate-scale-in       { animation: scale-in 0.13s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-slide-in-right { animation: slide-in-right 0.15s ease-out both; }
 
   @keyframes fade-in {
-    from { opacity: 0; transform: translateY(4px); }
+    from { opacity: 0; transform: translateY(3px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes slide-up {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.96); }
+    from { opacity: 0; transform: scale(0.97); }
     to   { opacity: 1; transform: scale(1); }
   }
 
@@ -165,54 +177,78 @@
     to   { opacity: 1; transform: translateX(0); }
   }
 
-  .dot-pulse {
-    animation: dot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
+  /* ── Running status pulse ──────────────────────────────────── */
+
+  .dot-pulse { animation: dot-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
   @keyframes dot-pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    50%       { opacity: 0.3; }
   }
 
-  .stagger-item {
-    animation: fade-in 0.15s ease-out both;
-  }
-  .stagger-item:nth-child(1) { animation-delay: 0ms; }
-  .stagger-item:nth-child(2) { animation-delay: 20ms; }
-  .stagger-item:nth-child(3) { animation-delay: 30ms; }
-  .stagger-item:nth-child(4) { animation-delay: 40ms; }
-  .stagger-item:nth-child(5) { animation-delay: 50ms; }
-  .stagger-item:nth-child(6) { animation-delay: 60ms; }
-  .stagger-item:nth-child(7) { animation-delay: 70ms; }
-  .stagger-item:nth-child(8) { animation-delay: 80ms; }
-  .stagger-item:nth-child(9) { animation-delay: 90ms; }
-  .stagger-item:nth-child(10) { animation-delay: 100ms; }
+  /* ── Stagger list ──────────────────────────────────────────── */
+
+  .stagger-item { animation: fade-in 0.15s ease-out both; }
+  .stagger-item:nth-child(1)  { animation-delay: 0ms; }
+  .stagger-item:nth-child(2)  { animation-delay: 20ms; }
+  .stagger-item:nth-child(3)  { animation-delay: 35ms; }
+  .stagger-item:nth-child(4)  { animation-delay: 50ms; }
+  .stagger-item:nth-child(5)  { animation-delay: 65ms; }
+  .stagger-item:nth-child(6)  { animation-delay: 78ms; }
+  .stagger-item:nth-child(7)  { animation-delay: 88ms; }
+  .stagger-item:nth-child(8)  { animation-delay: 96ms; }
+  .stagger-item:nth-child(9)  { animation-delay: 102ms; }
+  .stagger-item:nth-child(10) { animation-delay: 108ms; }
+
+  /* ── Shimmer skeleton ──────────────────────────────────────── */
 
   .shimmer {
     background: linear-gradient(90deg,
       var(--muted) 25%,
-      oklch(from var(--muted) calc(l + 0.04) c h) 50%,
+      oklch(from var(--muted) calc(l + 0.03) c h) 50%,
       var(--muted) 75%
     );
     background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
+    animation: shimmer 1.8s infinite;
   }
 
   @keyframes shimmer {
-    0% { background-position: 200% 0; }
+    0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
 
-  .card-hover {
-    @apply transition-colors duration-100;
-  }
-  .card-hover:hover {
-    background: var(--accent);
-  }
+  /* ── Surface interaction ───────────────────────────────────── */
+
+  .card-hover { @apply transition-colors duration-100; }
+  .card-hover:hover { background: var(--accent); }
 
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
   }
+
+  /* ── Pixel / retro accents ─────────────────────────────────── */
+
+  .pixel-border {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
+  .cursor-blink::after {
+    content: '▮';
+    color: var(--primary);
+    animation: cursor-blink 1.1s step-end infinite;
+    margin-left: 1px;
+    font-size: 0.8em;
+    vertical-align: middle;
+  }
+
+  @keyframes cursor-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  /* ── Reduced motion ────────────────────────────────────────── */
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

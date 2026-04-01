@@ -2,21 +2,31 @@ import React from "react";
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Layers, FlaskConical, Activity, AlertTriangle,
-  Globe, Brain, Settings, Search, Play, Scan, Plus,
-} from "lucide-react";
+  SquaresFour,
+  Stack,
+  Flask,
+  Pulse,
+  Warning,
+  Globe,
+  Brain,
+  Gear,
+  MagnifyingGlass,
+  Play,
+  Scan,
+  Plus,
+} from "@phosphor-icons/react";
 import { useProject } from "@/lib/projectContext";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { name: "Overview", href: "/overview", icon: LayoutDashboard },
-  { name: "Pages", href: "/pages", icon: Layers },
-  { name: "Flows", href: "/tests", icon: FlaskConical },
-  { name: "Runs", href: "/runs", icon: Activity },
-  { name: "Issues", href: "/bugs", icon: AlertTriangle },
+  { name: "Overview", href: "/overview", icon: SquaresFour },
+  { name: "Pages", href: "/pages", icon: Stack },
+  { name: "Flows", href: "/tests", icon: Flask },
+  { name: "Runs", href: "/runs", icon: Pulse },
+  { name: "Issues", href: "/bugs", icon: Warning },
   { name: "Environments", href: "/environments", icon: Globe },
   { name: "Memory", href: "/memory", icon: Brain },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Settings", href: "/settings", icon: Gear },
 ];
 
 interface CommandPaletteProps {
@@ -55,7 +65,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           loop
         >
           <div className="flex items-center gap-2 border-b border-border px-3">
-            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <MagnifyingGlass className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <Command.Input
               ref={inputRef}
               placeholder="Type a command or search..."

@@ -21,28 +21,27 @@ import {
   formatMs,
 } from "@/lib/formatters";
 import {
-  Activity,
+  Pulse,
   ArrowLeft,
-  CheckCircle2,
+  CheckCircle,
   XCircle,
-  Loader2,
+  Spinner,
   Brain,
-  ChevronDown,
-  ChevronRight,
-  AlertCircle,
+  CaretDown,
+  CaretRight,
+  WarningCircle,
   Eye,
-  EyeOff,
-  DollarSign,
+  EyeSlash,
+  CurrencyDollar,
   Compass,
-  Route,
+  Path,
   FileText,
-  Workflow,
-  Layers,
-  ListFilter,
-  Copy,
+  FlowArrow,
+  Stack,
+  Funnel,
   GitBranch,
   Circle,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 
 // --- Types ---
 
@@ -234,7 +233,7 @@ function FilmstripSentToModel({ call, runId }: { call: LLMCallRecord; runId: str
   return (
     <div className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/[0.04] px-3 py-3 space-y-2">
       <div className="flex items-center gap-2">
-        <Layers className="h-3.5 w-3.5 text-fuchsia-400/90 flex-shrink-0" />
+        <Stack className="h-3.5 w-3.5 text-fuchsia-400/90 flex-shrink-0" />
         <p className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400/80">
           Filmstrip sent to model ({frameCount} frame{frameCount !== 1 ? "s" : ""}, visit order →)
         </p>
@@ -424,11 +423,11 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
   navigator: { label: "Navigator", color: "text-emerald-400", Icon: Compass },
   review:    { label: "Review",    color: "text-violet-400",  Icon: Eye },
   holistic:  { label: "Flow review", color: "text-violet-300", Icon: GitBranch },
-  pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Route },
+  pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Path },
   summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
-  filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Layers },
-  crawl_link_filter:       { label: "Crawl links", color: "text-teal-400",    Icon: ListFilter },
-  crawl_suggested_flows: { label: "Crawl flows", color: "text-amber-400",   Icon: Workflow },
+  filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Stack },
+  crawl_link_filter:       { label: "Crawl links", color: "text-teal-400",    Icon: Funnel },
+  crawl_suggested_flows: { label: "Crawl flows", color: "text-amber-400",   Icon: FlowArrow },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
@@ -551,7 +550,7 @@ export const RunDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Activity className="h-4 w-4" />} title="Run">
+        <PageHeader icon={<Pulse className="h-4 w-4" />} title="Run">
           <Skeleton className="h-5 w-16" />
         </PageHeader>
         <div className="px-6 py-6 space-y-4 animate-fade-in">
@@ -576,9 +575,9 @@ export const RunDetail: React.FC = () => {
   if (!run) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Activity className="h-4 w-4" />} title="Run" />
+        <PageHeader icon={<Pulse className="h-4 w-4" />} title="Run" />
         <EmptyState
-          icon={<AlertCircle className="h-6 w-6" />}
+          icon={<WarningCircle className="h-6 w-6" />}
           title="Run not found"
           description="This run may have been deleted or the ID is invalid."
           action={{ label: "Back to Runs", onClick: () => navigate("/runs") }}
@@ -599,7 +598,7 @@ export const RunDetail: React.FC = () => {
     <div className="flex flex-col flex-1 min-h-0 w-full">
       {/* Back + breadcrumb + PageHeader */}
       <PageHeader
-        icon={<Activity className="h-4 w-4" />}
+        icon={<Pulse className="h-4 w-4" />}
         title={`Run ${run.id.slice(0, 8)}`}
       >
         <Badge variant={badgeVariantForStatus(run.status)} dot>
@@ -607,7 +606,7 @@ export const RunDetail: React.FC = () => {
         </Badge>
         {run.status === "running" && (
           <>
-            <Loader2 className="h-3.5 w-3.5 text-status-running animate-spin" />
+            <Spinner className="h-3.5 w-3.5 text-status-running animate-spin" />
             <Button
               size="sm"
               variant="destructive"
@@ -707,7 +706,7 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
   return (
     <Card>
       <CardContent className="p-4 space-y-2">
-        <SectionLabel icon={<Workflow className="h-3.5 w-3.5" />} text="Agent pipeline" />
+        <SectionLabel icon={<FlowArrow className="h-3.5 w-3.5" />} text="Agent pipeline" />
         <ol className="text-[12px] text-muted-foreground space-y-1.5 list-decimal list-inside">
           <li>
             <span className="text-foreground/90">Auth &amp; navigation</span> — session and target URL
@@ -746,7 +745,7 @@ function PathGeneratorCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
   return (
     <Card>
       <CardContent className="p-4 space-y-2">
-        <SectionLabel icon={<Route className="h-3.5 w-3.5" />} text="Path Generator plan" />
+        <SectionLabel icon={<Path className="h-3.5 w-3.5" />} text="Path Generator plan" />
         <p className="text-[11px] text-muted-foreground">
           Plan passed to the Navigator (model: <span className="font-mono">{call.model}</span>
           {call.costUsd > 0 ? `, ${formatCost(call.costUsd)}` : ""}).
@@ -772,7 +771,7 @@ function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
   return (
     <Card>
       <CardContent className="p-4 space-y-2">
-        <SectionLabel icon={<DollarSign className="h-3.5 w-3.5" />} text="Cost by agent" />
+        <SectionLabel icon={<CurrencyDollar className="h-3.5 w-3.5" />} text="Cost by agent" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {rows.map((r) => (
             <div key={r.agent} className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
@@ -814,15 +813,15 @@ function PlanChecklistRow({ item, idx }: { item: AgentPlanItem; idx: number }) {
     >
       <span className="mt-0.5 shrink-0 text-muted-foreground transition-transform duration-200">
         {isDone ? (
-          <CheckCircle2 className="h-4 w-4 text-muted-foreground/80" strokeWidth={2} />
+          <CheckCircle className="h-4 w-4 text-muted-foreground/80" weight="bold" />
         ) : isFailed ? (
-          <XCircle className="h-4 w-4 text-destructive/80" strokeWidth={2} />
+          <XCircle className="h-4 w-4 text-destructive/80" weight="bold" />
         ) : isCurrent ? (
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/25 ring-2 ring-primary/40">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           </span>
         ) : (
-          <Circle className="h-4 w-4 text-muted-foreground/50" strokeWidth={1.75} />
+          <Circle className="h-4 w-4 text-muted-foreground/50" weight="regular" />
         )}
       </span>
       <p
@@ -934,7 +933,7 @@ function OverviewTab({
 
           <Card className="min-h-0 flex-[0.85] flex flex-col overflow-hidden">
             <CardContent className="p-3 flex flex-col flex-1 min-h-0">
-              <SectionLabel icon={<Route className="h-3.5 w-3.5" />} text="Plan" />
+              <SectionLabel icon={<Path className="h-3.5 w-3.5" />} text="Plan" />
               <div className="mt-2 min-h-0 flex-1 basis-0 min-h-[80px] max-h-[min(38vh,300px)] overflow-y-auto overflow-x-hidden pr-1 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
                 {sortedPlan.length === 0 ? (
                   <p className="text-[12px] text-muted-foreground">No plan has been streamed yet.</p>
@@ -951,7 +950,7 @@ function OverviewTab({
 
           <Card className="min-h-0 flex-1 flex flex-col overflow-hidden">
             <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-0">
-              <SectionLabel icon={<Activity className="h-3.5 w-3.5" />} text="Live action" />
+              <SectionLabel icon={<Pulse className="h-3.5 w-3.5" />} text="Live action" />
               <div className="rounded border border-border/60 bg-muted/20 px-3 py-2 mt-2 mb-2 shrink-0 transition-all duration-200 animate-fade-in">
                 {latestEntry?.type === "activity" ? (
                   <>
@@ -1060,14 +1059,14 @@ function IssuesTab({
   return (
     <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in">
       <div className="mb-4">
-        <SectionLabel icon={<AlertCircle className="h-3.5 w-3.5" />} text={`Issues (${bugsFound.length})`} />
+        <SectionLabel icon={<WarningCircle className="h-3.5 w-3.5" />} text={`Issues (${bugsFound.length})`} />
         <p className="text-[12px] text-muted-foreground mt-1">
           Findings from the Navigator, review agents, and related signals for this run.
         </p>
       </div>
       {bugsFound.length === 0 ? (
         <EmptyState
-          icon={<AlertCircle className="h-5 w-5" />}
+          icon={<WarningCircle className="h-5 w-5" />}
           title="No issues"
           description="Nothing was reported for this run. Check the Overview for live activity and LLM Calls for audit detail."
         />
@@ -1121,8 +1120,8 @@ function BugCard({
       >
         <div className="flex items-center gap-2">
           {expanded
-            ? <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            : <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            ? <CaretDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            : <CaretRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           }
           <StatusDot status={bug.severity === "high" ? "failed" : bug.severity === "medium" ? "warning" : "partial"} />
           {typeLabel && (
@@ -1251,7 +1250,7 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
 
       {llmCalls.length === 0 ? (
         <EmptyState
-          icon={<DollarSign className="h-5 w-5" />}
+          icon={<CurrencyDollar className="h-5 w-5" />}
           title="No LLM calls"
           description="No LLM calls have been recorded for this run yet."
         />
@@ -1380,7 +1379,7 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
           <span className="flex items-center gap-1 flex-shrink-0">
             {call.hasVision
               ? <Eye className="h-3 w-3 text-violet-400" />
-              : <EyeOff className="h-3 w-3 text-muted-foreground/20" />
+              : <EyeSlash className="h-3 w-3 text-muted-foreground/20" />
             }
             {call.attempt > 1 && (
               <span className="text-[10px] text-amber-400 font-mono">x{call.attempt}</span>
@@ -1408,8 +1407,8 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
 
         {/* Chevron */}
         {expanded
-          ? <ChevronDown className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
-          : <ChevronRight className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
+          ? <CaretDown className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
+          : <CaretRight className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
         }
       </button>
 

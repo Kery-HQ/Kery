@@ -1,9 +1,19 @@
 import React from "react";
 import {
-  Globe, Plus, Trash2, ShieldCheck, ChevronDown,
-  Ban, LogIn, UserCircle, Database, Key, KeyRound, Info,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+  Globe,
+  Plus,
+  Trash,
+  ShieldCheck,
+  CaretDown,
+  Prohibit,
+  SignIn,
+  UserCircle,
+  Database,
+  Key,
+  LockKey,
+  Info,
+} from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,14 +42,14 @@ const AUTH_MODES: readonly {
   value: string;
   label: string;
   subtitle: string;
-  icon: LucideIcon;
+  icon: Icon;
   setupHelp: string;
 }[] = [
   {
     value: "none",
     label: "No auth",
     subtitle: "Start on your base URL without logging in",
-    icon: Ban,
+    icon: Prohibit,
     setupHelp:
       "Pick this when the app under test is public or you do not need a logged-in session. Kery opens the environment URL directly and does not send credentials.",
   },
@@ -47,7 +57,7 @@ const AUTH_MODES: readonly {
     value: "ui",
     label: "Form-based (UI login)",
     subtitle: "Playwright fills your login form before each run",
-    icon: LogIn,
+    icon: SignIn,
     setupHelp:
       "Set the login page URL, CSS selectors for username, password, and submit, then enter test credentials. Kery navigates to the login URL, fills the fields, submits, and continues the run in that session.",
   },
@@ -79,7 +89,7 @@ const AUTH_MODES: readonly {
     value: "oauthToken",
     label: "OAuth token (custom)",
     subtitle: "Client credentials or other OAuth flows in JSON",
-    icon: KeyRound,
+    icon: LockKey,
     setupHelp:
       "Paste a JSON config that defines token URL, client credentials, scopes, and how to read the access token. Kery uses it to fetch a fresh bearer token before runs when your API requires OAuth.",
   },
@@ -121,7 +131,7 @@ function AuthModeSelect({
             <CurrentIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <span className="truncate">{current.label}</span>
           </span>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <CaretDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -562,7 +572,7 @@ export const Environments: React.FC = () => {
                       isExpanded ? "bg-accent/50" : "hover:bg-accent/30",
                     )}
                   >
-                    <ChevronDown
+                    <CaretDown
                       className={cn(
                         "h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 transition-transform duration-150",
                         isExpanded ? "rotate-0" : "-rotate-90",
@@ -591,7 +601,7 @@ export const Environments: React.FC = () => {
                         onClick={() => setDeleteTarget(env)}
                         className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </button>

@@ -1,9 +1,17 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  AlertTriangle, ChevronDown, ChevronRight, ExternalLink,
-  RefreshCw, Globe, ListOrdered, Image as ImageIcon, Server, Calendar,
-} from "lucide-react";
+  Warning,
+  CaretDown,
+  CaretRight,
+  ArrowSquareOut,
+  ArrowsClockwise,
+  Globe,
+  ListNumbers,
+  Image as ImageIcon,
+  ComputerTower,
+  Calendar,
+} from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -109,9 +117,9 @@ export const Bugs: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<AlertTriangle className="h-4 w-4" />} title="Issues" />
+        <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues" />
         <EmptyState
-          icon={<AlertTriangle className="h-8 w-8" />}
+          icon={<Warning className="h-8 w-8" />}
           title="No project selected"
           description="Create or select a project to view issues."
         />
@@ -121,12 +129,12 @@ export const Bugs: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<AlertTriangle className="h-4 w-4" />} title="Issues">
+      <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues">
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
         )}
         <Button size="sm" variant="outline" onClick={load}>
-          <RefreshCw className="h-3.5 w-3.5" />
+          <ArrowsClockwise className="h-3.5 w-3.5" />
           Refresh
         </Button>
       </PageHeader>
@@ -142,7 +150,7 @@ export const Bugs: React.FC = () => {
             </div>
           ) : bugs.length === 0 ? (
             <EmptyState
-              icon={<AlertTriangle className="h-8 w-8" />}
+              icon={<Warning className="h-8 w-8" />}
               title="No issues yet"
               description="Issues are reported by the agent during test runs. Run a test to start finding problems."
               action={{ label: "Go to Flows", onClick: () => navigate("/tests") }}
@@ -213,8 +221,8 @@ export const Bugs: React.FC = () => {
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
                       >
                         {isExpanded
-                          ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          ? <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          : <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                         }
                         <StatusDot status={SEVERITY_DOT[bug.severity] ?? "stale"} />
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
@@ -246,7 +254,7 @@ export const Bugs: React.FC = () => {
                           {steps.length > 0 && (
                             <div>
                               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
-                                <ListOrdered className="h-3 w-3" />
+                                <ListNumbers className="h-3 w-3" />
                                 Steps to reproduce
                               </p>
                               <ol className="list-decimal list-inside space-y-1 text-[13px] text-foreground">
@@ -299,7 +307,7 @@ export const Bugs: React.FC = () => {
                           <div className="flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
                             {bug.environment && (
                               <span className="flex items-center gap-1">
-                                <Server className="h-3.5 w-3.5 flex-shrink-0" />
+                                <ComputerTower className="h-3.5 w-3.5 flex-shrink-0" />
                                 {bug.environment}
                               </span>
                             )}
@@ -312,7 +320,7 @@ export const Bugs: React.FC = () => {
                               >
                                 <Globe className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span className="truncate">{bug.url}</span>
-                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                <ArrowSquareOut className="h-3 w-3 flex-shrink-0" />
                               </a>
                             )}
                             <span className="flex items-center gap-1">
@@ -329,7 +337,7 @@ export const Bugs: React.FC = () => {
                               }}
                             >
                               View Run
-                              <ExternalLink className="h-3 w-3" />
+                              <ArrowSquareOut className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>

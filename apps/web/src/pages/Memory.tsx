@@ -1,8 +1,15 @@
 import React from "react";
 import {
-  Brain, Trash2, Plus, Pencil,
-  Route, EyeOff, ShieldAlert, Bug, Lightbulb,
-} from "lucide-react";
+  Brain,
+  Trash,
+  Plus,
+  Pencil,
+  Path,
+  EyeSlash,
+  ShieldWarning,
+  Bug,
+  Lightbulb,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,10 +31,10 @@ import {
 } from "@/projectApi";
 
 const TYPES: { value: MemoryEntryType; label: string; icon: React.ReactNode; badge: "success" | "default" | "neutral" | "warning" | "destructive" }[] = [
-  { value: "learned_path",  label: "Learned Path",  icon: <Route className="h-3 w-3" />,       badge: "success" },
+  { value: "learned_path",  label: "Learned Path",  icon: <Path className="h-3 w-3" />,       badge: "success" },
   { value: "tip",           label: "Tip",            icon: <Lightbulb className="h-3 w-3" />,   badge: "default" },
-  { value: "ignore_region", label: "Ignore Region",  icon: <EyeOff className="h-3 w-3" />,      badge: "neutral" },
-  { value: "avoid_region",  label: "Avoid Region",   icon: <ShieldAlert className="h-3 w-3" />, badge: "warning" },
+  { value: "ignore_region", label: "Ignore Region",  icon: <EyeSlash className="h-3 w-3" />,      badge: "neutral" },
+  { value: "avoid_region",  label: "Avoid Region",   icon: <ShieldWarning className="h-3 w-3" />, badge: "warning" },
   { value: "bug_pattern",   label: "Bug Pattern",    icon: <Bug className="h-3 w-3" />,         badge: "destructive" },
 ];
 
@@ -219,7 +226,7 @@ export const Memory: React.FC = () => {
           <Dialog open={clearOpen} onOpenChange={setClearOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="ghost" className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10">
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash className="h-3.5 w-3.5" />
                 Clear All
               </Button>
             </DialogTrigger>
@@ -386,7 +393,7 @@ export const Memory: React.FC = () => {
                           onClick={() => handleDelete(entry.id)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
