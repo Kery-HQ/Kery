@@ -5,7 +5,7 @@ import type { KeryClient } from "@kery/client";
 export function registerBugsTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_get_bugs",
-    `List bugs found by Kery testing for a project. Returns bug details including name, description, severity, and steps to reproduce. Screenshots are available in the web UI.`,
+    `List bugs found by Kery testing for a project. Returns bug details including name, description, and severity. Screenshots are available in the web UI.`,
     {
       projectId: z.string().uuid().describe("The Kery project ID"),
       status: z.enum(["open", "resolved", "all"]).default("open")
@@ -44,7 +44,6 @@ export function registerBugsTool(server: McpServer, client: KeryClient) {
               category: b.category,
               severity: b.severity,
               status: b.status,
-              stepsToReproduce: b.stepsToReproduce,
               url: b.url,
               reportedAt: b.reportedAt,
             })),

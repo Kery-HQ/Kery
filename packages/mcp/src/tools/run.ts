@@ -85,7 +85,6 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
                 description: b.description,
                 severity: b.severity,
                 category: b.category,
-                stepsToReproduce: b.stepsToReproduce,
                 url: b.url,
               })),
               webUrl: client.buildWebUrl(`/runs/${run.id}`),

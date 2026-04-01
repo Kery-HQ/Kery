@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun } from "@/projectApi";
+import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun, patchProjectBug, createMemoryEntry } from "@/projectApi";
 import { apiMediaUrl, runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -41,6 +44,9 @@ import {
   Funnel,
   GitBranch,
   Circle,
+  Image as ImageIcon,
+  Globe,
+  ArrowSquareOut,
 } from "@phosphor-icons/react";
 
 // --- Types ---
@@ -67,7 +73,6 @@ type RunStep = {
   /** Legacy: base64 or `/api/bugs/...` */
   screenshotBase64?: string | null;
   screenshot_base64?: string | null;
-  stepsToReproduce?: string[];
   name?: string;
   description?: string;
   category?: string;
@@ -443,7 +448,9 @@ export const RunDetail: React.FC = () => {
   const [run, setRun] = React.useState<Run | null>(null);
   const [steps, setSteps] = React.useState<RunStep[]>([]);
   const [llmCalls, setLlmCalls] = React.useState<LLMCallRecord[]>([]);
-  const [runBugs, setRunBugs] = React.useState<{ id?: string; name: string; description: string; url?: string | null }[]>([]);
+  const [runBugs, setRunBugs] = React.useState<
+    { id?: string; name: string; description: string; url?: string | null; step_index?: number | null }[]
+  >([]);
   const [loading, setLoading] = React.useState(true);
   const [liveScreenshot, setLiveScreenshot] = React.useState<string | null>(null);
   const [agentPlan, setAgentPlan] = React.useState<AgentPlanItem[]>([]);
@@ -682,7 +689,7 @@ export const RunDetail: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="issues" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
-            <IssuesTab run={run} bugsFound={bugsFound} runBugs={runBugs} />
+            <IssuesTab run={run} bugsFound={bugsFound} runBugs={runBugs} projectId={run.project_id ?? undefined} />
           </TabsContent>
 
           <TabsContent value="llm" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
@@ -1051,10 +1058,12 @@ function IssuesTab({
   run,
   bugsFound,
   runBugs,
+  projectId,
 }: {
   run: Run;
   bugsFound: RunStep[];
-  runBugs: { id?: string; name: string; description: string; url?: string | null }[];
+  runBugs: { id?: string; name: string; description: string; url?: string | null; step_index?: number | null }[];
+  projectId?: string;
 }) {
   return (
     <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in">
@@ -1071,10 +1080,10 @@ function IssuesTab({
           description="Nothing was reported for this run. Check the Overview for live activity and LLM Calls for audit detail."
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {bugsFound.map((bug: RunStep & { name?: string }, i: number) => (
             <div key={i} className="animate-fade-in" style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
-              <BugCard bug={bug} index={i} runBugs={runBugs} runId={run.id} />
+              <BugCard bug={bug} index={i} runBugs={runBugs} runId={run.id} projectId={projectId} />
             </div>
           ))}
         </div>
@@ -1087,86 +1096,132 @@ function IssuesTab({
 // Bug card (expandable, severity border)
 // ============================================================
 
+const BUG_CATEGORY_BADGE: Record<string, "default" | "neutral" | "outline"> = {
+  visual: "outline",
+  functional: "default",
+  ux: "neutral",
+  other: "neutral",
+};
+
 function BugCard({
   bug,
   index,
   runBugs,
   runId,
+  projectId,
 }: {
   bug: any;
   index: number;
-  runBugs: { id?: string; name: string; description: string; url?: string | null }[];
+  runBugs: { id?: string; name: string; description: string; url?: string | null; step_index?: number | null }[];
   runId: string;
+  projectId?: string;
 }) {
   const [expanded, setExpanded] = React.useState(false);
+  const [showRaw, setShowRaw] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
 
   const title = bug.name ?? (bug.reasoning
-    ? `${(bug.bugType ?? bug.category) ?? "Issue"} -- step ${bug.index}`
+    ? `${(bug.bugType ?? bug.category) ?? "Issue"} — step ${bug.index}`
     : `Issue at step ${bug.index}`);
-  const body  = bug.description ?? bug.reasoning;
+  const body = bug.description ?? bug.reasoning;
   const typeLabel = bug.category ?? bug.bugType;
 
-  const isTracked = runBugs.some(
+  const bodyNorm = (body ?? "").trim();
+  const nameNorm = (bug.name ?? "").trim();
+  const dbBug = runBugs.find(
     (b) =>
-      (b.description.trim() === (body ?? "").trim() || b.name.trim() === (bug.name ?? "").trim()) &&
-      (b.url ?? "").trim() === (bug.url ?? "").trim()
+      (typeof bug.index === "number" && b.step_index != null && b.step_index === bug.index) ||
+      (b.name.trim() === nameNorm && b.description.trim() === bodyNorm) ||
+      (b.description.trim() === bodyNorm && (b.url ?? "").trim() === (bug.url ?? "").trim()),
   );
+  const savedToProject = !!dbBug?.id;
+
+  async function resolveIssue() {
+    if (!projectId || !dbBug?.id) return;
+    setBusy(true);
+    try {
+      await patchProjectBug(projectId, dbBug.id, { status: "resolved" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function ignoreIssue() {
+    if (!projectId || !dbBug?.id) return;
+    setBusy(true);
+    try {
+      await patchProjectBug(projectId, dbBug.id, { status: "wont_fix" });
+      await createMemoryEntry(projectId, {
+        type: "ignore_region",
+        summary: `Ignored issue: ${title}`,
+        content: `${body ?? ""}\n\n${bug.url ? `URL: ${bug.url}` : ""}`.trim(),
+        confidence: 100,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const severityStatus =
+    bug.severity === "high" ? "failed" : bug.severity === "medium" ? "warning" : "low";
 
   return (
-    <Card className={cn("border-l-[3px] overflow-hidden", severityBorder(bug.severity))}>
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card overflow-hidden transition-colors border-l-[3px]",
+        severityBorder(bug.severity),
+      )}
+    >
       <button
-        className="w-full text-left px-4 py-3 hover:bg-accent/30 transition-colors"
+        type="button"
+        className="w-full text-left px-4 py-2.5 hover:bg-accent/30 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {expanded
-            ? <CaretDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            : <CaretRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            ? <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            : <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
           }
-          <StatusDot status={bug.severity === "high" ? "failed" : bug.severity === "medium" ? "warning" : "partial"} />
+          <StatusDot status={severityStatus} />
+          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{title}</span>
           {typeLabel && (
-            <span className="text-[11px] font-medium text-foreground capitalize">{typeLabel}</span>
+            <Badge variant={BUG_CATEGORY_BADGE[String(typeLabel)] ?? "neutral"} className="capitalize flex-shrink-0 text-[10px]">
+              {typeLabel}
+            </Badge>
           )}
           {bug.severity && (
-            <span className="text-[10px] text-muted-foreground capitalize">{bug.severity}</span>
+            <span className="text-[10px] text-muted-foreground capitalize flex-shrink-0">{bug.severity}</span>
           )}
-          <span className="text-[10px] font-mono text-muted-foreground/50 ml-auto tabular-nums">
-            step {bug.index ?? index + 1}
-          </span>
           {bug.source && (
-            <span className="text-[10px] text-muted-foreground/50">
+            <span className="text-[10px] text-muted-foreground/60 flex-shrink-0 hidden sm:inline">
               {bug.source === "review" ? "Review" : bug.source === "navigator" ? "Nav" : bug.source === "pathgen" ? "Path" : bug.source === "filmstrip" ? "Filmstrip" : bug.source}
             </span>
           )}
-          <Badge variant={isTracked ? "success" : "neutral"} className="text-[10px] ml-1">
-            {isTracked ? "tracked" : "skipped"}
-          </Badge>
+          <span className="text-[10px] font-mono text-muted-foreground/50 flex-shrink-0 tabular-nums">
+            step {bug.index ?? index + 1}
+          </span>
         </div>
-        <p className="text-[13px] text-foreground/90 mt-1.5 ml-5">{title}</p>
         {body && body !== title && (
-          <p className="text-[12px] text-muted-foreground mt-0.5 ml-5 line-clamp-2">{body}</p>
+          <p className="text-[12px] text-muted-foreground mt-1 ml-7 line-clamp-2">{body}</p>
         )}
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-border/50 space-y-3 ml-5">
+        <div className="border-t border-border px-4 py-4 space-y-4 bg-muted/10">
           {bug.url && (
-            <p className="text-[11px] font-mono text-muted-foreground/60 truncate pt-3">{bug.url}</p>
+            <a
+              href={bug.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[12px] font-mono text-muted-foreground hover:text-foreground truncate max-w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Globe className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{bug.url}</span>
+              <ArrowSquareOut className="h-3 w-3 flex-shrink-0" />
+            </a>
           )}
 
-          {/* Steps to reproduce */}
-          {bug.stepsToReproduce && bug.stepsToReproduce.length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Steps to Reproduce</p>
-              <ol className="list-decimal list-inside space-y-0.5">
-                {bug.stepsToReproduce.map((s: string, j: number) => (
-                  <li key={j} className="text-[12px] text-foreground/80">{s}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* Screenshot: file on volume (screenshotPath) or legacy inline / URL */}
           {(() => {
             const fileUrl = runScreenshotFileUrl(runId, bug.screenshotPath ?? bug.screenshot_path);
             const legacyRef =
@@ -1177,28 +1232,93 @@ function BugCard({
             if (!src) return null;
             return (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Screenshot</p>
-                <div className="rounded border border-border bg-black overflow-hidden">
-                  <img
-                    src={src}
-                    alt="Bug screenshot"
-                    className="w-full block max-h-64 object-contain object-top"
-                  />
-                </div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
+                  <ImageIcon className="h-3 w-3" />
+                  Screenshot
+                </p>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-border overflow-hidden hover:ring-1 hover:ring-primary/30 transition-all cursor-zoom-in"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <img
+                        src={src}
+                        alt="Bug screenshot"
+                        className="max-w-full max-h-[200px] object-contain bg-black/5"
+                      />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl" onClick={(e) => e.stopPropagation()}>
+                    <DialogHeader>
+                      <DialogTitle>Screenshot</DialogTitle>
+                    </DialogHeader>
+                    <img
+                      src={src}
+                      alt="Bug screenshot"
+                      className="w-full rounded-lg border border-border object-contain bg-black/5"
+                    />
+                  </DialogContent>
+                </Dialog>
               </div>
             );
           })()}
 
-          {/* Full step JSON */}
+          <div className="flex flex-wrap items-center gap-3">
+            {savedToProject && (
+              <Badge variant="outline" className="text-[10px]">In project issues</Badge>
+            )}
+            {projectId && dbBug?.id && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[11px]"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resolveIssue();
+                  }}
+                >
+                  Resolve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[11px]"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    ignoreIssue();
+                  }}
+                >
+                  Ignore
+                </Button>
+              </>
+            )}
+          </div>
+
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">Raw Data</p>
-            <pre className="text-[11px] font-mono bg-muted/50 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
-              {JSON.stringify(bug, null, 2)}
-            </pre>
+            <button
+              type="button"
+              className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-1.5 hover:text-foreground/70"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRaw(!showRaw);
+              }}
+            >
+              Raw data {showRaw ? "▼" : "▶"}
+            </button>
+            {showRaw && (
+              <pre className="text-[11px] font-mono bg-muted/50 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
+                {JSON.stringify(bug, null, 2)}
+              </pre>
+            )}
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 

@@ -30,7 +30,8 @@ Do NOT blame the automation driver for wrong clicks.
 
 Return JSON: { "bugs": [ { "type": "visual"|"ux"|"behavioral"|"a11y"|"performance"|"data", "description": string (max 100 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
-Be selective. 0 bugs is fine.`;
+Be selective. 0 bugs is fine.
+If you include "region", coordinates MUST use a 0–1000 scale on the screenshot image: (0,0) top-left, (1000,1000) bottom-right, same aspect ratio as the image.`;
 
 function chunkFrames(frames: FilmstripFrame[], size: number): FilmstripFrame[][] {
   const out: FilmstripFrame[][] = [];

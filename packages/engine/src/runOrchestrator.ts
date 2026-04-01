@@ -26,6 +26,7 @@ import {
 import { curateMemoryAfterRun } from "./memoryCurator.js";
 import { initStagehandSession, destroyStagehandSession, type StagehandSession } from "./stagehandBridge.js";
 import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
+import { dedupeRunStepBugs } from "./bugDedup.js";
 import type { StorageAdapter } from "./storage.js";
 import { rewriteForDocker } from "./dockerHost.js";
 
@@ -189,11 +190,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     let videoEnabled = !!videoTmpDir;
     if (shSession) {
       page = shSession.page;
-      if (videoTmpDir) {
-        await page.setViewportSize({ width: recordW, height: recordH }).catch((e) =>
-          logger.warn({ err: String(e).slice(0, 160) }, "setViewportSize for recording (non-fatal)"),
-        );
-      }
+      await page.setViewportSize({ width: recordW, height: recordH }).catch((e) =>
+        logger.warn({ err: String(e).slice(0, 160) }, "setViewportSize (non-fatal)"),
+      );
     } else {
       browser = await chromium.launch({
         headless: true,
@@ -537,8 +536,9 @@ function mergeBugs(
       screenshotBase64: b.screenshotBase64,
     });
   }
-  out.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-  return out;
+  const deduped = dedupeRunStepBugs(out);
+  deduped.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  return deduped;
 }
 
 // ─── Video helpers ──────────────────────────────────────────────────────────

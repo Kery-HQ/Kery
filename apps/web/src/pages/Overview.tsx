@@ -218,7 +218,7 @@ function SetupChecklist({
 const SEVERITY_DOT: Record<string, string> = {
   high: "bg-status-fail",
   medium: "bg-status-warn",
-  low: "bg-muted-foreground/40",
+  low: "bg-zinc-400 dark:bg-zinc-500",
 };
 
 type PageCoverageStats = {
@@ -395,7 +395,7 @@ function Dashboard({
                     <span className="flex-1 text-[13px] text-foreground truncate">{bug.name || "Issue"}</span>
                     {bug.category && <Badge variant="outline" className="text-[10px]">{bug.category}</Badge>}
                     <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
-                      {relativeTime(bug.reported_at)}
+                      {relativeTime(bug.reported_at ?? bug.reportedAt)}
                     </span>
                   </button>
                 ))}

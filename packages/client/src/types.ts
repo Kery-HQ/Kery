@@ -70,7 +70,6 @@ export type Bug = {
   /** JPEG filename under run screenshot dir (bytes on disk). */
   screenshotPath?: string | null;
   screenshotBase64?: string | null;
-  stepsToReproduce: string[];
   url?: string | null;
   runId: string;
   runLabel?: string | null;

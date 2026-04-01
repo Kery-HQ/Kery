@@ -142,8 +142,8 @@ export class PostgresAdapter implements StorageAdapter {
       if (existing.length > 0) { skipped++; continue; }
 
       await this.db.query(
-        `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, screenshot_path, region) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [projectId, runId, environmentId, bug.name, bug.description, bug.category, bug.severity, bug.status ?? "open", JSON.stringify(bug.stepsToReproduce ?? []), bug.url, runLabel, reportedAt, environmentName, bug.index ?? null, bug.screenshotPath ?? null, bug.region ?? null],
+        `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, url, run_label, reported_at, environment, step_index, screenshot_path, region) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        [projectId, runId, environmentId, bug.name, bug.description, bug.category, bug.severity, bug.status ?? "open", bug.url, runLabel, reportedAt, environmentName, bug.index ?? null, bug.screenshotPath ?? null, bug.region ?? null],
       );
       inserted++;
     }
@@ -152,7 +152,7 @@ export class PostgresAdapter implements StorageAdapter {
 
   async listBugs(projectId: string) {
     const { rows } = await this.db.query(
-      `SELECT id, project_id, run_id, environment_id, name, description, category, severity, status, steps_to_reproduce, url, run_label, reported_at, environment, step_index, created_at, screenshot_path, region FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
+      `SELECT id, project_id, run_id, environment_id, name, description, category, severity, status, url, run_label, reported_at, environment, step_index, created_at, screenshot_path, region FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
       [projectId],
     );
     return rows;

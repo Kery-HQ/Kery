@@ -7,7 +7,6 @@ import {
   ArrowSquareOut,
   ArrowsClockwise,
   Globe,
-  ListNumbers,
   Image as ImageIcon,
   ComputerTower,
   Calendar,
@@ -24,10 +23,11 @@ import {
 import { cn } from "@/lib/utils";
 import { formatReportedAt } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
-import { fetchProjectBugs } from "@/projectApi";
+import { fetchProjectBugs, patchProjectBug, createMemoryEntry } from "@/projectApi";
 import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 
 export type BugRecord = {
+  id?: string;
   name: string;
   description: string;
   category: "visual" | "functional" | "ux" | "other";
@@ -38,13 +38,12 @@ export type BugRecord = {
   screenshotBase64?: string | null;
   screenshot_base64?: string | null;
   run_id?: string;
-  stepsToReproduce?: string[];
-  /** API returns snake_case from DB rows */
-  steps_to_reproduce?: string[] | null;
   url?: string | null;
   runId: string;
   runLabel?: string | null;
-  reportedAt: string;
+  reportedAt?: string;
+  /** API returns snake_case from DB rows */
+  reported_at?: string;
   environment?: string | null;
   index?: number;
 };
@@ -60,7 +59,7 @@ const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 const SEVERITY_DOT: Record<string, string> = {
   high: "error",
   medium: "warning",
-  low: "stale",
+  low: "low",
 };
 
 const SEVERITY_VARIANT: Record<string, "destructive" | "warning" | "neutral"> = {
@@ -91,6 +90,7 @@ export const Bugs: React.FC = () => {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = React.useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("all");
+  const [actionBusy, setActionBusy] = React.useState<string | null>(null);
 
   async function load() {
     if (!currentProjectId) return;
@@ -101,6 +101,36 @@ export const Bugs: React.FC = () => {
   }
 
   React.useEffect(() => { load(); }, [currentProjectId]);
+
+  async function resolveBug(bug: BugRecord) {
+    if (!currentProjectId || !bug.id) return;
+    const key = bug.id;
+    setActionBusy(key);
+    try {
+      await patchProjectBug(currentProjectId, bug.id, { status: "resolved" });
+      await load();
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function ignoreBug(bug: BugRecord) {
+    if (!currentProjectId || !bug.id) return;
+    const key = bug.id;
+    setActionBusy(key);
+    try {
+      await patchProjectBug(currentProjectId, bug.id, { status: "wont_fix" });
+      await createMemoryEntry(currentProjectId, {
+        type: "ignore_region",
+        summary: `Ignored issue: ${bug.name}`,
+        content: `${bug.description}\n\n${bug.url ? `URL: ${bug.url}` : ""}`.trim(),
+        confidence: 100,
+      });
+      await load();
+    } finally {
+      setActionBusy(null);
+    }
+  }
 
   const filteredBugs = React.useMemo(() => {
     let result = [...bugs];
@@ -203,9 +233,9 @@ export const Bugs: React.FC = () => {
               {/* Bug list */}
               <div className="space-y-1.5">
                 {filteredBugs.map((bug, i) => {
-                  const steps = bug.stepsToReproduce ?? bug.steps_to_reproduce ?? [];
-                  const id = `${bug.run_id ?? bug.runId}-${bug.index ?? i}`;
+                  const id = bug.id ?? `${bug.run_id ?? bug.runId}-${bug.index ?? i}`;
                   const isExpanded = expandedId === id;
+                  const reportedIso = bug.reportedAt ?? bug.reported_at ?? "";
                   return (
                     <div
                       key={id}
@@ -235,7 +265,7 @@ export const Bugs: React.FC = () => {
                           {bug.status.replace("_", " ")}
                         </Badge>
                         <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
-                          {formatReportedAt(bug.reportedAt)}
+                          {formatReportedAt(reportedIso)}
                         </span>
                       </button>
 
@@ -248,20 +278,6 @@ export const Bugs: React.FC = () => {
                                 Description
                               </p>
                               <p className="text-[13px] text-foreground whitespace-pre-wrap">{bug.description}</p>
-                            </div>
-                          )}
-
-                          {steps.length > 0 && (
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
-                                <ListNumbers className="h-3 w-3" />
-                                Steps to reproduce
-                              </p>
-                              <ol className="list-decimal list-inside space-y-1 text-[13px] text-foreground">
-                                {steps.map((step, j) => (
-                                  <li key={j}>{step}</li>
-                                ))}
-                              </ol>
                             </div>
                           )}
 
@@ -325,20 +341,50 @@ export const Bugs: React.FC = () => {
                             )}
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3.5 w-3.5" />
-                              {new Date(bug.reportedAt).toLocaleString()}
+                              {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
                             </span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 text-[11px] gap-1 ml-auto"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/runs/${bug.run_id ?? bug.runId}`);
-                              }}
-                            >
-                              View Run
-                              <ArrowSquareOut className="h-3 w-3" />
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2 ml-auto">
+                              {bug.id && (bug.status === "open" || bug.status === "in_progress") && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-[11px]"
+                                    disabled={actionBusy === bug.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      resolveBug(bug);
+                                    }}
+                                  >
+                                    Resolve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-[11px]"
+                                    disabled={actionBusy === bug.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      ignoreBug(bug);
+                                    }}
+                                  >
+                                    Ignore
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-[11px] gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/runs/${bug.run_id ?? bug.runId}`);
+                                }}
+                              >
+                                View Run
+                                <ArrowSquareOut className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}

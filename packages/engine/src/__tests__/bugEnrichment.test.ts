@@ -40,23 +40,22 @@ describe("enrichBugsForRun", () => {
     assert.deepStrictEqual(enrichBugsForRun("r", "d", null, []), []);
   });
 
-  it("truncates long names", () => {
+  it("truncates long titles", () => {
     const longReason = "A".repeat(200);
     const bugs = enrichBugsForRun("run-1", "2026-01-01T00:00:00Z", null, [
       { reasoning: longReason, bugType: "ux" as const },
     ]);
-    assert.ok(bugs[0].name.length <= 81, "Name should be truncated"); // 80 + ellipsis
+    assert.ok(bugs[0].name.length <= 81, "Title should be truncated"); // 80 + ellipsis
   });
 
-  it("generates steps to reproduce from stepsDetail", () => {
-    const stepsDetail = [
-      { index: 1, action: "navigate", target: "http://app/login", status: "ok", url: "http://app/login" },
-      { index: 2, action: "fill", target: "Email", value: "a@b.com", status: "ok", url: "http://app/login" },
-      { index: 3, action: "click", target: "Submit", status: "ok", url: "http://app/login" },
-    ];
+  it("uses a shorter title than full description when a sentence break exists", () => {
     const bugs = enrichBugsForRun("run-1", "2026-01-01T00:00:00Z", null, [
-      { index: 3, reasoning: "Submit crashed", bugType: "functional" as const },
-    ], stepsDetail);
-    assert.ok(bugs[0].stepsToReproduce.length > 0, "Should generate steps to reproduce");
+      {
+        reasoning: "Login button has low contrast. The WCAG ratio is below 4.5:1 on the gray background.",
+        bugType: "visual" as const,
+      },
+    ]);
+    assert.ok(bugs[0].name.length < bugs[0].description.length, "Title should be shorter than description");
+    assert.ok(bugs[0].name.includes("Login"), "Title should reflect first sentence");
   });
 });

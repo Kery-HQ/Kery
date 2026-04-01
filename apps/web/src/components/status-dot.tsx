@@ -14,6 +14,8 @@ const colorMap: Record<string, string> = {
   warning: "bg-status-warn",
   stale: "bg-status-warn",
   partial: "bg-status-warn",
+  /** Severity: low — distinct from warning/medium */
+  low: "bg-zinc-400 dark:bg-zinc-500",
 };
 
 interface StatusDotProps {

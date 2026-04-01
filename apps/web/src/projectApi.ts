@@ -49,6 +49,17 @@ export async function fetchProjectBugs(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/bugs`);
 }
 
+export async function patchProjectBug(
+  projectId: string,
+  bugId: string,
+  patch: { status: "open" | "in_progress" | "resolved" | "wont_fix" },
+) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/bugs/${bugId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
 // --- Environments ---
 
 export async function fetchEnvironments(projectId: string) {

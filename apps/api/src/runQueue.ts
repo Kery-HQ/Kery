@@ -94,7 +94,7 @@ export function createRunWorker(
 
         const completedAt = new Date().toISOString();
         await materializeRunScreenshotFiles(data.runId, result.llmCalls, result.bugsFound);
-        const enrichedBugs = enrichBugsForRun(data.runId, completedAt, data.triggerRef, result.bugsFound, result.stepsDetail);
+        const enrichedBugs = enrichBugsForRun(data.runId, completedAt, data.triggerRef, result.bugsFound);
 
         const costUsd = Array.isArray(result.llmCalls)
           ? result.llmCalls.reduce(

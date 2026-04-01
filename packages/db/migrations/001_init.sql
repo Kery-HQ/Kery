@@ -99,7 +99,6 @@ CREATE TABLE IF NOT EXISTS bugs (
   category          text NOT NULL CHECK (category IN ('visual', 'functional', 'ux', 'other')),
   severity          text NOT NULL CHECK (severity IN ('low', 'medium', 'high')),
   status            text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'wont_fix')),
-  steps_to_reproduce jsonb NOT NULL DEFAULT '[]',
   url               text,
   run_label         text,
   reported_at       timestamptz NOT NULL,

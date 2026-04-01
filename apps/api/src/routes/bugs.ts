@@ -20,9 +20,16 @@ export function registerBugRoutes(app: FastifyInstance, storage: StorageAdapter)
   });
 
   app.patch("/api/projects/:projectId/bugs/:bugId", async (req, reply) => {
-    const { bugId } = ProjectBugParams.parse(req.params);
+    const { projectId, bugId } = ProjectBugParams.parse(req.params);
     const { status } = BugPatchBody.parse(req.body);
-    await pool.query("UPDATE bugs SET status = $1 WHERE id = $2", [status, bugId]);
+    const { rowCount } = await pool.query(
+      "UPDATE bugs SET status = $1 WHERE id = $2 AND project_id = $3",
+      [status, bugId, projectId],
+    );
+    if (rowCount === 0) {
+      reply.code(404).send({ error: "bug not found" });
+      return;
+    }
     reply.send({ ok: true });
   });
 }

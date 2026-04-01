@@ -19,7 +19,9 @@ export function duration(started?: string, completed?: string): string {
 
 export function relativeTime(iso?: string): string {
   if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diff = Date.now() - t;
   const sec = Math.floor(diff / 1000);
   if (sec < 60) return "just now";
   const min = Math.floor(sec / 60);
@@ -84,8 +86,10 @@ export function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export function formatReportedAt(iso: string): string {
+export function formatReportedAt(iso?: string | null): string {
+  if (iso == null || iso === "") return "—";
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / 86400000);

@@ -48,7 +48,7 @@ export const ProjectBugParams = z.object({
 });
 
 export const BugPatchBody = z.object({
-  status: z.enum(["open", "resolved", "ignored", "false_positive"]),
+  status: z.enum(["open", "in_progress", "resolved", "wont_fix"]),
 });
 
 export const TestUpdateBody = z.object({

@@ -216,7 +216,6 @@ export type Bug = {
   status: "open" | "in_progress" | "resolved" | "wont_fix";
   /** Filename under SCREENSHOTS_DIR/<runId>/ (e.g. bug-0.jpg); bytes on disk only. */
   screenshotPath?: string | null;
-  stepsToReproduce: string[];
   url?: string | null;
   runId: string;
   runLabel?: string | null;
