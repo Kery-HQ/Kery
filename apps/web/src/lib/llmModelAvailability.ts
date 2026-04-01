@@ -25,7 +25,7 @@ function inferDirectProvider(
   return "openrouter_only";
 }
 
-/** Whether the user can select this model id given which API keys exist (no OpenRouter). */
+/** Whether the user can select this model id given which API keys exist (mirrors engine `isModelRunnableWithConfig`). */
 export function isModelSelectable(modelId: string, keys: LlmKeyPresence): boolean {
   if (keys.hasOpenRouter) return true;
   const p = inferDirectProvider(modelId);
@@ -39,9 +39,9 @@ export function modelMissingKeyLabel(modelId: string, keys: LlmKeyPresence): str
   if (keys.hasOpenRouter) return null;
   const p = inferDirectProvider(modelId);
   if (p === "openrouter_only") return "Requires OpenRouter";
-  if (p === "openai" && !keys.hasOpenAI) return "Missing OPENAI_API_KEY";
-  if (p === "anthropic" && !keys.hasAnthropic) return "Missing ANTHROPIC_API_KEY";
-  if (p === "gemini" && !keys.hasGemini) return "Missing GEMINI_API_KEY";
+  if (p === "openai" && !keys.hasOpenAI) return "Missing OPENAI_API_KEY or OPENROUTER_API_KEY";
+  if (p === "anthropic" && !keys.hasAnthropic) return "Missing ANTHROPIC_API_KEY or OPENROUTER_API_KEY";
+  if (p === "gemini" && !keys.hasGemini) return "Missing GEMINI_API_KEY or OPENROUTER_API_KEY";
   return null;
 }
 

@@ -6,3 +6,11 @@ export type LLMUsage = {
   outputTokens: number;
   totalTokens: number;
 };
+
+/** Options passed through `llmChat` to provider implementations. */
+export type LlmChatOpts = {
+  maxTokens?: number;
+  temperature?: number;
+  responseFormat?: unknown;
+  timeoutMs?: number;
+};

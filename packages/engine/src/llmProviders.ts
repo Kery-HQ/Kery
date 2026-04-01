@@ -10,8 +10,8 @@ export type ModelProviderRequirement =
 const OPENROUTER_ONLY_PREFIXES = ["deepseek/", "meta/", "mistral/", "cohere/", "perplexity/", "qwen/"];
 
 /**
- * Classify which credential is needed for `model` when OPENROUTER_API_KEY is unset.
- * When OpenRouter is set, all catalog models are treated as available (routed via OpenRouter).
+ * Classify which direct provider matches `model`. OpenRouter can still satisfy the call
+ * when the matching direct key is missing (see `isModelRunnableWithConfig`).
  */
 export function inferModelProviderRequirement(model: string): ModelProviderRequirement {
   const m = model.trim();
@@ -49,27 +49,25 @@ export function hasDirectProviderKey(cfg: EngineConfig, provider: DirectModelPro
 
 /** True if the engine can run API calls for this model id with the given config. */
 export function isModelRunnableWithConfig(model: string, cfg: EngineConfig): boolean {
-  if (cfg.openrouterApiKey) return true;
   const req = inferModelProviderRequirement(model);
-  if (req.kind === "openrouter_only") return false;
-  return hasDirectProviderKey(cfg, req.provider);
+  if (req.kind === "openrouter_only") return !!cfg.openrouterApiKey;
+  return hasDirectProviderKey(cfg, req.provider) || !!cfg.openrouterApiKey;
 }
 
 /** Human-readable reason when `isModelRunnableWithConfig` is false (no secrets). */
 export function modelUnavailableReason(model: string, cfg: EngineConfig): string | null {
-  if (cfg.openrouterApiKey) return null;
+  if (isModelRunnableWithConfig(model, cfg)) return null;
   const req = inferModelProviderRequirement(model);
-  if (req.kind === "direct") {
-    if (hasDirectProviderKey(cfg, req.provider)) return null;
-    const keyName =
-      req.provider === "openai"
-        ? "OPENAI_API_KEY"
-        : req.provider === "anthropic"
-          ? "ANTHROPIC_API_KEY"
-          : "GEMINI_API_KEY";
-    return `Missing ${keyName}`;
+  if (req.kind === "openrouter_only") {
+    return req.hint ?? "Configure OPENROUTER_API_KEY for this model";
   }
-  return req.hint;
+  const keyName =
+    req.provider === "openai"
+      ? "OPENAI_API_KEY"
+      : req.provider === "anthropic"
+        ? "ANTHROPIC_API_KEY"
+        : "GEMINI_API_KEY";
+  return `Missing ${keyName} or OPENROUTER_API_KEY`;
 }
 
 /** Which provider API keys are present (for Settings UI). Never exposes key values. */

@@ -1,11 +1,12 @@
 import { getConfig, type ModelConfigKey } from "./config.js";
 import { logger } from "./logger.js";
 import { anthropicMessagesChat } from "./llmAnthropic.js";
+import { llmGeminiChat } from "./llmGemini.js";
+import { llmOpenAIChat, OPENAI_API_BASE } from "./llmOpenAI.js";
+import { llmOpenRouterChat } from "./llmOpenRouter.js";
 import {
   inferModelProviderRequirement,
-  wireModelForGeminiDirect,
-  wireModelForOpenAIDirect,
-  isModelRunnableWithConfig,
+  hasDirectProviderKey,
   modelUnavailableReason,
 } from "./llmProviders.js";
 import type { LLMUsage } from "./llmTypes.js";
@@ -14,12 +15,33 @@ import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 export type { LLMUsage } from "./llmTypes.js";
 export { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 
-const REFERER_URL = "https://kery.so";
+type LlmRoute =
+  | { kind: "openai" }
+  | { kind: "anthropic" }
+  | { kind: "gemini" }
+  | { kind: "openrouter" }
+  | { kind: "none"; reason: string };
 
-const OPENAI_API_BASE = "https://api.openai.com/v1";
-const GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
+/** Prefer the matching direct provider when its key is set; otherwise OpenRouter if configured. */
+function pickLlmRoute(model: string, cfg: ReturnType<typeof getConfig>): LlmRoute {
+  const req = inferModelProviderRequirement(model);
+  if (req.kind === "openrouter_only") {
+    if (cfg.openrouterApiKey) return { kind: "openrouter" };
+    return { kind: "none", reason: req.hint ?? `Model "${model}" requires OPENROUTER_API_KEY.` };
+  }
+  if (hasDirectProviderKey(cfg, req.provider)) {
+    return { kind: req.provider };
+  }
+  if (cfg.openrouterApiKey) return { kind: "openrouter" };
+  return {
+    kind: "none",
+    reason:
+      modelUnavailableReason(model, cfg) ??
+      "No LLM API key configured. Set OPENROUTER_API_KEY or the provider key (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY).",
+  };
+}
 
-/** Base URL for OpenRouter, or OpenAI when using direct OpenAI without OpenRouter (legacy helper). */
+/** Base URL for OpenRouter, or OpenAI when no OpenRouter key (UI / diagnostics helper). */
 export function getLLMBase(): string {
   const config = getConfig();
   return config.openrouterApiKey ? "https://openrouter.ai/api/v1" : OPENAI_API_BASE;
@@ -211,117 +233,6 @@ export function calcCostUsd(
 
 // ─── Low-level chat ───────────────────────────────────────────────────────────
 
-async function openAICompatibleChat(
-  baseUrl: string,
-  apiKey: string,
-  extraHeaders: Record<string, string>,
-  wireModel: string,
-  messages: any[],
-  opts: { maxTokens?: number; temperature?: number; responseFormat?: any; timeoutMs?: number },
-  options: { reasoningGemini?: boolean }
-): Promise<{ content: string; usage: LLMUsage }> {
-  const config = getConfig();
-  const body: any = {
-    model: wireModel,
-    messages,
-    max_tokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
-    temperature: opts.temperature ?? 0.1,
-  };
-
-  if (opts.responseFormat) {
-    body.response_format = opts.responseFormat;
-  }
-
-  if (options.reasoningGemini) {
-    body.reasoning = {
-      max_tokens: MAX_OUTPUT_TOKENS,
-      enabled: true,
-      exclude: false,
-    };
-  }
-
-  const timeoutMs = opts.timeoutMs ?? config.llmTimeoutMs;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        ...extraHeaders,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err: any) {
-    if (err?.name === "AbortError") throw new Error(`LLM call timed out after ${timeoutMs}ms`);
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`LLM ${res.status}: ${text}`);
-  }
-
-  const data: any = await res.json();
-  const choice = data.choices?.[0];
-
-  if (!choice) {
-    throw new Error(`LLM returned no choices: ${JSON.stringify(data).slice(0, 200)}`);
-  }
-
-  if (choice.finish_reason === "SAFETY") {
-    logger.warn("LLM SAFETY filter triggered");
-    return { content: "", usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } };
-  }
-
-  if (choice.finish_reason && choice.finish_reason !== "stop") {
-    logger.warn({ finish_reason: choice.finish_reason, model: wireModel }, "LLM non-stop finish reason");
-  }
-
-  const usage: LLMUsage = {
-    inputTokens: data.usage?.prompt_tokens ?? 0,
-    outputTokens: data.usage?.completion_tokens ?? 0,
-    totalTokens: data.usage?.total_tokens ?? 0,
-  };
-
-  return { content: choice.message?.content ?? "", usage };
-}
-
-async function llmChatOpenRouter(
-  messages: any[],
-  model: string,
-  opts: { maxTokens?: number; temperature?: number; responseFormat?: any; timeoutMs?: number }
-): Promise<{ content: string; usage: LLMUsage }> {
-  const config = getConfig();
-  const apiKey = config.openrouterApiKey!;
-  const wireModel =
-    model.startsWith("gemini-") && !model.includes("/") ? `google/${model}` : model;
-
-  return openAICompatibleChat(
-    "https://openrouter.ai/api/v1",
-    apiKey,
-    { "HTTP-Referer": REFERER_URL, "X-Title": "Kery Agent" },
-    wireModel,
-    messages,
-    opts,
-    { reasoningGemini: wireModel.startsWith("google/gemini") }
-  );
-}
-
-function llmProviderLabel(model: string): string {
-  const config = getConfig();
-  if (config.openrouterApiKey) return "openrouter";
-  if (!isModelRunnableWithConfig(model, config)) return "unconfigured";
-  const req = inferModelProviderRequirement(model);
-  if (req.kind !== "direct") return "openrouter-required";
-  return req.provider;
-}
-
 export async function llmChat(
   messages: any[],
   model: string,
@@ -329,7 +240,11 @@ export async function llmChat(
 ): Promise<{ content: string; usage: LLMUsage }> {
   const config = getConfig();
   const timeoutMs = opts.timeoutMs ?? config.llmTimeoutMs;
-  const provider = llmProviderLabel(model);
+  const route = pickLlmRoute(model, config);
+  if (route.kind === "none") {
+    throw new Error(route.reason);
+  }
+  const provider = route.kind;
   const structured = Boolean(opts.responseFormat);
   const t0 = Date.now();
   logger.info(
@@ -340,44 +255,19 @@ export async function llmChat(
   try {
     let result: { content: string; usage: LLMUsage };
 
-    if (config.openrouterApiKey) {
-      result = await llmChatOpenRouter(messages, model, opts);
-    } else if (!isModelRunnableWithConfig(model, config)) {
-      throw new Error(
-        modelUnavailableReason(model, config) ??
-          'No LLM API key configured. Set OPENROUTER_API_KEY or the provider key (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY).'
-      );
-    } else {
-      const req = inferModelProviderRequirement(model);
-      if (req.kind !== "direct") {
-        throw new Error(`Model "${model}" requires OPENROUTER_API_KEY.`);
-      }
-
-      if (req.provider === "anthropic") {
+    switch (route.kind) {
+      case "openai":
+        result = await llmOpenAIChat(messages, model, config.openaiApiKey, { ...opts, timeoutMs });
+        break;
+      case "anthropic":
         result = await anthropicMessagesChat(messages, model, config.anthropicApiKey, { ...opts, timeoutMs });
-      } else if (req.provider === "openai") {
-        const wireModel = wireModelForOpenAIDirect(model);
-        result = await openAICompatibleChat(
-          OPENAI_API_BASE,
-          config.openaiApiKey,
-          {},
-          wireModel,
-          messages,
-          opts,
-          { reasoningGemini: false }
-        );
-      } else {
-        const wireGemini = wireModelForGeminiDirect(model);
-        result = await openAICompatibleChat(
-          GEMINI_OPENAI_BASE,
-          config.geminiApiKey,
-          {},
-          wireGemini,
-          messages,
-          opts,
-          { reasoningGemini: false }
-        );
-      }
+        break;
+      case "gemini":
+        result = await llmGeminiChat(messages, model, config.geminiApiKey, { ...opts, timeoutMs });
+        break;
+      case "openrouter":
+        result = await llmOpenRouterChat(messages, model, config.openrouterApiKey!, { ...opts, timeoutMs });
+        break;
     }
 
     const durationMs = Date.now() - t0;

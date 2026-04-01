@@ -1,9 +1,7 @@
+import Anthropic from "@anthropic-ai/sdk";
 import type { LLMUsage } from "./llmTypes.js";
 import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-
-/** OpenRouter-style ids → Anthropic API `model` field (Messages API). */
 const ANTHROPIC_MODEL_IDS: Record<string, string> = {
   "anthropic/claude-sonnet-4.6": "claude-sonnet-4-20250514",
   "anthropic/claude-haiku-4.5": "claude-haiku-4-5-20251001",
@@ -24,15 +22,15 @@ function parseDataUrl(url: string): { mediaType: string; base64: string } | null
   return { mediaType: m[1], base64: m[2] };
 }
 
-function normalizeUserContent(content: string | any[]): any[] {
+function normalizeUserContent(content: string | any[]): Anthropic.ContentBlockParam[] {
   if (typeof content === "string") {
     return [{ type: "text", text: content }];
   }
   if (!Array.isArray(content)) {
     return [{ type: "text", text: String(content) }];
   }
-  const imageBlocks: any[] = [];
-  const textBlocks: any[] = [];
+  const imageBlocks: Anthropic.ImageBlockParam[] = [];
+  const textBlocks: Anthropic.TextBlockParam[] = [];
   for (const part of content) {
     if (part.type === "text") {
       textBlocks.push({ type: "text", text: part.text ?? "" });
@@ -44,21 +42,25 @@ function normalizeUserContent(content: string | any[]): any[] {
       }
       imageBlocks.push({
         type: "image",
-        source: { type: "base64", media_type: parsed.mediaType, data: parsed.base64 },
+        source: {
+          type: "base64",
+          media_type: parsed.mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+          data: parsed.base64,
+        },
       });
     }
   }
   return [...imageBlocks, ...textBlocks];
 }
 
-function normalizeAssistantContent(content: string | any[]): string | any[] {
+function normalizeAssistantContent(content: string | any[]): Anthropic.ContentBlockParam[] {
   if (typeof content === "string") {
     return [{ type: "text", text: content }];
   }
   if (!Array.isArray(content)) {
     return [{ type: "text", text: String(content) }];
   }
-  const blocks: any[] = [];
+  const blocks: Anthropic.ContentBlockParam[] = [];
   for (const part of content) {
     if (part.type === "text") blocks.push({ type: "text", text: part.text ?? "" });
     else blocks.push({ type: "text", text: JSON.stringify(part) });
@@ -66,9 +68,12 @@ function normalizeAssistantContent(content: string | any[]): string | any[] {
   return blocks;
 }
 
-function openAIMessagesToAnthropicPayload(messages: any[]): { system?: string; messages: any[] } {
+function openAIMessagesToAnthropicPayload(messages: any[]): {
+  system?: string;
+  messages: Anthropic.MessageParam[];
+} {
   const systemParts: string[] = [];
-  const out: any[] = [];
+  const out: Anthropic.MessageParam[] = [];
   for (const m of messages) {
     if (m.role === "system") {
       systemParts.push(typeof m.content === "string" ? m.content : JSON.stringify(m.content));
@@ -80,7 +85,6 @@ function openAIMessagesToAnthropicPayload(messages: any[]): { system?: string; m
     }
     if (m.role === "assistant") {
       out.push({ role: "assistant", content: normalizeAssistantContent(m.content) });
-      continue;
     }
   }
   return {
@@ -89,20 +93,16 @@ function openAIMessagesToAnthropicPayload(messages: any[]): { system?: string; m
   };
 }
 
-function extractAnthropicTextContent(data: any): string {
-  const blocks = data.content;
-  if (!Array.isArray(blocks)) return "";
+function extractAnthropicTextContent(data: Anthropic.Message): string {
   const texts: string[] = [];
-  for (const b of blocks) {
-    if (b.type === "text" && b.text) texts.push(b.text);
+  for (const b of data.content) {
+    if (b.type === "text" && "text" in b) texts.push(b.text);
   }
   return texts.join("");
 }
 
-function extractAnthropicToolInput(data: any, toolName: string): Record<string, unknown> | null {
-  const blocks = data.content;
-  if (!Array.isArray(blocks)) return null;
-  for (const b of blocks) {
+function extractAnthropicToolInput(data: Anthropic.Message, toolName: string): Record<string, unknown> | null {
+  for (const b of data.content) {
     if (b.type === "tool_use" && b.name === toolName && b.input && typeof b.input === "object") {
       return b.input as Record<string, unknown>;
     }
@@ -123,59 +123,50 @@ export async function anthropicMessagesChat(
 ): Promise<{ content: string; usage: LLMUsage }> {
   const wireModel = resolveAnthropicModelId(model);
   const { system, messages: anthropicMessages } = openAIMessagesToAnthropicPayload(messages);
-
   const maxOut = Math.min(opts.maxTokens ?? MAX_OUTPUT_TOKENS, 8192);
+  const timeoutMs = opts.timeoutMs ?? 45000;
 
-  const body: any = {
+  const client = new Anthropic({ apiKey, timeout: timeoutMs });
+
+  let toolName: string | null = null;
+  const tools: Anthropic.Tool[] | undefined =
+    opts.responseFormat?.type === "json_schema" && opts.responseFormat.json_schema
+      ? (() => {
+          const js = opts.responseFormat.json_schema;
+          toolName = js.name;
+          return [
+            {
+              name: js.name,
+              description: "Structured response required by the application.",
+              input_schema: js.schema,
+            },
+          ];
+        })()
+      : undefined;
+
+  const params: Anthropic.MessageCreateParams = {
     model: wireModel,
     max_tokens: maxOut,
     temperature: opts.temperature ?? 0.1,
     messages: anthropicMessages,
     ...(system ? { system } : {}),
+    ...(tools && toolName
+      ? {
+          tools,
+          tool_choice: { type: "tool", name: toolName },
+        }
+      : {}),
   };
 
-  let toolName: string | null = null;
-  if (opts.responseFormat?.type === "json_schema" && opts.responseFormat.json_schema) {
-    const js = opts.responseFormat.json_schema;
-    toolName = js.name;
-    body.tools = [
-      {
-        name: js.name,
-        description: "Structured response required by the application.",
-        input_schema: js.schema,
-      },
-    ];
-    body.tool_choice = { type: "tool", name: js.name };
-  }
-
-  const timeoutMs = opts.timeoutMs ?? 45000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  let res: Response;
+  let data: Anthropic.Message;
   try {
-    res = await fetch(ANTHROPIC_API, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+    data = await client.messages.create(params);
   } catch (err: any) {
-    if (err?.name === "AbortError") throw new Error(`Anthropic call timed out after ${timeoutMs}ms`);
+    if (err?.name === "AbortError" || err?.message?.includes("timeout")) {
+      throw new Error(`Anthropic call timed out after ${timeoutMs}ms`);
+    }
     throw err;
-  } finally {
-    clearTimeout(timeoutId);
   }
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Anthropic ${res.status}: ${text}`);
-  }
-
-  const data: any = await res.json();
 
   let contentStr = "";
   if (toolName) {
