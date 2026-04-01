@@ -1,10 +1,8 @@
 /** Keys for per-role model + optional custom $/1M token pricing (USD). */
 export const MODEL_CONFIG_KEYS = [
   "agentModel",
-  "summaryModel",
-  "reviewModel",
+  "crawlModel",
   "reviewAgentModel",
-  "scriptModel",
   "stagehandModel",
 ] as const;
 export type ModelConfigKey = (typeof MODEL_CONFIG_KEYS)[number];
@@ -15,10 +13,9 @@ export type EngineConfig = {
   anthropicApiKey: string;
   geminiApiKey: string;
   agentModel: string;
-  summaryModel: string;
-  reviewModel: string;
+  /** Crawl, path plans, auxiliary text: link filtering, suggested flows, intents, destination test plans. */
+  crawlModel: string;
   reviewAgentModel: string;
-  scriptModel: string;
   stagehandEnabled: boolean;
   stagehandModel: string;
   runTimeoutMinutes: number;

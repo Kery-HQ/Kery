@@ -89,12 +89,12 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         const planContext = formatTestPlanForNavigator(plan);
         if (planContext) context = context ? `${context}\n\n${planContext}` : planContext;
         if (usage) {
-          const model = config.reviewModel ?? "gemini-2.5-flash-lite";
+          const model = config.crawlModel;
           pathGenCalls.push({
             seq: 0, stepIndex: 0, model, hasVision: false, attempt: 1,
             inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens, durationMs,
-            costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewModel"),
+            costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "crawlModel"),
             query: pathPrompt ?? "Generate test plan for destination",
             requestMessages: pathPrompt ? [{ role: "user", content: pathPrompt }] : undefined,
             response: rawResponse ?? planContext ?? "",

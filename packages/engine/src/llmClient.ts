@@ -424,55 +424,10 @@ export async function llmAgentChat(messages: any[]): Promise<{ content: string; 
 export async function llmSummarize(prompt: string): Promise<{ content: string; usage: { inputTokens: number; outputTokens: number; totalTokens: number } }> {
   const { content, usage } = await llmChat(
     [{ role: "user", content: prompt }],
-    getConfig().summaryModel,
+    getConfig().crawlModel,
     { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 }
   );
   return { content, usage };
-}
-
-// ─── Review Agent (vision + text, structured bugs) ─────────────────────────────
-
-const REVIEW_BUG_SCHEMA = {
-  type: "json_schema" as const,
-  json_schema: {
-    name: "review_bugs",
-    strict: true,
-    schema: {
-      type: "object",
-      properties: {
-        bugs: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              type: { type: "string", enum: ["visual", "ux", "behavioral", "a11y", "performance", "data"] },
-              description: { type: "string" },
-              severity: { type: "string", enum: ["low", "medium", "high"] },
-              region: {
-                type: "object",
-                properties: { x: { type: "integer" }, y: { type: "integer" }, w: { type: "integer" }, h: { type: "integer" } },
-                required: ["x", "y", "w", "h"],
-                additionalProperties: false,
-              },
-            },
-            required: ["type", "description", "severity"],
-            additionalProperties: false,
-          },
-        },
-      },
-      required: ["bugs"],
-      additionalProperties: false,
-    },
-  },
-};
-
-export async function llmReviewAnalysis(messages: any[]): Promise<{ content: string; usage: LLMUsage }> {
-  const model = getConfig().reviewModel ?? "gemini-2.5-flash-lite";
-  return llmChat(messages, model, {
-    maxTokens: MAX_OUTPUT_TOKENS,
-    temperature: 0.2,
-    responseFormat: REVIEW_BUG_SCHEMA,
-  });
 }
 
 // ─── Path Generator (text only, structured test plan) ──────────────────────────
@@ -511,7 +466,7 @@ const TEST_PLAN_SCHEMA = {
 };
 
 export async function llmPathPlan(prompt: string): Promise<{ content: string; usage: LLMUsage }> {
-  const model = getConfig().reviewModel ?? "gemini-2.5-flash-lite";
+  const model = getConfig().crawlModel;
   return llmChat(
     [{ role: "user", content: prompt }],
     model,

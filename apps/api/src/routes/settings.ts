@@ -13,12 +13,13 @@ import { config as envConfig } from "../config.js";
 /** The model keys we allow setting via the API. */
 const MODEL_KEYS = [
   "agentModel",
-  "summaryModel",
-  "reviewModel",
+  "crawlModel",
   "reviewAgentModel",
-  "scriptModel",
   "stagehandModel",
 ] as const;
+
+/** Pre-merge DB keys — still read for migration; deleted on reset. */
+const LEGACY_MODEL_KEYS = ["summaryModel", "scriptModel", "reviewModel"] as const;
 
 type ModelKey = (typeof MODEL_KEYS)[number];
 
@@ -26,10 +27,8 @@ const priceEntry = z.object({ input: z.number(), output: z.number() });
 
 const ModelSettingsSchema = z.object({
   agentModel: z.string().optional(),
-  summaryModel: z.string().optional(),
-  reviewModel: z.string().optional(),
+  crawlModel: z.string().optional(),
   reviewAgentModel: z.string().optional(),
-  scriptModel: z.string().optional(),
   stagehandModel: z.string().optional(),
   /** Per-slot custom $/1M token (USD). `null` clears stored pricing for that slot. */
   modelPrices: z
@@ -44,6 +43,30 @@ export async function applyDbModelSettings(storage: StorageAdapter): Promise<voi
     const overrides: Record<string, string> = {};
     const prices: Partial<Record<ModelConfigKey, { input: number; output: number }>> = {};
     for (const key of MODEL_KEYS) {
+      if (key === "crawlModel") {
+        const v =
+          all["model.crawlModel"] ??
+          all["model.scriptModel"] ??
+          all["model.summaryModel"] ??
+          all["model.reviewModel"];
+        if (v) overrides.crawlModel = v;
+        const priceRaw =
+          all["modelPrice.crawlModel"] ??
+          all["modelPrice.scriptModel"] ??
+          all["modelPrice.summaryModel"] ??
+          all["modelPrice.reviewModel"];
+        if (priceRaw) {
+          try {
+            const j = JSON.parse(priceRaw) as { input?: unknown; output?: unknown };
+            if (typeof j.input === "number" && typeof j.output === "number") {
+              prices.crawlModel = { input: j.input, output: j.output };
+            }
+          } catch {
+            /* skip */
+          }
+        }
+        continue;
+      }
       const dbKey = `model.${key}`;
       if (all[dbKey]) overrides[key] = all[dbKey];
       const pKey = `modelPrice.${key}`;
@@ -73,10 +96,8 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
     const current = getConfig();
     const defaults: Record<ModelKey, string> = {
       agentModel: envConfig.agentModel,
-      summaryModel: envConfig.summaryModel,
-      reviewModel: envConfig.reviewModel,
+      crawlModel: envConfig.crawlModel,
       reviewAgentModel: envConfig.reviewAgentModel,
-      scriptModel: envConfig.scriptModel,
       stagehandModel: envConfig.stagehandModel,
     };
 
@@ -84,6 +105,15 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
     try {
       const all = await storage.getSettings();
       for (const key of MODEL_KEYS) {
+        if (key === "crawlModel") {
+          const v =
+            all["model.crawlModel"] ??
+            all["model.scriptModel"] ??
+            all["model.summaryModel"] ??
+            all["model.reviewModel"];
+          if (v) dbOverrides.crawlModel = v;
+          continue;
+        }
         const dbKey = `model.${key}`;
         if (all[dbKey]) dbOverrides[key] = all[dbKey];
       }
@@ -123,8 +153,12 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       if (value !== undefined) {
         const dbKey = `model.${key}`;
         if (value === "") {
-          // Empty string = reset to default
-          await storage.deleteSettings([dbKey]);
+          // Empty string = reset to default (crawl merge: clear legacy keys too)
+          const keysToDelete =
+            key === "crawlModel"
+              ? ["model.crawlModel", "model.scriptModel", "model.summaryModel", "model.reviewModel"]
+              : [dbKey];
+          await storage.deleteSettings(keysToDelete);
         } else {
           if (!isModelRunnableWithConfig(value, getConfig())) {
             reply.code(400).send({ error: "model_unavailable", message: `No API key configured for model "${value}".` });
@@ -132,6 +166,9 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
           }
           await storage.saveSetting(dbKey, value);
           overrides[key] = value;
+          if (key === "crawlModel") {
+            await storage.deleteSettings(["model.scriptModel", "model.summaryModel", "model.reviewModel"]);
+          }
         }
       }
     }
@@ -143,13 +180,29 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
         const dbPriceKey = `modelPrice.${k}`;
         const v = rawPrices[k];
         if (v === null) {
-          await storage.deleteSettings([dbPriceKey]);
+          const priceKeysToDelete =
+            k === "crawlModel"
+              ? [
+                  "modelPrice.crawlModel",
+                  "modelPrice.scriptModel",
+                  "modelPrice.summaryModel",
+                  "modelPrice.reviewModel",
+                ]
+              : [dbPriceKey];
+          await storage.deleteSettings(priceKeysToDelete);
         } else if (v && typeof v.input === "number" && typeof v.output === "number") {
           if (v.input < 0 || v.output < 0) {
             reply.code(400).send({ error: "invalid_price", message: "Model prices must be non-negative numbers." });
             return;
           }
           await storage.saveSetting(dbPriceKey, JSON.stringify({ input: v.input, output: v.output }));
+          if (k === "crawlModel") {
+            await storage.deleteSettings([
+              "modelPrice.scriptModel",
+              "modelPrice.summaryModel",
+              "modelPrice.reviewModel",
+            ]);
+          }
         }
       }
     }
@@ -164,15 +217,14 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
   app.delete("/api/settings/models", async (_req, reply) => {
     const dbKeys = MODEL_KEYS.map((k) => `model.${k}`);
     const priceKeys = MODEL_KEYS.map((k) => `modelPrice.${k}`);
-    await storage.deleteSettings([...dbKeys, ...priceKeys]);
+    const legacyDbKeys = LEGACY_MODEL_KEYS.flatMap((k) => [`model.${k}`, `modelPrice.${k}`]);
+    await storage.deleteSettings([...dbKeys, ...priceKeys, ...legacyDbKeys]);
 
     // Re-init from env defaults
     updateEngineConfig({
       agentModel: envConfig.agentModel,
-      summaryModel: envConfig.summaryModel,
-      reviewModel: envConfig.reviewModel,
+      crawlModel: envConfig.crawlModel,
       reviewAgentModel: envConfig.reviewAgentModel,
-      scriptModel: envConfig.scriptModel,
       stagehandModel: envConfig.stagehandModel,
       modelPriceUsdPerMillion: {},
     });

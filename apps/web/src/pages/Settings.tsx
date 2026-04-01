@@ -346,29 +346,6 @@ const AGENT_OPTIONS: ModelOption[] = [
   { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
 ];
 
-const TEXT_OPTIONS: ModelOption[] = [
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", price: "$0.08 / $0.30" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
-  { value: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano", price: "$0.10 / $0.40" },
-  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
-  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
-  { value: "openai/o3-mini", label: "o3-mini", price: "$1.10 / $4.40" },
-  { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", price: "$0.26 / $0.38" },
-  { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", price: "varies" },
-];
-
-const VISION_OPTIONS: ModelOption[] = [
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", price: "$0.08 / $0.30" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
-  { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
-  { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
-  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
-  { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
-];
-
 const REASONING_VISION_OPTIONS: ModelOption[] = [
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$15.00 / $75.00" },
@@ -415,28 +392,16 @@ const MODEL_CONFIG: { key: string; label: string; description: string; options: 
     options: AGENT_OPTIONS,
   },
   {
-    key: "summaryModel",
-    label: "Summary Model",
-    description: "Run summaries -- cheap, text-only",
-    options: TEXT_OPTIONS,
-  },
-  {
-    key: "reviewModel",
-    label: "Review Model",
-    description: "Screenshot review -- needs vision, cost-efficient",
-    options: VISION_OPTIONS,
+    key: "crawlModel",
+    label: "Crawl Model",
+    description: "Crawl tasks, destination path / test plan generation, per-page intents -- text & JSON",
+    options: CODE_OPTIONS,
   },
   {
     key: "reviewAgentModel",
     label: "Review Agent Model",
-    description: "Deep visual analysis -- needs strong vision + reasoning",
+    description: "Post-run holistic & filmstrip screenshot analysis -- strong vision + reasoning",
     options: REASONING_VISION_OPTIONS,
-  },
-  {
-    key: "scriptModel",
-    label: "Script Model",
-    description: "Playwright script & strategy generation",
-    options: CODE_OPTIONS,
   },
   {
     key: "stagehandModel",

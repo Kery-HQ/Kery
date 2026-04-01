@@ -418,11 +418,11 @@ ${lines}`;
     const t0 = Date.now();
     const { content: raw, usage } = await llmChat(
       [{ role: "user", content: prompt }],
-      config.scriptModel,
+      config.crawlModel,
       { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.1 },
     );
     const durationMs = Date.now() - t0;
-    const delta = calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens, "scriptModel");
+    const delta = calcCostUsd(config.crawlModel, usage.inputTokens, usage.outputTokens, "crawlModel");
     costAccum.usd += delta;
     costAccum.linkFilterUsd += delta;
     const fromModel = tryParse(raw);
@@ -447,7 +447,7 @@ ${lines}`;
 
     recordCrawlLlmCall(llmCalls, seqRef, {
       agent: "crawl_link_filter",
-      model: config.scriptModel,
+      model: config.crawlModel,
       query: querySummary,
       requestMessages,
       response: raw ?? "",
@@ -471,7 +471,7 @@ ${lines}`;
     logger.warn({ err: msg, batchSize: batch.length }, "Crawl: link-filter LLM failed, keeping batch");
     recordCrawlLlmCall(llmCalls, seqRef, {
       agent: "crawl_link_filter",
-      model: config.scriptModel,
+      model: config.crawlModel,
       query: querySummary,
       requestMessages,
       response: `ERROR: ${msg}`,
@@ -810,17 +810,17 @@ Return ONLY a JSON array: [{"name":"Short name","intent":"Step-by-step instructi
     const t0 = Date.now();
     const { content: raw, usage } = await llmChat(
       [{ role: "user", content: prompt }],
-      config.scriptModel,
+      config.crawlModel,
       { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3 },
     );
     const durationMs = Date.now() - t0;
-    const delta = calcCostUsd(config.scriptModel, usage.inputTokens, usage.outputTokens, "scriptModel");
+    const delta = calcCostUsd(config.crawlModel, usage.inputTokens, usage.outputTokens, "crawlModel");
     costAccum.usd += delta;
     costAccum.suggestedFlowsUsd += delta;
 
     recordCrawlLlmCall(llmCalls, seqRef, {
       agent: "crawl_suggested_flows",
-      model: config.scriptModel,
+      model: config.crawlModel,
       query: `suggested flows (${sitemap.length} pages in sitemap)`,
       requestMessages,
       response: raw ?? "",
@@ -848,7 +848,7 @@ Return ONLY a JSON array: [{"name":"Short name","intent":"Step-by-step instructi
     const msg = String(err);
     recordCrawlLlmCall(llmCalls, seqRef, {
       agent: "crawl_suggested_flows",
-      model: config.scriptModel,
+      model: config.crawlModel,
       query: `suggested flows (${sitemap.length} pages in sitemap)`,
       requestMessages,
       response: `ERROR: ${msg}`,
@@ -873,8 +873,8 @@ export async function generateIntentForNode(
 
   const prompt = `Generate a single test intent for this page starting from ${baseUrl}.\n\n${context.join("\n")}\n\nReply with ONLY the intent text.`;
   try {
-    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.summaryModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 });
-    if (costAccum) costAccum.usd += calcCostUsd(config.summaryModel, usage.inputTokens, usage.outputTokens, "summaryModel");
+    const { content, usage } = await llmChat([{ role: "user", content: prompt }], config.crawlModel, { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.2 });
+    if (costAccum) costAccum.usd += calcCostUsd(config.crawlModel, usage.inputTokens, usage.outputTokens, "crawlModel");
     const intent = content.trim();
     return intent.length > 20 ? intent : null;
   } catch { return null; }

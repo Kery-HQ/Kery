@@ -36,15 +36,11 @@ const SETTINGS_ITEMS = [
 ];
 
 function Logo() {
-  const [src, setSrc] = React.useState<"/logo.svg" | "/logo.png">("/logo.svg");
-  const [failed, setFailed] = React.useState(false);
-  if (failed) return null;
   return (
     <img
-      src={src}
-      alt=""
-      className="h-5 w-5 flex-shrink-0 object-contain"
-      onError={() => (src === "/logo.svg" ? setSrc("/logo.png") : setFailed(true))}
+      src="/logo/kery.png"
+      alt="Kery"
+      className="h-5 w-5 flex-shrink-0 object-contain [image-rendering:pixelated]"
     />
   );
 }

@@ -11,10 +11,14 @@ export const config = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   agentModel: process.env.AGENT_MODEL || "openai/gpt-4.1-mini",
-  summaryModel: process.env.SUMMARY_MODEL || "gemini-2.5-flash-lite",
-  reviewModel: process.env.REVIEW_MODEL || "gemini-2.5-flash-lite",
+  /** Crawl, path plans, auxiliary text. Legacy env keys still apply if `CRAWL_MODEL` is unset. */
+  crawlModel:
+    process.env.CRAWL_MODEL ||
+    process.env.SCRIPT_MODEL ||
+    process.env.SUMMARY_MODEL ||
+    process.env.REVIEW_MODEL ||
+    "gemini-2.5-flash",
   reviewAgentModel: process.env.REVIEW_AGENT_MODEL || "gemini-2.5-flash",
-  scriptModel: process.env.SCRIPT_MODEL || "gemini-2.5-flash",
   stagehandEnabled: process.env.STAGEHAND_ENABLED !== "false",
   stagehandModel: process.env.STAGEHAND_MODEL || "google/gemini-2.0-flash",
   runTimeoutMinutes: Number(process.env.RUN_TIMEOUT_MINUTES || 15),

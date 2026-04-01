@@ -37,7 +37,7 @@ export {
 export type { MemoryEntry, MemoryEntryInsert, MemoryEntryType, MemorySource } from "./agentMemory.js";
 
 // ─── LLM ─────────────────────────────────────────────────────────────────────
-export { llmChat, llmAgentChat, llmSummarize, llmReviewAnalysis, llmPathPlan, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+export { llmChat, llmAgentChat, llmSummarize, llmPathPlan, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 export type { LLMUsage } from "./llmClient.js";
 export {
   inferModelProviderRequirement,
