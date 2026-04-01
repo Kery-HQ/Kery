@@ -4,11 +4,13 @@ import * as fs from "fs";
 import * as path from "path";
 import { Pool } from "pg";
 import type { Queue } from "bullmq";
+import type { Redis } from "ioredis";
 import type { StorageAdapter } from "@kery/engine";
 import {
   getEmitter, requestStop, logger,
 } from "@kery/engine";
 import type { RunJobData } from "../runQueue.js";
+import { markRunStopRequested } from "../runStopRedis.js";
 import { RunIdParams, RunFilenameParams } from "./params.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
@@ -26,7 +28,12 @@ const RunSchema = z.object({
   destinationId: z.string().uuid().optional(),
 });
 
-export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter, runQueue: Queue<RunJobData>) {
+export function registerRunRoutes(
+  app: FastifyInstance,
+  storage: StorageAdapter,
+  runQueue: Queue<RunJobData>,
+  redis: Redis,
+) {
   const pool = storage.getPool() as Pool;
 
   app.post("/api/projects/:projectId/run", async (req, reply) => {
@@ -136,11 +143,15 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
 
     const heartbeat = setInterval(() => { reply.raw.write(`:keepalive\n\n`); }, 15_000);
     const onStep = (step: any) => send({ type: "step", step });
+    const onPlan = (plan: any) => send({ type: "plan", ...plan });
+    const onActivity = (activity: any) => send({ type: "activity", activity });
     const onScreenshot = (data: string) => send({ type: "screenshot", data });
     const onLLMCall = (call: any) => send({ type: "llm_call", call });
     const onDone = (run: any) => { clearInterval(heartbeat); send({ type: "done", run }); reply.raw.end(); };
 
     emitter.on("step", onStep);
+    emitter.on("plan", onPlan);
+    emitter.on("activity", onActivity);
     emitter.on("screenshot", onScreenshot);
     emitter.on("llm_call", onLLMCall);
     emitter.once("done", onDone);
@@ -148,6 +159,8 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
     req.raw.on("close", () => {
       clearInterval(heartbeat);
       emitter.off("step", onStep);
+      emitter.off("plan", onPlan);
+      emitter.off("activity", onActivity);
       emitter.off("screenshot", onScreenshot);
       emitter.off("llm_call", onLLMCall);
       emitter.off("done", onDone);
@@ -172,19 +185,20 @@ export function registerRunRoutes(app: FastifyInstance, storage: StorageAdapter,
     reply.send({ bugs });
   });
 
-  // Stop a running run
+  // Stop a running run (Redis signal is seen by the BullMQ worker; in-process emitter is a bonus)
   app.post("/api/runs/:runId/stop", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
     if (run.status !== "running") { reply.send({ ok: true, status: run.status }); return; }
-    const stopped = requestStop(runId);
-    if (!stopped) {
-      // No active emitter — force-mark as failed directly
-      await storage.updateTestRun(runId, {
-        status: "failed", summary: "Stopped by user", completed_at: new Date().toISOString(),
-      });
+    try {
+      await markRunStopRequested(redis, runId);
+    } catch (err) {
+      logger.error({ runId, err: String(err) }, "Stop: failed to set Redis signal");
+      reply.code(503).send({ ok: false, error: "stop_signal_unavailable" });
+      return;
     }
+    requestStop(runId);
     reply.send({ ok: true });
   });
 

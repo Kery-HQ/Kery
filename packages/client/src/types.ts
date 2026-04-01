@@ -52,6 +52,11 @@ export type RunStep = {
   source?: string;
 };
 
+export type AgentPlanItem = {
+  text: string;
+  status: "pending" | "done" | "current" | "failed";
+};
+
 /** A bug found during testing. */
 export type Bug = {
   id?: string;
@@ -157,6 +162,8 @@ export type OverviewStats = {
 /** SSE event from run stream. */
 export type RunStreamEvent =
   | { type: "step"; step: RunStep }
+  | { type: "plan"; items: AgentPlanItem[]; at: number }
+  | { type: "activity"; activity: { kind: "observe"; text: string; at: number } }
   | { type: "screenshot"; data: string }
   | { type: "llm_call"; call: LLMCallRecord }
   | { type: "done"; run: TestRun }

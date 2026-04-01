@@ -32,7 +32,7 @@ function AppShell() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Nav onOpenCommandPalette={() => setCmdkOpen(true)} />
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      <main className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         <Outlet />
       </main>
       <CommandPalette open={cmdkOpen} onOpenChange={setCmdkOpen} />

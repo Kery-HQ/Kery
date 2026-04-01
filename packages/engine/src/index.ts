@@ -22,7 +22,7 @@ export * from "./types.js";
 export { runAgent, handleAuth, waitForPageStable, executeAction, serializeWireMessagesForStorage } from "./agent.js";
 export type {
   AgentAction, RunStep, LLMCallRecord, AgentResult, LLMAgentType, LLMStoredMessage, LLMStoredContentPart,
-  AuthHandleResult, DoneResult,
+  AuthHandleResult, DoneResult, AgentPlanItem,
 } from "./agent.js";
 
 // ─── Token Auth (Clerk, Supabase) ────────────────────────────────────────────

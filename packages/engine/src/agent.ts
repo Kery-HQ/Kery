@@ -713,7 +713,7 @@ class ProgressSummary {
   }
 }
 
-type AgentPlanItem = {
+export type AgentPlanItem = {
   text: string;
   status: "pending" | "done" | "current" | "failed";
 };
@@ -1299,6 +1299,8 @@ async function tryAgentAuthViaRunAgent(
     undefined,
     undefined,
     onLLMCall,
+    undefined,
+    undefined,
     10,
     undefined,
     undefined,
@@ -1322,6 +1324,8 @@ export async function runAgent(
   onStep?: (step: RunStep) => void,
   onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer, domHash: string) => void,
   onLLMCall?: (call: LLMCallRecord) => void,
+  onAgentPlan?: (items: AgentPlanItem[]) => void,
+  onActivity?: (activity: { kind: "observe"; text: string; at: number }) => void,
   maxSteps?: number,
   targetUrl?: string,
   stagehandSession?: StagehandSession,
@@ -1662,7 +1666,11 @@ export async function runAgent(
           const nextPlan = normalizePlanItems(action.planItems);
           if (nextPlan.length > 0) {
             agentPlan = nextPlan;
+            onAgentPlan?.(nextPlan);
           }
+        } else if (action.action === "observe") {
+          const text = (action.observation ?? action.reasoning ?? "").trim();
+          if (text) onActivity?.({ kind: "observe", text, at: stepTimestamp() });
         } else if (action.action === "report_bug") {
           const bugStep: RunStep = {
             index: stepCounter + 1 + agentBugTracker.length,

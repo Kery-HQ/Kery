@@ -10,6 +10,7 @@ import { registerCrawlRoutes } from "./routes/crawl.js";
 import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings } from "./routes/settings.js";
+import { Redis } from "ioredis";
 import { createRunQueue, createRunWorker } from "./runQueue.js";
 import { withRunCorrelation } from "@kery/engine";
 
@@ -38,7 +39,9 @@ const storage = new PostgresAdapter(pool);
 
 // Initialize BullMQ run queue + worker
 const { queue: runQueue, connection: redisConnection } = createRunQueue(config.redisUrl);
-const runWorker = createRunWorker(redisConnection, storage);
+/** Shared Redis client for cross-process run stop signals (API sets key, worker polls). */
+const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
+const runWorker = createRunWorker(redisConnection, storage, redis);
 
 const app = Fastify({ logger: true });
 
@@ -71,7 +74,7 @@ app.get("/health", async () => ({ status: "ok" }));
 
 // Register routes — pass storage adapter and run queue
 registerProjectRoutes(app, storage);
-registerRunRoutes(app, storage, runQueue);
+registerRunRoutes(app, storage, runQueue, redis);
 registerCrawlRoutes(app, storage);
 registerTestRoutes(app, storage);
 registerBugRoutes(app, storage);
@@ -96,6 +99,7 @@ async function shutdown() {
   await app.close();
   // Close DB pool
   await pool.end();
+  await redis.quit().catch(() => {});
   process.exit(0);
 }
 

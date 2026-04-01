@@ -5,7 +5,10 @@ import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun, generateRegressionPlan,
   createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
+  isStopRequested,
 } from "@kery/engine";
+import type { Redis } from "ioredis";
+import { clearRunStopRequest, startRunStopPoller } from "./runStopRedis.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
@@ -53,6 +56,7 @@ export function createRunQueue(redisUrl: string) {
 export function createRunWorker(
   connection: { host: string; port: number; password?: string },
   storage: StorageAdapter,
+  redis: Redis,
 ) {
   const concurrency = detectConcurrency();
 
@@ -61,9 +65,11 @@ export function createRunWorker(
     async (job: Job<RunJobData>) => {
       const data = job.data;
       const emitter = createEmitter(data.runId);
+      await clearRunStopRequest(redis, data.runId).catch(() => {});
+      const stopPoller = startRunStopPoller(redis, data.runId);
 
       try {
-        const result = await runOrchestratedJob(storage, {
+        const runJob: any = {
           runId: data.runId,
           baseUrl: data.baseUrl,
           intent: data.intent,
@@ -76,10 +82,15 @@ export function createRunWorker(
           maxSteps: data.maxSteps,
           recordVideo: data.recordVideo,
           videosDir: VIDEOS_DIR,
-          onStep: (step) => emitter.emit("step", step),
-          onScreenshot: (buf) => emitter.emit("screenshot", buf.toString("base64")),  // SSE gets marked screenshot
-          onLLMCall: (call) => emitter.emit("llm_call", call),
-        });
+          onStep: (step: any) => emitter.emit("step", step),
+          onAgentPlan: (items: Array<{ text: string; status: "pending" | "done" | "current" | "failed" }>) =>
+            emitter.emit("plan", { items, at: Date.now() }),
+          onActivity: (activity: { kind: "observe"; text: string; at: number }) => emitter.emit("activity", activity),
+          onScreenshot: (buf: Buffer) => emitter.emit("screenshot", buf.toString("base64")),  // SSE gets marked screenshot
+          onLLMCall: (call: any) => emitter.emit("llm_call", call),
+          shouldStop: () => stopPoller.shouldStop() || isStopRequested(data.runId),
+        };
+        const result = await runOrchestratedJob(storage, runJob);
 
         const completedAt = new Date().toISOString();
         await materializeRunScreenshotFiles(data.runId, result.llmCalls, result.bugsFound);
@@ -146,6 +157,8 @@ export function createRunWorker(
         const failedRun = await storage.getTestRun(data.runId).catch(() => null);
         emitter.emit("done", failedRun ?? { runId: data.runId, status: "failed", summary: String(err) });
       } finally {
+        stopPoller.dispose();
+        await clearRunStopRequest(redis, data.runId).catch(() => {});
         destroyEmitter(data.runId);
       }
     },

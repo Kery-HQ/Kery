@@ -86,7 +86,8 @@ const OPENAI_AGENT_SCHEMA = {
                       text: { type: "string" },
                       status: { type: "string", enum: ["pending", "done", "current", "failed"] },
                     },
-                    required: ["text"],
+                    // OpenAI/Azure strict JSON schema: required must list every key in properties.
+                    required: ["text", "status"],
                     additionalProperties: false,
                   },
                 ],
@@ -139,7 +140,7 @@ const GEMINI_AGENT_SCHEMA = {
                   text: { type: "string" },
                   status: { type: "string", enum: ["pending", "done", "current", "failed"] },
                 },
-                required: ["text"],
+                required: ["text", "status"],
                 additionalProperties: false,
               },
             ],

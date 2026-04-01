@@ -8,7 +8,7 @@ import * as path from "path";
 import * as os from "os";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentType } from "./agent.js";
+import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentType, type AgentPlanItem } from "./agent.js";
 import { waitForPageStable } from "./agent.js";
 import type { AuthConfig } from "./types.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
@@ -43,8 +43,12 @@ export type RunJob = {
   recordVideo?: boolean;
   videosDir?: string;
   onStep?: (step: RunStep) => void;
+  onAgentPlan?: (items: AgentPlanItem[]) => void;
+  onActivity?: (activity: { kind: "observe"; text: string; at: number }) => void;
   onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer, domHash: string) => void;
   onLLMCall?: (call: LLMCallRecord) => void;
+  /** Optional extra stop check (e.g. Redis-backed signal from API process). Combined with in-process isStopRequested. */
+  shouldStop?: () => boolean;
 };
 
 export type RunResult = {
@@ -315,8 +319,10 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           }
         }
       },
-      job.onLLMCall, job.maxSteps, targetUrl, shSession,
-      job.runId ? () => isStopRequested(job.runId!) : undefined,
+      job.onLLMCall, job.onAgentPlan, job.onActivity, job.maxSteps, targetUrl, shSession,
+      !job.runId && !job.shouldStop
+        ? undefined
+        : () => (job.shouldStop?.() ?? false) || (job.runId ? isStopRequested(job.runId) : false),
       netMonitor,
     );
 
