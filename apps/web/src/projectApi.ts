@@ -41,8 +41,21 @@ export async function fetchProjectOverview(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/overview`);
 }
 
-export async function fetchProjectRuns(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/runs`);
+export type FetchProjectRunsParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+};
+
+export async function fetchProjectRuns(projectId: string, params: FetchProjectRunsParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.page && params.page > 0) qs.set("page", String(params.page));
+  if (params.pageSize && params.pageSize > 0) qs.set("pageSize", String(params.pageSize));
+  if (params.search?.trim()) qs.set("search", params.search.trim());
+  if (params.status?.trim()) qs.set("status", params.status.trim());
+  const suffix = qs.toString();
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/runs${suffix ? `?${suffix}` : ""}`);
 }
 
 export async function fetchProjectBugs(projectId: string) {

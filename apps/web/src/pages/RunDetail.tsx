@@ -664,26 +664,26 @@ export const RunDetail: React.FC = () => {
       {/* Radix Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="flex flex-col flex-1 min-h-0">
         <div className="px-6 flex-shrink-0 bg-card/50">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="overview" className="gap-1.5">
+          <TabsList>
+            <TabsTrigger value="overview">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="issues" className="gap-1.5">
+            <TabsTrigger value="issues">
               Issues
               {bugsFound.length > 0 && (
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
                   {bugsFound.length}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="llm" className="gap-1.5">
+            <TabsTrigger value="llm">
               LLM Calls
-              <span className="text-[11px] font-mono text-muted-foreground/50">{llmCalls.length}</span>
+              <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{llmCalls.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="memory" className="gap-1.5">
+            <TabsTrigger value="memory">
               Memory
               {memoryLoaded.length > 0 && (
-                <span className="text-[11px] font-mono text-muted-foreground/50">{memoryLoaded.length}</span>
+                <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{memoryLoaded.length}</span>
               )}
             </TabsTrigger>
           </TabsList>
@@ -1094,12 +1094,14 @@ function IssuesTab({
 }) {
   return (
     <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in">
-      <div className="mb-4">
-        <SectionLabel icon={<WarningCircle className="h-3.5 w-3.5" />} text={`Issues (${bugsFound.length})`} />
-        <p className="text-[12px] text-muted-foreground mt-1">
-          Findings from the Navigator, review agents, and related signals for this run.
-        </p>
-      </div>
+      {bugsFound.length > 0 ? (
+        <div className="mb-4">
+          <SectionLabel icon={<WarningCircle className="h-3.5 w-3.5" />} text={`Issues (${bugsFound.length})`} />
+          <p className="text-[12px] text-muted-foreground mt-1">
+            Findings from the Navigator, review agents, and related signals for this run.
+          </p>
+        </div>
+      ) : null}
       {bugsFound.length === 0 ? (
         <EmptyState
           icon={<WarningCircle className="h-5 w-5" />}

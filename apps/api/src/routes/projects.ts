@@ -62,6 +62,13 @@ const MemoryPatchBody = z.object({
   confidence: z.number().int().min(0).max(100).optional(),
 });
 
+const ProjectRunsQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().trim().max(200).optional(),
+  status: z.string().trim().max(40).optional(),
+});
+
 async function assertDestinationInProject(
   storage: StorageAdapter,
   projectId: string,
@@ -191,12 +198,54 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
   // Runs list
   app.get("/api/projects/:projectId/runs", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
+    const parsedQuery = ProjectRunsQuery.safeParse(req.query ?? {});
+    if (!parsedQuery.success) {
+      reply.code(400).send({ error: "invalid query", details: parsedQuery.error.issues });
+      return;
+    }
+
+    const page = parsedQuery.data.page;
+    const pageSize = parsedQuery.data.pageSize;
+    const offset = (page - 1) * pageSize;
+    const search = parsedQuery.data.search?.trim() || undefined;
+    const status = parsedQuery.data.status?.trim() || undefined;
+    const normalizedStatus = status && status !== "all" ? status : undefined;
+
+    const whereParts = ["tr.project_id = $1"];
+    const params: unknown[] = [projectId];
+    let n = 2;
+
+    if (normalizedStatus) {
+      whereParts.push(`tr.status = $${n++}`);
+      params.push(normalizedStatus);
+    }
+
+    if (search) {
+      whereParts.push(
+        `(tr.id::text ILIKE $${n} OR COALESCE(NULLIF(TRIM(tr.source_label), ''), st.name, NULLIF(TRIM(d.title), ''), d.normalized_route, '') ILIKE $${n})`,
+      );
+      params.push(`%${search}%`);
+      n += 1;
+    }
+
+    const whereSql = whereParts.join(" AND ");
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS total ${RUN_LIST_FROM} WHERE ${whereSql}`,
+      params,
+    );
+    const total = Number(countRes.rows[0]?.total ?? 0);
+
+    const runParams = [...params, pageSize, offset];
+    const limitParam = n++;
+    const offsetParam = n++;
     const { rows } = await pool.query(
       `SELECT tr.*, ${RUN_DISPLAY_NAME_SQL} ${RUN_LIST_FROM}
-       WHERE tr.project_id = $1 ORDER BY tr.started_at DESC NULLS LAST LIMIT 100`,
-      [projectId],
+       WHERE ${whereSql}
+       ORDER BY tr.started_at DESC NULLS LAST
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      runParams,
     );
-    reply.send({ runs: rows });
+    reply.send({ runs: rows, page, pageSize, total });
   });
 
   // Memory

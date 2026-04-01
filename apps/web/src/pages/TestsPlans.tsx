@@ -6,7 +6,6 @@ import {
   Play,
   Pencil,
   Trash,
-  Brain,
   Keyboard,
   CursorClick,
   NavigationArrow,
@@ -14,7 +13,10 @@ import {
   Repeat,
   CheckCircle,
   CaretDown,
+  Code,
+  Copy,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,8 +28,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { RunList } from "@/components/RunList";
@@ -36,8 +36,9 @@ import { statusVariant, relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
-  runProjectTest, fetchProjectRuns, fetchTestMemory,
+  runProjectTest, fetchProjectRuns,
 } from "@/projectApi";
+import { regressionPlanToPlaywrightSnippet } from "@/lib/regressionPlanPlaywright";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -63,9 +64,9 @@ type SavedTest = {
   regression_plan?: RegressionStep[] | null;
   plan_status?: "none" | "ready" | "stale" | null;
   plan_success_count?: number;
+  /** When persisted, shown instead of a generated preview. */
+  playwright_script?: string | null;
 };
-
-type MemoryFact = { selector: string; purpose: string; action: string; hits: number };
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
@@ -98,10 +99,6 @@ export const TestsPlans: React.FC = () => {
 
   // Detail tabs
   const [testTab, setTestTab] = React.useState<string>("runs");
-
-  // Memory
-  const [testMemory, setTestMemory] = React.useState<MemoryFact[]>([]);
-  const [memoryLoading, setMemoryLoading] = React.useState(false);
 
   // Runs for detail
   const [flowRuns, setFlowRuns] = React.useState<any[]>([]);
@@ -154,28 +151,9 @@ export const TestsPlans: React.FC = () => {
       .finally(() => setRunsLoading(false));
   }, [testTab, currentProjectId, selectedTest?.id]);
 
-  // ─── Test memory ────────────────────────────────────────────────────────
-
   React.useEffect(() => {
-    if (testTab !== "memory" || !selectedTest) return;
-    loadTestMemoryFn(selectedTest);
-  }, [testTab, selectedTest?.id]);
-
-  async function loadTestMemoryFn(test: SavedTest) {
-    setMemoryLoading(true);
-    try {
-      const res = await fetchTestMemory(test.project_id, test.id);
-      const entries = res.entries || [];
-      setTestMemory(entries.map((e: any) => ({
-        selector: e.summary,
-        purpose: e.content,
-        action: e.type,
-        hits: e.confidence ?? 50,
-      })));
-    } finally {
-      setMemoryLoading(false);
-    }
-  }
+    if (testTab === "memory") setTestTab("runs");
+  }, [testTab]);
 
   // ─── Select ─────────────────────────────────────────────────────────────
 
@@ -272,8 +250,26 @@ export const TestsPlans: React.FC = () => {
   // ─── Plan status badge helper ────────────────────────────────────────────
 
   function planBadge(test: SavedTest) {
-    if (test.plan_status === "ready") return <Badge variant="success" dot>Script</Badge>;
-    if (test.plan_status === "stale") return <Badge variant="warning" dot>Stale</Badge>;
+    if (test.plan_status === "ready") {
+      return (
+        <Badge
+          variant="outline"
+          className="shrink-0 rounded-md border-status-pass/35 bg-status-pass/12 px-2 py-0.5 text-[10px] font-medium text-status-pass"
+        >
+          Script generated
+        </Badge>
+      );
+    }
+    if (test.plan_status === "stale") {
+      return (
+        <Badge
+          variant="outline"
+          className="shrink-0 rounded-md border-status-warn/35 bg-status-warn/10 px-2 py-0.5 text-[10px] font-medium text-status-warn"
+        >
+          Script stale
+        </Badge>
+      );
+    }
     return null;
   }
 
@@ -369,7 +365,6 @@ export const TestsPlans: React.FC = () => {
                         <span className="text-[13px] font-medium text-foreground truncate">
                           {test.name}
                         </span>
-                        {planBadge(test)}
                         {test.run_count != null && test.run_count > 0 && (
                           <span className="text-[10px] font-mono text-muted-foreground/50">
                             {test.run_count} run{test.run_count !== 1 ? "s" : ""}
@@ -388,28 +383,31 @@ export const TestsPlans: React.FC = () => {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRunSaved(test)}
-                        disabled={running === test.id || !selectedEnvId}
-                        className="h-7 gap-1.5 text-[11px]"
-                      >
-                        <Play className="h-3 w-3" />
-                        {running === test.id ? "Starting..." : "Run"}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(test)} className="h-7 w-7 p-0">
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteTarget(test)}
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash className="h-3 w-3" />
-                      </Button>
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {planBadge(test)}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRunSaved(test)}
+                          disabled={running === test.id || !selectedEnvId}
+                          className="h-7 gap-1.5 text-[11px]"
+                        >
+                          <Play className="h-3 w-3" />
+                          {running === test.id ? "Starting..." : "Run"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(test)} className="h-7 w-7 p-0">
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget(test)}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </button>
 
@@ -419,13 +417,12 @@ export const TestsPlans: React.FC = () => {
                       <Tabs value={testTab} onValueChange={setTestTab} className="flex flex-col">
                         <TabsList className="px-4 flex-shrink-0">
                           <TabsTrigger value="runs">Runs</TabsTrigger>
-                          <TabsTrigger value="script" className="gap-1.5">
+                          <TabsTrigger value="script">
                             Script
                             {test.plan_status === "ready" && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" />
                             )}
                           </TabsTrigger>
-                          <TabsTrigger value="memory">Memory</TabsTrigger>
                           <TabsTrigger value="details">Details</TabsTrigger>
                         </TabsList>
 
@@ -444,11 +441,8 @@ export const TestsPlans: React.FC = () => {
                               plan={test.regression_plan}
                               planStatus={test.plan_status}
                               successCount={test.plan_success_count}
+                              playwrightScript={test.playwright_script}
                             />
-                          </TabsContent>
-
-                          <TabsContent value="memory" className="px-4 pb-4">
-                            <MemoryTab memory={testMemory} loading={memoryLoading} />
                           </TabsContent>
 
                           <TabsContent value="details" className="px-4 pb-4">
@@ -566,104 +560,137 @@ export const TestsPlans: React.FC = () => {
 
 // ─── Script Tab ───────────────────────────────────────────────────────────────
 
-function ScriptTab({ plan, planStatus, successCount }: {
+function ScriptTab({ plan, planStatus, successCount, playwrightScript }: {
   plan?: RegressionStep[] | null;
   planStatus?: string | null;
   successCount?: number;
+  playwrightScript?: string | null;
 }) {
+  const [codeOpen, setCodeOpen] = React.useState(false);
   const status = planStatus ?? "none";
   const steps = plan ?? [];
+  const showEmptyState = status === "none" || steps.length === 0;
+
+  const displayCode = React.useMemo(() => {
+    const raw = playwrightScript?.trim();
+    if (raw) return raw;
+    if (steps.length > 0) return regressionPlanToPlaywrightSnippet(steps);
+    return "";
+  }, [playwrightScript, steps]);
+
+  const codeSourceLabel = playwrightScript?.trim()
+    ? "Saved script"
+    : "Generated preview";
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <div className="flex items-center gap-3">
-        {status === "ready" ? (
-          <Badge variant="success" dot>Regression script active</Badge>
-        ) : status === "stale" ? (
-          <Badge variant="warning" dot>Script stale -- regenerates on next pass</Badge>
-        ) : (
-          <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-            <Repeat className="h-3.5 w-3.5" />
-            No regression script yet
-          </span>
-        )}
-        {(successCount ?? 0) > 0 && (
-          <span className="text-[11px] font-mono text-muted-foreground/50 ml-auto tabular-nums">
-            {successCount} successful replay{successCount !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
-
-      {status === "none" || steps.length === 0 ? (
-        <EmptyState
-          icon={<Repeat className="h-5 w-5" />}
-          title="No script generated"
-          description="Run this flow successfully and a deterministic Playwright script will be compiled automatically. Subsequent runs replay without LLM calls."
-        />
+    <div className="w-full space-y-5">
+      {showEmptyState ? (
+        <div className="flex justify-center">
+          <EmptyState
+            className="w-full max-w-lg py-16"
+            icon={<Repeat className="h-5 w-5" />}
+            title="No replay plan yet"
+            description="Run this flow successfully once. We’ll save the step sequence and reuse it on the next run."
+          />
+        </div>
       ) : (
         <>
-          <p className="text-[11px] text-muted-foreground">
-            {steps.length} step{steps.length !== 1 ? "s" : ""} -- pure Playwright replay (no LLM calls)
-            {status === "ready" && " -- self-heals via Stagehand when selectors break"}
-          </p>
+          <div className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Replay plan
+              </p>
+              <p className="mt-1.5 text-[14px] font-medium text-foreground tabular-nums">
+                {steps.length} step{steps.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 text-[11px] sm:items-end sm:text-right">
+              {status === "ready" && (
+                <span className="inline-flex items-center gap-1.5 text-status-pass">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" aria-hidden />
+                  In sync
+                </span>
+              )}
+              {status === "stale" && (
+                <span className="inline-flex items-center gap-1.5 text-status-warn">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-warn" aria-hidden />
+                  Out of date — refreshes on next run
+                </span>
+              )}
+              {(successCount ?? 0) > 0 && (
+                <span className="font-mono text-muted-foreground/70 tabular-nums">
+                  {successCount} successful replay{successCount !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+          </div>
+
           <RegressionPlanView steps={steps} />
+
+          {displayCode && (
+            <div className="space-y-2 border-t border-border pt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-[12px]"
+                  onClick={() => setCodeOpen((o) => !o)}
+                >
+                  <Code className="h-3.5 w-3.5" />
+                  {codeOpen ? "Hide" : "Show"} Playwright code
+                </Button>
+                {codeOpen && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 text-[12px]"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(displayCode);
+                      toast.success("Copied to clipboard");
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </Button>
+                )}
+              </div>
+              {codeOpen && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                    {codeSourceLabel}
+                  </p>
+                  <pre className="max-h-[min(50vh,22rem)] overflow-auto rounded-lg border border-border bg-muted/15 p-4 text-left text-[11px] font-mono leading-relaxed text-foreground/90">
+                    {displayCode}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
-// ─── Memory Tab ───────────────────────────────────────────────────────────────
-
-function MemoryTab({ memory, loading }: { memory: MemoryFact[]; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="space-y-2 max-w-2xl">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  if (memory.length === 0) {
-    return (
-      <EmptyState
-        icon={<Brain className="h-5 w-5" />}
-        title="No memory entries"
-        description="Memory is populated automatically when you run this flow."
-      />
-    );
-  }
-
-  return (
-    <div className="max-w-2xl">
-      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-3">
-        {memory.length} entr{memory.length !== 1 ? "ies" : "y"}
-      </p>
-      <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-        {memory.map((fact, i) => (
-          <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/30 transition-colors">
-            <MemIcon action={fact.action} />
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] text-foreground truncate">{fact.purpose}</p>
-              <p className="text-[11px] font-mono text-muted-foreground/60 truncate">{fact.selector}</p>
-            </div>
-            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums flex-shrink-0">
-              {fact.hits}x
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Details Tab ──────────────────────────────────────────────────────────────
+
+const DEFAULT_FLOW_MAX_STEPS = 50;
 
 function DetailsTab({ test }: { test: SavedTest }) {
   return (
     <div className="space-y-5 max-w-2xl">
+      <div>
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Max steps</p>
+        <p className="text-[13px] text-foreground tabular-nums">
+          {test.max_steps != null ? test.max_steps : DEFAULT_FLOW_MAX_STEPS}
+          {test.max_steps == null && (
+            <span className="text-muted-foreground/60 font-normal"> (default)</span>
+          )}
+        </p>
+      </div>
+
       <div>
         <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Intent</p>
         <div className="rounded-md bg-muted/40 border border-border px-4 py-3 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
@@ -681,47 +708,8 @@ function DetailsTab({ test }: { test: SavedTest }) {
           <p className="text-[12px] text-muted-foreground/50 italic">No context set</p>
         )}
       </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Settings</p>
-        <p className="text-[12px] text-muted-foreground leading-relaxed">
-          Full LLM request payloads and screenshots are always stored for every run (run detail → LLM tab).
-        </p>
-        <div className="flex items-center justify-between gap-4 py-1">
-          <span className="text-[13px] text-foreground">Max steps</span>
-          <span className="text-[12px] font-mono text-muted-foreground tabular-nums">
-            {test.max_steps ?? 50}
-          </span>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-1">
-        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Metadata</p>
-        <div className="flex items-center justify-between gap-4 py-1">
-          <span className="text-[12px] text-muted-foreground">ID</span>
-          <span className="text-[11px] font-mono text-muted-foreground/60">{test.id}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4 py-1">
-          <span className="text-[12px] text-muted-foreground">Created</span>
-          <span className="text-[11px] font-mono text-muted-foreground/60">{relativeTime(test.created_at)}</span>
-        </div>
-      </div>
     </div>
   );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function MemIcon({ action }: { action: string }) {
-  const cls = "h-3.5 w-3.5 flex-shrink-0";
-  if (action === "fill")     return <Keyboard          className={cn(cls, "text-blue-500/70")} />;
-  if (action === "click")    return <CursorClick className={cn(cls, "text-emerald-500/70")} />;
-  if (action === "navigate") return <NavigationArrow        className={cn(cls, "text-violet-500/70")} />;
-  return <Globe className={cn(cls, "text-muted-foreground/50")} />;
 }
 
 // ─── Shared Regression Plan Step Viewer (exported for PageDetail.tsx) ────────
@@ -739,30 +727,32 @@ const STEP_ACTION_COLORS: Record<string, string> = {
 };
 
 function StepActionIcon({ action }: { action: string }) {
-  const cls = "h-3.5 w-3.5 flex-shrink-0";
-  if (action === "fill")          return <Keyboard          className={cn(cls, "text-blue-500")} />;
-  if (action === "click")         return <CursorClick className={cn(cls, "text-emerald-500")} />;
-  if (action === "navigate")      return <NavigationArrow        className={cn(cls, "text-violet-500")} />;
-  if (action === "assert")        return <CheckCircle      className={cn(cls, "text-amber-500")} />;
-  return <Globe className={cn(cls, "text-muted-foreground/50")} />;
+  const cls = "h-4 w-4 shrink-0";
+  if (action === "fill") return <Keyboard className={cn(cls, "text-blue-500/75")} />;
+  if (action === "click") return <CursorClick className={cn(cls, "text-emerald-600/80 dark:text-emerald-400/85")} />;
+  if (action === "navigate") return <NavigationArrow className={cn(cls, "text-violet-500/75")} />;
+  if (action === "assert") return <CheckCircle className={cn(cls, "text-amber-500/75")} />;
+  return <Globe className={cn(cls, "text-muted-foreground/55")} />;
 }
 
 export function RegressionPlanView({ steps }: { steps: RegressionStep[] }) {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="w-full rounded-lg border border-border bg-card overflow-hidden">
       {steps.map((step, i) => (
         <div
           key={i}
           className={cn(
-            "flex items-start gap-3 px-4 py-2.5 text-[12px]",
+            "grid w-full grid-cols-[1.5rem_1.5rem_minmax(0,1fr)] items-start gap-x-1.5 pl-2 pr-4 py-3 text-[12px] sm:grid-cols-[1.625rem_1.75rem_minmax(0,1fr)] sm:pl-2.5 sm:pr-5",
             i > 0 && "border-t border-border",
           )}
         >
-          <span className="text-[10px] font-mono text-muted-foreground/40 w-5 flex-shrink-0 tabular-nums text-right pt-0.5">
+          <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums text-right pt-0.5">
             {i + 1}
           </span>
-          <StepActionIcon action={step.action} />
-          <div className="flex-1 min-w-0">
+          <div className="pt-0.5">
+            <StepActionIcon action={step.action} />
+          </div>
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className={cn("font-mono font-medium", STEP_ACTION_COLORS[step.action] ?? "text-foreground")}>
                 {step.action}

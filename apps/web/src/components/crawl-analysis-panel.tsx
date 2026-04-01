@@ -171,9 +171,9 @@ export function CrawlAnalysisPanel({ metadata, llmCalls, onBack }: CrawlAnalysis
         </Button>
       </div>
       <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 mt-2">
-        <TabsList className="h-8 w-full justify-start shrink-0">
-          <TabsTrigger value="overview" className="text-[11px]">Overview</TabsTrigger>
-          <TabsTrigger value="llm" className="text-[11px]">
+        <TabsList className="shrink-0">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="llm">
             LLM ({calls.length})
           </TabsTrigger>
         </TabsList>

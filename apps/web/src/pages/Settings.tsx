@@ -1,5 +1,5 @@
 import React from "react";
-import { Gear, Trash, ArrowCounterClockwise, Copy, Check } from "@phosphor-icons/react";
+import { Gear, Trash, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -48,8 +48,6 @@ export const Settings: React.FC = () => {
   const [modelPrices, setModelPrices] = React.useState<Partial<Record<ModelSlotKey, ModelPriceUsd>>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
-
-  const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
     setProjectName(currentProject?.name ?? "");
@@ -131,13 +129,6 @@ export const Settings: React.FC = () => {
     navigate("/overview");
   }
 
-  function copyProjectId() {
-    if (!currentProjectId) return;
-    navigator.clipboard.writeText(currentProjectId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   if (!currentProjectId || !currentProject) {
     return (
       <div className="flex flex-col min-h-full">
@@ -171,7 +162,7 @@ export const Settings: React.FC = () => {
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Display name</label>
                 <p className="text-[11px] text-muted-foreground/70 mb-2">
-                  Used in navigation, pages, and run summaries.
+                  Shown across the app and in run reports.
                 </p>
                 <div className="flex gap-2">
                   <Input
@@ -198,26 +189,6 @@ export const Settings: React.FC = () => {
                   </p>
                 )}
               </div>
-              <Separator />
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Project ID</label>
-                <p className="text-[11px] text-muted-foreground/70 mb-2">
-                  Stable internal identifier used by APIs and logs.
-                </p>
-                <div className="flex items-center gap-2">
-                  <p className="text-[12px] mono-ui text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5 border border-border flex-1 select-all">
-                    {currentProjectId}
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={copyProjectId}
-                    className="h-7 w-7 flex-shrink-0"
-                  >
-                    {copied ? <Check className="h-3.5 w-3.5 text-status-pass" /> : <Copy className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </section>
@@ -227,7 +198,7 @@ export const Settings: React.FC = () => {
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Models</p>
               <p className="text-[11px] text-muted-foreground/70 mt-1">
-                Each slot powers a different part of the pipeline. Start with presets, then customize only if needed.
+                Recommended defaults are already set. Change a slot only when you need different speed, quality, or cost.
               </p>
             </div>
             {hasCustomizedModels && (
@@ -395,27 +366,26 @@ const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [
 const MODEL_CONFIG: { key: string; label: string; description: string; options: ModelOption[] }[] = [
   {
     key: "agentModel",
-    label: "Agent Model",
-    description: "Browser automation decisions -- needs fast tool calling",
+    label: "Primary Browser Agent",
+    description: "Runs browser actions and tool calls during tests.",
     options: AGENT_OPTIONS,
   },
   {
     key: "auxiliaryModel",
-    label: "Auxiliary Model",
-    description:
-      "Text/JSON work: crawl, path & test plans, memory curation, page intents, summarization — not the main browser agent",
+    label: "Support Tasks",
+    description: "Handles planning, summaries, and structured text/JSON work.",
     options: CODE_OPTIONS,
   },
   {
     key: "reviewAgentModel",
-    label: "Review Agent Model",
-    description: "Post-run holistic & filmstrip screenshot analysis -- strong vision + reasoning",
+    label: "Run Reviewer",
+    description: "Analyzes screenshots and behavior after each run.",
     options: REASONING_VISION_OPTIONS,
   },
   {
     key: "stagehandModel",
-    label: "Stagehand Model",
-    description: "Smart element finding via Stagehand",
+    label: "Element Finder",
+    description: "Helps locate and target UI elements reliably.",
     options: STAGEHAND_OPTIONS,
   },
 ];
@@ -460,6 +430,7 @@ function ModelSelect({
 }) {
   const presetValues = React.useMemo(() => new Set(options.map((o) => o.value)), [options]);
   const isPresetCurrent = presetValues.has(current);
+  const currentOption = React.useMemo(() => options.find((o) => o.value === current), [options, current]);
 
   const [customOpen, setCustomOpen] = React.useState(!isPresetCurrent && current.length > 0);
   const [customProvider, setCustomProvider] = React.useState<CustomProviderId>("openai");
@@ -527,13 +498,11 @@ function ModelSelect({
   const presetSelectValue = isPresetCurrent ? current : "";
 
   return (
-    <div className="rounded-md border border-border/70 bg-surface-1/70 p-3">
-      <div className="flex items-center justify-between mb-1.5">
+    <div className="rounded-md border border-border/80 bg-surface-2/70 p-4">
+      <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
-          <label className="text-[12px] font-medium text-foreground">{label}</label>
-          {customized && (
-            <Badge variant="warning" className="text-[9px] px-1.5 py-0">customized</Badge>
-          )}
+          <label className="text-[13px] font-semibold text-foreground">{label}</label>
+          {customized && <Badge variant="warning" className="text-[9px] px-1.5 py-0">override</Badge>}
         </div>
         {customized && (
           <button
@@ -543,34 +512,42 @@ function ModelSelect({
             className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-50"
           >
             <ArrowCounterClockwise className="h-2.5 w-2.5" />
-            Reset
+            Use default
           </button>
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground/70 mb-2">{description}</p>
+      <p className="text-[11px] text-muted-foreground/70 mb-3">{description}</p>
 
       {!customOpen && (
         <>
-          <Select
-            value={presetSelectValue}
-            onChange={(e) => handlePresetChange(e.target.value)}
-            disabled={saving}
-            className={cn("mono-ui text-[12px]", customized && "border-primary/40")}
-          >
-            <option value="">Choose a preset…</option>
-            {options.map((opt) => {
-              const sel = optionSelectable(opt.value);
-              const missing =
-                llmKeys && !sel && opt.value !== current ? modelMissingKeyLabel(opt.value, llmKeys) : null;
-              return (
-                <option key={opt.value} value={opt.value} disabled={!sel}>
-                  {opt.label}{opt.price ? ` -- ${opt.price}` : ""}{opt.value === defaultValue ? " (default)" : ""}
-                  {missing ? ` — ${missing}` : ""}
-                </option>
-              );
-            })}
-          </Select>
+          <div className="rounded-md border border-border/70 bg-surface-3/60 p-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1">Selected model</p>
+            <Select
+              value={presetSelectValue}
+              onChange={(e) => handlePresetChange(e.target.value)}
+              disabled={saving}
+              className={cn("mono-ui text-[12px] bg-background", customized && "border-primary/40")}
+            >
+              <option value="">Choose model…</option>
+              {options.map((opt) => {
+                const sel = optionSelectable(opt.value);
+                const missing =
+                  llmKeys && !sel && opt.value !== current ? modelMissingKeyLabel(opt.value, llmKeys) : null;
+                return (
+                  <option key={opt.value} value={opt.value} disabled={!sel}>
+                    {opt.label}{opt.value === defaultValue ? " (default)" : ""}
+                    {missing ? ` — ${missing}` : ""}
+                  </option>
+                );
+              })}
+            </Select>
+          </div>
+          {currentOption?.price ? (
+            <p className="mt-2 text-[10px] text-muted-foreground/70">
+              Estimated price: {currentOption.price} in/out
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -578,9 +555,9 @@ function ModelSelect({
               setCustomError("");
             }}
             disabled={saving}
-            className="mt-1.5 text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+            className="mt-2 text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
           >
-            Custom model (provider + id)
+            Advanced: use custom model
           </button>
         </>
       )}
@@ -687,7 +664,7 @@ function ModelSelect({
       )}
 
       {!isPresetCurrent && !customOpen && current && (
-        <p className="text-[11px] mono-ui text-muted-foreground/80 mt-1.5 break-all">
+        <p className="text-[11px] mono-ui text-muted-foreground/80 mt-2 break-all rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
           Active: {current}
           {modelPrice?.input != null && modelPrice?.output != null && (
             <span className="block text-muted-foreground/60 mt-0.5">
