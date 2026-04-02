@@ -14,8 +14,6 @@ import type { AuthConfig } from "./types.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { runHolisticFlowReview } from "./holisticReviewAgent.js";
 import { isStopRequested } from "./runEvents.js";
-import { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
-import { calcCostUsd } from "./llmClient.js";
 import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, generateRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
 import {
@@ -75,36 +73,16 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
   let targetUrl: string | undefined;
   const pathGenCalls: LLMCallRecord[] = [];
 
-  // Path Generator
-  if (job.destinationId && job.projectId) {
+  // For page tests, compute the navigation target URL.
+  // Path generation / pre-planning is intentionally skipped: Navigator should plan from what it sees.
+  if (job.destinationId) {
     try {
       const dest = await storage.getDestination(job.destinationId);
       if (dest) {
         targetUrl = buildTargetUrl(job.baseUrl, dest.normalized_route);
-        const t0 = Date.now();
-        const { plan, usage, prompt: pathPrompt, rawResponse } = await generateTestPlan(storage, {
-          projectId: job.projectId, destinationId: job.destinationId,
-          destination: dest, intent: job.intent,
-        });
-        const durationMs = Date.now() - t0;
-        const planContext = formatTestPlanForNavigator(plan);
-        if (planContext) context = context ? `${context}\n\n${planContext}` : planContext;
-        if (usage) {
-          const model = config.auxiliaryModel;
-          pathGenCalls.push({
-            seq: 0, stepIndex: 0, model, hasVision: false, attempt: 1,
-            inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
-            totalTokens: usage.totalTokens, durationMs,
-            costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "auxiliaryModel"),
-            query: pathPrompt ?? "Generate test plan for destination",
-            requestMessages: pathPrompt ? [{ role: "user", content: pathPrompt }] : undefined,
-            response: rawResponse ?? planContext ?? "",
-            agent: "pathgen",
-          });
-        }
       }
     } catch (err) {
-      logger.warn({ err: String(err), destinationId: job.destinationId }, "Path generator failed");
+      logger.warn({ err: String(err), destinationId: job.destinationId }, "Failed to resolve target URL");
     }
   }
 

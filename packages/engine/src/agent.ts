@@ -509,7 +509,7 @@ async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
 
 // ─── System prompt builder ────────────────────────────────────────────────────
 
-const IMAGE_KEEP_LAST = 3;
+const IMAGE_KEEP_LAST = 2;
 
 function buildSystemPrompt(params: {
   intent: string;
@@ -522,7 +522,7 @@ function buildSystemPrompt(params: {
     ? `\nTest context (what to check / expected behaviors):\n${params.context}\n`
     : "";
   const targetSection = params.targetUrl
-    ? `\nTarget page: ${params.targetUrl}\nYou have been navigated to this page. Focus ALL testing on this page only. Do NOT navigate away, click "Back", or go to other pages. If you run out of things to test, call "done".\n`
+    ? `\nTarget page: ${params.targetUrl}\nYou have been navigated to this page.\nFocus ALL testing on this page only.\nStart by visually inspecting the page (screenshot + a11y tree) and then create a prioritized testing plan using the "plan" action.\nThen execute the plan step-by-step.\nYou can adapt the plan as you discover new interactions/states, but stay focused on validating behavior on this target page.\nIf you have sufficient coverage, call "done".\n`
     : "";
   const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
 
@@ -793,11 +793,17 @@ function pruneConversation(messages: any[]): void {
     if (msg.role !== "user") continue;
     userCount++;
     if (!Array.isArray(msg.content)) continue;
+
+    // Keep screenshots only in the most recent IMAGE_KEEP_LAST turns.
     const hasImage = msg.content.some((p: any) => p.type === "image_url");
     if (hasImage && userCount > IMAGE_KEEP_LAST) {
       msg.content = msg.content.filter((p: any) => p.type !== "image_url");
     }
-    if (userCount > KEEP_FULL_TURNS) {
+
+    // All turns except the most recent: collapse to "Previous → OK | URL: …".
+    // Checklist, interactive elements, visible text, and bug tracker are
+    // only meaningful in their latest version — strip them from every older turn.
+    if (userCount > 1) {
       const textPart = msg.content.find((p: any) => p.type === "text");
       if (textPart?.text && textPart.text.length > 200) {
         const prevMatch = textPart.text.match(/^Previous: (.+?)$/m);
@@ -811,7 +817,8 @@ function pruneConversation(messages: any[]): void {
     }
   }
 
-  // Aggressive collapse: on long runs, merge old summarized turns into one block
+  // Aggressive collapse: on very long runs, merge the already-summarised old
+  // turns into a single block to keep the message list short.
   if (userCount > COLLAPSE_AFTER_TURNS) {
     collapseOldTurns(messages);
   }
