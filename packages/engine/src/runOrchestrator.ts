@@ -73,6 +73,11 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
   let targetUrl: string | undefined;
   const pathGenCalls: LLMCallRecord[] = [];
 
+  // Runs created from a page/destination (i.e. `destinationId` without a saved `testId`)
+  // don't carry `maxSteps`, so apply a higher default for page tests.
+  const isPageTest = Boolean(job.destinationId) && !job.testId;
+  const maxStepsForRun = job.maxSteps ?? (isPageTest ? 200 : undefined);
+
   // For page tests, compute the navigation target URL.
   // Path generation / pre-planning is intentionally skipped: Navigator should plan from what it sees.
   if (job.destinationId) {
@@ -305,7 +310,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           }
         }
       },
-      job.onLLMCall, job.onAgentPlan, job.onActivity, job.maxSteps, targetUrl, shSession,
+      job.onLLMCall, job.onAgentPlan, job.onActivity, maxStepsForRun, targetUrl, shSession,
       !job.runId && !job.shouldStop
         ? undefined
         : () => (job.shouldStop?.() ?? false) || (job.runId ? isStopRequested(job.runId) : false),
