@@ -36,7 +36,7 @@ export function isSimilarBugName(a: string, b: string): boolean {
     if (trigramsB.has(t)) intersection++;
   }
   const similarity = (2 * intersection) / (trigramsA.size + trigramsB.size);
-  return similarity > 0.7;
+  return similarity > 0.5;
 }
 
 /**

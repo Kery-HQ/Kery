@@ -215,6 +215,10 @@ const LOOP_THRESHOLD = 3;
 const LOOP_FORCE_EXIT_AFTER = 4;
 const COORD_PROXIMITY = 50;
 const MAX_META_ACTIONS = 3;
+/** Cross-page loop detection: how many error-page visits before forcing exit */
+const ERROR_PAGE_FORCE_EXIT = 3;
+/** Cross-page loop detection: how many times same URL can be visited before warning */
+const URL_REPEAT_WARN = 4;
 
 type RecentAction = { action: string; x?: number; y?: number; target?: string; element?: number; elementName?: string; value?: string; assertion?: string; url?: string };
 
@@ -677,11 +681,17 @@ function buildObservation(params: {
 
 // ─── Progress Summary (survives conversation pruning) ────────────────────────
 
+const JOURNEY_WINDOW = 12;
+const JOURNEY_REASONING_MAX_CHARS = 540;
+/** Actions that carry no useful navigation reasoning — excluded from the journey block. */
+const JOURNEY_SKIP_ACTIONS = new Set(["auth", "wait", "assert"]);
+
 class ProgressSummary {
   private pagesVisited = new Set<string>();
   private actionsCompleted: string[] = [];
   private bugsFound: string[] = [];
   private failedAttempts: string[] = [];
+  private recentReasonings: Array<{ index: number; reasoning: string }> = [];
 
   recordStep(step: RunStep): void {
     if (step.url) this.pagesVisited.add(new URL(step.url).pathname);
@@ -690,6 +700,16 @@ class ProgressSummary {
     }
     if (step.status === "failed") {
       this.failedAttempts.push(`${step.action} ${step.target ?? ""}`.trim());
+    }
+    // Capture reasoning for the journey block, skipping low-signal action types.
+    if (step.reasoning && !JOURNEY_SKIP_ACTIONS.has(step.action)) {
+      this.recentReasonings.push({
+        index: step.index,
+        reasoning: step.reasoning.trim().slice(0, JOURNEY_REASONING_MAX_CHARS),
+      });
+      if (this.recentReasonings.length > JOURNEY_WINDOW) {
+        this.recentReasonings.shift();
+      }
     }
   }
 
@@ -709,6 +729,14 @@ class ProgressSummary {
     }
     if (this.failedAttempts.length > 0) {
       lines.push(`Failed attempts: ${this.failedAttempts.slice(-5).join("; ")}`);
+    }
+    // Journey block: show the agent's own recent reasoning so it can self-reflect on
+    // patterns (e.g. repeatedly hitting the same broken route) across URL changes.
+    if (this.recentReasonings.length >= 3) {
+      lines.push(
+        `\nJOURNEY — your reasoning over the last ${this.recentReasonings.length} steps:\n` +
+          this.recentReasonings.map(r => `[${r.index}] ${r.reasoning}`).join("\n"),
+      );
     }
     return lines.join("\n");
   }
@@ -1841,6 +1869,7 @@ export async function runAgent(
             preActionDomHash: preActionDomHash,
           };
           stepsDetail.push(okStep);
+          progress.recordStep(okStep);
           onStep?.(okStep);
           if (MUTATING_ACTIONS.has(action.action)) {
             pendingStagnation = {
@@ -1888,6 +1917,7 @@ export async function runAgent(
                 preActionDomHash: preActionDomHash,
               };
               stepsDetail.push(okStep);
+              progress.recordStep(okStep);
               onStep?.(okStep);
               if (MUTATING_ACTIONS.has(action.action)) {
                 pendingStagnation = {
@@ -1932,6 +1962,7 @@ export async function runAgent(
                 preActionDomHash: preActionDomHash,
               };
               stepsDetail.push(okStep);
+              progress.recordStep(okStep);
               onStep?.(okStep);
               if (MUTATING_ACTIONS.has(action.action)) {
                 pendingStagnation = {
