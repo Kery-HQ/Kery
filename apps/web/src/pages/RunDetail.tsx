@@ -861,6 +861,117 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
   );
 }
 
+const RUN_PREVIEW_WALLPAPER = "/wallpaper/run_details_wallpaper.png";
+
+/** Wallpaper + optional liquid-glass frame. `crisp` desk = full-bleed art (run starting). `blurred` = softened desk + grain + darken. */
+function BrowserPreviewStage({
+  badge,
+  children,
+  empty,
+  wallpaperTreatment,
+  framed,
+  liveFrameOpenAnim,
+  onLiveFrameOpenAnimEnd,
+}: {
+  badge: React.ReactNode;
+  children: React.ReactNode;
+  empty?: boolean;
+  wallpaperTreatment: "crisp" | "blurred";
+  framed: boolean;
+  liveFrameOpenAnim?: boolean;
+  onLiveFrameOpenAnimEnd?: () => void;
+}) {
+  const deskWallpaper = (
+    <div
+      className="pointer-events-none absolute inset-0 bg-cover bg-center"
+      style={{ backgroundImage: `url(${RUN_PREVIEW_WALLPAPER})` }}
+      aria-hidden
+    />
+  );
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {wallpaperTreatment === "crisp" ? (
+        deskWallpaper
+      ) : (
+        <>
+          <div className="pointer-events-none absolute inset-0 bg-muted/50 dark:bg-surface-2/80" aria-hidden />
+          <div className="run-preview-wallpaper-blur-wrap" aria-hidden>
+            <div
+              className="run-preview-wallpaper-blurred opacity-[0.92] dark:opacity-[0.72]"
+              style={{ backgroundImage: `url(${RUN_PREVIEW_WALLPAPER})` }}
+            />
+          </div>
+          <div className="run-preview-wallpaper-grain" aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-muted/18 dark:from-primary/[0.025] dark:to-background/12"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-0 bg-black/20 dark:bg-black/32"
+            aria-hidden
+          />
+        </>
+      )}
+
+      <div className="absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] sm:left-3 sm:top-3 sm:max-w-[calc(100%-1.5rem)]">
+        {badge}
+      </div>
+
+      <div className="relative z-10 flex min-h-[min(12rem,42svh)] flex-1 items-center justify-center p-2 pt-11 sm:min-h-0 sm:p-4 sm:pt-12 md:p-5 md:pt-14 lg:p-6 lg:pt-[3.75rem]">
+        {framed ? (
+          <div
+            className={cn(
+              "run-preview-liquid-shell flex max-h-full min-h-0 w-full max-w-full min-w-0 flex-col",
+              liveFrameOpenAnim && "run-preview-window-open-anim",
+            )}
+            onAnimationEnd={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (!e.animationName.includes("run-preview-window-open")) return;
+              onLiveFrameOpenAnimEnd?.();
+            }}
+          >
+            <div className="run-preview-liquid-inner flex max-h-full min-h-0 w-full flex-1 flex-col">
+              <div
+                className={cn(
+                  "relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]",
+                  empty && "items-center justify-center bg-muted/30 dark:bg-muted/15",
+                )}
+              >
+                {!empty && (
+                  <>
+                    <div className="pointer-events-none absolute inset-0 bg-muted/35 dark:bg-surface-2/60" aria-hidden />
+                    <div className="run-preview-wallpaper-blur-wrap" aria-hidden>
+                      <div
+                        className="run-preview-wallpaper-blurred opacity-[0.88] dark:opacity-[0.68]"
+                        style={{ backgroundImage: `url(${RUN_PREVIEW_WALLPAPER})` }}
+                      />
+                    </div>
+                    <div className="run-preview-wallpaper-grain" aria-hidden />
+                    <div
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-muted/14 dark:from-primary/[0.025] dark:to-background/10"
+                      aria-hidden
+                    />
+                    <div
+                      className="pointer-events-none absolute inset-0 bg-black/18 dark:bg-black/28"
+                      aria-hidden
+                    />
+                  </>
+                )}
+                <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex max-h-full min-h-0 w-full flex-1 flex-col items-center justify-center px-3">
+            {children}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OverviewTab({
   run, steps, bugsFound, liveScreenshot, totalCost, agentPlan, activityFeed,
 }: {
@@ -907,42 +1018,90 @@ function OverviewTab({
   }, [steps, run.id]);
 
   const showLive = run.status === "running" && !!liveScreenshot;
+  const isRunStarting = run.status === "running" && !liveScreenshot;
   const showRecording = !showLive && !!run.video_url;
+  const previewEmpty = !isRunStarting && !showLive && !showRecording && !snapshotSrc;
+
+  const [liveFrameOpenAnim, setLiveFrameOpenAnim] = React.useState(false);
+  const seenLivePreviewRef = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (showLive && !seenLivePreviewRef.current) {
+      seenLivePreviewRef.current = true;
+      setLiveFrameOpenAnim(true);
+    }
+    if (!showLive) {
+      seenLivePreviewRef.current = false;
+      setLiveFrameOpenAnim(false);
+    }
+  }, [showLive]);
+
+  React.useEffect(() => {
+    if (!liveFrameOpenAnim) return;
+    const id = window.setTimeout(() => setLiveFrameOpenAnim(false), 700);
+    return () => window.clearTimeout(id);
+  }, [liveFrameOpenAnim]);
 
   return (
     <div className="px-6 py-5 flex flex-col flex-1 min-h-0 h-full overflow-hidden animate-fade-in">
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-hidden">
-        <Card className="xl:col-span-3 min-h-0 h-full overflow-hidden flex flex-col">
-          <CardContent className="p-0 flex-1 min-h-0 bg-black relative flex flex-col">
-            <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-              <Badge
-                variant={showLive ? "running" : showRecording ? "secondary" : "neutral"}
-                className="text-[10px] uppercase tracking-wider"
-              >
-                {showLive ? "live" : showRecording ? "recording" : "snapshot"}
-              </Badge>
-              <span className="text-[10px] font-mono text-white/70">steps {steps.length}</span>
-            </div>
-            {showLive ? (
-              <img
-                src={`data:image/jpeg;base64,${liveScreenshot}`}
-                alt="Live browser"
-                className="h-full w-full min-h-0 object-contain flex-1"
-              />
-            ) : showRecording ? (
-              <video
-                src={apiMediaUrl(run.video_url!)}
-                controls
-                className="h-full w-full min-h-0 object-contain flex-1 bg-black"
-                preload="metadata"
-              />
-            ) : snapshotSrc ? (
-              <img src={snapshotSrc} alt="Run browser preview" className="h-full w-full min-h-0 object-contain flex-1" />
-            ) : (
-              <div className="h-full w-full min-h-0 flex flex-1 items-center justify-center text-muted-foreground text-[12px]">
-                No preview yet
-              </div>
-            )}
+        <Card className="flex h-full min-h-[min(13rem,38svh)] flex-col overflow-hidden sm:min-h-[min(15rem,36svh)] xl:col-span-3 xl:min-h-0">
+          <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+            <BrowserPreviewStage
+              empty={previewEmpty}
+              wallpaperTreatment={isRunStarting ? "crisp" : "blurred"}
+              framed={!isRunStarting}
+              liveFrameOpenAnim={liveFrameOpenAnim}
+              onLiveFrameOpenAnimEnd={() => setLiveFrameOpenAnim(false)}
+              badge={
+                <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/80 bg-card/95 px-2 py-1.5 backdrop-blur-md sm:gap-2 sm:px-2.5 sm:py-2">
+                  <Badge
+                    variant={
+                      isRunStarting || showLive ? "running" : showRecording ? "secondary" : "neutral"
+                    }
+                    className="text-[10px] uppercase tracking-wider"
+                  >
+                    {isRunStarting ? "starting" : showLive ? "live" : showRecording ? "recording" : "snapshot"}
+                  </Badge>
+                  <span
+                    className="hidden h-4 w-px shrink-0 bg-border/70 sm:block"
+                    aria-hidden
+                  />
+                  <span className="text-[11px] font-mono font-medium tabular-nums text-foreground/90 sm:text-[12px]">
+                    steps {steps.length}
+                  </span>
+                </div>
+              }
+            >
+              {isRunStarting ? (
+                <div className="flex max-w-[min(100%,22rem)] items-center gap-2 rounded-lg border border-primary/30 bg-card/93 px-3 py-2 ring-1 ring-primary/20 backdrop-blur-sm">
+                  <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" weight="bold" />
+                  <p className="font-display text-[11px] font-medium leading-snug tracking-tight text-foreground">
+                    Launching a browser for this run…
+                  </p>
+                </div>
+              ) : showLive ? (
+                <img
+                  src={`data:image/jpeg;base64,${liveScreenshot}`}
+                  alt="Live browser"
+                  className="h-full w-full min-h-0 flex-1 object-contain"
+                />
+              ) : showRecording ? (
+                <video
+                  src={apiMediaUrl(run.video_url!)}
+                  controls
+                  className="h-full w-full min-h-0 flex-1 object-contain"
+                  preload="metadata"
+                />
+              ) : snapshotSrc ? (
+                <img
+                  src={snapshotSrc}
+                  alt="Run browser preview"
+                  className="h-full w-full min-h-0 flex-1 object-contain"
+                />
+              ) : (
+                <p className="px-4 text-center text-[12px] text-muted-foreground">No preview yet</p>
+              )}
+            </BrowserPreviewStage>
           </CardContent>
         </Card>
 
