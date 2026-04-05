@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.81.0",
     "@browserbasehq/stagehand": "^2.3.0",
+    "@clerk/testing": "^2.0.8",
     "@google/genai": "^1.47.0",
     "openai": "^6.33.0",
     "pino": "^9.6.0",

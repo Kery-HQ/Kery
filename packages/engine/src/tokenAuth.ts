@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 import { createHmac } from "crypto";
+import { clerk } from "@clerk/testing/playwright";
 import { logger } from "./logger.js";
 
 type TokenProviderConfig = {
@@ -13,79 +14,44 @@ type TokenProviderConfig = {
 
 // ─── Clerk ──────────────────────────────────────────────────────────────────
 
+/**
+ * Sign in to a Clerk-protected app using the official @clerk/testing SDK.
+ *
+ * Uses clerk.signIn() with the emailAddress parameter, which internally handles:
+ * - Testing token fetch & injection (bypasses bot detection)
+ * - Dev browser initialization (required for development instances)
+ * - Full sign-in flow via the Clerk JS SDK running in the browser
+ *
+ * Requires the page to navigate to the app first so the Clerk JS SDK is loaded.
+ */
 export async function authenticateWithClerk(
+  page: Page,
   provider: TokenProviderConfig,
-): Promise<{ sessionToken: string }> {
-  const { apiUrl, apiKey, credentials } = provider;
-  if (!credentials?.email || !credentials?.password) {
-    throw new Error("Clerk auth requires credentials (email + password)");
+  baseUrl: string,
+): Promise<void> {
+  const { apiKey, apiUrl, credentials } = provider;
+  if (!credentials?.email) {
+    throw new Error("Clerk auth requires credentials.email");
   }
 
-  // Step 1: Create a sign-in via Clerk Backend API
-  const signInRes = await fetch(`${apiUrl.replace(/\/$/, "")}/v1/sign_ins`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      identifier: credentials.email,
-      password: credentials.password,
-    }),
+  // clerk.signIn() reads the secret key from this env var
+  process.env.CLERK_SECRET_KEY = apiKey;
+
+  // frontendApiUrl must be the host only, without protocol
+  const frontendApiUrl = new URL(apiUrl).host;
+
+  // Navigate to the app first — clerk.signIn() needs the Clerk JS SDK to be loaded on the page
+  logger.info({ baseUrl }, "Clerk: navigating to app to load Clerk JS SDK");
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+  logger.info({ email: credentials.email, frontendApiUrl }, "Clerk: signing in via @clerk/testing");
+  await clerk.signIn({
+    page,
+    emailAddress: credentials.email,
+    setupClerkTestingTokenOptions: { frontendApiUrl },
   });
 
-  if (!signInRes.ok) {
-    const body = await signInRes.text().catch(() => "");
-    throw new Error(`Clerk sign_in failed (${signInRes.status}): ${body.slice(0, 300)}`);
-  }
-
-  const signInData = await signInRes.json();
-  const sessionId = signInData?.response?.created_session_id;
-  if (!sessionId) {
-    throw new Error("Clerk sign_in did not return a session ID");
-  }
-
-  // Step 2: Get a session token (JWT)
-  const tokenRes = await fetch(
-    `${apiUrl.replace(/\/$/, "")}/v1/sessions/${sessionId}/tokens`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    },
-  );
-
-  if (!tokenRes.ok) {
-    const body = await tokenRes.text().catch(() => "");
-    throw new Error(`Clerk session token failed (${tokenRes.status}): ${body.slice(0, 300)}`);
-  }
-
-  const tokenData = await tokenRes.json();
-  const jwt = tokenData?.jwt;
-  if (!jwt) {
-    throw new Error("Clerk token response did not contain a JWT");
-  }
-
-  return { sessionToken: jwt };
-}
-
-export async function injectClerkSession(
-  page: Page,
-  sessionToken: string,
-  domain: string,
-): Promise<void> {
-  // Clerk uses a __session cookie
-  await page.context().addCookies([
-    {
-      name: "__session",
-      value: sessionToken,
-      domain: domain.startsWith(".") ? domain : `.${domain}`,
-      path: "/",
-      httpOnly: false,
-      secure: true,
-      sameSite: "Lax",
-    },
-  ]);
-  logger.info({ domain }, "Clerk session cookie injected");
+  logger.info("Clerk: sign-in complete");
 }
 
 // ─── Supabase ───────────────────────────────────────────────────────────────
@@ -255,12 +221,11 @@ export async function handleTokenAuth(
 
   try {
     if (provider.type === "clerk") {
-      const { sessionToken } = await authenticateWithClerk(provider);
-      await injectClerkSession(page, sessionToken, domain);
-      // Clerk JWTs expire in ~60s by default
+      await authenticateWithClerk(page, provider, baseUrl);
+      // Clerk browser sessions are long-lived; set a generous expiry
       activeSessions.set(page, {
         provider, baseUrl, domain,
-        expiresAt: Math.floor(Date.now() / 1000) + 60,
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
       });
     } else if (provider.type === "supabase") {
       const tokens = await authenticateWithSupabase(provider);
@@ -285,10 +250,8 @@ export async function handleTokenAuth(
 // ─── Token refresh ──────────────────────────────────────────────────────────
 
 async function refreshClerkToken(session: TokenSession, page: Page): Promise<void> {
-  // Re-authenticate entirely — Clerk Backend API doesn't have a refresh flow
-  const { sessionToken } = await authenticateWithClerk(session.provider);
-  await injectClerkSession(page, sessionToken, session.domain);
-  session.expiresAt = Math.floor(Date.now() / 1000) + 60;
+  await authenticateWithClerk(page, session.provider, session.baseUrl);
+  session.expiresAt = Math.floor(Date.now() / 1000) + 3600;
   logger.info("Clerk token refreshed");
 }
 
