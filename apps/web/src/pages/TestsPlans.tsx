@@ -13,10 +13,7 @@ import {
   Repeat,
   CheckCircle,
   CaretDown,
-  Code,
-  Copy,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,11 +35,10 @@ import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
   runProjectTest, fetchProjectRuns,
 } from "@/projectApi";
-import { regressionPlanToPlaywrightSnippet } from "@/lib/regressionPlanPlaywright";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type RegressionStep = {
+export type RegressionStep = {
   action: string;
   role?: string;
   name?: string;
@@ -64,8 +60,6 @@ type SavedTest = {
   regression_plan?: RegressionStep[] | null;
   plan_status?: "none" | "ready" | "stale" | null;
   plan_success_count?: number;
-  /** When persisted, shown instead of a generated preview. */
-  playwright_script?: string | null;
 };
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
@@ -441,7 +435,6 @@ export const TestsPlans: React.FC = () => {
                               plan={test.regression_plan}
                               planStatus={test.plan_status}
                               successCount={test.plan_success_count}
-                              playwrightScript={test.playwright_script}
                             />
                           </TabsContent>
 
@@ -560,27 +553,14 @@ export const TestsPlans: React.FC = () => {
 
 // ─── Script Tab ───────────────────────────────────────────────────────────────
 
-function ScriptTab({ plan, planStatus, successCount, playwrightScript }: {
+function ScriptTab({ plan, planStatus, successCount }: {
   plan?: RegressionStep[] | null;
   planStatus?: string | null;
   successCount?: number;
-  playwrightScript?: string | null;
 }) {
-  const [codeOpen, setCodeOpen] = React.useState(false);
   const status = planStatus ?? "none";
   const steps = plan ?? [];
   const showEmptyState = status === "none" || steps.length === 0;
-
-  const displayCode = React.useMemo(() => {
-    const raw = playwrightScript?.trim();
-    if (raw) return raw;
-    if (steps.length > 0) return regressionPlanToPlaywrightSnippet(steps);
-    return "";
-  }, [playwrightScript, steps]);
-
-  const codeSourceLabel = playwrightScript?.trim()
-    ? "Saved script"
-    : "Generated preview";
 
   return (
     <div className="w-full space-y-5">
@@ -626,48 +606,6 @@ function ScriptTab({ plan, planStatus, successCount, playwrightScript }: {
           </div>
 
           <RegressionPlanView steps={steps} />
-
-          {displayCode && (
-            <div className="space-y-2 border-t border-border pt-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 text-[12px]"
-                  onClick={() => setCodeOpen((o) => !o)}
-                >
-                  <Code className="h-3.5 w-3.5" />
-                  {codeOpen ? "Hide" : "Show"} Playwright code
-                </Button>
-                {codeOpen && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 gap-1.5 text-[12px]"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(displayCode);
-                      toast.success("Copied to clipboard");
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Copy
-                  </Button>
-                )}
-              </div>
-              {codeOpen && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                    {codeSourceLabel}
-                  </p>
-                  <pre className="max-h-[min(50vh,22rem)] overflow-auto rounded-lg border border-border bg-muted/15 p-4 text-left text-[11px] font-mono leading-relaxed text-foreground/90">
-                    {displayCode}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
     </div>

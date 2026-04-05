@@ -4,10 +4,6 @@ import {
   ArrowLeft,
   Play,
   Trash,
-  FileText,
-  CursorClick,
-  Layout,
-  LinkSimple,
   Brain,
   Clock,
   Repeat,
@@ -22,7 +18,7 @@ import { relativeTime, duration, statusVariant, runListLabel } from "@/lib/forma
 import { useProject } from "@/lib/projectContext";
 import { fetchPageDetail, fetchPageMemory, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
 import type { MemoryEntry } from "@/projectApi";
-import { RegressionPlanView } from "@/pages/TestsPlans";
+import { RegressionPlanView, type RegressionStep } from "@/pages/TestsPlans";
 
 type PageData = {
   page: {
@@ -32,10 +28,6 @@ type PageData = {
     health_status: string;
     issues_count: number;
     enabled: boolean;
-    forms_json?: Array<{ id?: string; fields?: any[]; submitText?: string }>;
-    buttons_json?: Array<{ text: string; selector: string }>;
-    interactions_json?: Array<{ trigger: string; revealed: string; fields: string[]; heading: string }>;
-    nav_links?: string[];
     regression_plan?: any[] | null;
     plan_status?: "none" | "ready" | "stale" | null;
     plan_success_count?: number;
@@ -159,10 +151,6 @@ export function PageDetail() {
   }
 
   const { page, recentRuns } = data;
-  const forms = page.forms_json || [];
-  const buttons = page.buttons_json || [];
-  const interactions = page.interactions_json || [];
-  const navLinks = page.nav_links || [];
   const hasRegressionPlan = page.regression_plan && page.regression_plan.length > 0;
 
   return (
@@ -240,7 +228,6 @@ export function PageDetail() {
           <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="forms">Forms & Interactions</TabsTrigger>
               <TabsTrigger value="memory">Memory</TabsTrigger>
               <TabsTrigger value="runs">Runs</TabsTrigger>
             </TabsList>
@@ -276,12 +263,6 @@ export function PageDetail() {
                           {page.last_inspected_at ? relativeTime(page.last_inspected_at) : "Never"}
                         </td>
                       </tr>
-                      <tr>
-                        <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Elements</td>
-                        <td className="px-4 py-2 font-mono text-muted-foreground">
-                          {forms.length} forms, {buttons.length} buttons, {interactions.length} interactions, {navLinks.length} links
-                        </td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -300,110 +281,7 @@ export function PageDetail() {
                         </span>
                       )}
                     </div>
-                    <RegressionPlanView steps={page.regression_plan!} />
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            {/* Forms & Interactions */}
-            <TabsContent value="forms">
-              <div className="space-y-5">
-                {/* Forms */}
-                {forms.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <FileText className="h-3.5 w-3.5" />
-                      Forms ({forms.length})
-                    </div>
-                    <div className="space-y-2">
-                      {forms.map((f, i) => (
-                        <div key={i} className="rounded-lg border border-border bg-card p-3 space-y-2">
-                          <div className="text-[13px] font-medium text-foreground">
-                            {f.submitText ? `Submit: "${f.submitText}"` : `Form ${i + 1}`}
-                          </div>
-                          {f.fields && f.fields.length > 0 && (
-                            <div className="space-y-1">
-                              {f.fields.map((field: any, j: number) => (
-                                <div key={j} className="flex items-center gap-2 text-[12px]">
-                                  <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                    {field.type || "text"}
-                                  </span>
-                                  <span className="text-foreground">{field.label || field.name}</span>
-                                  {field.required && (
-                                    <span className="text-[10px] text-destructive">required</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Buttons */}
-                {buttons.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <CursorClick className="h-3.5 w-3.5" />
-                      Buttons ({buttons.length})
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {buttons.map((b, i) => (
-                        <span key={i} className="font-mono text-[11px] px-2 py-1 rounded border border-border bg-card text-foreground">
-                          {b.text}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Interactions */}
-                {interactions.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <Layout className="h-3.5 w-3.5" />
-                      Interactions ({interactions.length})
-                    </div>
-                    <div className="rounded-lg border border-border bg-card divide-y divide-border overflow-hidden">
-                      {interactions.map((ix, i) => (
-                        <div key={i} className="flex items-center gap-2 px-3 py-2 text-[13px]">
-                          <span className="font-medium text-foreground">{ix.trigger}</span>
-                          <span className="text-muted-foreground/40">&rarr;</span>
-                          <span className="text-muted-foreground">{ix.revealed}</span>
-                          {ix.heading && (
-                            <span className="text-[11px] text-muted-foreground/50 ml-auto font-mono">
-                              {ix.heading}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Nav links */}
-                {navLinks.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <LinkSimple className="h-3.5 w-3.5" />
-                      Navigation links ({navLinks.length})
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {navLinks.map((link, i) => (
-                        <span key={i} className="font-mono text-[11px] px-2 py-1 rounded border border-border bg-card text-muted-foreground">
-                          {link}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {forms.length === 0 && buttons.length === 0 && interactions.length === 0 && navLinks.length === 0 && (
-                  <div className="text-center py-12 text-[13px] text-muted-foreground">
-                    No forms or interactions discovered on this page.
+                    <RegressionPlanView steps={page.regression_plan as RegressionStep[]} />
                   </div>
                 )}
               </div>

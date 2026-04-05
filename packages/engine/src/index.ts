@@ -40,7 +40,7 @@ export type { CurateMemoryInput, CurateMemoryResult } from "./memoryCurator.js";
 export type { MemoryEntry, MemoryEntryInsert, MemoryEntryType, MemorySource } from "./agentMemory.js";
 
 // ─── LLM ─────────────────────────────────────────────────────────────────────
-export { llmChat, llmAgentChat, llmSummarize, llmPathPlan, llmMemoryCurate, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+export { llmChat, llmAgentChat, llmSummarize, llmMemoryCurate, calcCostUsd, getLLMBase, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 export type { LLMUsage, MemoryCurationParsed } from "./llmClient.js";
 export {
   inferModelProviderRequirement,
@@ -65,10 +65,6 @@ export type { TrackedStep, MicroGoal } from "./planTracker.js";
 // ─── Regression Engine ───────────────────────────────────────────────────────
 export { evaluateCondition, generateRegressionPlan, executeRegressionPlan, updatePlanConfidence } from "./regressionEngine.js";
 export type { CompletionCondition, RegressionStep, RegressionResult } from "./regressionEngine.js";
-
-// ─── Path Generator ──────────────────────────────────────────────────────────
-export { generateTestPlan, formatTestPlanForNavigator } from "./pathGenerator.js";
-export type { PathGeneratorInput, GenerateTestPlanResult } from "./pathGenerator.js";
 
 // ─── Flow & visual review (post-run) ───────────────────────────────────────
 export { runHolisticFlowReview } from "./holisticReviewAgent.js";

@@ -36,8 +36,6 @@ type Page = {
   health: "clean" | "issues" | "stale" | "untested";
   issues: number;
   enabled: boolean;
-  formCount: number;
-  interactionCount: number;
 };
 
 type Coverage = {
@@ -601,14 +599,6 @@ export function Pages() {
                           {page.issues > 0 && (
                             <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium tabular-nums flex-shrink-0">
                               {page.issues} issue{page.issues !== 1 ? "s" : ""}
-                            </span>
-                          )}
-
-                          {(page.formCount > 0 || page.interactionCount > 0) && (
-                            <span className="text-[11px] font-mono text-muted-foreground/40 flex-shrink-0 hidden md:block">
-                              {page.formCount > 0 && `${page.formCount}f`}
-                              {page.formCount > 0 && page.interactionCount > 0 && " "}
-                              {page.interactionCount > 0 && `${page.interactionCount}i`}
                             </span>
                           )}
 

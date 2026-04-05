@@ -72,7 +72,7 @@ type RunStep = {
   bugType?: "visual" | "functional" | "ux" | "other";
   severity?: "low" | "medium" | "high";
   at?: number;
-  source?: "navigator" | "review" | "pathgen" | "filmstrip" | "network";
+  source?: "navigator" | "review" | "filmstrip" | "network";
   screenshot?: string;
   /** On-disk JPEG name under run folder (preferred). */
   screenshotPath?: string | null;
@@ -102,7 +102,6 @@ type LLMAgentType =
   | "navigator"
   | "review"
   | "holistic"
-  | "pathgen"
   | "summary"
   | "filmstrip"
   | "crawl_link_filter"
@@ -166,7 +165,7 @@ type Run = {
   source_back_path?: string | null;
   steps_json?: RunStep[];
   memory_loaded?: MemoryEntryBrief[];
-  bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "pathgen" | "filmstrip" })[];
+  bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "filmstrip" })[];
   llm_calls_json?: LLMCallRecord[];
 };
 
@@ -431,11 +430,12 @@ function badgeVariantForStatus(status: string): "success" | "destructive" | "war
   return statusVariant(status);
 }
 
-const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Icon: React.ComponentType<{ className?: string }> }> = {
+type LlmAgentDisplay = { label: string; color: string; Icon: React.ComponentType<{ className?: string }> };
+
+const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
   navigator: { label: "Navigator", color: "text-emerald-400", Icon: Compass },
   review:    { label: "Review",    color: "text-violet-400",  Icon: Eye },
   holistic:  { label: "Flow review", color: "text-violet-300", Icon: GitBranch },
-  pathgen:   { label: "Path Gen",  color: "text-amber-400",   Icon: Path },
   summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
   filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Stack },
   crawl_link_filter:       { label: "Crawl links", color: "text-teal-400",    Icon: Funnel },
@@ -444,9 +444,15 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, { label: string; color: string; Ico
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
-  "navigator", "holistic", "filmstrip", "pathgen", "summary",
+  "navigator", "holistic", "filmstrip", "summary",
   "crawl_link_filter", "crawl_route_filter", "crawl_suggested_flows",
 ];
+
+/** Legacy or engine-only agents (e.g. memory_curator) still render in the LLM tab. */
+function llmAgentDisplay(agent: string): LlmAgentDisplay {
+  const row = (LLM_AGENT_CONFIG as Record<string, LlmAgentDisplay | undefined>)[agent];
+  return row ?? { label: agent, color: "text-muted-foreground", Icon: Brain };
+}
 
 // --- Main component ---
 
@@ -727,7 +733,6 @@ export const RunDetail: React.FC = () => {
 };
 
 function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]; stepsCount: number }) {
-  const hasPathGen = llmCalls.some((c) => c.agent === "pathgen");
   const hasHolistic = llmCalls.some((c) => c.agent === "holistic");
   const hasFilmstrip = llmCalls.some((c) => c.agent === "filmstrip");
   const navCalls = llmCalls.filter((c) => (c.agent ?? "navigator") === "navigator").length;
@@ -739,11 +744,6 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
           <li>
             <span className="text-foreground/90">Auth &amp; navigation</span> — session and target URL
           </li>
-          {hasPathGen && (
-            <li>
-              <span className="text-foreground/90">Path Generator</span> — test plan text injected into Navigator context
-            </li>
-          )}
           <li>
             <span className="text-foreground/90">Navigator loop</span> — {stepsCount} step{stepsCount !== 1 ? "s" : ""} recorded,{" "}
             {navCalls} LLM decision{navCalls !== 1 ? "s" : ""}
@@ -767,27 +767,8 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
   );
 }
 
-function PathGeneratorCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
-  const call = llmCalls.find((c) => c.agent === "pathgen");
-  if (!call?.response) return null;
-  return (
-    <Card>
-      <CardContent className="p-4 space-y-2">
-        <SectionLabel icon={<Path className="h-3.5 w-3.5" />} text="Path Generator plan" />
-        <p className="text-[11px] text-muted-foreground">
-          Plan passed to the Navigator (model: <span className="font-mono">{call.model}</span>
-          {call.costUsd > 0 ? `, ${formatCost(call.costUsd)}` : ""}).
-        </p>
-        <pre className="text-[11px] font-mono bg-muted/50 rounded-md p-3 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-foreground/80 border border-border/50">
-          {call.response}
-        </pre>
-      </CardContent>
-    </Card>
-  );
-}
-
 function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
-  const agents = ["navigator", "holistic", "filmstrip", "pathgen", "summary"] as const;
+  const agents = ["navigator", "holistic", "filmstrip", "summary"] as const;
   const rows = agents
     .map((a) => ({
       agent: a,
@@ -826,43 +807,57 @@ function sortPlanItemsForChecklist(items: AgentPlanItem[]): AgentPlanItem[] {
   return [...cur, ...pend, ...fail, ...done];
 }
 
-function PlanChecklistRow({ item, idx }: { item: AgentPlanItem; idx: number }) {
+function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boolean }) {
   const isDone = item.status === "done";
   const isCurrent = item.status === "current";
   const isFailed = item.status === "failed";
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 py-2 pl-1 pr-2 rounded-md transition-colors duration-200 animate-fade-in",
-        isCurrent && "bg-primary/[0.07] ring-1 ring-primary/20",
-        isDone && "opacity-65",
-      )}
-      style={{ animationDelay: `${Math.min(idx, 12) * 25}ms` }}
-    >
-      <span className="mt-0.5 shrink-0 text-muted-foreground transition-transform duration-200">
-        {isDone ? (
-          <CheckCircle className="h-4 w-4 text-muted-foreground/80" weight="bold" />
-        ) : isFailed ? (
-          <XCircle className="h-4 w-4 text-destructive/80" weight="bold" />
-        ) : isCurrent ? (
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/25 ring-2 ring-primary/40">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          </span>
-        ) : (
-          <Circle className="h-4 w-4 text-muted-foreground/50" weight="regular" />
-        )}
-      </span>
-      <p
-        className={cn(
-          "text-[13px] leading-snug text-foreground transition-colors duration-200",
-          isDone && "line-through text-muted-foreground",
-          isCurrent && "font-medium",
-          isFailed && "text-destructive/90",
-        )}
-      >
-        {item.text}
-      </p>
-    </div>
+    <li className="stagger-item list-none">
+      <div className="flex gap-3">
+        <div className="flex w-[22px] shrink-0 flex-col items-center">
+          <div
+            className={cn(
+              "relative z-[1] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition-[background-color,box-shadow] duration-150 ease-out",
+              isCurrent && "bg-primary/10 ring-2 ring-primary/15",
+              !isCurrent && !isDone && !isFailed && "bg-transparent",
+            )}
+          >
+            {isDone ? (
+              <CheckCircle className="h-3.5 w-3.5 text-status-pass" weight="bold" />
+            ) : isFailed ? (
+              <XCircle className="h-3.5 w-3.5 text-destructive/85" weight="bold" />
+            ) : isCurrent ? (
+              <span className="dot-pulse h-2 w-2 rounded-full bg-primary" />
+            ) : (
+              <Circle className="h-3.5 w-3.5 text-muted-foreground/40" weight="regular" />
+            )}
+          </div>
+          {!isLast && (
+            <div
+              className="mt-1 min-h-[10px] w-px flex-1 bg-gradient-to-b from-border/50 to-border/15"
+              aria-hidden
+            />
+          )}
+        </div>
+        <div
+          className={cn(
+            "min-w-0 flex-1 pb-3 transition-[background-color] duration-150 ease-out",
+            isCurrent && "rounded-md bg-primary/[0.035] -mx-1 -mt-0.5 px-2.5 py-1.5",
+          )}
+        >
+          <p
+            className={cn(
+              "text-[13px] leading-snug tracking-[-0.01em] text-foreground transition-colors duration-150",
+              isDone && "text-muted-foreground/85 line-through decoration-border/50 decoration-1",
+              isCurrent && "font-medium text-foreground",
+              isFailed && "text-destructive/90",
+            )}
+          >
+            {item.text}
+          </p>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -889,6 +884,14 @@ function OverviewTab({
   );
 
   const sortedPlan = React.useMemo(() => sortPlanItemsForChecklist(agentPlan), [agentPlan]);
+
+  const planProgress = React.useMemo(() => {
+    const n = agentPlan.length;
+    if (n === 0) return null;
+    const done = agentPlan.filter((i) => i.status === "done").length;
+    const failed = agentPlan.filter((i) => i.status === "failed").length;
+    return { n, done, failed, pct: Math.round((done / n) * 100) };
+  }, [agentPlan]);
 
   const snapshotSrc = React.useMemo(() => {
     const lastWithScreenshot = [...steps]
@@ -959,18 +962,63 @@ function OverviewTab({
             </CardContent>
           </Card>
 
-          <Card className="min-h-0 flex-[0.85] flex flex-col overflow-hidden">
-            <CardContent className="p-3 flex flex-col flex-1 min-h-0">
-              <SectionLabel icon={<Path className="h-3.5 w-3.5" />} text="Plan" />
-              <div className="mt-2 min-h-0 flex-1 basis-0 min-h-[80px] max-h-[min(38vh,300px)] overflow-y-auto overflow-x-hidden pr-1 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
-                {sortedPlan.length === 0 ? (
-                  <p className="text-[12px] text-muted-foreground">No plan has been streamed yet.</p>
-                ) : (
-                  <div className="space-y-0.5 pr-1">
-                    {sortedPlan.map((item, idx) => (
-                      <PlanChecklistRow key={`${item.text}-${item.status}-${idx}`} item={item} idx={idx} />
-                    ))}
+          <Card className="min-h-0 flex-[0.85] flex flex-col overflow-hidden border-border/55 bg-card/90">
+            <CardContent className="flex flex-1 min-h-0 flex-col p-0">
+              <div className="shrink-0 border-b border-border/40 bg-surface-2/50 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <SectionLabel className="mb-0 min-w-0" icon={<Path className="h-3.5 w-3.5" />} text="Plan" />
+                  {planProgress && (
+                    <div className="shrink-0 text-right">
+                      <p className="text-[11px] tabular-nums text-muted-foreground">
+                        <span className="text-foreground/80">{planProgress.done}</span>
+                        <span className="text-muted-foreground/50"> / {planProgress.n}</span>
+                        {run.status === "running" && sortedPlan.some((i) => i.status === "current") && (
+                          <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-primary/80">
+                            live
+                          </span>
+                        )}
+                      </p>
+                      {planProgress.failed > 0 && (
+                        <p className="text-[10px] text-destructive/75 mt-0.5">{planProgress.failed} blocked</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {planProgress && planProgress.n > 0 && (
+                  <div
+                    className="mt-2.5 h-1 overflow-hidden rounded-full bg-muted/50"
+                    role="progressbar"
+                    aria-valuenow={planProgress.pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-status-pass/45 via-primary/30 to-primary/40 transition-[width] duration-200 ease-out"
+                      style={{ width: `${planProgress.pct}%` }}
+                    />
                   </div>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 basis-0 min-h-[88px] max-h-[min(38vh,300px)] overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
+                {sortedPlan.length === 0 ? (
+                  <div className="flex animate-fade-in flex-col items-center justify-center gap-2.5 py-7 text-center">
+                    <div className="rounded-full bg-muted/35 p-3 ring-1 ring-border/30">
+                      <Path className="h-6 w-6 text-muted-foreground/35" weight="duotone" />
+                    </div>
+                    <p className="max-w-[220px] text-[12px] leading-relaxed text-muted-foreground">
+                      Checklist steps appear here as the agent streams its plan.
+                    </p>
+                  </div>
+                ) : (
+                  <ol className="m-0 list-none p-0">
+                    {sortedPlan.map((item, idx) => (
+                      <PlanChecklistRow
+                        key={`${idx}-${item.text.slice(0, 96)}`}
+                        item={item}
+                        isLast={idx === sortedPlan.length - 1}
+                      />
+                    ))}
+                  </ol>
                 )}
               </div>
             </CardContent>
@@ -987,8 +1035,14 @@ function OverviewTab({
                   </>
                 ) : latestEntry?.type === "plan" ? (
                   <>
-                    <p className="text-[14px] text-foreground">Updated plan ({latestEntry.items.length} items)</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Checklist refreshed</p>
+                    <div className="flex items-center gap-2">
+                      <Path className="h-3.5 w-3.5 shrink-0 text-primary/60" weight="duotone" />
+                      <p className="text-[13px] text-foreground">
+                        Plan refreshed · {latestEntry.items.length}{" "}
+                        {latestEntry.items.length === 1 ? "step" : "steps"}
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 pl-[22px]">Navigator checklist</p>
                   </>
                 ) : latestHumanized ? (
                   <>
@@ -1020,13 +1074,20 @@ function OverviewTab({
                       return (
                         <div
                           key={`plan-${entry.at}-${idx}`}
-                          className="text-[12px] rounded border border-border/50 px-2 py-1.5 bg-card/40 animate-slide-up transition-colors duration-200"
+                          className="animate-slide-up rounded-lg border border-border/35 bg-muted/12 px-2.5 py-2 transition-colors duration-150 hover:bg-muted/18"
                           style={{ animationDelay: `${delay}ms` }}
                         >
-                          <p className="text-foreground">Plan updated ({entry.items.length} items)</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">
-                            {new Date(entry.at).toLocaleTimeString()}
-                          </p>
+                          <div className="flex items-start gap-2">
+                            <Path className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/50" weight="duotone" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] text-foreground/95">
+                                Plan · {entry.items.length} {entry.items.length === 1 ? "step" : "steps"}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/80">
+                                {new Date(entry.at).toLocaleTimeString()}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       );
                     }
@@ -1403,7 +1464,7 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
               All ({agentCounts.all})
             </button>
             {agentsWithCalls.map((a) => {
-              const { label, Icon, color } = LLM_AGENT_CONFIG[a];
+              const { label, Icon, color } = llmAgentDisplay(a);
               return (
                 <button
                   key={a}
@@ -1426,7 +1487,7 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
           {agentsWithCalls.length > 1 && (
             <div className="flex flex-wrap gap-x-4 text-[11px] text-muted-foreground">
               {agentsWithCalls.map((a) => {
-                const { label } = LLM_AGENT_CONFIG[a];
+                const { label } = llmAgentDisplay(a);
                 return (
                   <span key={a}>
                     <span className="font-medium text-foreground/70">{label}:</span>{" "}
@@ -1466,7 +1527,7 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
   const [expanded, setExpanded] = React.useState(false);
   const isScan = call.role === "dom-scan";
   const agent  = call.agent ?? "navigator";
-  const agentInfo = LLM_AGENT_CONFIG[agent];
+  const agentInfo = llmAgentDisplay(agent);
 
   return (
     <Card className={cn(
@@ -1474,7 +1535,6 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
       agent === "navigator" && "border-l-2 border-l-emerald-500/30",
       agent === "review"    && "border-l-2 border-l-violet-500/30",
       agent === "holistic"  && "border-l-2 border-l-violet-400/30",
-      agent === "pathgen"   && "border-l-2 border-l-amber-500/30",
       agent === "summary"   && "border-l-2 border-l-sky-500/30",
       agent === "filmstrip" && "border-l-2 border-l-fuchsia-500/30",
       agent === "crawl_link_filter" && "border-l-2 border-l-teal-500/30",
@@ -1496,12 +1556,10 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
         </span>
 
         {/* Agent badge */}
-        {agentInfo && (
-          <span className={cn("text-[10px] font-medium flex items-center gap-0.5 flex-shrink-0", agentInfo.color)}>
-            <agentInfo.Icon className="h-3 w-3" />
-            {agentInfo.label}
-          </span>
-        )}
+        <span className={cn("text-[10px] font-medium flex items-center gap-0.5 flex-shrink-0", agentInfo.color)}>
+          <agentInfo.Icon className="h-3 w-3" />
+          {agentInfo.label}
+        </span>
 
         {/* Model */}
         <span className="text-[11px] text-foreground truncate flex-1 min-w-0">{call.model}</span>
@@ -1630,13 +1688,15 @@ function SectionLabel({
   icon,
   text,
   children,
+  className,
 }: {
   icon: React.ReactNode;
   text: string;
   children?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
+    <div className={cn("mb-3 flex items-center gap-2", className)}>
       <span className="text-muted-foreground">{icon}</span>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">{text}</p>
       {children}

@@ -26,7 +26,6 @@ import { initStagehandSession, destroyStagehandSession, type StagehandSession } 
 import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
 import { dedupeRunStepBugs } from "./bugDedup.js";
 import type { StorageAdapter } from "./storage.js";
-import { rewriteForDocker } from "./dockerHost.js";
 
 export type RunJob = {
   runId?: string;
@@ -64,22 +63,30 @@ export type RunResult = {
 
 export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): Promise<RunResult> {
   const config = getConfig();
-  job.baseUrl = rewriteForDocker(job.baseUrl);
-  if (job.auth?.loginUrl) job.auth.loginUrl = rewriteForDocker(job.auth.loginUrl);
+
+  // When running inside Docker, the browser cannot reach `localhost` — that resolves to the
+  // container itself, not the host machine. Historically we rewrote URLs to
+  // `host.docker.internal`, but that made ClerkJS report a key-mismatch redirect loop because
+  // `host.docker.internal` is not in Clerk's Dashboard allowed-origins list (and never will be
+  // for apps that haven't configured it). The fix is to keep all app URLs as `localhost` and
+  // instead tell Chrome to resolve `localhost` to `host.docker.internal` at the DNS layer via
+  // --host-resolver-rules. From the browser's security model the origin stays `localhost`, so
+  // Clerk (and any other auth provider) accepts it without any dashboard configuration.
+  const DOCKER_BROWSER_ARGS = process.env.KERY_DOCKER
+    ? ["--host-resolver-rules=MAP localhost host.docker.internal"]
+    : [];
 
   logger.info({ intent: job.intent }, "Starting orchestrated run");
 
   let context = job.context ?? "";
   let targetUrl: string | undefined;
-  const pathGenCalls: LLMCallRecord[] = [];
 
   // Runs created from a page/destination (i.e. `destinationId` without a saved `testId`)
   // don't carry `maxSteps`, so apply a higher default for page tests.
   const isPageTest = Boolean(job.destinationId) && !job.testId;
   const maxStepsForRun = job.maxSteps ?? (isPageTest ? 200 : undefined);
 
-  // For page tests, compute the navigation target URL.
-  // Path generation / pre-planning is intentionally skipped: Navigator should plan from what it sees.
+  // For page tests, compute the navigation target URL. Navigator plans from what it sees on the page.
   if (job.destinationId) {
     try {
       const dest = await storage.getDestination(job.destinationId);
@@ -180,7 +187,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       browser = await chromium.launch({
         headless: true,
         executablePath: process.env.CHROMIUM_PATH || undefined,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: ["--no-sandbox", "--disable-setuid-sandbox", ...DOCKER_BROWSER_ARGS],
       });
       const contextOpts: any = { viewport: { width: recordW, height: recordH } };
       if (videoTmpDir) {
@@ -264,7 +271,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           return {
             status: regResult.status === "passed" ? "passed" : "failed",
             steps: stepsDetail.map(s => `[${s.index}] ${s.action} \u2192 ${s.target ?? ""}`),
-            stepsDetail, bugsFound, llmCalls: pathGenCalls,
+            stepsDetail, bugsFound, llmCalls: [],
             memoryLoaded: allMemory, memoryProposed: 0, videoUrl,
           };
         }
@@ -397,7 +404,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       },
     });
 
-    const mergedCalls = mergeLLMCalls(pathGenCalls, agentResult.llmCalls, holisticCalls, filmstripCalls, memoryCuratorCalls);
+    const mergedCalls = mergeLLMCalls(agentResult.llmCalls, holisticCalls, filmstripCalls, memoryCuratorCalls);
 
     if (shSession) {
       await finalizeStagehandRecording(shSession, videoTmpDir, job.runId);
@@ -443,14 +450,12 @@ function buildTargetUrl(baseUrl: string, normalizedRoute: string): string {
 }
 
 function mergeLLMCalls(
-  pathGen: LLMCallRecord[],
   navigator: LLMCallRecord[],
   holistic: LLMCallRecord[],
   filmstrip: LLMCallRecord[] = [],
   memoryCurator: LLMCallRecord[] = [],
 ): LLMCallRecord[] {
   const merged: LLMCallRecord[] = [
-    ...pathGen.map((c) => ({ ...c, agent: "pathgen" as LLMAgentType })),
     ...navigator.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
     ...holistic.map((c) => ({ ...c, agent: (c.agent ?? "holistic") as LLMAgentType })),
     ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),

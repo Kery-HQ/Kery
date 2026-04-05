@@ -155,29 +155,7 @@ export type CrawlRun = {
 };
 
 /** Source of a bug in multi-agent runs */
-export type BugSource = "navigator" | "review" | "pathgen" | "filmstrip";
-
-/** Single step in a path (human-readable target; Navigator resolves to coordinates) */
-export type PathStep = {
-  action: "navigate" | "click" | "fill" | "assert" | "wait" | "hover" | "scroll" | "pressKey" | "selectOption" | "back";
-  target: string;
-  value?: string;
-  expectation?: string;
-  reasoning: string;
-};
-
-/** Test plan produced by the Path Generator for the Navigator to execute */
-export type TestPlan = {
-  happyPaths: PathStep[][];
-  sadPaths: PathStep[][];
-  edgeCases: PathStep[][];
-  interactionFlows: PathStep[][];
-  regressionChecks: PathStep[][];
-  authFlows: PathStep[][];
-  dataIntegrity: PathStep[][];
-  boundaryValues: PathStep[][];
-  crossPageFlows: PathStep[][];
-};
+export type BugSource = "navigator" | "review" | "filmstrip";
 
 /** Bug categories from the Review / Filmstrip agents (aligned with review prompt output) */
 export type ReviewBug = {

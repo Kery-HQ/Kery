@@ -76,7 +76,7 @@ export type Bug = {
   reportedAt: string;
   environment?: string | null;
   index?: number;
-  source?: "navigator" | "review" | "pathgen" | "filmstrip";
+  source?: "navigator" | "review" | "filmstrip";
   /** Bounding box when provided by review/filmstrip (also burned into screenshot file). */
   region?: { x: number; y: number; w: number; h: number };
 };

@@ -15,7 +15,7 @@ type AgentBugStep = {
   bugType?: "visual" | "functional" | "ux" | "other";
   severity?: "low" | "medium" | "high";
   screenshotPath?: string;
-  source?: "navigator" | "review" | "network" | "pathgen" | "filmstrip";
+  source?: "navigator" | "review" | "network" | "filmstrip";
   region?: { x: number; y: number; w: number; h: number };
   [k: string]: unknown;
 };
@@ -98,7 +98,7 @@ export function enrichBugsForRun(
       environment: null,
       index: typeof b.index === "number" ? b.index : undefined,
       source:
-        b.source === "navigator" || b.source === "review" || b.source === "pathgen" || b.source === "filmstrip"
+        b.source === "navigator" || b.source === "review" || b.source === "filmstrip"
           ? b.source
           : undefined,
       region:

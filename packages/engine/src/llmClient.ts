@@ -320,50 +320,6 @@ export async function llmSummarize(prompt: string): Promise<{ content: string; u
   return { content, usage };
 }
 
-// ─── Path Generator (text only, structured test plan) ──────────────────────────
-
-const PATH_STEP_SCHEMA = {
-  type: "object",
-  properties: {
-    action: { type: "string", enum: ["navigate", "click", "fill", "assert", "wait", "hover", "scroll", "pressKey", "selectOption", "back"] },
-    target: { type: "string" },
-    value: { type: "string" },
-    expectation: { type: "string" },
-    reasoning: { type: "string" },
-  },
-  required: ["action", "target", "reasoning"],
-  additionalProperties: false,
-};
-
-const TEST_PLAN_SCHEMA = {
-  type: "json_schema" as const,
-  json_schema: {
-    name: "test_plan",
-    strict: true,
-    schema: {
-      type: "object",
-      properties: {
-        happyPaths: { type: "array", items: { type: "array", items: PATH_STEP_SCHEMA } },
-        sadPaths: { type: "array", items: { type: "array", items: PATH_STEP_SCHEMA } },
-        edgeCases: { type: "array", items: { type: "array", items: PATH_STEP_SCHEMA } },
-        interactionFlows: { type: "array", items: { type: "array", items: PATH_STEP_SCHEMA } },
-        regressionChecks: { type: "array", items: { type: "array", items: PATH_STEP_SCHEMA } },
-      },
-      required: ["happyPaths", "sadPaths", "edgeCases", "interactionFlows", "regressionChecks"],
-      additionalProperties: false,
-    },
-  },
-};
-
-export async function llmPathPlan(prompt: string): Promise<{ content: string; usage: LLMUsage }> {
-  const model = getConfig().auxiliaryModel;
-  return llmChat(
-    [{ role: "user", content: prompt }],
-    model,
-    { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.3, responseFormat: TEST_PLAN_SCHEMA }
-  );
-}
-
 // ─── Memory curator (text only, structured JSON) ───────────────────────────────
 
 const MEMORY_ADD_ITEM_SCHEMA = {

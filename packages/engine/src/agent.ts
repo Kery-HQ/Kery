@@ -69,7 +69,7 @@ export type RunStep = {
   bugType?: "visual" | "functional" | "ux" | "other";
   severity?: "low" | "medium" | "high";
   at?: number;
-  source?: "navigator" | "review" | "pathgen" | "filmstrip";
+  source?: "navigator" | "review" | "filmstrip";
   elementRef?: { role: string; name: string };
   screenshotBase64?: string;
   /** After materialize: JPEG filename under SCREENSHOTS_DIR/<runId>/ */
@@ -94,7 +94,6 @@ export type LLMAgentType =
   | "navigator"
   | "review"
   | "holistic"
-  | "pathgen"
   | "summary"
   | "filmstrip"
   | "crawl_link_filter"
@@ -904,6 +903,12 @@ function validateAction(action: AgentAction): string | null {
   if (action.action === "report_bug") {
     if (!action.bugDescription?.trim()) return `"report_bug" requires "bugDescription".`;
   }
+  if (action.action === "navigate") {
+    const raw = (action.target ?? action.value ?? "").trim();
+    if (!raw.startsWith("http")) {
+      return `"navigate" requires an absolute URL in "target" (preferred) or "value".`;
+    }
+  }
   return null;
 }
 
@@ -1113,8 +1118,11 @@ export async function executeAction(page: Page, action: AgentAction): Promise<Ex
       break;
     }
     case "navigate": {
-      if (!action.target?.startsWith("http")) break;
-      await page.goto(action.target, { waitUntil: "domcontentloaded" });
+      const url = (action.target ?? action.value ?? "").trim();
+      if (!url.startsWith("http")) break;
+      // Chrome's --host-resolver-rules (set at launch) maps localhost → host.docker.internal
+      // at the DNS layer when running in Docker, so we never need to rewrite URLs here.
+      await page.goto(url, { waitUntil: "domcontentloaded" });
       await waitForPageStable(page, 4000);
       break;
     }
