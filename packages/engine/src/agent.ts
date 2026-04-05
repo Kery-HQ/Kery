@@ -1028,27 +1028,98 @@ async function clickAtCoordinates(page: Page, x: number, y: number): Promise<str
   return clickedElement;
 }
 
+/**
+ * After a click near a form row, ensure a real INPUT/TEXTAREA is focused.
+ * Clicks often land on a sibling (e.g. planecraft.app/ span) so elementFromPoint
+ * is not the input; React controlled fields need Playwright fill on the focused control.
+ */
+async function focusEditableNearPoint(page: Page, px: number, py: number): Promise<boolean> {
+  return page.evaluate(({ cx, cy }) => {
+    const tryFocus = (n: Node | null): boolean => {
+      if (!n || !(n instanceof HTMLElement)) return false;
+      if (n instanceof HTMLInputElement) {
+        const t = (n.type || "text").toLowerCase();
+        if (t === "hidden" || t === "submit" || t === "button" || t === "checkbox" || t === "radio") return false;
+        n.focus();
+        return true;
+      }
+      if (n instanceof HTMLTextAreaElement) {
+        n.focus();
+        return true;
+      }
+      if (n.isContentEditable) {
+        n.focus();
+        return true;
+      }
+      return false;
+    };
+
+    for (const node of document.elementsFromPoint(cx, cy)) {
+      if (tryFocus(node)) return true;
+    }
+
+    let el: Element | null = document.elementFromPoint(cx, cy);
+    for (let d = 0; d < 8 && el; d++) {
+      if (tryFocus(el)) return true;
+      const scope = el.closest("div, label, form, fieldset, li, td") ?? el;
+      const inp = scope.querySelector(
+        "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='checkbox']):not([type='radio']), textarea"
+      );
+      if (tryFocus(inp)) return true;
+      el = el.parentElement;
+    }
+    return false;
+  }, { cx: px, cy: py });
+}
+
 async function fillAtCoordinates(page: Page, x: number, y: number, value: string): Promise<string> {
   const { px, py } = toPixel(x, y);
   const clickedElement = await describeElementAtPoint(page, px, py);
   await page.mouse.click(px, py);
-  await new Promise(r => setTimeout(r, 150));
+  await new Promise(r => setTimeout(r, 200));
+
+  const focused = await focusEditableNearPoint(page, px, py);
+  if (focused) {
+    try {
+      await page.locator(":focus").fill(value, { timeout: 5000 });
+      return clickedElement;
+    } catch {
+      /* fall through to legacy paths */
+    }
+  }
+
   const filled = await page.evaluate(({ cx, cy, val }: { cx: number; cy: number; val: string }) => {
-    const el = document.elementFromPoint(cx, cy) as HTMLInputElement | HTMLTextAreaElement | null;
-    if (el && ("value" in el) && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, "value"
-      )?.set;
-      if (nativeSetter) {
-        nativeSetter.call(el, val);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-        return true;
+    let el: HTMLInputElement | HTMLTextAreaElement | null = null;
+    for (const node of document.elementsFromPoint(cx, cy)) {
+      if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+        el = node;
+        break;
       }
     }
-    return false;
+    if (!el) {
+      const top = document.elementFromPoint(cx, cy);
+      let walk: Element | null = top;
+      for (let d = 0; d < 8 && walk && !el; d++) {
+        const scope = walk.closest("div, label, form, fieldset") ?? walk;
+        const found = scope.querySelector(
+          "input:not([type='hidden']):not([type='submit']):not([type='button']), textarea"
+        );
+        if (found instanceof HTMLInputElement || found instanceof HTMLTextAreaElement) el = found;
+        walk = walk.parentElement;
+      }
+    }
+    if (!el) return false;
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, "value"
+    )?.set;
+    if (!nativeSetter) return false;
+    nativeSetter.call(el, val);
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, data: val, inputType: "insertText" }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
   }, { cx: px, cy: py, val: value }).catch(() => false);
   if (filled) return clickedElement;
+
   const isMac = process.platform === "darwin";
   await page.keyboard.press(isMac ? "Meta+a" : "Control+a");
   await page.keyboard.type(value, { delay: 20 });
@@ -1813,6 +1884,50 @@ export async function runAgent(
                 elementRef: { role: resolvedA11yEl.role, name: resolvedA11yEl.name },
                 domContext: trimDomContext(dom),
                 executionMethod: "playwright",
+                observation: action.observation,
+                preActionDomHash: preActionDomHash,
+              };
+              stepsDetail.push(okStep);
+              onStep?.(okStep);
+              if (MUTATING_ACTIONS.has(action.action)) {
+                pendingStagnation = {
+                  preHash: preActionDomHash,
+                  url: currentUrl,
+                  action: action.action,
+                  elementName,
+                };
+              }
+              networkMonitor?.markActionEnd();
+              continue;
+            }
+
+            // resolveElement returned null (element has no W3C-accessible name) but we
+            // have a bbox from extraction time. Use the bbox center as coordinates so
+            // click/fill still work without modifying the action object.
+            if (resolvedA11yEl.bbox && (action.action === "click" || action.action === "fill")) {
+              const { x: bx, y: by, width: bw, height: bh } = resolvedA11yEl.bbox;
+              const cx = ((bx + bw / 2) / VIEWPORT_W) * 1000;
+              const cy = ((by + bh / 2) / VIEWPORT_H) * 1000;
+              logger.info(
+                { id: resolvedA11yEl.id, role: resolvedA11yEl.role, name: resolvedA11yEl.name, action: action.action, cx, cy },
+                "resolveElement returned null — falling back to bbox coordinates",
+              );
+              stepExecutionMethod = "coordinates";
+              if (action.action === "fill" && action.value !== undefined) {
+                await fillAtCoordinates(page, cx, cy, action.value);
+              } else {
+                await clickAtCoordinates(page, cx, cy);
+                await waitForPageStable(page, 4000);
+              }
+              prevResult = { action, status: "ok" };
+              const okStep: RunStep = {
+                index: stepCounter, action: action.action, element: action.element,
+                target: action.target ?? resolvedA11yEl.name, value: action.value,
+                assertion: action.assertion, reasoning: action.reasoning,
+                url, status: "ok", fromMemory: false, at: stepTimestamp(),
+                elementRef: { role: resolvedA11yEl.role, name: resolvedA11yEl.name },
+                domContext: trimDomContext(dom),
+                executionMethod: "coordinates",
                 observation: action.observation,
                 preActionDomHash: preActionDomHash,
               };

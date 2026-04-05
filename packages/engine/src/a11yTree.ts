@@ -153,6 +153,19 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     }
     var testAttr = el.getAttribute("data-test") || el.getAttribute("data-testid") || el.getAttribute("data-test-id");
     if (testAttr) return testAttr.replace(/[-_]+/g, " ").trim().slice(0, 60);
+    // Heuristic: label is a preceding sibling of an ancestor (e.g. div>label + div>input).
+    // Walk up to 3 levels and check previous siblings for a <label> element.
+    var anc = el.parentElement;
+    for (var d = 0; d < 3 && anc; d++, anc = anc.parentElement) {
+      var sib = anc.previousElementSibling;
+      while (sib) {
+        if (sib.tagName === "LABEL") {
+          var lt = (sib.textContent || "").trim();
+          if (lt) return lt.slice(0, 60);
+        }
+        sib = sib.previousElementSibling;
+      }
+    }
     return "";
   }
 
@@ -468,7 +481,22 @@ export function hasSufficientA11y(elements: A11yElement[]): boolean {
 
 export async function resolveElement(page: Page, element: A11yElement): Promise<Locator | null> {
   if (!element.name || element.name.startsWith("(unnamed ")) {
-    logger.debug({ id: element.id, role: element.role }, "Unnamed element — skipping locator resolution, will use coordinates");
+    // If we have a recorded bbox, scan all elements of the same role and return the
+    // one whose position matches. This handles inputs with no accessible name/label.
+    if (element.bbox) {
+      try {
+        const roleLocator = page.getByRole(element.role as any);
+        const count = await roleLocator.count();
+        for (let i = 0; i < count; i++) {
+          const box = await roleLocator.nth(i).boundingBox({ timeout: 1000 }).catch(() => null);
+          if (box && Math.abs(box.x - element.bbox.x) < 15 && Math.abs(box.y - element.bbox.y) < 15) {
+            logger.debug({ id: element.id, role: element.role, strategy: "bbox", matchIndex: i }, "Unnamed element resolved via bbox position match");
+            return roleLocator.nth(i);
+          }
+        }
+      } catch { /* role not supported by Playwright — fall through */ }
+    }
+    logger.debug({ id: element.id, role: element.role }, "Unnamed element — no bbox match, will use coordinates");
     return null;
   }
 
@@ -527,6 +555,30 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
             return frameLoc.first();
           }
         } catch { /* skip inaccessible frames */ }
+      }
+      // Last resort: if we recorded a bbox during extraction, scan all elements of this
+      // role by position. This recovers inputs whose accessible name was derived from a
+      // positional heuristic (e.g. a sibling <label> with no `for` attribute) that
+      // Playwright's W3C algorithm doesn't recognise.
+      if (element.bbox) {
+        try {
+          const roleLocator = page.getByRole(element.role as any);
+          const roleCount = await roleLocator.count();
+          for (let i = 0; i < roleCount; i++) {
+            const box = await roleLocator.nth(i).boundingBox({ timeout: 1000 }).catch(() => null);
+            if (
+              box &&
+              Math.abs(box.x - element.bbox.x) < 15 &&
+              Math.abs(box.y - element.bbox.y) < 15
+            ) {
+              logger.debug(
+                { id: element.id, role: element.role, name: element.name, strategy: "bbox-position-fallback", matchIndex: i },
+                "Element resolved via bbox position fallback (name not recognised by Playwright a11y)",
+              );
+              return roleLocator.nth(i);
+            }
+          }
+        } catch { /* role not supported by Playwright — give up */ }
       }
       logger.debug({ id: element.id, role: element.role, name: element.name }, "Element NOT found \u2014 no locator matched");
     }
