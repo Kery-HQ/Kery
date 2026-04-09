@@ -474,7 +474,7 @@ export async function extractVisibleText(page: Page): Promise<string> {
 // ─── Sufficient A11y Check ────────────────────────────────────────────────────
 
 export function hasSufficientA11y(elements: A11yElement[]): boolean {
-  return elements.length >= 3;
+  return elements.length >= 1;
 }
 
 // ─── Element Resolution to Playwright Locators ───────────────────────────────
