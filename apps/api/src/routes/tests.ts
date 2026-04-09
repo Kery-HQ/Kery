@@ -36,14 +36,38 @@ export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter
   app.put("/api/projects/:projectId/tests/:testId", async (req, reply) => {
     const { testId } = ProjectTestParams.parse(req.params);
     const body = TestUpdateBody.parse(req.body);
-    const sets: string[] = [];
-    const values: any[] = [testId];
-    let i = 2;
-    if (body.name) { sets.push(`name = $${i++}`); values.push(body.name); }
-    if (body.intent) { sets.push(`intent = $${i++}`); values.push(body.intent); }
-    if (body.context !== undefined) { sets.push(`context = $${i++}`); values.push(body.context); }
-    if (sets.length === 0) { reply.code(400).send({ error: "nothing to update" }); return; }
-    const { rows } = await pool.query(`UPDATE saved_tests SET ${sets.join(", ")} WHERE id = $1 RETURNING *`, values);
+    const { rows: curRows } = await pool.query("SELECT * FROM saved_tests WHERE id = $1", [testId]);
+    if (curRows.length === 0) { reply.code(404).send({ error: "not found" }); return; }
+    const cur = curRows[0];
+
+    const hasPatch =
+      body.name !== undefined ||
+      body.intent !== undefined ||
+      body.context !== undefined ||
+      body.reset_script === true;
+    if (!hasPatch) { reply.code(400).send({ error: "nothing to update" }); return; }
+
+    const name = body.name ?? cur.name;
+    const intent = body.intent ?? cur.intent;
+    const context = body.context !== undefined ? body.context : cur.context;
+
+    const intentChanged =
+      body.intent !== undefined &&
+      String(body.intent).trim() !== String(cur.intent ?? "").trim();
+
+    let regression_plan = cur.regression_plan;
+    let plan_status = cur.plan_status;
+    let plan_success_count = cur.plan_success_count;
+    if (body.reset_script === true || intentChanged) {
+      regression_plan = null;
+      plan_status = "none";
+      plan_success_count = 0;
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE saved_tests SET name = $2, intent = $3, context = $4, regression_plan = $5, plan_status = $6, plan_success_count = $7 WHERE id = $1 RETURNING *`,
+      [testId, name, intent, context, regression_plan, plan_status, plan_success_count],
+    );
     reply.send({ test: rows[0] });
   });
 

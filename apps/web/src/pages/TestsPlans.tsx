@@ -13,6 +13,7 @@ import {
   Repeat,
   CheckCircle,
   CaretDown,
+  ArrowCounterClockwise,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,7 @@ import { statusVariant, relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
-  runProjectTest, fetchProjectRuns,
+  resetTestScript, runProjectTest, fetchProjectRuns,
 } from "@/projectApi";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -215,6 +216,14 @@ export const TestsPlans: React.FC = () => {
     setTests((prev) => prev.filter((t) => t.id !== test.id));
     if (selectedTest?.id === test.id) setSelectedTest(null);
     setDeleteTarget(null);
+  }
+
+  async function handleResetScript(testId: string) {
+    if (!currentProjectId) return;
+    const res = await resetTestScript(currentProjectId, testId);
+    const updated = res.test as SavedTest;
+    setTests((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    if (selectedTest?.id === updated.id) setSelectedTest(updated);
   }
 
   // ─── Run ────────────────────────────────────────────────────────────────
@@ -432,6 +441,12 @@ export const TestsPlans: React.FC = () => {
 
                           <TabsContent value="script" className="px-4 pb-4">
                             <ScriptTab
+                              canReset={
+                                (test.regression_plan?.length ?? 0) > 0 ||
+                                test.plan_status === "ready" ||
+                                test.plan_status === "stale"
+                              }
+                              onReset={() => handleResetScript(test.id)}
                               plan={test.regression_plan}
                               planStatus={test.plan_status}
                               successCount={test.plan_success_count}
@@ -474,7 +489,9 @@ export const TestsPlans: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Intent</label>
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                Custom flow description
+              </label>
               <Textarea
                 value={formIntent}
                 onChange={(e) => setFormIntent(e.target.value)}
@@ -482,6 +499,11 @@ export const TestsPlans: React.FC = () => {
                 placeholder="Describe what the agent should do..."
                 className="text-[13px] resize-y"
               />
+              {editing && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground/60">
+                  Changing this clears the saved script; the next successful run records a new one.
+                </p>
+              )}
             </div>
             <div>
               <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">
@@ -553,7 +575,15 @@ export const TestsPlans: React.FC = () => {
 
 // ─── Script Tab ───────────────────────────────────────────────────────────────
 
-function ScriptTab({ plan, planStatus, successCount }: {
+function ScriptTab({
+  canReset,
+  onReset,
+  plan,
+  planStatus,
+  successCount,
+}: {
+  canReset: boolean;
+  onReset: () => Promise<void>;
   plan?: RegressionStep[] | null;
   planStatus?: string | null;
   successCount?: number;
@@ -561,9 +591,36 @@ function ScriptTab({ plan, planStatus, successCount }: {
   const status = planStatus ?? "none";
   const steps = plan ?? [];
   const showEmptyState = status === "none" || steps.length === 0;
+  const [resetting, setResetting] = React.useState(false);
+
+  async function handleResetClick() {
+    setResetting(true);
+    try {
+      await onReset();
+    } finally {
+      setResetting(false);
+    }
+  }
 
   return (
     <div className="w-full space-y-5">
+      {canReset && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-[12px] self-start sm:self-auto"
+            disabled={resetting}
+            loading={resetting}
+            onClick={handleResetClick}
+          >
+            <ArrowCounterClockwise className="h-3.5 w-3.5" />
+            Reset script
+          </Button>
+        </div>
+      )}
+
       {showEmptyState ? (
         <div className="flex justify-center">
           <EmptyState
@@ -630,7 +687,9 @@ function DetailsTab({ test }: { test: SavedTest }) {
       </div>
 
       <div>
-        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Intent</p>
+        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">
+          Custom flow description
+        </p>
         <div className="rounded-md bg-muted/40 border border-border px-4 py-3 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
           {test.intent}
         </div>

@@ -248,11 +248,22 @@ export async function createTest(projectId: string, payload: { name: string; int
   });
 }
 
-export async function updateTest(projectId: string, testId: string, payload: { name?: string; intent?: string; context?: string; max_steps?: number | null }) {
+export async function updateTest(projectId: string, testId: string, payload: {
+  name?: string;
+  intent?: string;
+  context?: string;
+  max_steps?: number | null;
+  reset_script?: boolean;
+}) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+/** Clear the saved replay script for a flow (next run discovers steps again). */
+export async function resetTestScript(projectId: string, testId: string) {
+  return updateTest(projectId, testId, { reset_script: true });
 }
 
 export async function deleteTest(projectId: string, testId: string) {

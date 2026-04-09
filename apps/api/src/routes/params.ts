@@ -59,6 +59,8 @@ export const TestUpdateBody = z.object({
   name: z.string().min(2).optional(),
   intent: z.string().min(3).optional(),
   context: z.string().nullable().optional(),
+  /** Clear saved replay plan (regression script) for this flow */
+  reset_script: z.boolean().optional(),
 });
 
 export const ProjectUpdateBody = z.object({

@@ -1476,6 +1476,14 @@ export async function runAgent(
 
   const stagehandPage = stagehandSession?.page ?? null;
 
+  // Auto-accept native browser dialogs (alert, confirm, prompt, beforeunload).
+  // Without this the agent hangs indefinitely waiting for a dialog it cannot see.
+  const onDialog = (dialog: import("playwright").Dialog) => {
+    logger.debug({ type: dialog.type(), message: dialog.message() }, "Auto-accepting native dialog");
+    dialog.accept().catch(() => {});
+  };
+  page.on("dialog", onDialog);
+
   try {
     const authOutcome = await handleAuth(page, auth, context, baseUrl, handleLLMCall);
     if (authOutcome.ok) {
@@ -2062,5 +2070,7 @@ export async function runAgent(
 
   } catch (err) {
     return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: String(err) };
+  } finally {
+    page.off("dialog", onDialog);
   }
 }

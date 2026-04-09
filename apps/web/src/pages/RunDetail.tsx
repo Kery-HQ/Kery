@@ -799,14 +799,6 @@ function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
 // Overview tab
 // ============================================================
 
-function sortPlanItemsForChecklist(items: AgentPlanItem[]): AgentPlanItem[] {
-  const cur = items.filter((i) => i.status === "current");
-  const pend = items.filter((i) => i.status === "pending");
-  const fail = items.filter((i) => i.status === "failed");
-  const done = items.filter((i) => i.status === "done");
-  return [...cur, ...pend, ...fail, ...done];
-}
-
 function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boolean }) {
   const isDone = item.status === "done";
   const isCurrent = item.status === "current";
@@ -994,8 +986,6 @@ function OverviewTab({
     [activityFeed],
   );
 
-  const sortedPlan = React.useMemo(() => sortPlanItemsForChecklist(agentPlan), [agentPlan]);
-
   const planProgress = React.useMemo(() => {
     const n = agentPlan.length;
     if (n === 0) return null;
@@ -1131,7 +1121,7 @@ function OverviewTab({
                       <p className="text-[11px] tabular-nums text-muted-foreground">
                         <span className="text-foreground/80">{planProgress.done}</span>
                         <span className="text-muted-foreground/50"> / {planProgress.n}</span>
-                        {run.status === "running" && sortedPlan.some((i) => i.status === "current") && (
+                        {run.status === "running" && agentPlan.some((i) => i.status === "current") && (
                           <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-primary/80">
                             live
                           </span>
@@ -1159,7 +1149,7 @@ function OverviewTab({
                 )}
               </div>
               <div className="min-h-0 flex-1 basis-0 min-h-[88px] max-h-[min(38vh,300px)] overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
-                {sortedPlan.length === 0 ? (
+                {agentPlan.length === 0 ? (
                   <div className="flex animate-fade-in flex-col items-center justify-center gap-2.5 py-7 text-center">
                     <div className="rounded-full bg-muted/35 p-3 ring-1 ring-border/30">
                       <Path className="h-6 w-6 text-muted-foreground/35" weight="duotone" />
@@ -1170,11 +1160,11 @@ function OverviewTab({
                   </div>
                 ) : (
                   <ol className="m-0 list-none p-0">
-                    {sortedPlan.map((item, idx) => (
+                    {agentPlan.map((item, idx) => (
                       <PlanChecklistRow
                         key={`${idx}-${item.text.slice(0, 96)}`}
                         item={item}
-                        isLast={idx === sortedPlan.length - 1}
+                        isLast={idx === agentPlan.length - 1}
                       />
                     ))}
                   </ol>
