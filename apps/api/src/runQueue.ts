@@ -3,12 +3,13 @@ import * as os from "os";
 import * as path from "path";
 import type { StorageAdapter } from "@kery/engine";
 import {
-  runOrchestratedJob, enrichBugsForRun, generateRegressionPlan,
+  runOrchestratedJob, enrichBugsForRun, generateScriptWithLLM,
   createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
   isStopRequested,
 } from "@kery/engine";
 import type { Redis } from "ioredis";
 import { clearRunStopRequest, startRunStopPoller } from "./runStopRedis.js";
+import { createRunLiveBridge, deleteLiveRunState } from "./liveRunBridge.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
@@ -65,6 +66,12 @@ export function createRunWorker(
     async (job: Job<RunJobData>) => {
       const data = job.data;
       const emitter = createEmitter(data.runId);
+      const live = createRunLiveBridge({
+        redis,
+        runId: data.runId,
+        screenshotsDir: SCREENSHOTS_DIR,
+        emitter,
+      });
       await clearRunStopRequest(redis, data.runId).catch(() => {});
       const stopPoller = startRunStopPoller(redis, data.runId);
 
@@ -82,12 +89,12 @@ export function createRunWorker(
           maxSteps: data.maxSteps,
           recordVideo: data.recordVideo,
           videosDir: VIDEOS_DIR,
-          onStep: (step: any) => emitter.emit("step", step),
+          onStep: (step: any) => void live.forwardStep(step),
           onAgentPlan: (items: Array<{ text: string; status: "pending" | "done" | "current" | "failed" }>) =>
-            emitter.emit("plan", { items, at: Date.now() }),
-          onActivity: (activity: { kind: "observe"; text: string; at: number }) => emitter.emit("activity", activity),
-          onScreenshot: (buf: Buffer) => emitter.emit("screenshot", buf.toString("base64")),  // SSE gets marked screenshot
-          onLLMCall: (call: any) => emitter.emit("llm_call", call),
+            void live.forwardAgentPlan(items),
+          onActivity: (activity: { kind: "observe"; text: string; at: number }) => void live.forwardActivity(activity),
+          onScreenshot: (buf: Buffer) => void live.forwardScreenshot(buf),
+          onLLMCall: (call: any) => void live.forwardLlmCall(call),
           shouldStop: () => stopPoller.shouldStop() || isStopRequested(data.runId),
         };
         const result = await runOrchestratedJob(storage, runJob);
@@ -96,19 +103,39 @@ export function createRunWorker(
         await materializeRunScreenshotFiles(data.runId, result.llmCalls, result.bugsFound);
         const enrichedBugs = enrichBugsForRun(data.runId, completedAt, data.triggerRef, result.bugsFound);
 
-        const costUsd = Array.isArray(result.llmCalls)
-          ? result.llmCalls.reduce(
-            (s: number, c: { costUsd?: number }) => s + (typeof c?.costUsd === "number" ? c.costUsd : 0),
-            0,
-          )
-          : 0;
+        // Generate regression scripts before the transaction so their LLM calls
+        // can be appended to llm_calls_json and persisted in the same write.
+        const scriptLLMCalls: any[] = [];
+        const onScriptLLMCall = (call: any) => {
+          scriptLLMCalls.push(call);
+          void live.forwardLlmCall(call);
+        };
+
+        let destRegPlan: any[] | null = null;
+        if (data.destinationId && result.status === "passed" && result.stepsDetail?.length > 0) {
+          const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
+          if (plan.length > 0) destRegPlan = plan;
+        }
+
+        let testRegPlan: any[] | null = null;
+        if (data.testId && result.status === "passed" && result.stepsDetail?.length > 0) {
+          const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
+          if (plan.length > 0) testRegPlan = plan;
+        }
+
+        const allLLMCalls = [...result.llmCalls, ...scriptLLMCalls].map((c, i) => ({ ...c, seq: i + 1 }));
+
+        const costUsd = allLLMCalls.reduce(
+          (s: number, c: { costUsd?: number }) => s + (typeof c?.costUsd === "number" ? c.costUsd : 0),
+          0,
+        );
 
         // Wrap all post-run DB writes in a transaction for atomicity
         await storage.withTransaction(async (tx) => {
           await tx.updateTestRun(data.runId, {
             status: result.status, summary: null,
             steps_json: result.stepsDetail, bugs_json: enrichedBugs,
-            llm_calls_json: result.llmCalls, completed_at: completedAt,
+            llm_calls_json: allLLMCalls, completed_at: completedAt,
             video_url: result.videoUrl || null,
             cost_usd: costUsd,
           });
@@ -127,23 +154,17 @@ export function createRunWorker(
             }
             await tx.updateDestinationHealth(data.destinationId, healthData);
 
-            if (result.status === "passed" && result.stepsDetail?.length > 0) {
-              const regPlan = generateRegressionPlan(result.stepsDetail);
-              if (regPlan.length > 0) {
-                await tx.updateRegressionPlan("app_tree_destinations", data.destinationId, {
-                  regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
-                });
-              }
+            if (destRegPlan) {
+              await tx.updateRegressionPlan("app_tree_destinations", data.destinationId, {
+                regression_plan: destRegPlan, plan_status: "ready", plan_success_count: 1,
+              });
             }
           }
 
-          if (data.testId && result.status === "passed" && result.stepsDetail?.length > 0) {
-            const regPlan = generateRegressionPlan(result.stepsDetail);
-            if (regPlan.length > 0) {
-              await tx.updateSavedTest(data.testId, {
-                regression_plan: regPlan, plan_status: "ready", plan_success_count: 1,
-              });
-            }
+          if (data.testId && testRegPlan) {
+            await tx.updateSavedTest(data.testId, {
+              regression_plan: testRegPlan, plan_status: "ready", plan_success_count: 1,
+            });
           }
         });
 
@@ -159,6 +180,7 @@ export function createRunWorker(
       } finally {
         stopPoller.dispose();
         await clearRunStopRequest(redis, data.runId).catch(() => {});
+        await deleteLiveRunState(redis, data.runId, SCREENSHOTS_DIR);
         destroyEmitter(data.runId);
       }
     },

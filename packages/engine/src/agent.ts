@@ -99,7 +99,9 @@ export type LLMAgentType =
   | "crawl_link_filter"
   | "crawl_route_filter"
   | "crawl_suggested_flows"
-  | "memory_curator";
+  | "memory_curator"
+  | "script_generator"
+  | "regression_heal";
 
 /** Serializable multimodal message for run-detail UI (no raw base64 — images are parallel `imageBase64s` / `imagePaths`). */
 export type LLMStoredContentPart =

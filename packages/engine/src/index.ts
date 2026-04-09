@@ -66,6 +66,10 @@ export type { TrackedStep, MicroGoal } from "./planTracker.js";
 export { evaluateCondition, generateRegressionPlan, executeRegressionPlan, updatePlanConfidence } from "./regressionEngine.js";
 export type { CompletionCondition, RegressionStep, RegressionResult } from "./regressionEngine.js";
 
+// ─── Script Generator ────────────────────────────────────────────────────────
+export { generateScriptWithLLM } from "./scriptGenerator.js";
+export type { GenerateScriptResult } from "./scriptGenerator.js";
+
 // ─── Flow & visual review (post-run) ───────────────────────────────────────
 export { runHolisticFlowReview } from "./holisticReviewAgent.js";
 export type { HolisticReviewInput } from "./holisticReviewAgent.js";
@@ -85,6 +89,16 @@ export type { BugRegion } from "./bugScreenshotMarkup.js";
 
 // ─── Run Events ──────────────────────────────────────────────────────────────
 export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested } from "./runEvents.js";
+
+// ─── Live run snapshot (Redis + Run Detail hydrate) ───────────────────────────
+export {
+  LIVE_PREVIEW_FILENAME,
+  liveRunRedisKey,
+  emptyLiveRunSnapshot,
+  applyLiveRunEvent,
+  parseLiveRunSnapshot,
+} from "./liveRunSnapshot.js";
+export type { LiveRunSnapshot, LiveActivityEntry, LiveRunReduceEvent } from "./liveRunSnapshot.js";
 
 // ─── Crawler ─────────────────────────────────────────────────────────────────
 export { runCrawl, executeCrawlRun, generateIntentForNode } from "./crawlerWorker.js";

@@ -54,6 +54,8 @@ import {
   ArrowSquareOut,
   Calendar,
   ComputerTower,
+  Lightning,
+  Scroll,
 } from "@phosphor-icons/react";
 
 // --- Types ---
@@ -106,7 +108,11 @@ type LLMAgentType =
   | "filmstrip"
   | "crawl_link_filter"
   | "crawl_route_filter"
-  | "crawl_suggested_flows";
+  | "crawl_suggested_flows"
+  | "memory_curator"
+  | "script_generator"
+  | "stagehand"
+  | "regression_heal";
 
 type LLMStoredContentPart =
   | { type: "text"; text: string }
@@ -167,9 +173,41 @@ type Run = {
   memory_loaded?: MemoryEntryBrief[];
   bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "filmstrip" })[];
   llm_calls_json?: LLMCallRecord[];
+  /** Present while `status === "running"` when Redis live snapshot exists (see `@kery/engine` `LiveRunSnapshot`). */
+  live_snapshot?: {
+    agentPlan: { items: AgentPlanItem[]; at: number } | null;
+    activity: ActivityEntry[];
+    livePreview: { filename: string; updatedAt: number } | null;
+    observability?: Record<string, unknown>;
+  };
 };
 
 type Tab = "overview" | "issues" | "llm" | "memory";
+
+/** Derive overview tab state from `GET /api/runs/:id` (includes merged Redis live data while running). */
+function liveUiFromRun(run: Run): {
+  steps: RunStep[];
+  llmCalls: LLMCallRecord[];
+  agentPlan: AgentPlanItem[];
+  activityFeed: ActivityEntry[];
+  livePreviewDisk: { filename: string; updatedAt: number } | null;
+} {
+  const steps = (run.steps_json ?? []) as RunStep[];
+  const llmCalls = (run.llm_calls_json ?? []) as LLMCallRecord[];
+  const ls = run.live_snapshot;
+  let activityFeed: ActivityEntry[];
+  if (ls?.activity != null && ls.activity.length > 0) {
+    activityFeed = ls.activity as ActivityEntry[];
+  } else {
+    activityFeed = steps.map((step) => ({ type: "step" as const, step, at: step.at ?? Date.now() }));
+  }
+  const agentPlan = ls?.agentPlan?.items ?? [];
+  const livePreviewDisk =
+    run.status === "running" && ls?.livePreview?.filename
+      ? ls.livePreview
+      : null;
+  return { steps, llmCalls, agentPlan, activityFeed, livePreviewDisk };
+}
 
 // --- Helpers ---
 
@@ -433,18 +471,23 @@ function badgeVariantForStatus(status: string): "success" | "destructive" | "war
 type LlmAgentDisplay = { label: string; color: string; Icon: React.ComponentType<{ className?: string }> };
 
 const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
-  navigator: { label: "Navigator", color: "text-emerald-400", Icon: Compass },
-  review:    { label: "Review",    color: "text-violet-400",  Icon: Eye },
-  holistic:  { label: "Flow review", color: "text-violet-300", Icon: GitBranch },
-  summary:   { label: "Summary",   color: "text-sky-400",     Icon: FileText },
-  filmstrip: { label: "Filmstrip", color: "text-fuchsia-400", Icon: Stack },
-  crawl_link_filter:       { label: "Crawl links", color: "text-teal-400",    Icon: Funnel },
-  crawl_route_filter:    { label: "Crawl routes", color: "text-teal-300",   Icon: Funnel },
-  crawl_suggested_flows: { label: "Crawl flows", color: "text-amber-400",   Icon: FlowArrow },
+  navigator:       { label: "Navigator",      color: "text-emerald-400", Icon: Compass },
+  review:          { label: "Review",         color: "text-violet-400",  Icon: Eye },
+  holistic:        { label: "Flow review",    color: "text-violet-300",  Icon: GitBranch },
+  summary:         { label: "Summary",        color: "text-sky-400",     Icon: FileText },
+  filmstrip:       { label: "Filmstrip",      color: "text-fuchsia-400", Icon: Stack },
+  crawl_link_filter:     { label: "Crawl links",   color: "text-teal-400",    Icon: Funnel },
+  crawl_route_filter:    { label: "Crawl routes",  color: "text-teal-300",    Icon: Funnel },
+  crawl_suggested_flows: { label: "Crawl flows",   color: "text-amber-400",   Icon: FlowArrow },
+  memory_curator:   { label: "Memory",       color: "text-orange-400", Icon: Brain },
+  script_generator: { label: "Script gen",   color: "text-cyan-400",   Icon: Scroll },
+  stagehand:        { label: "Stagehand",    color: "text-yellow-400", Icon: Lightning },
+  regression_heal:  { label: "Heal",         color: "text-rose-400",   Icon: Lightning },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
   "navigator", "holistic", "filmstrip", "summary",
+  "regression_heal", "memory_curator", "script_generator", "stagehand",
   "crawl_link_filter", "crawl_route_filter", "crawl_suggested_flows",
 ];
 
@@ -475,6 +518,10 @@ export const RunDetail: React.FC = () => {
   >([]);
   const [loading, setLoading] = React.useState(true);
   const [liveScreenshot, setLiveScreenshot] = React.useState<string | null>(null);
+  const [livePreviewDisk, setLivePreviewDisk] = React.useState<{
+    filename: string;
+    updatedAt: number;
+  } | null>(null);
   const [agentPlan, setAgentPlan] = React.useState<AgentPlanItem[]>([]);
   const [activityFeed, setActivityFeed] = React.useState<ActivityEntry[]>([]);
   const [tab, setTab] = React.useState<Tab>("overview");
@@ -495,10 +542,12 @@ export const RunDetail: React.FC = () => {
         if (res.run) {
           initialRun = res.run;
           setRun(res.run);
-          setSteps(res.run.steps_json ?? []);
-          setLlmCalls(res.run.llm_calls_json ?? []);
-          setAgentPlan([]);
-          setActivityFeed((res.run.steps_json ?? []).map((step: RunStep) => ({ type: "step" as const, step, at: step.at ?? Date.now() })));
+          const ui = liveUiFromRun(res.run);
+          setSteps(ui.steps);
+          setLlmCalls(ui.llmCalls);
+          setAgentPlan(ui.agentPlan);
+          setActivityFeed(ui.activityFeed);
+          setLivePreviewDisk(ui.livePreviewDisk);
           if (res.run.status !== "running") {
             fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
           }
@@ -534,9 +583,14 @@ export const RunDetail: React.FC = () => {
           }
           if (msg.type === "done") {
             setRun(msg.run);
-            setSteps(msg.run?.steps_json ?? []);
-            setLlmCalls(msg.run?.llm_calls_json ?? []);
-            setActivityFeed((msg.run?.steps_json ?? []).map((step: RunStep) => ({ type: "step" as const, step, at: step.at ?? Date.now() })));
+            const ui = msg.run ? liveUiFromRun(msg.run) : null;
+            if (ui) {
+              setSteps(ui.steps);
+              setLlmCalls(ui.llmCalls);
+              setAgentPlan(ui.agentPlan);
+              setActivityFeed(ui.activityFeed);
+            }
+            setLivePreviewDisk(null);
             setLiveScreenshot(null);
             if (msg.run?.id) fetchRunBugs(msg.run.id).then((r: any) => setRunBugs(r.bugs ?? []));
             es?.close();
@@ -551,9 +605,12 @@ export const RunDetail: React.FC = () => {
           const res = await fetchRun(runId!);
           if (res.run) {
             setRun(res.run);
-            setSteps(res.run.steps_json ?? []);
-            setLlmCalls(res.run.llm_calls_json ?? []);
-            setActivityFeed((res.run.steps_json ?? []).map((step: RunStep) => ({ type: "step" as const, step, at: step.at ?? Date.now() })));
+            const ui = liveUiFromRun(res.run);
+            setSteps(ui.steps);
+            setLlmCalls(ui.llmCalls);
+            setAgentPlan(ui.agentPlan);
+            setActivityFeed(ui.activityFeed);
+            setLivePreviewDisk(ui.livePreviewDisk);
             if (res.run.status !== "running") {
               fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
               if (pollInterval) {
@@ -573,6 +630,14 @@ export const RunDetail: React.FC = () => {
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [runId]);
+
+  // Must be declared before any early returns so hook call order is stable
+  const livePreviewDiskUrl = React.useMemo(() => {
+    if (!run || run.status !== "running" || !livePreviewDisk) return null;
+    const base = runScreenshotFileUrl(run.id, livePreviewDisk.filename);
+    if (!base) return null;
+    return `${base}?t=${livePreviewDisk.updatedAt}`;
+  }, [run?.status, run?.id, livePreviewDisk]);
 
   // --- Loading skeleton ---
 
@@ -704,6 +769,7 @@ export const RunDetail: React.FC = () => {
               steps={steps}
               bugsFound={bugsFound}
               liveScreenshot={liveScreenshot}
+              livePreviewDiskUrl={livePreviewDiskUrl}
               totalCost={totalCost}
               agentPlan={agentPlan}
               activityFeed={activityFeed}
@@ -768,7 +834,7 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
 }
 
 function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
-  const agents = ["navigator", "holistic", "filmstrip", "summary"] as const;
+  const agents = ["navigator", "holistic", "filmstrip", "summary", "regression_heal", "memory_curator", "script_generator", "stagehand"] as const;
   const rows = agents
     .map((a) => ({
       agent: a,
@@ -784,7 +850,7 @@ function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {rows.map((r) => (
             <div key={r.agent} className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{r.agent}</p>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{llmAgentDisplay(r.agent).label}</p>
               <p className="text-[13px] font-mono text-foreground">{formatCost(r.cost)}</p>
               <p className="text-[10px] text-muted-foreground/70">{r.calls} call{r.calls !== 1 ? "s" : ""}</p>
             </div>
@@ -859,6 +925,7 @@ const RUN_PREVIEW_WALLPAPER = "/wallpaper/run_details_wallpaper.png";
 function BrowserPreviewStage({
   badge,
   children,
+  tabLabel,
   empty,
   wallpaperTreatment,
   framed,
@@ -867,6 +934,7 @@ function BrowserPreviewStage({
 }: {
   badge: React.ReactNode;
   children: React.ReactNode;
+  tabLabel: string;
   empty?: boolean;
   wallpaperTreatment: "crisp" | "blurred";
   framed: boolean;
@@ -923,6 +991,9 @@ function BrowserPreviewStage({
               onLiveFrameOpenAnimEnd?.();
             }}
           >
+            <div className="run-preview-browser-tab-wrap" aria-hidden>
+              <div className="run-preview-browser-tab">{tabLabel}</div>
+            </div>
             <div className="run-preview-liquid-inner flex max-h-full min-h-0 w-full flex-1 flex-col">
               <div
                 className={cn(
@@ -965,12 +1036,14 @@ function BrowserPreviewStage({
 }
 
 function OverviewTab({
-  run, steps, bugsFound, liveScreenshot, totalCost, agentPlan, activityFeed,
+  run, steps, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed,
 }: {
   run: Run;
   steps: RunStep[];
   bugsFound: RunStep[];
   liveScreenshot: string | null;
+  /** Throttled on-disk live frame from Redis rehydrate (`/api/bugs/:runId/live-preview.jpg?t=…`). */
+  livePreviewDiskUrl: string | null;
   totalCost: number;
   agentPlan: AgentPlanItem[];
   activityFeed: ActivityEntry[];
@@ -1008,22 +1081,34 @@ function OverviewTab({
   }, [steps, run.id]);
 
   const showLive = run.status === "running" && !!liveScreenshot;
-  const isRunStarting = run.status === "running" && !liveScreenshot;
-  const showRecording = !showLive && !!run.video_url;
-  const previewEmpty = !isRunStarting && !showLive && !showRecording && !snapshotSrc;
+  const showLiveDisk = run.status === "running" && !liveScreenshot && !!livePreviewDiskUrl;
+  const isRunStarting = run.status === "running" && !liveScreenshot && !showLiveDisk;
+  const showRecording = !showLive && !showLiveDisk && !!run.video_url;
+  const previewEmpty = !isRunStarting && !showLive && !showLiveDisk && !showRecording && !snapshotSrc;
+  const previewTabLabel = React.useMemo(() => {
+    const src = (run.source_label ?? "").trim();
+    if (src) return src;
+    const latestUrl = [...steps].reverse().find((s) => !!s.url)?.url;
+    if (!latestUrl) return "App";
+    try {
+      return new URL(latestUrl).hostname.replace(/^www\./, "") || "App";
+    } catch {
+      return latestUrl;
+    }
+  }, [run.source_label, steps]);
 
   const [liveFrameOpenAnim, setLiveFrameOpenAnim] = React.useState(false);
   const seenLivePreviewRef = React.useRef(false);
   React.useLayoutEffect(() => {
-    if (showLive && !seenLivePreviewRef.current) {
+    if ((showLive || showLiveDisk) && !seenLivePreviewRef.current) {
       seenLivePreviewRef.current = true;
       setLiveFrameOpenAnim(true);
     }
-    if (!showLive) {
+    if (!showLive && !showLiveDisk) {
       seenLivePreviewRef.current = false;
       setLiveFrameOpenAnim(false);
     }
-  }, [showLive]);
+  }, [showLive, showLiveDisk]);
 
   React.useEffect(() => {
     if (!liveFrameOpenAnim) return;
@@ -1037,6 +1122,7 @@ function OverviewTab({
         <Card className="flex h-full min-h-[min(13rem,38svh)] flex-col overflow-hidden sm:min-h-[min(15rem,36svh)] xl:col-span-3 xl:min-h-0">
           <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-0">
             <BrowserPreviewStage
+              tabLabel={previewTabLabel}
               empty={previewEmpty}
               wallpaperTreatment={isRunStarting ? "crisp" : "blurred"}
               framed={!isRunStarting}
@@ -1046,11 +1132,17 @@ function OverviewTab({
                 <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/80 bg-card/95 px-2 py-1.5 backdrop-blur-md sm:gap-2 sm:px-2.5 sm:py-2">
                   <Badge
                     variant={
-                      isRunStarting || showLive ? "running" : showRecording ? "secondary" : "neutral"
+                      isRunStarting || showLive || showLiveDisk ? "running" : showRecording ? "secondary" : "neutral"
                     }
                     className="text-[10px] uppercase tracking-wider"
                   >
-                    {isRunStarting ? "starting" : showLive ? "live" : showRecording ? "recording" : "snapshot"}
+                    {isRunStarting
+                      ? "starting"
+                      : showLive || showLiveDisk
+                        ? "live"
+                        : showRecording
+                          ? "recording"
+                          : "snapshot"}
                   </Badge>
                   <span
                     className="hidden h-4 w-px shrink-0 bg-border/70 sm:block"
@@ -1072,6 +1164,12 @@ function OverviewTab({
               ) : showLive ? (
                 <img
                   src={`data:image/jpeg;base64,${liveScreenshot}`}
+                  alt="Live browser"
+                  className="h-full w-full min-h-0 flex-1 object-contain"
+                />
+              ) : showLiveDisk ? (
+                <img
+                  src={livePreviewDiskUrl!}
                   alt="Live browser"
                   className="h-full w-full min-h-0 flex-1 object-contain"
                 />

@@ -7,10 +7,11 @@ import type { Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import type { StorageAdapter } from "@kery/engine";
 import {
-  getEmitter, requestStop, logger,
+  getEmitter, requestStop, logger, LIVE_PREVIEW_FILENAME,
 } from "@kery/engine";
 import type { RunJobData } from "../runQueue.js";
 import { markRunStopRequested } from "../runStopRedis.js";
+import { mergeDbRunWithLiveSnapshot, readLiveRunSnapshotFromRedis } from "../liveRunBridge.js";
 import { RunIdParams, RunFilenameParams } from "./params.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
@@ -189,8 +190,14 @@ export function registerRunRoutes(
   // Get single run
   app.get("/api/runs/:runId", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
-    const run = await storage.getTestRun(runId);
+    let run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
+    if (run.status === "running") {
+      const live = await readLiveRunSnapshotFromRedis(redis, runId);
+      if (live) {
+        run = mergeDbRunWithLiveSnapshot(run as Record<string, unknown>, live) as typeof run;
+      }
+    }
     reply.send({ run });
   });
 
@@ -299,9 +306,13 @@ export function registerRunRoutes(
     }
     try {
       const buf = await fs.promises.readFile(filePath);
+      const cacheControl =
+        safe === LIVE_PREVIEW_FILENAME
+          ? "private, no-store, max-age=0"
+          : "public, max-age=31536000, immutable";
       return reply
         .header("Content-Type", "image/jpeg")
-        .header("Cache-Control", "public, max-age=31536000, immutable")
+        .header("Cache-Control", cacheControl)
         .send(buf);
     } catch (err) {
       logger.warn({ err: String(err), filePath }, "Bug screenshot read failed");
