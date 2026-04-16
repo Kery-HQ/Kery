@@ -6,7 +6,6 @@ import {
   MagnifyingGlass,
   Play,
   Trash,
-  ClockCounterClockwise,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,8 +23,6 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { relativeTime, formatCrawlLlmCostLine, duration } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
@@ -35,17 +32,11 @@ import {
   triggerScan,
   fetchScanStatus,
   fetchCrawlRuns,
-  fetchCrawlRun,
   togglePage,
   runDestination,
   deletePage,
 } from "@/projectApi";
-import {
-  CrawlAnalysisPanel,
-  type CrawlLlmCallRecord,
-  type CrawlMetadataJson,
-} from "@/components/crawl-analysis-panel";
-import { CrawlRunStatusPanel } from "@/components/crawl-run-status-panel";
+import { ScanBanner, type ScanBannerRun } from "@/components/scan-banner";
 
 type Page = {
   id: string;
@@ -71,13 +62,12 @@ type CrawlRunRow = {
   started_at: string;
   completed_at: string | null;
   pages_visited: number | null;
-  nodes_found?: number | null;
   cost_usd: number | null;
   llm_cost_breakdown_json: { linkFilterUsd?: number; suggestedFlowsUsd?: number } | null;
-  crawl_metadata_json?: CrawlLiveMeta | null;
+  crawl_metadata_json?: LastScanMeta | null;
 };
 
-type CrawlLiveMeta = {
+type LastScanMeta = {
   phase?: string;
   durationMs?: number;
   baseUrl?: string;
@@ -87,9 +77,10 @@ type CrawlLiveMeta = {
     currentUrl: string | null;
     currentRoute: string | null;
   };
-  stats?: { pagesVisited?: number; nodesFound?: number; llmCallCount?: number };
+  stats?: { pagesVisited?: number; nodesFound?: number; llmCallCount?: number; suggestedFlowsCount?: number };
   inProgress?: boolean;
   error?: string;
+  startedAt?: string;
   finishedAt?: string;
   diagnostics?: {
     bfsPagesDiscovered: number;
@@ -115,6 +106,33 @@ const HEALTH_LABEL: Record<string, string> = {
 /** After this, the scan button stays clickable and sends `force` to abort a stuck server-side `running` row. */
 const SCAN_FORCE_REPLACE_AFTER_MS = 2 * 60 * 1000;
 
+function formatScanLogLine(meta: LastScanMeta): string {
+  const parts: string[] = [];
+  if (meta.startedAt) parts.push(`started: ${new Date(meta.startedAt).toLocaleString()}`);
+  if (meta.finishedAt) parts.push(`finished: ${new Date(meta.finishedAt).toLocaleString()}`);
+  if (meta.durationMs != null) parts.push(`duration: ${Math.round(meta.durationMs / 1000)}s`);
+  if (meta.baseUrl) parts.push(`base_url: ${meta.baseUrl}`);
+  if (meta.stats) {
+    const s = meta.stats;
+    if (s.pagesVisited != null) parts.push(`pages_visited: ${s.pagesVisited}`);
+    if (s.nodesFound != null) parts.push(`nodes_found: ${s.nodesFound}`);
+    if (s.suggestedFlowsCount != null) parts.push(`suggested_flows: ${s.suggestedFlowsCount}`);
+    if (s.llmCallCount != null) parts.push(`llm_calls: ${s.llmCallCount}`);
+  }
+  if (meta.diagnostics) {
+    const d = meta.diagnostics;
+    parts.push(`bfs_pages_discovered: ${d.bfsPagesDiscovered}`);
+    parts.push(`after_shallow_cap: ${d.afterShallowTrim}`);
+    parts.push(`after_route_filter: ${d.afterRouteFilter}`);
+    if (d.hints.length > 0) parts.push(`hints:\n${d.hints.map(h => `  - ${h}`).join("\n")}`);
+  }
+  if (meta.limits && Object.keys(meta.limits).length > 0) {
+    parts.push(`limits: ${JSON.stringify(meta.limits)}`);
+  }
+  if (meta.error) parts.push(`error: ${meta.error}`);
+  return parts.join("\n");
+}
+
 export function Pages() {
   const navigate = useNavigate();
   const { currentProject } = useProject();
@@ -126,25 +144,16 @@ export function Pages() {
   const [crawlRuns, setCrawlRuns] = React.useState<CrawlRunRow[]>([]);
   const [environments, setEnvironments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  /** True while a crawl is running (including after refresh if latest run is still running). */
   const [scanActive, setScanActive] = React.useState(false);
-  /** Latest row from scan/status while polling; drives live progress UI. */
   const [liveScan, setLiveScan] = React.useState<LastScan | null>(null);
-  /** After POST /scan, ignore stale "completed" until this time (race with DB insert). */
   const scanExpectUntilRef = React.useRef<number | null>(null);
-  /** Client clock for "stuck" detection when `started_at` is missing (race before first poll). */
   const [scanSessionStartedAt, setScanSessionStartedAt] = React.useState<number | null>(null);
   const [scanUiTick, setScanUiTick] = React.useState(0);
   const [rateLimited, setRateLimited] = React.useState(false);
   const [filter, setFilter] = React.useState("");
   const [healthFilter, setHealthFilter] = React.useState<HealthFilter>("all");
-  const [scanHistoryOpen, setScanHistoryOpen] = React.useState(false);
-  const [crawlDetailId, setCrawlDetailId] = React.useState<string | null>(null);
-  const [crawlDetail, setCrawlDetail] = React.useState<{
-    llm_calls_json?: CrawlLlmCallRecord[] | null;
-    crawl_metadata_json?: CrawlMetadataJson | null;
-  } | null>(null);
-  const [crawlDetailLoading, setCrawlDetailLoading] = React.useState(false);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [scanLogOpen, setScanLogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<Page | null>(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
   const [runBusyId, setRunBusyId] = React.useState<string | null>(null);
@@ -152,27 +161,6 @@ export function Pages() {
 
   const defaultEnv = environments.find((e: { is_default?: boolean }) => e.is_default) || environments[0];
   const defaultEnvId: string | null = defaultEnv?.id ?? null;
-
-  const closeCrawlDetail = React.useCallback(() => {
-    setCrawlDetailId(null);
-    setCrawlDetail(null);
-  }, []);
-
-  const openCrawlDetail = React.useCallback(async (runId: string) => {
-    if (!pid) return;
-    setCrawlDetailId(runId);
-    setCrawlDetailLoading(true);
-    setCrawlDetail(null);
-    try {
-      const res = (await fetchCrawlRun(pid, runId)) as {
-        run?: { llm_calls_json?: CrawlLlmCallRecord[] | null; crawl_metadata_json?: CrawlMetadataJson | null };
-      };
-      setCrawlDetail(res.run ?? null);
-    } catch {
-      setCrawlDetail(null);
-    }
-    setCrawlDetailLoading(false);
-  }, [pid]);
 
   const loadData = React.useCallback(async () => {
     if (!pid) return;
@@ -205,7 +193,7 @@ export function Pages() {
     return () => window.clearInterval(iv);
   }, [scanActive]);
 
-  // Refresh-safe: if user reloads while a crawl is running, resume polling.
+  // Resume polling if page reloads during an active crawl.
   React.useEffect(() => {
     if (!pid) return;
     let cancelled = false;
@@ -221,7 +209,7 @@ export function Pages() {
     return () => { cancelled = true; };
   }, [pid]);
 
-  // Poll while a scan is active; stop when latest run is no longer running.
+  // Poll while scan is active; stop when no longer running.
   React.useEffect(() => {
     if (!pid || !scanActive) return;
     let cancelled = false;
@@ -237,13 +225,12 @@ export function Pages() {
         return;
       }
 
-      if (expectUntil != null && Date.now() < expectUntil) {
-        return;
-      }
+      if (expectUntil != null && Date.now() < expectUntil) return;
 
       scanExpectUntilRef.current = null;
       setScanActive(false);
       setLiveScan(null);
+      setScanLogOpen(true);
       loadData();
     };
     const iv = setInterval(poll, 2000);
@@ -335,6 +322,7 @@ export function Pages() {
   async function handleScan(force = false) {
     if (!pid) return;
     setRateLimited(false);
+    setScanLogOpen(false);
     try {
       const useForce = force || (scanActive && canForceReplaceScan);
       const res = (await triggerScan(pid, useForce)) as { _status?: number };
@@ -353,7 +341,17 @@ export function Pages() {
     }
   }
 
-  const lastScanLlm = lastScan ? formatCrawlLlmCostLine(lastScan) : null;
+  // The banner run — use live data while scanning, otherwise last scan for summary.
+  const bannerRun: ScanBannerRun | null = scanActive
+    ? (liveScan ?? {
+        status: "running",
+        started_at: scanSessionStartedAt
+          ? new Date(scanSessionStartedAt).toISOString()
+          : new Date().toISOString(),
+      })
+    : lastScan;
+
+  const recentRuns = crawlRuns.slice(0, 5);
 
   if (!pid) {
     return (
@@ -371,102 +369,11 @@ export function Pages() {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader icon={<Stack className="h-4 w-4" />} title="Pages">
-        {lastScan?.completed_at && (
+        {lastScan?.completed_at && !scanActive && (
           <span className="text-[11px] text-muted-foreground/50">
             Scanned {relativeTime(lastScan.completed_at)}
-            {lastScanLlm && (
-              <> &middot; <span className="font-mono">{lastScanLlm}</span> LLM</>
-            )}
           </span>
         )}
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setScanHistoryOpen(true)}
-          aria-label="Scan history"
-          className="gap-1.5"
-        >
-          <ClockCounterClockwise className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Scan history</span>
-        </Button>
-        <Sheet
-          open={scanHistoryOpen}
-          onOpenChange={o => {
-            setScanHistoryOpen(o);
-            if (!o) closeCrawlDetail();
-          }}
-        >
-          <SheetContent className="flex flex-col p-0 gap-0 w-full sm:max-w-lg">
-            <SheetHeader className="px-4 py-3 border-b border-border shrink-0 text-left">
-              <SheetTitle>{crawlDetailId ? "Crawl analysis" : "Scan history"}</SheetTitle>
-              <SheetDescription className={crawlDetailId ? "sr-only" : undefined}>
-                {crawlDetailId ? "LLM calls and crawl metadata" : "Past crawl runs. Open a row for full LLM payloads and metadata."}
-              </SheetDescription>
-            </SheetHeader>
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-4 pb-4 pt-2">
-              {crawlDetailId ? (
-                crawlDetailLoading ? (
-                  <div className="space-y-2 py-2">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-32 w-full" />
-                    <Skeleton className="h-24 w-full" />
-                  </div>
-                ) : (
-                  <CrawlAnalysisPanel
-                    metadata={crawlDetail?.crawl_metadata_json}
-                    llmCalls={crawlDetail?.llm_calls_json}
-                    onBack={closeCrawlDetail}
-                  />
-                )
-              ) : loading ? (
-                <p className="text-[12px] text-muted-foreground py-4">Loading…</p>
-              ) : crawlRuns.length === 0 ? (
-                <p className="text-[12px] text-muted-foreground py-4">No scans yet. Run a scan to see history here.</p>
-              ) : (
-                <div className="flex-1 min-h-0 overflow-y-auto -mx-1">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>When</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Pages</TableHead>
-                        <TableHead className="text-right">LLM cost</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {crawlRuns.map(run => {
-                        const llm = formatCrawlLlmCostLine(run);
-                        const when = run.completed_at || run.started_at;
-                        return (
-                          <TableRow
-                            key={run.id}
-                            className="cursor-pointer hover:bg-accent/50"
-                            onClick={() => openCrawlDetail(run.id)}
-                          >
-                            <TableCell className="font-mono text-[12px] text-muted-foreground">
-                              {relativeTime(when)}
-                              {run.completed_at && (
-                                <span className="text-muted-foreground/50"> · {duration(run.started_at, run.completed_at)}</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-[12px] capitalize">{run.status}</TableCell>
-                            <TableCell className="text-right font-mono text-[12px] tabular-nums">
-                              {run.pages_visited ?? "—"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-[12px] text-muted-foreground">
-                              {llm ?? "—"}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
         <Button
           size="sm"
           variant={pages.length === 0 ? "default" : "outline"}
@@ -487,41 +394,42 @@ export function Pages() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-6 py-5 w-full max-w-4xl mx-auto space-y-4 animate-fade-in">
 
-          {/* Scanning progress (persisted server-side; safe to refresh) */}
-          {scanActive && (
-            <div className="space-y-2">
-              <CrawlRunStatusPanel
-                variant="live"
-                run={
-                  liveScan ??
-                  ({
-                    status: "running",
-                    started_at: scanSessionStartedAt
-                      ? new Date(scanSessionStartedAt).toISOString()
-                      : new Date().toISOString(),
-                  } as LastScan)
-                }
-              />
-              {canForceReplaceScan && (
-                <p className="text-[11px] text-muted-foreground px-1">
-                  No progress? Use <span className="font-medium text-foreground">Replace stuck scan</span> in the
-                  header to abort this run and start a new one.
-                </p>
+          {/* Scan banner — live or last-run summary */}
+          {bannerRun && (
+            <ScanBanner run={bannerRun} live={scanActive} />
+          )}
+
+          {/* Replace stuck notice */}
+          {scanActive && canForceReplaceScan && (
+            <p className="text-[11px] text-muted-foreground px-1">
+              No progress? Use{" "}
+              <span className="font-medium text-foreground">Replace stuck scan</span> in the header
+              to abort this run and start a new one.
+            </p>
+          )}
+
+          {/* Scan log — collapsible, auto-opens after scan finishes */}
+          {!scanActive && lastScan?.crawl_metadata_json && (
+            <div className="rounded-lg border border-border/60 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setScanLogOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-accent/20 transition-colors"
+              >
+                <span className="text-[12px] font-medium text-foreground/80">Scan log</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {scanLogOpen ? "hide" : "show"}
+                </span>
+              </button>
+              {scanLogOpen && (
+                <pre className="px-4 pb-4 text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-words leading-relaxed border-t border-border/40 pt-3 bg-muted/10">
+                  {formatScanLogLine(lastScan.crawl_metadata_json)}
+                </pre>
               )}
             </div>
           )}
 
-          {/* Latest finished scan — full detail when outcome looks wrong */}
-          {!scanActive &&
-            lastScan &&
-            (lastScan.status === "failed" ||
-              lastScan.pages_visited === 0 ||
-              lastScan.crawl_metadata_json?.error ||
-              (lastScan.crawl_metadata_json?.diagnostics?.hints?.length ?? 0) > 0) && (
-              <CrawlRunStatusPanel variant="summary" run={lastScan} title="Latest scan (detail)" />
-            )}
-
-          {/* Rate limit */}
+          {/* Rate limit notice */}
           {rateLimited && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex items-center justify-between">
               <p className="text-[12px] text-muted-foreground">
@@ -530,6 +438,52 @@ export function Pages() {
               <Button size="sm" variant="outline" onClick={() => handleScan(true)} className="h-7 text-[11px]">
                 Scan anyway
               </Button>
+            </div>
+          )}
+
+          {/* Recent scans — compact inline list */}
+          {!scanActive && recentRuns.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(o => !o)}
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+              >
+                <span className={cn("transition-transform text-[9px]", historyOpen ? "rotate-90" : "")}>▶</span>
+                Recent scans ({recentRuns.length})
+              </button>
+              {historyOpen && (
+                <div className="mt-2 rounded-lg border border-border/60 divide-y divide-border/40 overflow-hidden">
+                  {recentRuns.map(run => {
+                    const llm = formatCrawlLlmCostLine(run);
+                    const when = run.completed_at || run.started_at;
+                    const dur = run.completed_at ? duration(run.started_at, run.completed_at) : null;
+                    return (
+                      <div
+                        key={run.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 text-[11px]"
+                      >
+                        <span className="text-muted-foreground/70 tabular-nums">{relativeTime(when)}</span>
+                        <span className={cn(
+                          "capitalize",
+                          run.status === "failed" ? "text-destructive/80" : "text-muted-foreground",
+                        )}>
+                          {run.status}
+                        </span>
+                        <span className="font-mono tabular-nums text-muted-foreground/70">
+                          {run.pages_visited ?? "—"} pages
+                        </span>
+                        {llm && (
+                          <span className="font-mono tabular-nums text-muted-foreground/70">{llm}</span>
+                        )}
+                        {dur && (
+                          <span className="font-mono tabular-nums text-muted-foreground/50">{dur}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -647,7 +601,7 @@ export function Pages() {
                 </div>
               </div>
 
-              {/* Flat page tile grid */}
+              {/* Page tile grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {filteredPages.map(page => (
                   <div
