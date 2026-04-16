@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/page-header";
@@ -342,6 +343,14 @@ function llmRoleLabel(role: string): string {
   if (r === "assistant") return "Assistant";
   if (r === "tool") return "Tool";
   return role;
+}
+
+function messageTextContent(content: string | LLMStoredContentPart[]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n\n");
 }
 
 function LLMRequestInspector({
@@ -1629,6 +1638,7 @@ function BugCard({
 
 function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCallRecord[]; totalCost: number }) {
   const [agentFilter, setAgentFilter] = React.useState<LLMAgentType | "all">("all");
+  const [selectedCall, setSelectedCall] = React.useState<LLMCallRecord | null>(null);
 
   const totalInput  = llmCalls.reduce((s, c) => s + c.inputTokens, 0);
   const totalOutput = llmCalls.reduce((s, c) => s + c.outputTokens, 0);
@@ -1639,6 +1649,15 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
   const filteredCalls = agentFilter === "all"
     ? llmCalls
     : llmCalls.filter((c) => (c.agent ?? "navigator") === agentFilter);
+  const selectedIndex = selectedCall
+    ? filteredCalls.findIndex((c) => c.seq === selectedCall.seq)
+    : -1;
+
+  React.useEffect(() => {
+    if (!selectedCall) return;
+    if (selectedIndex >= 0) return;
+    setSelectedCall(null);
+  }, [selectedCall, selectedIndex]);
 
   const agentCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: llmCalls.length };
@@ -1741,17 +1760,39 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
           {/* Call list */}
           <div className="space-y-1">
             {filteredCalls.map((call) => (
-              <LLMCallRow key={call.seq} call={call} runId={runId} />
+              <LLMCallRow
+                key={call.seq}
+                call={call}
+                onSelect={setSelectedCall}
+                isSelected={selectedCall?.seq === call.seq}
+              />
             ))}
           </div>
+          <LLMCallDetailSheet
+            runId={runId}
+            calls={filteredCalls}
+            selectedCall={selectedCall}
+            selectedIndex={selectedIndex}
+            onSelect={setSelectedCall}
+            onOpenChange={(open) => {
+              if (!open) setSelectedCall(null);
+            }}
+          />
         </>
       )}
     </div>
   );
 }
 
-function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
-  const [expanded, setExpanded] = React.useState(false);
+function LLMCallRow({
+  call,
+  onSelect,
+  isSelected,
+}: {
+  call: LLMCallRecord;
+  onSelect: (call: LLMCallRecord) => void;
+  isSelected: boolean;
+}) {
   const isScan = call.role === "dom-scan";
   const agent  = call.agent ?? "navigator";
   const agentInfo = llmAgentDisplay(agent);
@@ -1760,10 +1801,11 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
     <Card className={cn(
       "overflow-visible transition-colors",
       agent !== "navigator" && "border-l-2 border-l-border/60",
+      isSelected && "ring-1 ring-border",
     )}>
       <button
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => onSelect(call)}
       >
         {/* Seq */}
         <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums w-5 text-right flex-shrink-0">
@@ -1818,36 +1860,256 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
         </span>
 
         {/* Chevron */}
-        {expanded
-          ? <CaretDown className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
-          : <CaretRight className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
-        }
+        <CaretRight className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
       </button>
-
-      {expanded && (
-        <div className="px-4 pb-4 pt-3 border-t border-border/50 space-y-4 min-h-0">
-          {call.agent === "filmstrip" && <FilmstripSentToModel call={call} runId={runId} />}
-          <div className="space-y-2 min-h-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-              Request (full payload)
-            </p>
-            <LLMRequestInspector call={call} runId={runId} />
-          </div>
-          {call.response ? (
-            <div className="space-y-2 min-h-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                Response
-              </p>
-              <div className="h-[min(48vh,420px)] min-h-[10rem] overflow-y-auto overflow-x-auto overscroll-contain rounded-md border border-border bg-muted/20 [scrollbar-gutter:stable]">
-                <pre className="block w-full min-w-0 text-[11px] font-mono whitespace-pre-wrap break-words p-3 text-foreground/80 leading-relaxed">
-                  {call.response}
-                </pre>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
     </Card>
+  );
+}
+
+function LLMCallDetailSheet({
+  runId,
+  calls,
+  selectedCall,
+  selectedIndex,
+  onSelect,
+  onOpenChange,
+}: {
+  runId: string;
+  calls: LLMCallRecord[];
+  selectedCall: LLMCallRecord | null;
+  selectedIndex: number;
+  onSelect: (call: LLMCallRecord) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [wrapResponse, setWrapResponse] = React.useState(true);
+  const [activeTab, setActiveTab] = React.useState("messages");
+  const call = selectedCall;
+  const canPrev = selectedIndex > 0;
+  const canNext = selectedIndex >= 0 && selectedIndex < calls.length - 1;
+  const agentInfo = llmAgentDisplay(call?.agent ?? "navigator");
+  const imageCount = call
+    ? Math.max(call.imagePaths?.length ?? 0, call.imageBase64s?.length ?? 0, call.imagePath || call.imageBase64 ? 1 : 0)
+    : 0;
+
+  async function copyText(text: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // no-op for unsupported clipboard environments
+    }
+  }
+
+  return (
+    <Sheet open={!!call} onOpenChange={onOpenChange}>
+      <SheetContent className="flex flex-col p-0 gap-0 w-full sm:max-w-3xl">
+        {!call ? null : (
+          <>
+            <SheetHeader className="sticky top-0 z-10 border-b border-border bg-popover p-4 space-y-3">
+              <SheetTitle className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-mono text-muted-foreground">
+                    #{call.seq}  s{call.stepIndex}
+                  </p>
+                  <p className="text-[13px] font-medium text-foreground truncate">
+                    {agentInfo.label} · {call.model}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    disabled={!canPrev}
+                    onClick={() => canPrev && onSelect(calls[selectedIndex - 1])}
+                  >
+                    Prev
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    disabled={!canNext}
+                    onClick={() => canNext && onSelect(calls[selectedIndex + 1])}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </SheetTitle>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className="text-[10px] h-5">
+                  <agentInfo.Icon className="h-3 w-3 mr-1" />
+                  {agentInfo.label}
+                </Badge>
+                <Badge variant={call.hasVision ? "secondary" : "outline"} className="text-[10px] h-5">
+                  {call.hasVision ? "vision" : "text"}
+                </Badge>
+                {call.attempt > 1 && (
+                  <Badge variant="neutral" className="text-[10px] h-5">
+                    retry x{call.attempt}
+                  </Badge>
+                )}
+                {call.role === "dom-scan" && (
+                  <Badge variant="neutral" className="text-[10px] h-5">dom-scan</Badge>
+                )}
+              </div>
+              <div className="text-[11px] text-muted-foreground flex items-center gap-3 flex-wrap">
+                <span>In <span className="font-mono text-foreground/80">{call.inputTokens.toLocaleString()}</span></span>
+                <span>Out <span className="font-mono text-foreground/80">{call.outputTokens.toLocaleString()}</span></span>
+                <span>Cost <span className="font-mono text-foreground/80">{formatCost(call.costUsd)}</span></span>
+                <span>Time <span className="font-mono text-foreground/80">{formatMs(call.durationMs)}</span></span>
+              </div>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="messages">Messages ({call.requestMessages?.length ?? (call.query ? 1 : 0)})</TabsTrigger>
+                  {call.agent === "filmstrip" && <TabsTrigger value="filmstrip">Filmstrip ({imageCount})</TabsTrigger>}
+                  <TabsTrigger value="response">Response</TabsTrigger>
+                  <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </SheetHeader>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 flex flex-col">
+              <TabsContent value="messages" className="mt-0 p-4 min-h-0 overflow-y-auto space-y-3">
+                {call.requestMessages && call.requestMessages.length > 0 ? (
+                  call.requestMessages.map((m, mi) => (
+                    <Card key={`${m.role}-${mi}`} className={cn(m.role === "system" && "border-border/80 bg-muted/15")}>
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Badge variant="outline" className="text-[10px] h-5 font-mono uppercase">
+                            {llmRoleLabel(m.role)}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-[10px]"
+                            onClick={() => void copyText(messageTextContent(m.content))}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        {typeof m.content === "string" ? (
+                          <pre className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/85 leading-relaxed">
+                            {m.content}
+                          </pre>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {m.content.map((part, pi) =>
+                              part.type === "text" ? (
+                                <pre key={pi} className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/85 leading-relaxed">
+                                  {part.text}
+                                </pre>
+                              ) : (
+                                <div key={pi} className="space-y-1">
+                                  {part.label ? <p className="text-[10px] text-muted-foreground">{part.label}</p> : null}
+                                  {(() => {
+                                    const src = llmCallImageSrcByIndex(call, runId, part.imageIndex);
+                                    return src ? (
+                                      <div className="rounded border border-border bg-black overflow-hidden">
+                                        <img src={src} alt={`Input image ${part.imageIndex + 1}`} className="w-full max-h-80 object-contain object-top" />
+                                      </div>
+                                    ) : (
+                                      <p className="text-[10px] text-muted-foreground italic">Image {part.imageIndex + 1} not available on disk</p>
+                                    );
+                                  })()}
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Card>
+                    <CardContent className="p-3 space-y-3">
+                      {call.query ? (
+                        <pre className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/85 leading-relaxed">
+                          {call.query}
+                        </pre>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic">No request text stored for this call.</p>
+                      )}
+                      {imageCount > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Array.from({ length: imageCount }, (_, i) => {
+                            const src = llmCallImageSrcByIndex(call, runId, i);
+                            return src ? (
+                              <div key={i} className="rounded border border-border bg-black overflow-hidden">
+                                <p className="text-[9px] font-mono text-muted-foreground px-2 py-1 border-b border-border/50">Image {i + 1}</p>
+                                <img src={src} alt={`Screenshot ${i + 1}`} className="w-full max-h-64 object-contain object-top" />
+                              </div>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="filmstrip" className="mt-0 p-4 min-h-0 overflow-y-auto">
+                {call.agent === "filmstrip" ? <FilmstripSentToModel call={call} runId={runId} /> : null}
+              </TabsContent>
+
+              <TabsContent value="response" className="mt-0 p-4 min-h-0 overflow-y-auto space-y-2">
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => setWrapResponse((v) => !v)}
+                  >
+                    {wrapResponse ? "No wrap" : "Wrap"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => void copyText(call.response ?? "")}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 overflow-auto max-h-[70vh]">
+                  <pre
+                    className={cn(
+                      "text-[11px] font-mono p-3 text-foreground/85 leading-relaxed",
+                      wrapResponse ? "whitespace-pre-wrap break-words" : "whitespace-pre",
+                    )}
+                  >
+                    {call.response || "No response stored for this call."}
+                  </pre>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="raw" className="mt-0 p-4 min-h-0 overflow-y-auto space-y-2">
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => void copyText(JSON.stringify(call, null, 2))}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 overflow-auto max-h-[70vh]">
+                  <pre className="text-[11px] font-mono whitespace-pre p-3 text-foreground/85 leading-relaxed">
+                    {JSON.stringify(call, null, 2)}
+                  </pre>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 

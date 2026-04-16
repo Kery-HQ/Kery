@@ -78,6 +78,10 @@ const ProjectRunsQuery = z.object({
   status: z.string().trim().max(40).optional(),
 });
 
+const PagePatchBody = z.object({
+  enabled: z.boolean(),
+});
+
 async function assertDestinationInProject(
   storage: StorageAdapter,
   projectId: string,
@@ -406,6 +410,38 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
       [projectId],
     );
     reply.send({ pages, coverage, lastScan: lastScanRows[0] ?? null });
+  });
+
+  app.patch("/api/projects/:projectId/pages/:destinationId", async (req, reply) => {
+    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
+    const parsed = PagePatchBody.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.issues });
+      return;
+    }
+    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    const { rows } = await pool.query(
+      `UPDATE app_tree_destinations SET enabled = $1, updated_at = now()
+       WHERE id = $2 AND project_id = $3 RETURNING id, enabled`,
+      [parsed.data.enabled, destinationId, projectId],
+    );
+    reply.send({ page: rows[0] });
+  });
+
+  app.delete("/api/projects/:projectId/pages/:destinationId", async (req, reply) => {
+    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
+    const { rowCount } = await pool.query(
+      `DELETE FROM app_tree_destinations WHERE id = $1 AND project_id = $2`,
+      [destinationId, projectId],
+    );
+    if (!rowCount) {
+      reply.code(404).send({ error: "Page not found" });
+      return;
+    }
+    reply.send({ ok: true });
   });
 
   // Page-scoped memory (must be registered before GET .../pages/:destinationId)

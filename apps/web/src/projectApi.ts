@@ -376,6 +376,10 @@ export async function togglePage(projectId: string, pageId: string, enabled: boo
   });
 }
 
+export async function deletePage(projectId: string, pageId: string) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${pageId}`, { method: "DELETE" });
+}
+
 export async function triggerScan(projectId: string, force = false) {
   const url = `${API_BASE}/api/projects/${projectId}/scan${force ? "?force=true" : ""}`;
   const res = await fetch(url, { method: "POST" });
