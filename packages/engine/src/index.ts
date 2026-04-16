@@ -82,6 +82,8 @@ export type { NetworkMonitorResult } from "./networkMonitor.js";
 
 // ─── Bug Enrichment ──────────────────────────────────────────────────────────
 export { enrichBugsForRun } from "./bugEnrichment.js";
+export { runBugTriageAgent } from "./bugTriageAgent.js";
+export type { BugTriageInput, BugTriageResult } from "./bugTriageAgent.js";
 
 // ─── Bug screenshot markup (red box on saved JPEGs) ───────────────────────────
 export { drawRedBoundingBoxOnJpeg } from "./bugScreenshotMarkup.js";

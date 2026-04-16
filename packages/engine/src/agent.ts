@@ -96,6 +96,7 @@ export type LLMAgentType =
   | "holistic"
   | "summary"
   | "filmstrip"
+  | "bug_triage"
   | "crawl_link_filter"
   | "crawl_route_filter"
   | "crawl_suggested_flows"

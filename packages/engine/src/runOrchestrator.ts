@@ -26,6 +26,7 @@ import { curateMemoryAfterRun } from "./memoryCurator.js";
 import { initStagehandSession, destroyStagehandSession, type StagehandSession } from "./stagehandBridge.js";
 import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
 import { dedupeRunStepBugs } from "./bugDedup.js";
+import { runBugTriageAgent } from "./bugTriageAgent.js";
 import type { StorageAdapter } from "./storage.js";
 
 export type RunJob = {
@@ -434,6 +435,26 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       }
       logger.info({ count: netBugs.length }, "Network monitor: action-correlated bugs merged");
     }
+    const triageCalls: LLMCallRecord[] = [];
+    const openProjectBugs = job.projectId
+      ? await storage.getOpenBugs(job.projectId, 100_000).catch(() => [])
+      : [];
+    const triageResult = await runBugTriageAgent(
+      {
+        bugs: bugsFound,
+        intent: job.intent,
+        openProjectBugs,
+        memoryEntries: allMemory,
+      },
+      { onLLMCall: (call) => triageCalls.push({ ...call, seq: 0 }) },
+    );
+    bugsFound = triageResult.bugs;
+    if (triageResult.skippedCount > 0) {
+      logger.info(
+        { skippedCount: triageResult.skippedCount, remaining: bugsFound.length },
+        "Bug triage: filtered run bug candidates",
+      );
+    }
     const memoryCuratorCalls: LLMCallRecord[] = [];
 
     if (agentResult.status === "passed" && allMemory.length > 0) {
@@ -456,7 +477,14 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     });
 
     const handoffHealCalls: LLMCallRecord[] = (job as any).__handoffHealCalls ?? [];
-    const mergedCalls = mergeLLMCalls(agentResult.llmCalls, holisticCalls, filmstripCalls, memoryCuratorCalls, handoffHealCalls);
+    const mergedCalls = mergeLLMCalls(
+      agentResult.llmCalls,
+      holisticCalls,
+      filmstripCalls,
+      triageCalls,
+      memoryCuratorCalls,
+      handoffHealCalls,
+    );
 
     // If this was a handoff run, prepend the completed regression steps so the
     // combined trace represents the full flow. Re-index all steps sequentially.
@@ -534,6 +562,7 @@ function mergeLLMCalls(
   navigator: LLMCallRecord[],
   holistic: LLMCallRecord[],
   filmstrip: LLMCallRecord[] = [],
+  triage: LLMCallRecord[] = [],
   memoryCurator: LLMCallRecord[] = [],
   healCalls: LLMCallRecord[] = [],
 ): LLMCallRecord[] {
@@ -542,6 +571,7 @@ function mergeLLMCalls(
     ...navigator.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
     ...holistic.map((c) => ({ ...c, agent: (c.agent ?? "holistic") as LLMAgentType })),
     ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),
+    ...triage.map((c) => ({ ...c, agent: (c.agent ?? "bug_triage") as LLMAgentType })),
     ...memoryCurator.map((c) => ({ ...c, agent: (c.agent ?? "memory_curator") as LLMAgentType })),
   ];
   merged.forEach((c, i) => { c.seq = i + 1; });
