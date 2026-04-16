@@ -3,14 +3,24 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   Stack,
   ArrowsClockwise,
-  CaretRight,
   MagnifyingGlass,
-  Spinner,
+  Play,
+  Trash,
   ClockCounterClockwise,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -20,7 +30,15 @@ import { cn } from "@/lib/utils";
 import { relativeTime, formatCrawlLlmCostLine, duration } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
-  fetchPages, fetchEnvironments, triggerScan, fetchScanStatus, fetchCrawlRuns, fetchCrawlRun,
+  fetchPages,
+  fetchEnvironments,
+  triggerScan,
+  fetchScanStatus,
+  fetchCrawlRuns,
+  fetchCrawlRun,
+  togglePage,
+  runDestination,
+  deletePage,
 } from "@/projectApi";
 import {
   CrawlAnalysisPanel,
@@ -127,6 +145,13 @@ export function Pages() {
     crawl_metadata_json?: CrawlMetadataJson | null;
   } | null>(null);
   const [crawlDetailLoading, setCrawlDetailLoading] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<Page | null>(null);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [runBusyId, setRunBusyId] = React.useState<string | null>(null);
+  const [testAllBusy, setTestAllBusy] = React.useState(false);
+
+  const defaultEnv = environments.find((e: { is_default?: boolean }) => e.is_default) || environments[0];
+  const defaultEnvId: string | null = defaultEnv?.id ?? null;
 
   const closeCrawlDetail = React.useCallback(() => {
     setCrawlDetailId(null);
@@ -251,6 +276,61 @@ export function Pages() {
     }
     return result;
   }, [pages, filter, healthFilter]);
+
+  const handleToggleEnabled = React.useCallback(async (page: Page, enabled: boolean) => {
+    if (!pid) return;
+    const prev = page.enabled;
+    setPages(prevPages => prevPages.map(p => (p.id === page.id ? { ...p, enabled } : p)));
+    try {
+      await togglePage(pid, page.id, enabled);
+    } catch {
+      setPages(prevPages => prevPages.map(p => (p.id === page.id ? { ...p, enabled: prev } : p)));
+      toast.error("Could not update testing toggle");
+    }
+  }, [pid]);
+
+  const handleRunPage = React.useCallback(async (page: Page) => {
+    if (!pid || !defaultEnvId || !page.enabled) return;
+    setRunBusyId(page.id);
+    try {
+      await runDestination(pid, defaultEnvId, page.id);
+      navigate("/runs");
+    } catch {
+      toast.error("Could not start test run");
+    }
+    setRunBusyId(null);
+  }, [pid, defaultEnvId, navigate]);
+
+  const handleTestAll = React.useCallback(async () => {
+    if (!pid || !defaultEnvId) return;
+    const targets = pages.filter(p => p.enabled);
+    if (targets.length === 0) return;
+    setTestAllBusy(true);
+    try {
+      for (const p of targets) {
+        await runDestination(pid, defaultEnvId, p.id);
+      }
+      navigate("/runs");
+    } catch {
+      toast.error("Could not queue all tests");
+    }
+    setTestAllBusy(false);
+  }, [pid, defaultEnvId, pages, navigate]);
+
+  const confirmDeletePage = React.useCallback(async () => {
+    if (!pid || !deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await deletePage(pid, deleteTarget.id);
+      setDeleteTarget(null);
+      await loadData();
+    } catch {
+      toast.error("Could not remove page");
+    }
+    setDeleteBusy(false);
+  }, [pid, deleteTarget, loadData]);
+
+  const enabledPageCount = React.useMemo(() => pages.filter(p => p.enabled).length, [pages]);
 
   async function handleScan(force = false) {
     if (!pid) return;
@@ -521,50 +601,67 @@ export function Pages() {
             />
           ) : (
             <>
-              {/* Filter bar */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="relative flex-1 min-w-[180px] max-w-xs">
-                  <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-                  <Input
-                    value={filter}
-                    onChange={e => setFilter(e.target.value)}
-                    placeholder="Filter pages..."
-                    className="pl-8"
-                  />
-                </div>
-                <div className="flex items-center gap-1">
-                  {HEALTH_FILTERS.map(h => (
-                    <Button
-                      key={h}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setHealthFilter(h)}
-                      className={cn(
-                        "h-7 px-2.5 text-[11px] capitalize",
-                        healthFilter === h
-                          ? "bg-accent text-foreground"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {HEALTH_LABEL[h]}
-                    </Button>
-                  ))}
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
+                  loading={testAllBusy}
+                  onClick={() => void handleTestAll()}
+                  className="gap-1.5"
+                >
+                  {!testAllBusy && <Play className="h-3.5 w-3.5" />}
+                  Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
+                </Button>
+
+                {/* Filter bar */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[180px] max-w-xs">
+                    <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+                    <Input
+                      value={filter}
+                      onChange={e => setFilter(e.target.value)}
+                      placeholder="Filter pages..."
+                      className="pl-8"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {HEALTH_FILTERS.map(h => (
+                      <Button
+                        key={h}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setHealthFilter(h)}
+                        className={cn(
+                          "h-7 px-2.5 text-[11px] capitalize",
+                          healthFilter === h
+                            ? "bg-accent text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {HEALTH_LABEL[h]}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Flat page tile grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {filteredPages.map(page => (
-                  <Link
+                  <div
                     key={page.id}
-                    to={`/pages/${page.id}`}
                     className={cn(
-                      "group rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30",
-                      !page.enabled && "opacity-50",
+                      "rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[5.5rem]",
+                      !page.enabled && "opacity-60",
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        to={`/pages/${page.id}`}
+                        className="min-w-0 flex-1 space-y-1 group/link"
+                      >
                         <div className="flex items-center gap-2 min-w-0">
                           <StatusDot status={page.health} />
                           <span className={cn(
@@ -579,21 +676,60 @@ export function Pages() {
                             {page.title}
                           </p>
                         )}
+                      </Link>
+                      <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
+                        <Switch
+                          checked={page.enabled}
+                          onCheckedChange={v => { void handleToggleEnabled(page, v); }}
+                          aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
+                          className="scale-90"
+                        />
                       </div>
-                      <CaretRight className="h-3.5 w-3.5 mt-0.5 text-muted-foreground/25 group-hover:text-muted-foreground/60 flex-shrink-0" />
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground/60 capitalize">{page.health}</span>
-                      <span className={cn(
-                        "font-medium tabular-nums",
-                        page.issues > 0
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-muted-foreground/60"
-                      )}>
-                        {page.issues} issue{page.issues !== 1 ? "s" : ""}
-                      </span>
+                    <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
+                      <div className="min-w-0 space-y-0.5">
+                        <span className="text-muted-foreground/60 capitalize block">{page.health}</span>
+                        <span className={cn(
+                          "font-medium tabular-nums block",
+                          page.issues > 0
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-muted-foreground/60"
+                        )}>
+                          {page.issues} issue{page.issues !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                          disabled={!page.enabled || !defaultEnvId}
+                          loading={runBusyId === page.id}
+                          onClick={e => {
+                            e.preventDefault();
+                            void handleRunPage(page);
+                          }}
+                          aria-label={`Run test for ${page.route}`}
+                        >
+                          {runBusyId !== page.id && <Play className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={e => {
+                            e.preventDefault();
+                            setDeleteTarget(page);
+                          }}
+                          aria-label={`Remove ${page.route} from project`}
+                        >
+                          <Trash className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
 
@@ -606,6 +742,36 @@ export function Pages() {
           )}
         </div>
       </div>
+
+      <Dialog open={deleteTarget != null} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove page from project?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget && (
+                <>
+                  This removes <span className="font-mono text-foreground">{deleteTarget.route}</span> from your
+                  catalog. Flow edges and page memory for this route are deleted. You can add it again with a scan.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              loading={deleteBusy}
+              onClick={() => void confirmDeletePage()}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
