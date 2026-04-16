@@ -5,7 +5,6 @@ import {
   Play,
   Trash,
   Brain,
-  Clock,
   Repeat,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
@@ -44,13 +43,6 @@ type PageData = {
     completed_at?: string | null;
     trigger_ref?: string;
   }>;
-};
-
-const HEALTH_VARIANT: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-  clean: "success",
-  issues: "warning",
-  stale: "warning",
-  untested: "neutral",
 };
 
 export function PageDetail() {
@@ -152,74 +144,77 @@ export function PageDetail() {
 
   const { page, recentRuns } = data;
   const hasRegressionPlan = page.regression_plan && page.regression_plan.length > 0;
+  const routeRaw = (page.normalized_route ?? "/").trim() || "/";
+
+  const statusHint =
+    page.issues_count > 0
+      ? `${page.issues_count} issue${page.issues_count !== 1 ? "s" : ""}`
+      : page.health_status !== "clean"
+        ? page.health_status.replace(/_/g, " ")
+        : null;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-border bg-card/50 px-6 py-3">
-        <div className="max-w-4xl mx-auto space-y-2">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      {/* Header — single compact row */}
+      <div className="flex-shrink-0 border-b border-border bg-card/40 px-6">
+        <div className="mx-auto flex h-11 max-w-4xl items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <button
+              type="button"
               onClick={() => navigate("/pages")}
-              className="hover:text-foreground transition-colors flex items-center gap-1"
+              className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
             >
-              <ArrowLeft className="h-3 w-3" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               Pages
             </button>
-            <span>/</span>
-            <span className="font-mono text-foreground truncate">{page.normalized_route}</span>
+            <span className="select-none text-muted-foreground/35" aria-hidden>
+              ·
+            </span>
+            <StatusDot status={page.health_status} />
+            <h1 className="min-w-0 truncate font-mono text-[13px] font-semibold text-foreground" title={routeRaw}>
+              {routeRaw}
+            </h1>
+            {statusHint && (
+              <span className="shrink-0 capitalize text-[11px] text-muted-foreground">{statusHint}</span>
+            )}
           </div>
 
-          {/* Title row */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <StatusDot status={page.health_status} />
-              <h1 className="font-mono text-[14px] font-semibold text-foreground truncate">
-                {page.normalized_route}
-              </h1>
-              <Badge variant={HEALTH_VARIANT[page.health_status] ?? "neutral"} className="capitalize">
-                {page.health_status}
-              </Badge>
-              {page.issues_count > 0 && (
-                <Badge variant="warning">
-                  {page.issues_count} issue{page.issues_count !== 1 ? "s" : ""}
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {confirmReset ? (
-                <div className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5">
-                  <span className="text-[11px] text-destructive">Delete all page data?</span>
-                  <Button size="sm" variant="destructive" onClick={handleReset} loading={resetting} className="h-7 text-[11px]">
-                    Yes, reset
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)} className="h-7 text-[11px]">
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmReset(true)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash className="h-3.5 w-3.5" />
-                </Button>
-              )}
+          <div className="flex shrink-0 items-center gap-1">
+            {!confirmReset ? (
               <Button
                 size="sm"
-                onClick={handleRun}
-                disabled={!page.enabled || !defaultEnvId}
-                loading={running}
+                variant="ghost"
+                onClick={() => setConfirmReset(true)}
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                aria-label="Reset page data"
               >
-                {!running && <Play className="h-3.5 w-3.5" />}
-                Run this page
+                <Trash className="h-3.5 w-3.5" />
               </Button>
-            </div>
+            ) : null}
+            <Button
+              size="sm"
+              onClick={handleRun}
+              disabled={!page.enabled || !defaultEnvId}
+              loading={running}
+              className="h-8 gap-1.5 text-[12px]"
+            >
+              {!running && <Play className="h-3.5 w-3.5" />}
+              Run this page
+            </Button>
           </div>
         </div>
+
+        {confirmReset && (
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2 border-t border-border/50 py-2">
+            <span className="text-[11px] text-destructive/90">Delete all page data?</span>
+            <Button size="sm" variant="destructive" onClick={handleReset} loading={resetting} className="h-7 text-[11px]">
+              Yes, reset
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)} className="h-7 text-[11px]">
+              Cancel
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Tabbed content */}

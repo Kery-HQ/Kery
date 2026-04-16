@@ -273,17 +273,17 @@ function FilmstripSentToModel({ call, runId }: { call: LLMCallRecord; runId: str
 
   if (frameCount === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-fuchsia-500/25 bg-fuchsia-500/5 px-3 py-2 text-[11px] text-muted-foreground">
+      <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
         No filmstrip images stored for this call.
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/[0.04] px-3 py-3 space-y-2">
+    <div className="rounded-lg border border-border/70 bg-muted/15 px-3 py-3 space-y-2">
       <div className="flex items-center gap-2">
-        <Stack className="h-3.5 w-3.5 text-fuchsia-400/90 flex-shrink-0" />
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400/80">
+        <Stack className="h-3.5 w-3.5 text-muted-foreground/70 flex-shrink-0" />
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
           Filmstrip sent to model ({frameCount} frame{frameCount !== 1 ? "s" : ""}, visit order →)
         </p>
       </div>
@@ -294,10 +294,10 @@ function FilmstripSentToModel({ call, runId }: { call: LLMCallRecord; runId: str
           return (
             <div
               key={i}
-              className="flex-shrink-0 w-[min(200px,72vw)] rounded-md border border-border bg-card overflow-hidden shadow-sm"
+              className="flex-shrink-0 w-[min(200px,72vw)] rounded-md border border-border/70 bg-card overflow-hidden"
             >
               <div className="px-2 py-1 border-b border-border/60 bg-muted/30">
-                <p className="text-[9px] font-mono text-fuchsia-400/90 tabular-nums">#{i + 1}</p>
+                <p className="text-[9px] font-mono text-muted-foreground/80 tabular-nums">#{i + 1}</p>
                 {url ? (
                   <p className="text-[9px] font-mono text-muted-foreground truncate" title={url}>
                     {url}
@@ -471,18 +471,18 @@ function badgeVariantForStatus(status: string): "success" | "destructive" | "war
 type LlmAgentDisplay = { label: string; color: string; Icon: React.ComponentType<{ className?: string }> };
 
 const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
-  navigator:       { label: "Navigator",      color: "text-emerald-400", Icon: Compass },
-  review:          { label: "Review",         color: "text-violet-400",  Icon: Eye },
-  holistic:        { label: "Flow review",    color: "text-violet-300",  Icon: GitBranch },
-  summary:         { label: "Summary",        color: "text-sky-400",     Icon: FileText },
-  filmstrip:       { label: "Filmstrip",      color: "text-fuchsia-400", Icon: Stack },
-  crawl_link_filter:     { label: "Crawl links",   color: "text-teal-400",    Icon: Funnel },
-  crawl_route_filter:    { label: "Crawl routes",  color: "text-teal-300",    Icon: Funnel },
-  crawl_suggested_flows: { label: "Crawl flows",   color: "text-amber-400",   Icon: FlowArrow },
-  memory_curator:   { label: "Memory",       color: "text-orange-400", Icon: Brain },
-  script_generator: { label: "Script gen",   color: "text-cyan-400",   Icon: Scroll },
-  stagehand:        { label: "Stagehand",    color: "text-yellow-400", Icon: Lightning },
-  regression_heal:  { label: "Heal",         color: "text-rose-400",   Icon: Lightning },
+  navigator:       { label: "Navigator",      color: "text-foreground/75", Icon: Compass },
+  review:          { label: "Review",         color: "text-foreground/75", Icon: Eye },
+  holistic:        { label: "Flow review",    color: "text-foreground/75", Icon: GitBranch },
+  summary:         { label: "Summary",        color: "text-foreground/75", Icon: FileText },
+  filmstrip:       { label: "Filmstrip",      color: "text-foreground/75", Icon: Stack },
+  crawl_link_filter:     { label: "Crawl links",   color: "text-foreground/75", Icon: Funnel },
+  crawl_route_filter:    { label: "Crawl routes",  color: "text-foreground/75", Icon: Funnel },
+  crawl_suggested_flows: { label: "Crawl flows",   color: "text-foreground/75", Icon: FlowArrow },
+  memory_curator:   { label: "Memory",       color: "text-foreground/75", Icon: Brain },
+  script_generator: { label: "Script gen",   color: "text-foreground/75", Icon: Scroll },
+  stagehand:        { label: "Stagehand",    color: "text-foreground/75", Icon: Lightning },
+  regression_heal:  { label: "Heal",         color: "text-foreground/75", Icon: Lightning },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
@@ -687,13 +687,14 @@ export const RunDetail: React.FC = () => {
   const backUrl = run.project_id && run.source_back_path
     ? `/projects/${run.project_id}/${run.source_back_path}`
     : "/runs";
+  const runTitle = (run.source_label?.trim() || run.summary?.trim() || "Run");
 
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full">
       {/* Back + breadcrumb + PageHeader */}
       <PageHeader
         icon={<Pulse className="h-4 w-4" />}
-        title={`Run ${run.id.slice(0, 8)}`}
+        title={runTitle}
       >
         <Badge variant={badgeVariantForStatus(run.status)} dot>
           {run.status}
@@ -875,8 +876,8 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
         <div className="flex w-[22px] shrink-0 flex-col items-center">
           <div
             className={cn(
-              "relative z-[1] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition-[background-color,box-shadow] duration-150 ease-out",
-              isCurrent && "bg-primary/10 ring-2 ring-primary/15",
+              "relative z-[1] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition-colors duration-150 ease-out",
+              isCurrent && "bg-muted/40",
               !isCurrent && !isDone && !isFailed && "bg-transparent",
             )}
           >
@@ -892,15 +893,15 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
           </div>
           {!isLast && (
             <div
-              className="mt-1 min-h-[10px] w-px flex-1 bg-gradient-to-b from-border/50 to-border/15"
+              className="mt-1 min-h-[10px] w-px flex-1 bg-border/40"
               aria-hidden
             />
           )}
         </div>
         <div
           className={cn(
-            "min-w-0 flex-1 pb-3 transition-[background-color] duration-150 ease-out",
-            isCurrent && "rounded-md bg-primary/[0.035] -mx-1 -mt-0.5 px-2.5 py-1.5",
+            "min-w-0 flex-1 pb-3 transition-colors duration-150 ease-out",
+            isCurrent && "rounded-md bg-muted/25 -mx-1 -mt-0.5 px-2.5 py-1.5",
           )}
         >
           <p
@@ -955,7 +956,7 @@ function BrowserPreviewStage({
         deskWallpaper
       ) : (
         <>
-          <div className="pointer-events-none absolute inset-0 bg-muted/50 dark:bg-surface-2/80" aria-hidden />
+          <div className="pointer-events-none absolute inset-0 bg-muted/45 dark:bg-surface-2/78" aria-hidden />
           <div className="run-preview-wallpaper-blur-wrap" aria-hidden>
             <div
               className="run-preview-wallpaper-blurred opacity-[0.92] dark:opacity-[0.72]"
@@ -963,14 +964,7 @@ function BrowserPreviewStage({
             />
           </div>
           <div className="run-preview-wallpaper-grain" aria-hidden />
-          <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-muted/18 dark:from-primary/[0.025] dark:to-background/12"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute inset-0 bg-black/20 dark:bg-black/32"
-            aria-hidden
-          />
+          <div className="pointer-events-none absolute inset-0 bg-black/18 dark:bg-black/28" aria-hidden />
         </>
       )}
 
@@ -1003,7 +997,7 @@ function BrowserPreviewStage({
               >
                 {!empty && (
                   <>
-                    <div className="pointer-events-none absolute inset-0 bg-muted/35 dark:bg-surface-2/60" aria-hidden />
+                    <div className="pointer-events-none absolute inset-0 bg-muted/32 dark:bg-surface-2/58" aria-hidden />
                     <div className="run-preview-wallpaper-blur-wrap" aria-hidden>
                       <div
                         className="run-preview-wallpaper-blurred opacity-[0.88] dark:opacity-[0.68]"
@@ -1011,14 +1005,7 @@ function BrowserPreviewStage({
                       />
                     </div>
                     <div className="run-preview-wallpaper-grain" aria-hidden />
-                    <div
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-muted/14 dark:from-primary/[0.025] dark:to-background/10"
-                      aria-hidden
-                    />
-                    <div
-                      className="pointer-events-none absolute inset-0 bg-black/18 dark:bg-black/28"
-                      aria-hidden
-                    />
+                    <div className="pointer-events-none absolute inset-0 bg-black/16 dark:bg-black/24" aria-hidden />
                   </>
                 )}
                 <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
@@ -1129,7 +1116,7 @@ function OverviewTab({
               liveFrameOpenAnim={liveFrameOpenAnim}
               onLiveFrameOpenAnimEnd={() => setLiveFrameOpenAnim(false)}
               badge={
-                <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/80 bg-card/95 px-2 py-1.5 backdrop-blur-md sm:gap-2 sm:px-2.5 sm:py-2">
+                <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/70 bg-card/90 px-2 py-1.5 backdrop-blur-[2px] sm:gap-2 sm:px-2.5 sm:py-2">
                   <Badge
                     variant={
                       isRunStarting || showLive || showLiveDisk ? "running" : showRecording ? "secondary" : "neutral"
@@ -1155,8 +1142,8 @@ function OverviewTab({
               }
             >
               {isRunStarting ? (
-                <div className="flex max-w-[min(100%,22rem)] items-center gap-2 rounded-lg border border-primary/30 bg-card/93 px-3 py-2 ring-1 ring-primary/20 backdrop-blur-sm">
-                  <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" weight="bold" />
+                <div className="flex max-w-[min(100%,22rem)] items-center gap-2 rounded-lg border border-border/70 bg-card/92 px-3 py-2 backdrop-blur-[2px]">
+                  <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" weight="bold" />
                   <p className="font-display text-[11px] font-medium leading-snug tracking-tight text-foreground">
                     Launching a browser for this run…
                   </p>
@@ -1209,9 +1196,9 @@ function OverviewTab({
             </CardContent>
           </Card>
 
-          <Card className="min-h-0 flex-[0.85] flex flex-col overflow-hidden border-border/55 bg-card/90">
+          <Card className="min-h-0 flex-[0.85] flex flex-col overflow-hidden border-border/60 bg-card/90">
             <CardContent className="flex flex-1 min-h-0 flex-col p-0">
-              <div className="shrink-0 border-b border-border/40 bg-surface-2/50 px-3 py-2.5">
+              <div className="shrink-0 border-b border-border/40 bg-surface-2/35 px-3 py-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <SectionLabel className="mb-0 min-w-0" icon={<Path className="h-3.5 w-3.5" />} text="Plan" />
                   {planProgress && (
@@ -1220,7 +1207,7 @@ function OverviewTab({
                         <span className="text-foreground/80">{planProgress.done}</span>
                         <span className="text-muted-foreground/50"> / {planProgress.n}</span>
                         {run.status === "running" && agentPlan.some((i) => i.status === "current") && (
-                          <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-primary/80">
+                          <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
                             live
                           </span>
                         )}
@@ -1239,10 +1226,7 @@ function OverviewTab({
                     aria-valuemin={0}
                     aria-valuemax={100}
                   >
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-status-pass/45 via-primary/30 to-primary/40 transition-[width] duration-200 ease-out"
-                      style={{ width: `${planProgress.pct}%` }}
-                    />
+                    <div className="h-full rounded-full bg-foreground/25 transition-[width] duration-200 ease-out" style={{ width: `${planProgress.pct}%` }} />
                   </div>
                 )}
               </div>
@@ -1319,13 +1303,9 @@ function OverviewTab({
                     const delay = Math.min(idx, 12) * 22;
                     if (entry.type === "plan") {
                       return (
-                        <div
-                          key={`plan-${entry.at}-${idx}`}
-                          className="animate-slide-up rounded-lg border border-border/35 bg-muted/12 px-2.5 py-2 transition-colors duration-150 hover:bg-muted/18"
-                          style={{ animationDelay: `${delay}ms` }}
-                        >
+                        <div key={`plan-${entry.at}-${idx}`} className="animate-slide-up rounded-lg border border-border/35 bg-muted/10 px-2.5 py-2 transition-colors duration-150 hover:bg-muted/14" style={{ animationDelay: `${delay}ms` }}>
                           <div className="flex items-start gap-2">
-                            <Path className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/50" weight="duotone" />
+                            <Path className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" weight="duotone" />
                             <div className="min-w-0 flex-1">
                               <p className="text-[12px] text-foreground/95">
                                 Plan · {entry.items.length} {entry.items.length === 1 ? "step" : "steps"}
@@ -1779,14 +1759,7 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
   return (
     <Card className={cn(
       "overflow-visible transition-colors",
-      agent === "navigator" && "border-l-2 border-l-emerald-500/30",
-      agent === "review"    && "border-l-2 border-l-violet-500/30",
-      agent === "holistic"  && "border-l-2 border-l-violet-400/30",
-      agent === "summary"   && "border-l-2 border-l-sky-500/30",
-      agent === "filmstrip" && "border-l-2 border-l-fuchsia-500/30",
-      agent === "crawl_link_filter" && "border-l-2 border-l-teal-500/30",
-      agent === "crawl_route_filter" && "border-l-2 border-l-teal-500/30",
-      agent === "crawl_suggested_flows" && "border-l-2 border-l-amber-500/30",
+      agent !== "navigator" && "border-l-2 border-l-border/60",
     )}>
       <button
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
@@ -1827,10 +1800,10 @@ function LLMCallRow({ call, runId }: { call: LLMCallRecord; runId: string }) {
         )}
 
         {/* Tokens */}
-        <span className="text-[11px] font-mono tabular-nums text-blue-400 w-14 text-right flex-shrink-0">
+        <span className="text-[11px] font-mono tabular-nums text-foreground/75 w-14 text-right flex-shrink-0">
           {call.inputTokens.toLocaleString()}
         </span>
-        <span className="text-[11px] font-mono tabular-nums text-emerald-400 w-14 text-right flex-shrink-0">
+        <span className="text-[11px] font-mono tabular-nums text-foreground/75 w-14 text-right flex-shrink-0">
           {call.outputTokens.toLocaleString()}
         </span>
 

@@ -252,18 +252,6 @@ export function Pages() {
     return result;
   }, [pages, filter, healthFilter]);
 
-  const groupedByPrefix = React.useMemo(() => {
-    const groups = new Map<string, Page[]>();
-    for (const p of filteredPages) {
-      const parts = p.route.split("/").filter(Boolean);
-      const prefix = parts.length > 0 ? `/${parts[0]}` : "/";
-      const list = groups.get(prefix) || [];
-      list.push(p);
-      groups.set(prefix, list);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredPages]);
-
   async function handleScan(force = false) {
     if (!pid) return;
     setRateLimited(false);
@@ -564,49 +552,48 @@ export function Pages() {
                 </div>
               </div>
 
-              {/* Page list grouped by prefix */}
-              <div className="space-y-4">
-                {groupedByPrefix.map(([prefix, prefixPages]) => (
-                  <div key={prefix} className="space-y-0.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 px-1 pb-1">
-                      {prefix}
-                    </div>
-                    <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-                      {prefixPages.map(page => (
-                        <Link
-                          key={page.id}
-                          to={`/pages/${page.id}`}
-                          className={cn(
-                            "group flex items-center gap-3 px-4 py-2 hover:bg-accent/40 transition-colors",
-                            !page.enabled && "opacity-50",
-                          )}
-                        >
+              {/* Flat page tile grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {filteredPages.map(page => (
+                  <Link
+                    key={page.id}
+                    to={`/pages/${page.id}`}
+                    className={cn(
+                      "group rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30",
+                      !page.enabled && "opacity-50",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 min-w-0">
                           <StatusDot status={page.health} />
-
                           <span className={cn(
-                            "font-mono text-[13px] flex-1 truncate min-w-0",
+                            "font-mono text-[13px] truncate",
                             !page.enabled && "line-through",
                           )}>
                             {page.route}
                           </span>
-
-                          {page.title && page.title !== page.route && (
-                            <span className="text-[11px] text-muted-foreground/50 truncate max-w-[180px] hidden sm:block">
-                              {page.title}
-                            </span>
-                          )}
-
-                          {page.issues > 0 && (
-                            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium tabular-nums flex-shrink-0">
-                              {page.issues} issue{page.issues !== 1 ? "s" : ""}
-                            </span>
-                          )}
-
-                          <CaretRight className="h-3.5 w-3.5 text-muted-foreground/20 group-hover:text-muted-foreground/50 flex-shrink-0" />
-                        </Link>
-                      ))}
+                        </div>
+                        {page.title && page.title !== page.route && (
+                          <p className="text-[11px] text-muted-foreground/60 truncate">
+                            {page.title}
+                          </p>
+                        )}
+                      </div>
+                      <CaretRight className="h-3.5 w-3.5 mt-0.5 text-muted-foreground/25 group-hover:text-muted-foreground/60 flex-shrink-0" />
                     </div>
-                  </div>
+                    <div className="mt-2 flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground/60 capitalize">{page.health}</span>
+                      <span className={cn(
+                        "font-medium tabular-nums",
+                        page.issues > 0
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-muted-foreground/60"
+                      )}>
+                        {page.issues} issue{page.issues !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </Link>
                 ))}
               </div>
 

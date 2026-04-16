@@ -13,6 +13,7 @@ import {
   Repeat,
   CheckCircle,
   CaretDown,
+  CaretRight,
   ArrowCounterClockwise,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,7 @@ export const TestsPlans: React.FC = () => {
   const [runsLoading, setRunsLoading] = React.useState(false);
 
   const [running, setRunning] = React.useState<string | null>(null);
+  const [resettingScriptId, setResettingScriptId] = React.useState<string | null>(null);
 
   // ─── Init ───────────────────────────────────────────────────────────────
 
@@ -220,10 +222,15 @@ export const TestsPlans: React.FC = () => {
 
   async function handleResetScript(testId: string) {
     if (!currentProjectId) return;
-    const res = await resetTestScript(currentProjectId, testId);
-    const updated = res.test as SavedTest;
-    setTests((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    if (selectedTest?.id === updated.id) setSelectedTest(updated);
+    setResettingScriptId(testId);
+    try {
+      const res = await resetTestScript(currentProjectId, testId);
+      const updated = res.test as SavedTest;
+      setTests((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      if (selectedTest?.id === updated.id) setSelectedTest(updated);
+    } finally {
+      setResettingScriptId(null);
+    }
   }
 
   // ─── Run ────────────────────────────────────────────────────────────────
@@ -418,16 +425,35 @@ export const TestsPlans: React.FC = () => {
                   {isExpanded && (
                     <div className="border-t border-border animate-fade-in">
                       <Tabs value={testTab} onValueChange={setTestTab} className="flex flex-col">
-                        <TabsList className="px-4 flex-shrink-0">
-                          <TabsTrigger value="runs">Runs</TabsTrigger>
-                          <TabsTrigger value="script">
-                            Script
-                            {test.plan_status === "ready" && (
-                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" />
+                        <div className="px-4 flex items-center justify-between gap-3">
+                          <TabsList className="flex-shrink-0 px-0">
+                            <TabsTrigger value="runs">Runs</TabsTrigger>
+                            <TabsTrigger value="script">
+                              Script
+                              {test.plan_status === "ready" && (
+                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" />
+                              )}
+                            </TabsTrigger>
+                            <TabsTrigger value="details">Details</TabsTrigger>
+                          </TabsList>
+                          {testTab === "script" &&
+                            ((test.regression_plan?.length ?? 0) > 0 ||
+                              test.plan_status === "ready" ||
+                              test.plan_status === "stale") && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 gap-1.5 text-[11px] shrink-0"
+                                disabled={resettingScriptId === test.id}
+                                loading={resettingScriptId === test.id}
+                                onClick={() => handleResetScript(test.id)}
+                              >
+                                <ArrowCounterClockwise className="h-3.5 w-3.5" />
+                                Reset script
+                              </Button>
                             )}
-                          </TabsTrigger>
-                          <TabsTrigger value="details">Details</TabsTrigger>
-                        </TabsList>
+                        </div>
 
                         <div className="max-h-[500px] overflow-y-auto">
                           <TabsContent value="runs" className="px-4 pb-4">
@@ -441,15 +467,8 @@ export const TestsPlans: React.FC = () => {
 
                           <TabsContent value="script" className="px-4 pb-4">
                             <ScriptTab
-                              canReset={
-                                (test.regression_plan?.length ?? 0) > 0 ||
-                                test.plan_status === "ready" ||
-                                test.plan_status === "stale"
-                              }
-                              onReset={() => handleResetScript(test.id)}
                               plan={test.regression_plan}
                               planStatus={test.plan_status}
-                              successCount={test.plan_success_count}
                             />
                           </TabsContent>
 
@@ -576,51 +595,18 @@ export const TestsPlans: React.FC = () => {
 // ─── Script Tab ───────────────────────────────────────────────────────────────
 
 function ScriptTab({
-  canReset,
-  onReset,
   plan,
   planStatus,
-  successCount,
 }: {
-  canReset: boolean;
-  onReset: () => Promise<void>;
   plan?: RegressionStep[] | null;
   planStatus?: string | null;
-  successCount?: number;
 }) {
   const status = planStatus ?? "none";
   const steps = plan ?? [];
   const showEmptyState = status === "none" || steps.length === 0;
-  const [resetting, setResetting] = React.useState(false);
-
-  async function handleResetClick() {
-    setResetting(true);
-    try {
-      await onReset();
-    } finally {
-      setResetting(false);
-    }
-  }
 
   return (
-    <div className="w-full space-y-5">
-      {canReset && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-[12px] self-start sm:self-auto"
-            disabled={resetting}
-            loading={resetting}
-            onClick={handleResetClick}
-          >
-            <ArrowCounterClockwise className="h-3.5 w-3.5" />
-            Reset script
-          </Button>
-        </div>
-      )}
-
+    <div className="w-full">
       {showEmptyState ? (
         <div className="flex justify-center">
           <EmptyState
@@ -631,39 +617,7 @@ function ScriptTab({
           />
         </div>
       ) : (
-        <>
-          <div className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Replay plan
-              </p>
-              <p className="mt-1.5 text-[14px] font-medium text-foreground tabular-nums">
-                {steps.length} step{steps.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5 text-[11px] sm:items-end sm:text-right">
-              {status === "ready" && (
-                <span className="inline-flex items-center gap-1.5 text-status-pass">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" aria-hidden />
-                  In sync
-                </span>
-              )}
-              {status === "stale" && (
-                <span className="inline-flex items-center gap-1.5 text-status-warn">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-warn" aria-hidden />
-                  Out of date — refreshes on next run
-                </span>
-              )}
-              {(successCount ?? 0) > 0 && (
-                <span className="font-mono text-muted-foreground/70 tabular-nums">
-                  {successCount} successful replay{successCount !== 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <RegressionPlanView steps={steps} />
-        </>
+        <RegressionPlanView steps={steps} />
       )}
     </div>
   );
@@ -712,80 +666,138 @@ function DetailsTab({ test }: { test: SavedTest }) {
 // ─── Shared Regression Plan Step Viewer (exported for PageDetail.tsx) ────────
 
 const STEP_ACTION_COLORS: Record<string, string> = {
-  click:         "text-emerald-600 dark:text-emerald-400",
-  fill:          "text-blue-600 dark:text-blue-400",
-  navigate:      "text-violet-600 dark:text-violet-400",
-  assert:        "text-amber-600 dark:text-amber-400",
-  pressKey:      "text-cyan-600 dark:text-cyan-400",
-  selectOption:  "text-purple-600 dark:text-purple-400",
+  click:         "text-foreground/90",
+  fill:          "text-foreground/90",
+  navigate:      "text-foreground/90",
+  assert:        "text-foreground/90",
+  pressKey:      "text-foreground/90",
+  selectOption:  "text-foreground/90",
   scroll:        "text-muted-foreground",
   back:          "text-muted-foreground",
-  wait:          "text-muted-foreground/60",
+  wait:          "text-muted-foreground/70",
 };
 
 function StepActionIcon({ action }: { action: string }) {
   const cls = "h-4 w-4 shrink-0";
-  if (action === "fill") return <Keyboard className={cn(cls, "text-blue-500/75")} />;
-  if (action === "click") return <CursorClick className={cn(cls, "text-emerald-600/80 dark:text-emerald-400/85")} />;
-  if (action === "navigate") return <NavigationArrow className={cn(cls, "text-violet-500/75")} />;
-  if (action === "assert") return <CheckCircle className={cn(cls, "text-amber-500/75")} />;
+  if (action === "fill") return <Keyboard className={cn(cls, "text-muted-foreground/75")} />;
+  if (action === "click") return <CursorClick className={cn(cls, "text-muted-foreground/75")} />;
+  if (action === "navigate") return <NavigationArrow className={cn(cls, "text-muted-foreground/75")} />;
+  if (action === "assert") return <CheckCircle className={cn(cls, "text-muted-foreground/75")} />;
   return <Globe className={cn(cls, "text-muted-foreground/55")} />;
 }
 
+function regressionStepHasExpandableDetails(step: RegressionStep): boolean {
+  return Boolean(
+    (step.purpose && step.purpose.trim()) ||
+      (step.url && step.action !== "navigate") ||
+      step.doneWhen,
+  );
+}
+
+function StepSummaryLine({ step }: { step: RegressionStep }) {
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 truncate">
+      <span className={cn("shrink-0 font-mono font-medium", STEP_ACTION_COLORS[step.action] ?? "text-foreground")}>
+        {step.action}
+      </span>
+      {step.role && step.name && (
+        <span className="shrink-0 font-mono text-foreground/80">
+          {step.role}:<span className="text-foreground">&quot;{step.name}&quot;</span>
+        </span>
+      )}
+      {!step.role && step.name && (
+        <span className="shrink-0 font-mono text-foreground/80">&quot;{step.name}&quot;</span>
+      )}
+      {step.value && step.action !== "navigate" && (
+        <span className="truncate text-muted-foreground">= &quot;{step.value}&quot;</span>
+      )}
+      {step.action === "navigate" && step.value && (
+        <span className="truncate font-mono text-foreground/80">{step.value}</span>
+      )}
+    </div>
+  );
+}
+
+const REGRESSION_STEP_GRID =
+  "grid w-full grid-cols-[1.25rem_1.5rem_1.75rem_minmax(0,1fr)] items-center gap-x-1.5 pl-2 pr-4 py-2 text-[12px] sm:pl-2.5 sm:pr-5";
+
 export function RegressionPlanView({ steps }: { steps: RegressionStep[] }) {
+  const [openByIndex, setOpenByIndex] = React.useState<Record<number, boolean>>({});
+
+  function toggleRow(i: number) {
+    setOpenByIndex((prev) => ({ ...prev, [i]: !prev[i] }));
+  }
+
   return (
     <div className="w-full rounded-lg border border-border bg-card overflow-hidden">
-      {steps.map((step, i) => (
-        <div
-          key={i}
-          className={cn(
-            "grid w-full grid-cols-[1.5rem_1.5rem_minmax(0,1fr)] items-start gap-x-1.5 pl-2 pr-4 py-3 text-[12px] sm:grid-cols-[1.625rem_1.75rem_minmax(0,1fr)] sm:pl-2.5 sm:pr-5",
-            i > 0 && "border-t border-border",
-          )}
-        >
-          <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums text-right pt-0.5">
-            {i + 1}
-          </span>
-          <div className="pt-0.5">
-            <StepActionIcon action={step.action} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={cn("font-mono font-medium", STEP_ACTION_COLORS[step.action] ?? "text-foreground")}>
-                {step.action}
-              </span>
-              {step.role && step.name && (
-                <span className="font-mono text-foreground/80">
-                  {step.role}:<span className="text-foreground">&quot;{step.name}&quot;</span>
-                </span>
-              )}
-              {!step.role && step.name && (
-                <span className="font-mono text-foreground/80">&quot;{step.name}&quot;</span>
-              )}
-              {step.value && step.action !== "navigate" && (
-                <span className="text-muted-foreground">= &quot;{step.value}&quot;</span>
-              )}
-              {step.action === "navigate" && step.value && (
-                <span className="font-mono text-violet-500/80 truncate">{step.value}</span>
+      {steps.map((step, i) => {
+        const hasDetails = regressionStepHasExpandableDetails(step);
+        const expanded = Boolean(openByIndex[i]);
+        const rowBase = cn(REGRESSION_STEP_GRID, i > 0 && "border-t border-border");
+
+        const body = (
+          <>
+            <div className="flex h-8 w-5 shrink-0 items-center justify-center text-muted-foreground/50">
+              {hasDetails ? (
+                expanded ? (
+                  <CaretDown className="h-3.5 w-3.5" weight="bold" aria-hidden />
+                ) : (
+                  <CaretRight className="h-3.5 w-3.5" weight="bold" aria-hidden />
+                )
+              ) : null}
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums text-right">
+              {i + 1}
+            </span>
+            <div className="flex h-8 items-center">
+              <StepActionIcon action={step.action} />
+            </div>
+            <div className="min-w-0 py-0.5">
+              <StepSummaryLine step={step} />
+              {hasDetails && expanded && (
+                <div className="mt-2 space-y-1 border-l border-border/60 pl-2.5">
+                  {step.purpose?.trim() && (
+                    <p className="text-[11px] leading-snug text-muted-foreground/80">{step.purpose}</p>
+                  )}
+                  {step.url && step.action !== "navigate" && (
+                    <p className="truncate font-mono text-[10px] text-muted-foreground/50" title={step.url}>
+                      {step.url}
+                    </p>
+                  )}
+                  {step.doneWhen && (
+                    <p className="text-[10px] text-muted-foreground/55">
+                      done when: {step.doneWhen.type}
+                      {step.doneWhen.value && ` "${step.doneWhen.value}"`}
+                      {step.doneWhen.text && ` "${step.doneWhen.text}"`}
+                      {step.doneWhen.name && ` ${step.doneWhen.role}:"${step.doneWhen.name}"`}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
-            {step.purpose && (
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5">{step.purpose}</p>
-            )}
-            {step.url && step.action !== "navigate" && (
-              <p className="text-[10px] font-mono text-muted-foreground/30 mt-0.5 truncate">{step.url}</p>
-            )}
-            {step.doneWhen && (
-              <p className="text-[10px] text-muted-foreground/40 mt-0.5">
-                done when: {step.doneWhen.type}
-                {step.doneWhen.value && ` "${step.doneWhen.value}"`}
-                {step.doneWhen.text && ` "${step.doneWhen.text}"`}
-                {step.doneWhen.name && ` ${step.doneWhen.role}:"${step.doneWhen.name}"`}
-              </p>
-            )}
+          </>
+        );
+
+        if (hasDetails) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleRow(i)}
+              className={cn(rowBase, "w-full cursor-pointer text-left transition-colors hover:bg-accent/25")}
+              aria-expanded={expanded}
+            >
+              {body}
+            </button>
+          );
+        }
+
+        return (
+          <div key={i} className={rowBase}>
+            {body}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
