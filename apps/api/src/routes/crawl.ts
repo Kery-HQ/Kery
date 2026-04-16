@@ -122,9 +122,8 @@ export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapte
   app.get("/api/projects/:projectId/crawl/runs", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
     const { rows } = await pool.query(
-      `SELECT id, project_id, environment_id, status, trigger_type, pages_visited, nodes_found, destinations_built,
-              started_at, completed_at, cost_usd, llm_cost_breakdown_json
-       FROM crawl_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 20`,
+      `SELECT id, status, pages_visited, started_at, completed_at, cost_usd, llm_cost_breakdown_json
+       FROM crawl_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 5`,
       [projectId],
     );
     reply.send({ runs: rows });

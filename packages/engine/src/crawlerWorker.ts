@@ -1079,7 +1079,6 @@ export async function executeCrawlRun(
       sitemap_json: snap.sitemap,
       cost_usd: snap.costUsd,
       llm_cost_breakdown_json: snap.llmCostBreakdown,
-      llm_calls_json: snap.llmCalls,
       crawl_metadata_json: snap.crawlMetadataPartial,
     });
   };
@@ -1106,7 +1105,6 @@ export async function executeCrawlRun(
       nodes_found: result.nodesFound, destinations_built: result.destinationsBuilt,
       sitemap_json: result.sitemap, cost_usd: result.costUsd,
       llm_cost_breakdown_json: result.llmCostBreakdown,
-      llm_calls_json: result.llmCalls,
       crawl_metadata_json: result.crawlMetadata,
       completed_at: new Date().toISOString(),
     });
@@ -1126,7 +1124,6 @@ export async function executeCrawlRun(
         sitemap_json: lastSnapshot.sitemap,
         cost_usd: lastSnapshot.costUsd,
         llm_cost_breakdown_json: lastSnapshot.llmCostBreakdown,
-        llm_calls_json: lastSnapshot.llmCalls,
         crawl_metadata_json: {
           ...lastSnapshot.crawlMetadataPartial,
           inProgress: false,
