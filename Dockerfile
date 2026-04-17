@@ -25,6 +25,7 @@ COPY packages/db/package.json packages/db/
 COPY packages/client/package.json packages/client/
 COPY packages/mcp/package.json packages/mcp/
 COPY apps/api/package.json apps/api/
+COPY apps/worker/package.json apps/worker/
 COPY apps/web/package.json apps/web/
 
 RUN npm install --ignore-scripts --workspaces --include-workspace-root
@@ -39,7 +40,8 @@ COPY apps/ apps/
 RUN npm run build --workspace=packages/engine
 RUN npm run build --workspace=packages/db
 RUN npm run build --workspace=apps/api
+RUN npm run build --workspace=apps/worker
 
-# Run migrations then start
+# Default: run migrations then start API (overridden by worker service in docker-compose)
 COPY packages/db/migrations packages/db/migrations
 CMD ["sh", "-c", "node packages/db/dist/migrate.js && node apps/api/dist/server.js"]

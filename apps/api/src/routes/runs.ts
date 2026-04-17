@@ -4,14 +4,12 @@ import * as fs from "fs";
 import * as path from "path";
 import { Pool } from "pg";
 import type { Queue } from "bullmq";
-import type { Redis } from "ioredis";
+import { Redis } from "ioredis";
 import type { StorageAdapter } from "@kery/engine";
-import {
-  getEmitter, requestStop, logger, LIVE_PREVIEW_FILENAME,
-} from "@kery/engine";
+import { logger, LIVE_PREVIEW_FILENAME } from "@kery/engine";
 import type { RunJobData } from "../runQueue.js";
 import { markRunStopRequested } from "../runStopRedis.js";
-import { mergeDbRunWithLiveSnapshot, readLiveRunSnapshotFromRedis } from "../liveRunBridge.js";
+import { mergeDbRunWithLiveSnapshot, readLiveRunSnapshotFromRedis, runEventsChannel } from "../liveRunBridge.js";
 import { RunIdParams, RunFilenameParams } from "./params.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
@@ -34,6 +32,7 @@ export function registerRunRoutes(
   storage: StorageAdapter,
   runQueue: Queue<RunJobData>,
   redis: Redis,
+  redisUrl: string,
 ) {
   const pool = storage.getPool() as Pool;
 
@@ -48,7 +47,7 @@ export function registerRunRoutes(
       }
       const existing = idempotencyCache.get(idempotencyKey);
       if (existing && existing.expiresAt > now) {
-        reply.send({ runId: existing.runId, status: "running", deduplicated: true });
+        reply.send({ runId: existing.runId, status: "queued", deduplicated: true });
         return;
       }
     }
@@ -104,7 +103,8 @@ export function registerRunRoutes(
       project_id: projectId, environment_id: environmentId,
       test_id: testId ?? null, destination_id: destinationId ?? null,
       trigger_type: "manual", trigger_ref: "dashboard",
-      status: "running", started_at: new Date().toISOString(),
+      // The job has only been enqueued here; worker flips this to `running`.
+      status: "queued", started_at: new Date().toISOString(),
       source_type: sourceType,
       source_label: sourceLabel,
     });
@@ -134,10 +134,10 @@ export function registerRunRoutes(
       idempotencyCache.set(idempotencyKey, { runId: run.id, expiresAt: Date.now() + IDEMPOTENCY_TTL_MS });
     }
 
-    reply.send({ runId: run.id, status: "running" });
+    reply.send({ runId: run.id, status: "queued" });
   });
 
-  // SSE streaming
+  // SSE streaming — uses Redis Pub/Sub so the worker process can be separate
   app.get("/api/runs/:runId/stream", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
     reply.hijack();
@@ -152,39 +152,53 @@ export function registerRunRoutes(
       (reply.raw as any).flush?.();
     };
 
-    const emitter = getEmitter(runId);
-    if (!emitter) {
-      const run = await storage.getTestRun(runId);
-      if (!run) send({ type: "error", message: "run not found" });
-      else send({ type: "done", run });
+    // Check if run exists and is still active
+    const run = await storage.getTestRun(runId);
+    if (!run) {
+      send({ type: "error", message: "run not found" });
       reply.raw.end();
       return;
     }
 
-    const heartbeat = setInterval(() => { reply.raw.write(`:keepalive\n\n`); }, 15_000);
-    const onStep = (step: any) => send({ type: "step", step });
-    const onPlan = (plan: any) => send({ type: "plan", ...plan });
-    const onActivity = (activity: any) => send({ type: "activity", activity });
-    const onScreenshot = (data: string) => send({ type: "screenshot", data });
-    const onLLMCall = (call: any) => send({ type: "llm_call", call });
-    const onDone = (run: any) => { clearInterval(heartbeat); send({ type: "done", run }); reply.raw.end(); };
+    // Run already finished — send final state immediately
+    if (run.status !== "running" && run.status !== "queued") {
+      send({ type: "done", run });
+      reply.raw.end();
+      return;
+    }
 
-    emitter.on("step", onStep);
-    emitter.on("plan", onPlan);
-    emitter.on("activity", onActivity);
-    emitter.on("screenshot", onScreenshot);
-    emitter.on("llm_call", onLLMCall);
-    emitter.once("done", onDone);
+    // Dedicated subscriber connection (Redis forbids pub/sub and commands on the same client)
+    const redisSub = new Redis(redisUrl, { maxRetriesPerRequest: null });
+    const channel = runEventsChannel(runId);
+    let ended = false;
 
-    req.raw.on("close", () => {
+    const cleanup = async () => {
+      if (ended) return;
+      ended = true;
       clearInterval(heartbeat);
-      emitter.off("step", onStep);
-      emitter.off("plan", onPlan);
-      emitter.off("activity", onActivity);
-      emitter.off("screenshot", onScreenshot);
-      emitter.off("llm_call", onLLMCall);
-      emitter.off("done", onDone);
+      try {
+        await redisSub.unsubscribe(channel);
+        redisSub.disconnect();
+      } catch { /* ignore */ }
+    };
+
+    const heartbeat = setInterval(() => { reply.raw.write(`:keepalive\n\n`); }, 15_000);
+
+    redisSub.on("message", (_ch: string, message: string) => {
+      try {
+        const payload = JSON.parse(message);
+        send(payload);
+        if (payload.type === "done") {
+          void cleanup().then(() => reply.raw.end());
+        }
+      } catch {
+        /* ignore malformed messages */
+      }
     });
+
+    await redisSub.subscribe(channel);
+
+    req.raw.on("close", () => { void cleanup(); });
   });
 
   // Get single run
@@ -211,12 +225,15 @@ export function registerRunRoutes(
     reply.send({ bugs });
   });
 
-  // Stop a running run (Redis signal is seen by the BullMQ worker; in-process emitter is a bonus)
+  // Stop a run — works for both "queued" and "running" states
   app.post("/api/runs/:runId/stop", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
-    if (run.status !== "running") { reply.send({ ok: true, status: run.status }); return; }
+    if (run.status !== "running" && run.status !== "queued") {
+      reply.send({ ok: true, status: run.status });
+      return;
+    }
     try {
       await markRunStopRequested(redis, runId);
     } catch (err) {
@@ -224,7 +241,6 @@ export function registerRunRoutes(
       reply.code(503).send({ ok: false, error: "stop_signal_unavailable" });
       return;
     }
-    requestStop(runId);
     reply.send({ ok: true });
   });
 

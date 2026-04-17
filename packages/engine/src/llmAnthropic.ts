@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMUsage } from "./llmTypes.js";
+import type { LLMUsage, LlmChatOpts } from "./llmTypes.js";
 import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 
 const ANTHROPIC_MODEL_IDS: Record<string, string> = {
@@ -114,12 +114,7 @@ export async function anthropicMessagesChat(
   messages: any[],
   model: string,
   apiKey: string,
-  opts: {
-    maxTokens?: number;
-    temperature?: number;
-    responseFormat?: any;
-    timeoutMs?: number;
-  }
+  opts: LlmChatOpts = {}
 ): Promise<{ content: string; usage: LLMUsage }> {
   const wireModel = resolveAnthropicModelId(model);
   const { system, messages: anthropicMessages } = openAIMessagesToAnthropicPayload(messages);
@@ -129,16 +124,17 @@ export async function anthropicMessagesChat(
   const client = new Anthropic({ apiKey, timeout: timeoutMs });
 
   let toolName: string | null = null;
+  const rf = opts.responseFormat as { type?: string; json_schema?: { name: string; schema: unknown } } | undefined;
   const tools: Anthropic.Tool[] | undefined =
-    opts.responseFormat?.type === "json_schema" && opts.responseFormat.json_schema
+    rf?.type === "json_schema" && rf.json_schema
       ? (() => {
-          const js = opts.responseFormat.json_schema;
+          const js = rf.json_schema!;
           toolName = js.name;
           return [
             {
               name: js.name,
               description: "Structured response required by the application.",
-              input_schema: js.schema,
+              input_schema: js.schema as any,
             },
           ];
         })()
@@ -160,7 +156,7 @@ export async function anthropicMessagesChat(
 
   let data: Anthropic.Message;
   try {
-    data = await client.messages.create(params);
+    data = await client.messages.create(params, opts.signal ? { signal: opts.signal } : undefined);
   } catch (err: any) {
     if (err?.name === "AbortError" || err?.message?.includes("timeout")) {
       throw new Error(`Anthropic call timed out after ${timeoutMs}ms`);

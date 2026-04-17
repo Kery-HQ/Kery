@@ -65,6 +65,40 @@ services:
       redis:
         condition: service_healthy
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "apps/worker/dist/worker.js"]
+    environment:
+      DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
+      REDIS_URL: redis://redis:6379
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AGENT_MODEL: ${AGENT_MODEL:-openai/gpt-4.1-mini}
+      REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-4.6}
+      AUXILIARY_MODEL: ${AUXILIARY_MODEL:-${CRAWL_MODEL:-gemini-2.5-flash}}
+      SCRIPT_MODEL: ${SCRIPT_MODEL:-}
+      SUMMARY_MODEL: ${SUMMARY_MODEL:-}
+      REVIEW_MODEL: ${REVIEW_MODEL:-}
+      STAGEHAND_ENABLED: ${STAGEHAND_ENABLED:-true}
+      STAGEHAND_MODEL: ${STAGEHAND_MODEL:-google/gemini-2.0-flash}
+      RUN_TIMEOUT_MINUTES: ${RUN_TIMEOUT_MINUTES:-15}
+      RECORD_VIDEO: ${RECORD_VIDEO:-true}
+      VIDEOS_DIR: /app/data/videos
+      SCREENSHOTS_DIR: /app/data/screenshots
+    volumes:
+      - appdata:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   web:
     build:
       context: .

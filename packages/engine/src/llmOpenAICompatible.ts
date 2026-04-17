@@ -38,7 +38,8 @@ export async function openAIStyleChat(
   if (extra?.bodyExtensions) Object.assign(body, extra.bodyExtensions);
 
   const completion = await client.chat.completions.create(
-    body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
+    body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+    opts.signal ? { signal: opts.signal } : undefined
   );
 
   const choice = completion.choices[0];

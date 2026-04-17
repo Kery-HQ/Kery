@@ -11,7 +11,7 @@ import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings } from "./routes/settings.js";
 import { Redis } from "ioredis";
-import { createRunQueue, createRunWorker } from "./runQueue.js";
+import { createRunQueue } from "./runQueue.js";
 import { withRunCorrelation } from "@kery/engine";
 
 // Initialize engine config from environment
@@ -35,11 +35,10 @@ initEngineConfig({
 const pool = initPool(config.databaseUrl);
 const storage = new PostgresAdapter(pool);
 
-// Initialize BullMQ run queue + worker
-const { queue: runQueue, connection: redisConnection } = createRunQueue(config.redisUrl);
-/** Shared Redis client for cross-process run stop signals (API sets key, worker polls). */
+// Initialize BullMQ queue (enqueue only — execution handled by the worker process)
+const { queue: runQueue } = createRunQueue(config.redisUrl);
+/** Redis client for live snapshot reads and run stop signals. */
 const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
-const runWorker = createRunWorker(redisConnection, storage, redis);
 
 const app = Fastify({ logger: true });
 
@@ -72,7 +71,7 @@ app.get("/health", async () => ({ status: "ok" }));
 
 // Register routes — pass storage adapter and run queue
 registerProjectRoutes(app, storage);
-registerRunRoutes(app, storage, runQueue, redis);
+registerRunRoutes(app, storage, runQueue, redis, config.redisUrl);
 registerCrawlRoutes(app, storage);
 registerTestRoutes(app, storage);
 registerBugRoutes(app, storage);
@@ -90,12 +89,8 @@ try {
 // Graceful shutdown
 async function shutdown() {
   console.log("Shutting down gracefully...");
-  // Stop accepting new jobs
-  await runWorker.close();
   await runQueue.close();
-  // Close HTTP server
   await app.close();
-  // Close DB pool
   await pool.end();
   await redis.quit().catch(() => {});
   process.exit(0);

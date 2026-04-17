@@ -264,6 +264,15 @@ export function Pages() {
     return result;
   }, [pages, filter, healthFilter]);
 
+  const enabledFilteredPages = React.useMemo(
+    () => filteredPages.filter((p) => p.enabled),
+    [filteredPages],
+  );
+  const disabledFilteredPages = React.useMemo(
+    () => filteredPages.filter((p) => !p.enabled),
+    [filteredPages],
+  );
+
   const handleToggleEnabled = React.useCallback(async (page: Page, enabled: boolean) => {
     if (!pid) return;
     const prev = page.enabled;
@@ -392,186 +401,73 @@ export function Pages() {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-5 w-full max-w-4xl mx-auto space-y-4 animate-fade-in">
-
-          {/* Scan banner — live or last-run summary */}
-          {bannerRun && (
-            <ScanBanner run={bannerRun} live={scanActive} />
-          )}
-
-          {/* Replace stuck notice */}
-          {scanActive && canForceReplaceScan && (
-            <p className="text-[11px] text-muted-foreground px-1">
-              No progress? Use{" "}
-              <span className="font-medium text-foreground">Replace stuck scan</span> in the header
-              to abort this run and start a new one.
-            </p>
-          )}
-
-          {/* Scan log — collapsible, auto-opens after scan finishes */}
-          {!scanActive && lastScan?.crawl_metadata_json && (
-            <div className="rounded-lg border border-border/60 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setScanLogOpen(o => !o)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-accent/20 transition-colors"
-              >
-                <span className="text-[12px] font-medium text-foreground/80">Scan log</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {scanLogOpen ? "hide" : "show"}
-                </span>
-              </button>
-              {scanLogOpen && (
-                <pre className="px-4 pb-4 text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-words leading-relaxed border-t border-border/40 pt-3 bg-muted/10">
-                  {formatScanLogLine(lastScan.crawl_metadata_json)}
-                </pre>
-              )}
-            </div>
-          )}
-
-          {/* Rate limit notice */}
-          {rateLimited && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex items-center justify-between">
-              <p className="text-[12px] text-muted-foreground">
-                A scan ran in the last hour. Run again anyway?
-              </p>
-              <Button size="sm" variant="outline" onClick={() => handleScan(true)} className="h-7 text-[11px]">
-                Scan anyway
-              </Button>
-            </div>
-          )}
-
-          {/* Recent scans — compact inline list */}
-          {!scanActive && recentRuns.length > 0 && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setHistoryOpen(o => !o)}
-                className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
-              >
-                <span className={cn("transition-transform text-[9px]", historyOpen ? "rotate-90" : "")}>▶</span>
-                Recent scans ({recentRuns.length})
-              </button>
-              {historyOpen && (
-                <div className="mt-2 rounded-lg border border-border/60 divide-y divide-border/40 overflow-hidden">
-                  {recentRuns.map(run => {
-                    const llm = formatCrawlLlmCostLine(run);
-                    const when = run.completed_at || run.started_at;
-                    const dur = run.completed_at ? duration(run.started_at, run.completed_at) : null;
-                    return (
-                      <div
-                        key={run.id}
-                        className="flex items-center justify-between gap-3 px-3 py-2 text-[11px]"
-                      >
-                        <span className="text-muted-foreground/70 tabular-nums">{relativeTime(when)}</span>
-                        <span className={cn(
-                          "capitalize",
-                          run.status === "failed" ? "text-destructive/80" : "text-muted-foreground",
-                        )}>
-                          {run.status}
+        <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-fade-in">
+          <div className="grid grid-cols-1 gap-4">
+            <aside className="space-y-3 xl:grid xl:grid-cols-12 xl:gap-3 xl:space-y-0">
+              {coverage && coverage.total > 0 && (
+                <div className="space-y-2 rounded-lg border border-border/60 bg-card px-3 py-2.5 xl:col-span-5">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{coverage.tested} of {coverage.total} tested</span>
+                    <div className="flex items-center gap-3">
+                      {coverage.clean > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          {coverage.clean} clean
                         </span>
-                        <span className="font-mono tabular-nums text-muted-foreground/70">
-                          {run.pages_visited ?? "—"} pages
+                      )}
+                      {coverage.withIssues > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          {coverage.withIssues} issues
                         </span>
-                        {llm && (
-                          <span className="font-mono tabular-nums text-muted-foreground/70">{llm}</span>
-                        )}
-                        {dur && (
-                          <span className="font-mono tabular-nums text-muted-foreground/50">{dur}</span>
-                        )}
-                      </div>
-                    );
-                  })}
+                      )}
+                      {coverage.stale > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                          {coverage.stale} stale
+                        </span>
+                      )}
+                      {coverage.untested > 0 && (
+                        <span className="flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                          {coverage.untested} untested
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">
+                    {coverage.clean > 0 && (
+                      <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(coverage.clean / coverage.total) * 100}%` }} />
+                    )}
+                    {coverage.withIssues > 0 && (
+                      <div className="bg-amber-500 h-full transition-all" style={{ width: `${(coverage.withIssues / coverage.total) * 100}%` }} />
+                    )}
+                    {coverage.stale > 0 && (
+                      <div className="bg-orange-400 h-full transition-all" style={{ width: `${(coverage.stale / coverage.total) * 100}%` }} />
+                    )}
+                    {coverage.untested > 0 && (
+                      <div className="bg-muted-foreground/30 h-full transition-all" style={{ width: `${(coverage.untested / coverage.total) * 100}%` }} />
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Coverage bar */}
-          {coverage && coverage.total > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>{coverage.tested} of {coverage.total} tested</span>
-                <div className="flex items-center gap-3">
-                  {coverage.clean > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      {coverage.clean} clean
-                    </span>
-                  )}
-                  {coverage.withIssues > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                      {coverage.withIssues} issues
-                    </span>
-                  )}
-                  {coverage.stale > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-                      {coverage.stale} stale
-                    </span>
-                  )}
-                  {coverage.untested > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
-                      {coverage.untested} untested
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">
-                {coverage.clean > 0 && (
-                  <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(coverage.clean / coverage.total) * 100}%` }} />
-                )}
-                {coverage.withIssues > 0 && (
-                  <div className="bg-amber-500 h-full transition-all" style={{ width: `${(coverage.withIssues / coverage.total) * 100}%` }} />
-                )}
-                {coverage.stale > 0 && (
-                  <div className="bg-orange-400 h-full transition-all" style={{ width: `${(coverage.stale / coverage.total) * 100}%` }} />
-                )}
-                {coverage.untested > 0 && (
-                  <div className="bg-muted-foreground/30 h-full transition-all" style={{ width: `${(coverage.untested / coverage.total) * 100}%` }} />
-                )}
-              </div>
-            </div>
-          )}
+              {!loading && pages.length > 0 && (
+                <div className="rounded-lg border border-border/60 bg-card p-3 space-y-3 xl:col-span-7">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
+                    loading={testAllBusy}
+                    onClick={() => void handleTestAll()}
+                    className="gap-1.5 w-full"
+                  >
+                    {!testAllBusy && <Play className="h-3.5 w-3.5" />}
+                    Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
+                  </Button>
 
-          {loading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : pages.length === 0 ? (
-            <EmptyState
-              icon={<Stack className="h-8 w-8" />}
-              title="No pages discovered yet"
-              description="Click 'Scan my app' to discover all pages, forms, and interactions."
-              action={
-                environments.length === 0
-                  ? { label: "Add environment first", onClick: () => navigate("/environments") }
-                  : undefined
-              }
-            />
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
-                  loading={testAllBusy}
-                  onClick={() => void handleTestAll()}
-                  className="gap-1.5"
-                >
-                  {!testAllBusy && <Play className="h-3.5 w-3.5" />}
-                  Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
-                </Button>
-
-                {/* Filter bar */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="relative flex-1 min-w-[180px] max-w-xs">
+                  <div className="relative w-full">
                     <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
                     <Input
                       value={filter}
@@ -580,7 +476,8 @@ export function Pages() {
                       className="pl-8"
                     />
                   </div>
-                  <div className="flex items-center gap-1">
+
+                  <div className="flex items-center gap-1 flex-wrap">
                     {HEALTH_FILTERS.map(h => (
                       <Button
                         key={h}
@@ -599,101 +496,302 @@ export function Pages() {
                     ))}
                   </div>
                 </div>
-              </div>
+              )}
+            </aside>
 
-              {/* Page tile grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {filteredPages.map(page => (
-                  <div
-                    key={page.id}
-                    className={cn(
-                      "rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[5.5rem]",
-                      !page.enabled && "opacity-60",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <Link
-                        to={`/pages/${page.id}`}
-                        className="min-w-0 flex-1 space-y-1 group/link"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <StatusDot status={page.health} />
-                          <span className={cn(
-                            "font-mono text-[13px] truncate",
-                            !page.enabled && "line-through",
-                          )}>
-                            {page.route}
-                          </span>
-                        </div>
-                        {page.title && page.title !== page.route && (
-                          <p className="text-[11px] text-muted-foreground/60 truncate">
-                            {page.title}
-                          </p>
-                        )}
-                      </Link>
-                      <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
-                        <Switch
-                          checked={page.enabled}
-                          onCheckedChange={v => { void handleToggleEnabled(page, v); }}
-                          aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
-                          className="scale-90"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
-                      <div className="min-w-0 space-y-0.5">
-                        <span className="text-muted-foreground/60 capitalize block">{page.health}</span>
-                        <span className={cn(
-                          "font-medium tabular-nums block",
-                          page.issues > 0
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-muted-foreground/60"
-                        )}>
-                          {page.issues} issue{page.issues !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                          disabled={!page.enabled || !defaultEnvId}
-                          loading={runBusyId === page.id}
-                          onClick={e => {
-                            e.preventDefault();
-                            void handleRunPage(page);
-                          }}
-                          aria-label={`Run test for ${page.route}`}
-                        >
-                          {runBusyId !== page.id && <Play className="h-3.5 w-3.5" />}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={e => {
-                            e.preventDefault();
-                            setDeleteTarget(page);
-                          }}
-                          aria-label={`Remove ${page.route} from project`}
-                        >
-                          <Trash className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <main className="space-y-3">
+              {/* Scan banner — live or last-run summary */}
+              {bannerRun && (
+                <ScanBanner run={bannerRun} live={scanActive} />
+              )}
 
-              {filteredPages.length === 0 && (filter || healthFilter !== "all") && (
-                <div className="text-center py-8 text-[13px] text-muted-foreground">
-                  No pages matching current filters
+              {/* Replace stuck notice */}
+              {scanActive && canForceReplaceScan && (
+                <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+                  <p className="text-[11px] text-muted-foreground">
+                    No progress? Use{" "}
+                    <span className="font-medium text-foreground">Replace stuck scan</span> in the header
+                    to abort this run and start a new one.
+                  </p>
                 </div>
               )}
-            </>
-          )}
+
+              {/* Rate limit notice */}
+              {rateLimited && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex items-center justify-between">
+                  <p className="text-[12px] text-muted-foreground">
+                    A scan ran in the last hour. Run again anyway?
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => handleScan(true)} className="h-7 text-[11px]">
+                    Scan anyway
+                  </Button>
+                </div>
+              )}
+
+              {/* Scan log — collapsible, auto-opens after scan finishes */}
+              {!scanActive && lastScan?.crawl_metadata_json && (
+                <div className="rounded-lg border border-border/60 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setScanLogOpen(o => !o)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-accent/20 transition-colors"
+                  >
+                    <span className="text-[12px] font-medium text-foreground/80">Scan log</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {scanLogOpen ? "hide" : "show"}
+                    </span>
+                  </button>
+                  {scanLogOpen && (
+                    <pre className="px-4 pb-4 text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-words leading-relaxed border-t border-border/40 pt-3 bg-muted/10">
+                      {formatScanLogLine(lastScan.crawl_metadata_json)}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              {/* Recent scans — compact inline list */}
+              {!scanActive && recentRuns.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen(o => !o)}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                  >
+                    <span className={cn("transition-transform text-[9px]", historyOpen ? "rotate-90" : "")}>▶</span>
+                    Recent scans ({recentRuns.length})
+                  </button>
+                  {historyOpen && (
+                    <div className="mt-2 rounded-lg border border-border/60 divide-y divide-border/40 overflow-hidden">
+                      {recentRuns.map(run => {
+                        const llm = formatCrawlLlmCostLine(run);
+                        const when = run.completed_at || run.started_at;
+                        const dur = run.completed_at ? duration(run.started_at, run.completed_at) : null;
+                        return (
+                          <div
+                            key={run.id}
+                            className="flex items-center justify-between gap-3 px-3 py-2 text-[11px]"
+                          >
+                            <span className="text-muted-foreground/70 tabular-nums">{relativeTime(when)}</span>
+                            <span className={cn(
+                              "capitalize",
+                              run.status === "failed" ? "text-destructive/80" : "text-muted-foreground",
+                            )}>
+                              {run.status}
+                            </span>
+                            <span className="font-mono tabular-nums text-muted-foreground/70">
+                              {run.pages_visited ?? "—"} pages
+                            </span>
+                            {llm && (
+                              <span className="font-mono tabular-nums text-muted-foreground/70">{llm}</span>
+                            )}
+                            {dur && (
+                              <span className="font-mono tabular-nums text-muted-foreground/50">{dur}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {loading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : pages.length === 0 ? (
+                <EmptyState
+                  icon={<Stack className="h-8 w-8" />}
+                  title="No pages discovered yet"
+                  description="Click 'Scan my app' to discover all pages, forms, and interactions."
+                  action={
+                    environments.length === 0
+                      ? { label: "Add environment first", onClick: () => navigate("/environments") }
+                      : undefined
+                  }
+                />
+              ) : (
+                <>
+                  {/* Enabled page tiles */}
+                  {enabledFilteredPages.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                        Enabled pages ({enabledFilteredPages.length})
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                        {enabledFilteredPages.map(page => (
+                          <div
+                            key={page.id}
+                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[5.5rem]"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <Link
+                                to={`/pages/${page.id}`}
+                                className="min-w-0 flex-1 space-y-1 group/link"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <StatusDot status={page.health} />
+                                  <span className="font-mono text-[13px] truncate">
+                                    {page.route}
+                                  </span>
+                                </div>
+                                {page.title && page.title !== page.route && (
+                                  <p className="text-[11px] text-muted-foreground/60 truncate">
+                                    {page.title}
+                                  </p>
+                                )}
+                              </Link>
+                              <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
+                                <Switch
+                                  checked={page.enabled}
+                                  onCheckedChange={v => { void handleToggleEnabled(page, v); }}
+                                  aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
+                                  className="scale-90"
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
+                              <div className="min-w-0 space-y-0.5">
+                                <span className="text-muted-foreground/60 capitalize block">{page.health}</span>
+                                <span className={cn(
+                                  "font-medium tabular-nums block",
+                                  page.issues > 0
+                                    ? "text-amber-600 dark:text-amber-400"
+                                    : "text-muted-foreground/60"
+                                )}>
+                                  {page.issues} issue{page.issues !== 1 ? "s" : ""}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                  disabled={!defaultEnvId}
+                                  loading={runBusyId === page.id}
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    void handleRunPage(page);
+                                  }}
+                                  aria-label={`Run test for ${page.route}`}
+                                >
+                                  {runBusyId !== page.id && <Play className="h-3.5 w-3.5" />}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    setDeleteTarget(page);
+                                  }}
+                                  aria-label={`Remove ${page.route} from project`}
+                                >
+                                  <Trash className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Disabled page tiles */}
+                  {disabledFilteredPages.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                        Disabled pages ({disabledFilteredPages.length})
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                        {disabledFilteredPages.map(page => (
+                          <div
+                            key={page.id}
+                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[5.5rem] opacity-60"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <Link
+                                to={`/pages/${page.id}`}
+                                className="min-w-0 flex-1 space-y-1 group/link"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <StatusDot status={page.health} />
+                                  <span className="font-mono text-[13px] truncate line-through">
+                                    {page.route}
+                                  </span>
+                                </div>
+                                {page.title && page.title !== page.route && (
+                                  <p className="text-[11px] text-muted-foreground/60 truncate">
+                                    {page.title}
+                                  </p>
+                                )}
+                              </Link>
+                              <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
+                                <Switch
+                                  checked={page.enabled}
+                                  onCheckedChange={v => { void handleToggleEnabled(page, v); }}
+                                  aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
+                                  className="scale-90"
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
+                              <div className="min-w-0 space-y-0.5">
+                                <span className="text-muted-foreground/60 capitalize block">{page.health}</span>
+                                <span className={cn(
+                                  "font-medium tabular-nums block",
+                                  page.issues > 0
+                                    ? "text-amber-600 dark:text-amber-400"
+                                    : "text-muted-foreground/60"
+                                )}>
+                                  {page.issues} issue{page.issues !== 1 ? "s" : ""}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                  disabled
+                                  aria-label={`Run test for ${page.route}`}
+                                >
+                                  <Play className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    setDeleteTarget(page);
+                                  }}
+                                  aria-label={`Remove ${page.route} from project`}
+                                >
+                                  <Trash className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredPages.length === 0 && (filter || healthFilter !== "all") && (
+                    <div className="text-center py-8 text-[13px] text-muted-foreground">
+                      No pages matching current filters
+                    </div>
+                  )}
+                </>
+              )}
+            </main>
+          </div>
         </div>
       </div>
 

@@ -31,7 +31,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { RunList } from "@/components/RunList";
 import { cn } from "@/lib/utils";
-import { statusVariant, relativeTime } from "@/lib/formatters";
+import { relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
