@@ -180,12 +180,15 @@ export function FlowDetail() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-card/50">
+      <div className="flex flex-col min-h-full">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-4 w-40" />
+          <div className="flex-1" />
+          <Skeleton className="h-7 w-16" />
+          <Skeleton className="h-7 w-14" />
         </div>
-        <div className="px-6 py-5 max-w-4xl mx-auto w-full space-y-4 animate-fade-in">
+        <div className="px-6 py-5 space-y-4 animate-fade-in">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-6 w-full" />
           <Skeleton className="h-40 w-full" />
@@ -196,15 +199,17 @@ export function FlowDetail() {
 
   if (error || !test) {
     return (
-      <div className="flex flex-col h-full">
-        <div className="px-6 py-6 max-w-4xl mx-auto space-y-4">
+      <div className="flex flex-col min-h-full">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
           <button
             onClick={() => navigate("/tests")}
-            className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Flows
           </button>
+        </div>
+        <div className="px-6 py-5">
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-foreground">
             {error || "Flow not found"}
           </div>
@@ -216,60 +221,58 @@ export function FlowDetail() {
   const hasRegressionPlan = (test.regression_plan?.length ?? 0) > 0;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-border bg-card/40 px-6">
-        <div className="mx-auto flex h-11 max-w-4xl items-center gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/tests")}
-              className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Flows
-            </button>
-            <span className="select-none text-muted-foreground/35" aria-hidden>·</span>
-            {test.plan_status === "ready" && (
-              <Badge variant="success" className="text-[10px]">Script ready</Badge>
-            )}
-            {test.plan_status === "stale" && (
-              <Badge variant="warning" className="text-[10px]">Script stale</Badge>
-            )}
-            <h1
-              className="min-w-0 truncate text-[13px] font-semibold text-foreground"
-              title={test.name}
-            >
-              {test.name}
-            </h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={openEdit}
-              className="h-8 gap-1.5 text-[12px]"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleRun}
-              disabled={!defaultEnvId}
-              loading={running}
-              className="h-8 gap-1.5 text-[12px]"
-            >
-              {!running && <Play className="h-3.5 w-3.5" />}
-              Run
-            </Button>
-          </div>
+      <div className="flex items-center justify-between gap-4 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/tests")}
+            className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Flows
+          </button>
+          <span className="select-none text-muted-foreground/35 text-[14px]" aria-hidden>/</span>
+          <h1
+            className="min-w-0 truncate font-display font-semibold text-[14px] tracking-tight text-foreground"
+            title={test.name}
+          >
+            {test.name}
+          </h1>
+          {test.plan_status === "ready" && (
+            <Badge variant="success" className="text-[10px] shrink-0">Script ready</Badge>
+          )}
+          {test.plan_status === "stale" && (
+            <Badge variant="warning" className="text-[10px] shrink-0">Script stale</Badge>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={openEdit}
+            className="h-8 gap-1.5 text-[12px]"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleRun}
+            disabled={!defaultEnvId}
+            loading={running}
+            className="h-8 gap-1.5 text-[12px]"
+          >
+            {!running && <Play className="h-3.5 w-3.5" />}
+            Run
+          </Button>
         </div>
       </div>
 
       {/* Tabbed content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="max-w-4xl mx-auto animate-fade-in">
+        <div className="animate-fade-in">
           <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -293,38 +296,60 @@ export function FlowDetail() {
 
             {/* Overview */}
             <TabsContent value="overview">
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
-                <table className="w-full text-[13px]">
-                  <tbody className="divide-y divide-border">
-                    <tr>
-                      <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide w-28">Name</td>
-                      <td className="px-4 py-2 text-foreground">{test.name}</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide align-top pt-3">Intent</td>
-                      <td className="px-4 py-2 text-foreground whitespace-pre-wrap leading-relaxed">{test.intent}</td>
-                    </tr>
-                    {test.context ? (
-                      <tr>
-                        <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide align-top pt-3">Context</td>
-                        <td className="px-4 py-2 text-foreground whitespace-pre-wrap leading-relaxed">{test.context}</td>
-                      </tr>
-                    ) : null}
-                    <tr>
-                      <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Max steps</td>
-                      <td className="px-4 py-2 text-foreground tabular-nums">
-                        {test.max_steps ?? DEFAULT_FLOW_MAX_STEPS}
-                        {test.max_steps == null && (
-                          <span className="text-muted-foreground/60 font-normal"> (default)</span>
-                        )}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Created</td>
-                      <td className="px-4 py-2 font-mono text-muted-foreground">{relativeTime(test.created_at)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Main — intent + context */}
+                <div className="lg:col-span-2 space-y-3">
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Description</p>
+                    <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{test.intent}</p>
+                  </div>
+                  {test.context ? (
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Context</p>
+                      <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{test.context}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Sidebar — metadata */}
+                <div className="space-y-px rounded-lg border border-border bg-card overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border last:border-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Max steps</p>
+                    <p className="text-[13px] text-foreground tabular-nums">
+                      {test.max_steps ?? DEFAULT_FLOW_MAX_STEPS}
+                      {test.max_steps == null && (
+                        <span className="text-muted-foreground/50"> (default)</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="px-4 py-3 border-b border-border last:border-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Script</p>
+                    <div>
+                      {test.plan_status === "ready" && <Badge variant="success">Ready</Badge>}
+                      {test.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
+                      {(!test.plan_status || test.plan_status === "none") && (
+                        <span className="text-[13px] text-muted-foreground/50">None yet</span>
+                      )}
+                      {(test.plan_success_count ?? 0) > 0 && (
+                        <p className="text-[11px] font-mono text-muted-foreground/50 mt-1">
+                          {test.plan_success_count} successful replay{test.plan_success_count !== 1 ? "s" : ""}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-4 py-3 border-b border-border last:border-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Open issues</p>
+                    <p className="text-[13px] text-foreground">
+                      {bugs.filter(b => b.status === "open" || b.status === "in_progress").length || (
+                        <span className="text-muted-foreground/50">None</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="px-4 py-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Created</p>
+                    <p className="text-[13px] font-mono text-muted-foreground">{relativeTime(test.created_at)}</p>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 
@@ -497,9 +522,12 @@ export function FlowDetail() {
             {/* Memory */}
             <TabsContent value="memory">
               {memory.length === 0 ? (
-                <div className="text-center py-12 text-[13px] text-muted-foreground">
-                  No project memory entries yet.
-                </div>
+                <EmptyState
+                  icon={<Brain className="h-5 w-5" />}
+                  title="No memory entries yet"
+                  description="Memory is built up as the agent runs flows and learns about your project."
+                  className="py-16"
+                />
               ) : (
                 <div className="space-y-1.5">
                   {memory.map((e) => (
