@@ -1882,11 +1882,14 @@ function LLMCallDetailSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const [wrapResponse, setWrapResponse] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState("messages");
+  const [activeTab, setActiveTab] = React.useState("conversation");
   const call = selectedCall;
   const canPrev = selectedIndex > 0;
   const canNext = selectedIndex >= 0 && selectedIndex < calls.length - 1;
   const agentInfo = llmAgentDisplay(call?.agent ?? "navigator");
+  const allMessages = call?.requestMessages ?? [];
+  const systemMessages = allMessages.filter((m) => m.role.toLowerCase() === "system");
+  const conversationMessages = allMessages.filter((m) => m.role.toLowerCase() !== "system");
   const imageCount = call
     ? Math.max(call.imagePaths?.length ?? 0, call.imageBase64s?.length ?? 0, call.imagePath || call.imageBase64 ? 1 : 0)
     : 0;
@@ -1962,7 +1965,10 @@ function LLMCallDetailSheet({
               </div>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList>
-                  <TabsTrigger value="messages">Messages ({call.requestMessages?.length ?? (call.query ? 1 : 0)})</TabsTrigger>
+                  <TabsTrigger value="system">System ({systemMessages.length})</TabsTrigger>
+                  <TabsTrigger value="conversation">
+                    Conversation ({conversationMessages.length || (call.query ? 1 : 0)})
+                  </TabsTrigger>
                   {call.agent === "filmstrip" && <TabsTrigger value="filmstrip">Filmstrip ({imageCount})</TabsTrigger>}
                   <TabsTrigger value="response">Response</TabsTrigger>
                   <TabsTrigger value="raw">Raw JSON</TabsTrigger>
@@ -1971,10 +1977,70 @@ function LLMCallDetailSheet({
             </SheetHeader>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 flex flex-col">
-              <TabsContent value="messages" className="mt-0 p-4 min-h-0 overflow-y-auto space-y-3">
-                {call.requestMessages && call.requestMessages.length > 0 ? (
-                  call.requestMessages.map((m, mi) => (
+              <TabsContent value="system" className="mt-0 p-4 min-h-0 overflow-y-auto space-y-3">
+                {systemMessages.length > 0 ? (
+                  systemMessages.map((m, mi) => (
                     <Card key={`${m.role}-${mi}`} className={cn(m.role === "system" && "border-border/80 bg-muted/15")}>
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Badge variant="outline" className="text-[10px] h-5 font-mono uppercase">
+                            {llmRoleLabel(m.role)}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-[10px]"
+                            onClick={() => void copyText(messageTextContent(m.content))}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        {typeof m.content === "string" ? (
+                          <pre className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/85 leading-relaxed">
+                            {m.content}
+                          </pre>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {m.content.map((part, pi) =>
+                              part.type === "text" ? (
+                                <pre key={pi} className="text-[11px] font-mono whitespace-pre-wrap break-words text-foreground/85 leading-relaxed">
+                                  {part.text}
+                                </pre>
+                              ) : (
+                                <div key={pi} className="space-y-1">
+                                  {part.label ? <p className="text-[10px] text-muted-foreground">{part.label}</p> : null}
+                                  {(() => {
+                                    const src = llmCallImageSrcByIndex(call, runId, part.imageIndex);
+                                    return src ? (
+                                      <div className="rounded border border-border bg-black overflow-hidden">
+                                        <img src={src} alt={`Input image ${part.imageIndex + 1}`} className="w-full max-h-80 object-contain object-top" />
+                                      </div>
+                                    ) : (
+                                      <p className="text-[10px] text-muted-foreground italic">Image {part.imageIndex + 1} not available on disk</p>
+                                    );
+                                  })()}
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Card>
+                    <CardContent className="p-3">
+                      <p className="text-[11px] text-muted-foreground italic">No system prompt captured for this call.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="conversation" className="mt-0 p-4 min-h-0 overflow-y-auto space-y-3">
+                {conversationMessages.length > 0 ? (
+                  conversationMessages.map((m, mi) => (
+                    <Card key={`${m.role}-${mi}`}>
                       <CardContent className="p-3 space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <Badge variant="outline" className="text-[10px] h-5 font-mono uppercase">
@@ -2030,7 +2096,7 @@ function LLMCallDetailSheet({
                           {call.query}
                         </pre>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground italic">No request text stored for this call.</p>
+                        <p className="text-[11px] text-muted-foreground italic">No conversation messages stored for this call.</p>
                       )}
                       {imageCount > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
