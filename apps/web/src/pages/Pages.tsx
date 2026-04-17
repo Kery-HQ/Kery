@@ -794,7 +794,7 @@ export function Pages() {
               {deleteTarget && (
                 <>
                   This removes <span className="font-mono text-foreground">{deleteTarget.route}</span> from your
-                  catalog. Flow edges and page memory for this route are deleted. You can add it again with a scan.
+                  catalog. Flow edges and run history for this route are deleted. You can add it again with a scan.
                 </>
               )}
             </DialogDescription>

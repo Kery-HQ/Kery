@@ -30,9 +30,9 @@ export { handleTokenAuth, authenticateWithClerk, authenticateWithSupabase, refre
 
 // ─── Memory ──────────────────────────────────────────────────────────────────
 export {
-  loadProjectMemory, loadPageMemory,
-  loadProjectMemoryWithDecay, loadPageMemoryWithDecay,
-  saveProjectMemoryEntries, savePageMemoryEntries,
+  loadProjectMemory,
+  loadProjectMemoryWithDecay,
+  saveProjectMemoryEntries,
   formatMemoryForPrompt, proposeMemoriesFromRun, boostConfidence,
 } from "./agentMemory.js";
 export { curateMemoryAfterRun } from "./memoryCurator.js";

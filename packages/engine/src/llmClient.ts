@@ -332,7 +332,7 @@ const MEMORY_ADD_ITEM_SCHEMA = {
     },
     summary: { type: "string" },
     content: { type: "string" },
-    scope: { type: "string", enum: ["project", "page"] },
+    scope: { type: "string", enum: ["project"] },
     confidence: { type: "integer" },
     regionDescription: { type: ["string", "null"] },
   },
@@ -376,7 +376,7 @@ export type MemoryCurationParsed = {
     type: "learned_path" | "ignore_region" | "avoid_region" | "bug_pattern" | "tip";
     summary: string;
     content: string;
-    scope: "project" | "page";
+    scope: "project";
     confidence: number;
     regionDescription: string | null;
   }>;

@@ -18,7 +18,7 @@ import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
 import { generateScriptWithLLM } from "./scriptGenerator.js";
 import {
-  loadProjectMemoryWithDecay, loadPageMemoryWithDecay,
+  loadProjectMemoryWithDecay,
   boostConfidence,
   type MemoryEntry,
 } from "./agentMemory.js";
@@ -135,8 +135,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
   }
   const projectMemory = job.projectId ? await loadProjectMemoryWithDecay(storage, job.projectId) : [];
-  const pageMemory = job.destinationId ? await loadPageMemoryWithDecay(storage, job.destinationId) : [];
-  const allMemory = [...pageMemory, ...projectMemory];
+  const allMemory = projectMemory;
 
   // Launch browser
   let browser;
@@ -474,10 +473,8 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       runStatus: agentResult.status === "passed" ? "passed" : "failed",
       stepsDetail: agentResult.stepsDetail,
       projectId: job.projectId,
-      destinationId: job.destinationId,
       destinationRoute,
       projectMemory,
-      pageMemory,
       onLLMCall: (call) => {
         memoryCuratorCalls.push(call);
         job.onLLMCall?.(call);

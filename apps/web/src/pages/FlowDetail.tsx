@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Play,
   Pencil,
-  Brain,
   Repeat,
   ArrowCounterClockwise,
   Warning,
@@ -38,14 +37,12 @@ import {
   fetchTests,
   fetchEnvironments,
   fetchProjectRuns,
-  fetchMemory,
   fetchProjectBugs,
   runProjectTest,
   updateTest,
   resetTestScript,
   patchProjectBug,
 } from "@/projectApi";
-import type { MemoryEntry } from "@/projectApi";
 import { RegressionPlanView, type RegressionStep } from "@/pages/TestsPlans";
 import { BUG_SEVERITY_STATUS_DOT } from "@/lib/bug-issue-display";
 import { runScreenshotFileUrl } from "@/lib/apiAssets";
@@ -73,7 +70,6 @@ export function FlowDetail() {
   const { currentProjectId } = useProject();
 
   const [test, setTest] = React.useState<SavedTest | null>(null);
-  const [memory, setMemory] = React.useState<MemoryEntry[]>([]);
   const [runs, setRuns] = React.useState<any[]>([]);
   const [bugs, setBugs] = React.useState<BugRecord[]>([]);
   const [environments, setEnvironments] = React.useState<any[]>([]);
@@ -96,9 +92,8 @@ export function FlowDetail() {
     setLoading(true);
     setError(null);
     try {
-      const [testsRes, memRes, runsRes, envsRes, bugsRes] = await Promise.all([
+      const [testsRes, runsRes, envsRes, bugsRes] = await Promise.all([
         fetchTests(currentProjectId),
-        fetchMemory(currentProjectId),
         fetchProjectRuns(currentProjectId),
         fetchEnvironments(currentProjectId),
         fetchProjectBugs(currentProjectId).catch(() => ({ bugs: [] })),
@@ -112,7 +107,6 @@ export function FlowDetail() {
         return;
       }
       setTest(found);
-      setMemory((memRes as { entries: MemoryEntry[] }).entries ?? []);
       setRuns((runsRes.runs ?? []).filter((r: any) => r.test_id === testId));
       setEnvironments((envsRes as any).environments ?? []);
       setBugs(((bugsRes as any).bugs ?? []).filter((b: BugRecord) => b.test_id === testId));
@@ -290,7 +284,6 @@ export function FlowDetail() {
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="memory">Memory</TabsTrigger>
               <TabsTrigger value="runs">Runs</TabsTrigger>
             </TabsList>
 
@@ -515,35 +508,6 @@ export function FlowDetail() {
                       </div>
                     );
                   })}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Memory */}
-            <TabsContent value="memory">
-              {memory.length === 0 ? (
-                <EmptyState
-                  icon={<Brain className="h-5 w-5" />}
-                  title="No memory entries yet"
-                  description="Memory is built up as the agent runs flows and learns about your project."
-                  className="py-16"
-                />
-              ) : (
-                <div className="space-y-1.5">
-                  {memory.map((e) => (
-                    <div
-                      key={e.id}
-                      className="rounded-lg border border-border bg-card px-3 py-2 flex items-start gap-2"
-                    >
-                      <Brain className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[13px] font-medium text-foreground">{e.type}</span>
-                        {e.summary && (
-                          <p className="text-[12px] text-muted-foreground mt-0.5">{e.summary}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </TabsContent>

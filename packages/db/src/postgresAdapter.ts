@@ -47,14 +47,6 @@ export class PostgresAdapter implements StorageAdapter {
     return rows;
   }
 
-  async loadPageMemory(destinationId: string) {
-    const { rows } = await this.db.query(
-      `SELECT * FROM memory_entries WHERE scope = 'page' AND destination_id = $1 ORDER BY confidence DESC LIMIT 50`,
-      [destinationId],
-    );
-    return rows;
-  }
-
   async saveProjectMemoryEntries(projectId: string, entries: any[]) {
     if (entries.length === 0) return;
     const values: any[] = [];
@@ -67,22 +59,6 @@ export class PostgresAdapter implements StorageAdapter {
     }
     await this.db.query(
       `INSERT INTO memory_entries (scope, project_id, type, summary, content, region, source, confidence) VALUES ${placeholders.join(", ")}`,
-      values,
-    );
-  }
-
-  async savePageMemoryEntries(destinationId: string, entries: any[]) {
-    if (entries.length === 0) return;
-    const values: any[] = [];
-    const placeholders: string[] = [];
-    let idx = 1;
-    for (const e of entries) {
-      placeholders.push(`('page', $${idx}, $${idx+1}, $${idx+2}, $${idx+3}, $${idx+4}, $${idx+5}, $${idx+6})`);
-      values.push(destinationId, e.type, e.summary, e.content, e.region ? JSON.stringify(e.region) : null, e.source ?? "agent", e.confidence ?? 50);
-      idx += 7;
-    }
-    await this.db.query(
-      `INSERT INTO memory_entries (scope, destination_id, type, summary, content, region, source, confidence) VALUES ${placeholders.join(", ")}`,
       values,
     );
   }

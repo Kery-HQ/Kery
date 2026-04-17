@@ -4,9 +4,7 @@ import {
   ArrowLeft,
   Play,
   Trash,
-  Brain,
   Repeat,
-  Stack,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +14,7 @@ import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { relativeTime, duration, statusVariant, runListLabel } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
-import { fetchPageDetail, fetchPageMemory, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
-import type { MemoryEntry } from "@/projectApi";
+import { fetchPageDetail, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
 import { RegressionPlanView, type RegressionStep } from "@/pages/TestsPlans";
 
 type PageData = {
@@ -51,7 +48,6 @@ export function PageDetail() {
   const navigate = useNavigate();
   const { currentProjectId } = useProject();
   const [data, setData] = React.useState<PageData | null>(null);
-  const [memory, setMemory] = React.useState<MemoryEntry[]>([]);
   const [environments, setEnvironments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [running, setRunning] = React.useState(false);
@@ -64,18 +60,15 @@ export function PageDetail() {
     setLoading(true);
     setError(null);
     try {
-      const [detailRes, memoryRes, envsRes] = await Promise.all([
+      const [detailRes, envsRes] = await Promise.all([
         fetchPageDetail(currentProjectId, destinationId),
-        fetchPageMemory(currentProjectId, destinationId),
         fetchEnvironments(currentProjectId),
       ]);
       setData(detailRes as PageData);
-      setMemory((memoryRes as { entries: MemoryEntry[] }).entries || []);
       setEnvironments((envsRes as { environments: any[] }).environments || []);
     } catch (e: any) {
       setError(e?.message || "Failed to load page");
       setData(null);
-      setMemory([]);
       setEnvironments([]);
     }
     setLoading(false);
@@ -225,7 +218,6 @@ export function PageDetail() {
           <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="memory">Memory</TabsTrigger>
               <TabsTrigger value="runs">
                 Runs
                 {recentRuns.length > 0 && (
@@ -308,32 +300,6 @@ export function PageDetail() {
                   </div>
                 </div>
               </div>
-            </TabsContent>
-
-            {/* Memory */}
-            <TabsContent value="memory">
-              {memory.length === 0 ? (
-                <EmptyState
-                  icon={<Brain className="h-5 w-5" />}
-                  title="No memory entries yet"
-                  description="Memory is built up as the agent inspects this page over time."
-                  className="py-16"
-                />
-              ) : (
-                <div className="space-y-1.5">
-                  {memory.map((e) => (
-                    <div key={e.id} className="rounded-lg border border-border bg-card px-3 py-2 flex items-start gap-2">
-                      <Brain className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[13px] font-medium text-foreground">{e.type}</span>
-                        {e.summary && (
-                          <p className="text-[12px] text-muted-foreground mt-0.5">{e.summary}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </TabsContent>
 
             {/* Runs */}
