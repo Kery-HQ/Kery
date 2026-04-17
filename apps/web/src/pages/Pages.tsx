@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -45,6 +46,8 @@ type Page = {
   health: "clean" | "issues" | "stale" | "untested";
   issues: number;
   enabled: boolean;
+  plan_status?: "none" | "ready" | "stale" | null;
+  plan_success_count?: number;
 };
 
 type Coverage = {
@@ -106,6 +109,7 @@ const HEALTH_LABEL: Record<string, string> = {
 /** After this, the scan button stays clickable and sends `force` to abort a stuck server-side `running` row. */
 const SCAN_FORCE_REPLACE_AFTER_MS = 2 * 60 * 1000;
 
+
 function formatScanLogLine(meta: LastScanMeta): string {
   const parts: string[] = [];
   if (meta.startedAt) parts.push(`started: ${new Date(meta.startedAt).toLocaleString()}`);
@@ -143,6 +147,7 @@ export function Pages() {
   const [lastScan, setLastScan] = React.useState<LastScan | null>(null);
   const [crawlRuns, setCrawlRuns] = React.useState<CrawlRunRow[]>([]);
   const [environments, setEnvironments] = React.useState<any[]>([]);
+  const [selectedEnvId, setSelectedEnvId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [scanActive, setScanActive] = React.useState(false);
   const [liveScan, setLiveScan] = React.useState<LastScan | null>(null);
@@ -160,7 +165,7 @@ export function Pages() {
   const [testAllBusy, setTestAllBusy] = React.useState(false);
 
   const defaultEnv = environments.find((e: { is_default?: boolean }) => e.is_default) || environments[0];
-  const defaultEnvId: string | null = defaultEnv?.id ?? null;
+  const defaultEnvId: string | null = selectedEnvId ?? defaultEnv?.id ?? null;
 
   const loadData = React.useCallback(async () => {
     if (!pid) return;
@@ -175,7 +180,10 @@ export function Pages() {
       setCoverage(pagesRes.coverage || null);
       setLastScan(pagesRes.lastScan || null);
       setCrawlRuns((crawlRes as { runs?: CrawlRunRow[] })?.runs || []);
-      setEnvironments((envsRes as any).environments || []);
+      const loadedEnvs = (envsRes as any).environments || [];
+      setEnvironments(loadedEnvs);
+      setSelectedEnvId((prev) => prev ?? loadedEnvs.find((e: { is_default?: boolean }) => e.is_default)?.id ?? loadedEnvs[0]?.id ?? null);
+      setCrawlRuns((crawlRes as { runs?: CrawlRunRow[] })?.runs || []);
     } catch {}
     setLoading(false);
   }, [pid]);
@@ -360,7 +368,9 @@ export function Pages() {
       })
     : lastScan;
 
-  const recentRuns = crawlRuns.slice(0, 5);
+  const totalIssuesFound = pages.reduce((sum, p) => sum + Math.max(0, Number(p.issues || 0)), 0);
+  const needsAttentionCount = pages.filter((p) => p.health === "issues" || p.health === "stale").length;
+  const issuesPageCount = pages.filter((p) => p.issues > 0).length;
 
   if (!pid) {
     return (
@@ -378,14 +388,9 @@ export function Pages() {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader icon={<Stack className="h-4 w-4" />} title="Pages">
-        {lastScan?.completed_at && !scanActive && (
-          <span className="text-[11px] text-muted-foreground/50">
-            Scanned {relativeTime(lastScan.completed_at)}
-          </span>
-        )}
         <Button
           size="sm"
-          variant={pages.length === 0 ? "default" : "outline"}
+          variant="outline"
           onClick={() => handleScan()}
           loading={scanActive && !canForceReplaceScan}
         >
@@ -396,112 +401,98 @@ export function Pages() {
               : "Scanning..."
             : pages.length === 0
               ? "Scan my app"
-              : "Re-scan"}
+              : "Scan app"}
         </Button>
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-fade-in">
           <div className="grid grid-cols-1 gap-4">
-            <aside className="space-y-3 xl:grid xl:grid-cols-12 xl:gap-3 xl:space-y-0">
+            <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {coverage && coverage.total > 0 && (
-                <div className="space-y-2 rounded-lg border border-border/60 bg-card px-3 py-2.5 xl:col-span-5">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{coverage.tested} of {coverage.total} tested</span>
-                    <div className="flex items-center gap-3">
-                      {coverage.clean > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          {coverage.clean} clean
+                <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
+                  <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div
+                      className="relative h-14 w-14 rounded-full"
+                      style={{
+                        background: `conic-gradient(
+                          rgb(16 185 129) 0 ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg,
+                          rgb(245 158 11) ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg,
+                          rgb(251 146 60) ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg,
+                          rgb(148 163 184 / 0.35) ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg 360deg
+                        )`,
+                      }}
+                    >
+                      <div className="absolute inset-2 rounded-full bg-card flex items-center justify-center">
+                        <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                          {coverage.tested}/{coverage.total}
                         </span>
-                      )}
-                      {coverage.withIssues > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                          {coverage.withIssues} issues
-                        </span>
-                      )}
-                      {coverage.stale > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-                          {coverage.stale} stale
-                        </span>
-                      )}
-                      {coverage.untested > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
-                          {coverage.untested} untested
-                        </span>
-                      )}
+                      </div>
+                    </div>
+                    <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                      <p>{coverage.clean} clean</p>
+                      <p>{coverage.withIssues} issues</p>
+                      <p>{coverage.stale} stale</p>
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden flex">
-                    {coverage.clean > 0 && (
-                      <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(coverage.clean / coverage.total) * 100}%` }} />
-                    )}
-                    {coverage.withIssues > 0 && (
-                      <div className="bg-amber-500 h-full transition-all" style={{ width: `${(coverage.withIssues / coverage.total) * 100}%` }} />
-                    )}
-                    {coverage.stale > 0 && (
-                      <div className="bg-orange-400 h-full transition-all" style={{ width: `${(coverage.stale / coverage.total) * 100}%` }} />
-                    )}
-                    {coverage.untested > 0 && (
-                      <div className="bg-muted-foreground/30 h-full transition-all" style={{ width: `${(coverage.untested / coverage.total) * 100}%` }} />
-                    )}
-                  </div>
                 </div>
               )}
+              {/* Issues Found */}
+              <div className={cn(
+                "rounded-lg border bg-card px-3 py-3",
+                totalIssuesFound > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-border/60",
+              )}>
+                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Issues Found</p>
+                <p className={cn(
+                  "mt-2 text-[26px] font-semibold tabular-nums",
+                  totalIssuesFound > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+                )}>
+                  {pages.length === 0 ? "—" : totalIssuesFound}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {totalIssuesFound === 0
+                    ? "No bugs detected"
+                    : `Across ${issuesPageCount} page${issuesPageCount !== 1 ? "s" : ""}`}
+                </p>
+              </div>
 
-              {!loading && pages.length > 0 && (
-                <div className="rounded-lg border border-border/60 bg-card p-3 space-y-3 xl:col-span-7">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
-                    loading={testAllBusy}
-                    onClick={() => void handleTestAll()}
-                    className="gap-1.5 w-full"
-                  >
-                    {!testAllBusy && <Play className="h-3.5 w-3.5" />}
-                    Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
-                  </Button>
+              {/* Needs Attention */}
+              <div className={cn(
+                "rounded-lg border bg-card px-3 py-3",
+                needsAttentionCount > 0 ? "border-orange-400/30 bg-orange-400/5" : "border-border/60",
+              )}>
+                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Needs Attention</p>
+                <p className={cn(
+                  "mt-2 text-[26px] font-semibold tabular-nums",
+                  needsAttentionCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
+                )}>
+                  {pages.length === 0 ? "—" : needsAttentionCount}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {needsAttentionCount === 0
+                    ? "All pages are clean"
+                    : "Pages with issues or stale results"}
+                </p>
+              </div>
 
-                  <div className="relative w-full">
-                    <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-                    <Input
-                      value={filter}
-                      onChange={e => setFilter(e.target.value)}
-                      placeholder="Filter pages..."
-                      className="pl-8"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {HEALTH_FILTERS.map(h => (
-                      <Button
-                        key={h}
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setHealthFilter(h)}
-                        className={cn(
-                          "h-7 px-2.5 text-[11px] capitalize",
-                          healthFilter === h
-                            ? "bg-accent text-foreground"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {HEALTH_LABEL[h]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Last Scan */}
+              <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
+                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Last Scan</p>
+                <p className="mt-2 text-[26px] font-semibold tabular-nums text-foreground">
+                  {lastScan?.pages_visited ?? (pages.length > 0 ? pages.length : "—")}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {lastScan?.completed_at
+                    ? `Pages · ${relativeTime(lastScan.completed_at)}`
+                    : "Never scanned"}
+                </p>
+              </div>
             </aside>
 
             <main className="space-y-3">
-              {/* Scan banner — live or last-run summary */}
-              {bannerRun && (
+              {/* Scan banner — only while running */}
+              {scanActive && bannerRun && (
                 <ScanBanner run={bannerRun} live={scanActive} />
               )}
 
@@ -528,73 +519,6 @@ export function Pages() {
                 </div>
               )}
 
-              {/* Scan log — collapsible, auto-opens after scan finishes */}
-              {!scanActive && lastScan?.crawl_metadata_json && (
-                <div className="rounded-lg border border-border/60 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setScanLogOpen(o => !o)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-accent/20 transition-colors"
-                  >
-                    <span className="text-[12px] font-medium text-foreground/80">Scan log</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {scanLogOpen ? "hide" : "show"}
-                    </span>
-                  </button>
-                  {scanLogOpen && (
-                    <pre className="px-4 pb-4 text-[11px] font-mono text-muted-foreground whitespace-pre-wrap break-words leading-relaxed border-t border-border/40 pt-3 bg-muted/10">
-                      {formatScanLogLine(lastScan.crawl_metadata_json)}
-                    </pre>
-                  )}
-                </div>
-              )}
-
-              {/* Recent scans — compact inline list */}
-              {!scanActive && recentRuns.length > 0 && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setHistoryOpen(o => !o)}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
-                  >
-                    <span className={cn("transition-transform text-[9px]", historyOpen ? "rotate-90" : "")}>▶</span>
-                    Recent scans ({recentRuns.length})
-                  </button>
-                  {historyOpen && (
-                    <div className="mt-2 rounded-lg border border-border/60 divide-y divide-border/40 overflow-hidden">
-                      {recentRuns.map(run => {
-                        const llm = formatCrawlLlmCostLine(run);
-                        const when = run.completed_at || run.started_at;
-                        const dur = run.completed_at ? duration(run.started_at, run.completed_at) : null;
-                        return (
-                          <div
-                            key={run.id}
-                            className="flex items-center justify-between gap-3 px-3 py-2 text-[11px]"
-                          >
-                            <span className="text-muted-foreground/70 tabular-nums">{relativeTime(when)}</span>
-                            <span className={cn(
-                              "capitalize",
-                              run.status === "failed" ? "text-destructive/80" : "text-muted-foreground",
-                            )}>
-                              {run.status}
-                            </span>
-                            <span className="font-mono tabular-nums text-muted-foreground/70">
-                              {run.pages_visited ?? "—"} pages
-                            </span>
-                            {llm && (
-                              <span className="font-mono tabular-nums text-muted-foreground/70">{llm}</span>
-                            )}
-                            {dur && (
-                              <span className="font-mono tabular-nums text-muted-foreground/50">{dur}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {loading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -614,17 +538,84 @@ export function Pages() {
                 />
               ) : (
                 <>
+                  <div className="rounded-lg border border-border/60 bg-card p-3 space-y-3">
+                    <div className="relative w-full">
+                      <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+                      <Input
+                        value={filter}
+                        onChange={e => setFilter(e.target.value)}
+                        placeholder="Filter pages..."
+                        className="pl-8"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {HEALTH_FILTERS.map(h => (
+                        <Button
+                          key={h}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setHealthFilter(h)}
+                          className={cn(
+                            "h-7 px-2.5 text-[11px] capitalize",
+                            healthFilter === h
+                              ? "bg-accent text-foreground"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {HEALTH_LABEL[h]}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Enabled page tiles */}
                   {enabledFilteredPages.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                        Enabled pages ({enabledFilteredPages.length})
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                          Enabled pages ({enabledFilteredPages.length})
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {environments.length > 0 && (
+                            <Select
+                              value={defaultEnvId ?? ""}
+                              onChange={(e) => setSelectedEnvId(e.target.value)}
+                              className="w-[170px] h-8 text-[12px]"
+                            >
+                              {environments.map((env) => (
+                                <option key={env.id} value={env.id}>{env.name}</option>
+                              ))}
+                            </Select>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
+                            loading={testAllBusy}
+                            onClick={() => void handleTestAll()}
+                            className="gap-1.5 h-8"
+                          >
+                            {!testAllBusy && <Play className="h-3.5 w-3.5" />}
+                            Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleScan()}
+                            loading={scanActive && !canForceReplaceScan}
+                            className="h-8"
+                          >
+                            {!(scanActive && !canForceReplaceScan) && <ArrowsClockwise className="h-3.5 w-3.5" />}
+                            {scanActive ? (canForceReplaceScan ? "Replace scan" : "Scanning...") : "Scan app"}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         {enabledFilteredPages.map(page => (
                           <div
                             key={page.id}
-                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[5.5rem]"
+                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[8rem]"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <Link
@@ -654,7 +645,6 @@ export function Pages() {
                             </div>
                             <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
                               <div className="min-w-0 space-y-0.5">
-                                <span className="text-muted-foreground/60 capitalize block">{page.health}</span>
                                 <span className={cn(
                                   "font-medium tabular-nums block",
                                   page.issues > 0
@@ -707,11 +697,11 @@ export function Pages() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
                         Disabled pages ({disabledFilteredPages.length})
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         {disabledFilteredPages.map(page => (
                           <div
                             key={page.id}
-                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[5.5rem] opacity-60"
+                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[8rem] opacity-60"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <Link
@@ -741,13 +731,14 @@ export function Pages() {
                             </div>
                             <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
                               <div className="min-w-0 space-y-0.5">
-                                <span className="text-muted-foreground/60 capitalize block">{page.health}</span>
-                                <span className={cn(
-                                  "font-medium tabular-nums block",
-                                  page.issues > 0
-                                    ? "text-amber-600 dark:text-amber-400"
-                                    : "text-muted-foreground/60"
-                                )}>
+                                <span
+                                  className={cn(
+                                    "font-medium tabular-nums block",
+                                    page.issues > 0
+                                      ? "text-amber-600 dark:text-amber-400"
+                                      : "text-muted-foreground/60",
+                                  )}
+                                >
                                   {page.issues} issue{page.issues !== 1 ? "s" : ""}
                                 </span>
                               </div>

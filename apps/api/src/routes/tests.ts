@@ -16,10 +16,17 @@ export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter
   app.get("/api/projects/:projectId/tests", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
     const { rows } = await pool.query(
-      "SELECT * FROM saved_tests WHERE project_id = $1 ORDER BY created_at DESC",
+      `SELECT st.*,
+              COUNT(DISTINCT b.id) FILTER (WHERE b.status NOT IN ('resolved', 'wont_fix')) AS issues_count
+       FROM saved_tests st
+       LEFT JOIN test_runs tr ON tr.test_id = st.id
+       LEFT JOIN bugs b ON b.run_id = tr.id
+       WHERE st.project_id = $1
+       GROUP BY st.id
+       ORDER BY st.created_at DESC`,
       [projectId],
     );
-    reply.send({ tests: rows });
+    reply.send({ tests: rows.map(r => ({ ...r, issues_count: Number(r.issues_count) })) });
   });
 
   app.post("/api/projects/:projectId/tests", async (req, reply) => {
@@ -68,6 +75,28 @@ export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter
       `UPDATE saved_tests SET name = $2, intent = $3, context = $4, regression_plan = $5, plan_status = $6, plan_success_count = $7 WHERE id = $1 RETURNING *`,
       [testId, name, intent, context, regression_plan, plan_status, plan_success_count],
     );
+    reply.send({ test: rows[0] });
+  });
+
+  app.patch("/api/projects/:projectId/tests/:testId", async (req, reply) => {
+    const { testId } = ProjectTestParams.parse(req.params);
+    const body = z.object({ enabled: z.boolean() }).parse(req.body);
+    const { rows } = await pool.query(
+      `UPDATE saved_tests SET enabled = $2 WHERE id = $1 RETURNING *`,
+      [testId, body.enabled],
+    );
+    if (rows.length === 0) { reply.code(404).send({ error: "not found" }); return; }
+    reply.send({ test: rows[0] });
+  });
+
+  app.patch("/api/projects/:projectId/tests/:testId", async (req, reply) => {
+    const { testId } = ProjectTestParams.parse(req.params);
+    const body = z.object({ enabled: z.boolean() }).parse(req.body);
+    const { rows } = await pool.query(
+      `UPDATE saved_tests SET enabled = $2 WHERE id = $1 RETURNING *`,
+      [testId, body.enabled],
+    );
+    if (rows.length === 0) { reply.code(404).send({ error: "not found" }); return; }
     reply.send({ test: rows[0] });
   });
 

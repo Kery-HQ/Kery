@@ -152,7 +152,15 @@ export class PostgresAdapter implements StorageAdapter {
 
   async listBugs(projectId: string) {
     const { rows } = await this.db.query(
-      `SELECT id, project_id, run_id, environment_id, name, description, category, severity, status, url, run_label, reported_at, environment, step_index, created_at, screenshot_path, region FROM bugs WHERE project_id = $1 ORDER BY reported_at DESC LIMIT 200`,
+      `SELECT b.id, b.project_id, b.run_id, b.environment_id, b.name, b.description, b.category, b.severity, b.status, b.url, b.run_label, b.reported_at, b.environment, b.step_index, b.created_at, b.screenshot_path, b.region,
+              tr.test_id, tr.destination_id,
+              st.name AS test_name
+       FROM bugs b
+       LEFT JOIN test_runs tr ON tr.id = b.run_id
+       LEFT JOIN saved_tests st ON st.id = tr.test_id
+       WHERE b.project_id = $1
+       ORDER BY b.reported_at DESC
+       LIMIT 200`,
       [projectId],
     );
     return rows;

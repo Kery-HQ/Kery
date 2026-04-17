@@ -11,6 +11,8 @@ import {
   ComputerTower,
   Calendar,
   Trash,
+  Stack,
+  Flask,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,10 @@ export type BugRecord = {
   reportedAt?: string;
   /** API returns snake_case from DB rows */
   reported_at?: string;
+  /** Joined from test_runs */
+  test_id?: string | null;
+  destination_id?: string | null;
+  test_name?: string | null;
   environment?: string | null;
   index?: number;
 };
@@ -67,6 +73,9 @@ const SEVERITY_FILTERS = ["all", "high", "medium", "low"] as const;
 type SeverityFilter = (typeof SEVERITY_FILTERS)[number];
 
 const CATEGORY_FILTERS = ["all", "visual", "functional", "ux", "other"] as const;
+const SOURCE_FILTERS = ["all", "pages", "flows"] as const;
+type SourceFilter = (typeof SOURCE_FILTERS)[number];
+
 type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -90,6 +99,7 @@ export const Bugs: React.FC = () => {
   const [bugs, setBugs] = React.useState<BugRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = React.useState<SourceFilter>("all");
   const [severityFilter, setSeverityFilter] = React.useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("all");
   const [actionBusy, setActionBusy] = React.useState<string | null>(null);
@@ -164,9 +174,14 @@ export const Bugs: React.FC = () => {
     if (categoryFilter !== "all") {
       result = result.filter(b => b.category === categoryFilter);
     }
+    if (sourceFilter === "flows") {
+      result = result.filter(b => !!b.test_id);
+    } else if (sourceFilter === "pages") {
+      result = result.filter(b => !!b.destination_id && !b.test_id);
+    }
     result.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     return result;
-  }, [bugs, severityFilter, categoryFilter]);
+  }, [bugs, severityFilter, categoryFilter, sourceFilter]);
 
   if (!currentProjectId) {
     return (
@@ -222,7 +237,27 @@ export const Bugs: React.FC = () => {
             />
           ) : (
             <>
-              {/* Filter bar */}
+              <div className="flex flex-wrap gap-y-2 gap-x-3 items-center">
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-muted-foreground/50 mr-1">Source</span>
+                  {SOURCE_FILTERS.map(s => (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSourceFilter(s)}
+                      className={cn(
+                        "h-7 px-2.5 text-[11px] gap-1",
+                        sourceFilter === s ? "bg-accent text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {s === "pages" && <Stack className="h-3 w-3" />}
+                      {s === "flows" && <Flask className="h-3 w-3" />}
+                      {s === "all" ? "All" : s === "pages" ? "Pages" : "Flows"}
+                    </Button>
+                  ))}
+                </div>
+                <div className="h-4 w-px bg-border" />
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1">
                   <span className="text-[11px] text-muted-foreground/50 mr-1">Severity</span>
@@ -266,6 +301,7 @@ export const Bugs: React.FC = () => {
                   ))}
                 </div>
               </div>
+              </div>
 
               {/* Bug list */}
               <div className="space-y-1.5">
@@ -295,6 +331,21 @@ export const Bugs: React.FC = () => {
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
                           {bug.name}
                         </span>
+                        {bug.test_id ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/tests/${bug.test_id}`); }}
+                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border border-violet-400/30 bg-violet-400/8 text-violet-600 dark:text-violet-400 hover:bg-violet-400/15 transition-colors flex-shrink-0"
+                          >
+                            <Flask className="h-2.5 w-2.5" />
+                            {bug.test_name ?? "Flow"}
+                          </button>
+                        ) : bug.destination_id ? (
+                          <span className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border border-sky-400/30 bg-sky-400/8 text-sky-600 dark:text-sky-400 flex-shrink-0">
+                            <Stack className="h-2.5 w-2.5" />
+                            Page
+                          </span>
+                        ) : null}
                         <BugCategoryTag category={bug.category} />
                         <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize flex-shrink-0">
                           {bug.status.replace("_", " ")}
@@ -390,6 +441,20 @@ export const Bugs: React.FC = () => {
                                     Ignore
                                   </Button>
                                 </>
+                              )}
+                              {bug.test_id && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-[11px] gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/tests/${bug.test_id}`);
+                                  }}
+                                >
+                                  <Flask className="h-3 w-3" />
+                                  View Flow
+                                </Button>
                               )}
                               <Button
                                 size="sm"

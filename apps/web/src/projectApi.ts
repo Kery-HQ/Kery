@@ -266,6 +266,13 @@ export async function resetTestScript(projectId: string, testId: string) {
   return updateTest(projectId, testId, { reset_script: true });
 }
 
+export async function toggleTest(projectId: string, testId: string, enabled: boolean) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export async function deleteTest(projectId: string, testId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, { method: "DELETE" });
 }

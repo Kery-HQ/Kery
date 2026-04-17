@@ -394,13 +394,15 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
   app.get("/api/projects/:projectId/pages", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
     const { rows: destinations } = await pool.query(
-      `SELECT id, normalized_route, title, health_status, issues_count, last_inspected_at, enabled, forms_json, interactions_json FROM app_tree_destinations WHERE project_id = $1 ORDER BY normalized_route`,
+      `SELECT id, normalized_route, title, health_status, issues_count, last_inspected_at, enabled, forms_json, interactions_json, plan_status, plan_success_count FROM app_tree_destinations WHERE project_id = $1 ORDER BY normalized_route`,
       [projectId],
     );
     const pages = destinations.map((d: any) => ({
       id: d.id, route: d.normalized_route, title: d.title,
       health: d.health_status, issues: d.issues_count, enabled: d.enabled,
       formCount: (d.forms_json || []).length, interactionCount: (d.interactions_json || []).length,
+      plan_status: d.plan_status ?? "none",
+      plan_success_count: d.plan_success_count ?? 0,
     }));
     const coverage = await storage.getProjectCoverage(projectId);
     const { rows: lastScanRows } = await pool.query(

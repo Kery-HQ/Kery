@@ -21,6 +21,7 @@ import { RunDetail } from "@/pages/RunDetail";
 import { Bugs } from "@/pages/Bugs";
 import { Pages } from "@/pages/Pages";
 import { PageDetail } from "@/pages/PageDetail";
+import { FlowDetail } from "@/pages/FlowDetail";
 import { ProjectProvider } from "@/lib/projectContext";
 import { useHotkey } from "@/lib/hooks";
 
@@ -55,7 +56,10 @@ function App() {
                 <Route path=":destinationId" element={<PageDetail />} />
               </Route>
               <Route path="discover" element={<Navigate to="/pages" replace />} />
-              <Route path="tree" element={<Navigate to="/pages" replace />} />
+              <Route path="tests" element={<Outlet />}>
+                <Route index element={<TestsPlans />} />
+                <Route path=":testId" element={<FlowDetail />} />
+              </Route>
               <Route path="tests" element={<TestsPlans />} />
               <Route path="runs" element={<Runs />} />
               <Route path="runs/:runId" element={<RunDetail />} />
