@@ -923,7 +923,7 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
         <div
           className={cn(
             "min-w-0 flex-1 pb-3 transition-colors duration-150 ease-out",
-            isCurrent && "rounded-md bg-muted/25 -mx-1 -mt-0.5 px-2.5 py-1.5",
+            isCurrent && "plan-current-pulse rounded-md bg-muted/25 -mx-1 -mt-0.5 px-2.5 py-1.5",
           )}
         >
           <p
@@ -1158,7 +1158,7 @@ function OverviewTab({
                     aria-hidden
                   />
                   <span className="text-[11px] font-mono font-medium tabular-nums text-foreground/90 sm:text-[12px]">
-                    steps {steps.length}
+                    live preview
                   </span>
                 </div>
               }
@@ -1218,7 +1218,7 @@ function OverviewTab({
             </CardContent>
           </Card>
 
-          <Card className="min-h-0 flex-[0.85] flex flex-col overflow-hidden border-border/60 bg-card/90">
+          <Card className="min-h-0 flex-[1.05] flex flex-col overflow-hidden border-border/60 bg-card/90">
             <CardContent className="flex flex-1 min-h-0 flex-col p-0">
               <div className="shrink-0 border-b border-border/40 bg-surface-2/35 px-3 py-2.5">
                 <div className="flex items-start justify-between gap-3">
@@ -1248,7 +1248,7 @@ function OverviewTab({
                     aria-valuemin={0}
                     aria-valuemax={100}
                   >
-                    <div className="h-full rounded-full bg-foreground/25 transition-[width] duration-200 ease-out" style={{ width: `${planProgress.pct}%` }} />
+                    <div className="plan-progress-glow h-full rounded-full bg-foreground/25 transition-[width] duration-200 ease-out" style={{ width: `${planProgress.pct}%` }} />
                   </div>
                 )}
               </div>
@@ -1277,20 +1277,20 @@ function OverviewTab({
             </CardContent>
           </Card>
 
-          <Card className="min-h-0 flex-1 flex flex-col overflow-hidden">
+          <Card className="min-h-0 flex-[0.75] flex flex-col overflow-hidden">
             <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-0">
-              <SectionLabel icon={<Pulse className="h-3.5 w-3.5" />} text="Live action" />
+              <SectionLabel icon={<Pulse className="h-3.5 w-3.5" />} text="Recent activity" />
               <div className="rounded border border-border/60 bg-muted/20 px-3 py-2 mt-2 mb-2 shrink-0 transition-all duration-200 animate-fade-in">
                 {latestEntry?.type === "activity" ? (
                   <>
-                    <p className="text-[14px] text-foreground">Observing {latestEntry.activity.text}</p>
+                    <p className="text-[13px] text-foreground">Observing {latestEntry.activity.text}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">Agent observation</p>
                   </>
                 ) : latestEntry?.type === "plan" ? (
                   <>
                     <div className="flex items-center gap-2">
                       <Path className="h-3.5 w-3.5 shrink-0 text-primary/60" weight="duotone" />
-                      <p className="text-[13px] text-foreground">
+                      <p className="text-[12px] text-foreground">
                         Plan refreshed · {latestEntry.items.length}{" "}
                         {latestEntry.items.length === 1 ? "step" : "steps"}
                       </p>
@@ -1306,7 +1306,7 @@ function OverviewTab({
                           run.status === "running" ? "text-status-running" : "text-muted-foreground",
                         )}
                       />
-                      <p className="text-[14px] text-foreground">{latestHumanized.title}</p>
+                      <p className="text-[13px] text-foreground">{latestHumanized.title}</p>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       {latestHumanized.detail || latestStep?.url || "No details"}
