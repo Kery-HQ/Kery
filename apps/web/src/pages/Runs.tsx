@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Pulse, ArrowsClockwise } from "@phosphor-icons/react";
+import { Pulse, ArrowsClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -11,11 +11,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { statusVariant, duration, relativeTime, formatRunCost, runListLabel } from "@/lib/formatters";
+import { runScreenshotFileUrl } from "@/lib/apiAssets";
+import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
-import { fetchProjectRuns } from "@/projectApi";
+import { fetchProjectRuns, fetchRun, stopRun } from "@/projectApi";
 
 const STATUS_FILTERS = ["all", "running", "queued", "passed", "failed", "stopped"] as const;
 const PAGE_SIZE = 25;
+
+type ActiveRunTile = {
+  id: string;
+  status: "running" | "queued";
+  started_at?: string;
+  source_label?: string | null;
+  display_name?: string | null;
+  livePreviewUrl?: string | null;
+};
 
 export const Runs: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +39,11 @@ export const Runs: React.FC = () => {
   const [searchInput, setSearchInput] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<(typeof STATUS_FILTERS)[number]>("all");
+  const [activeRuns, setActiveRuns] = React.useState<ActiveRunTile[]>([]);
+  const [activeLoading, setActiveLoading] = React.useState(false);
+  const activeLoadedRef = React.useRef(false);
+  const [liveExpanded, setLiveExpanded] = React.useState(false);
+  const [stoppingRunId, setStoppingRunId] = React.useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = search.length > 0 || status !== "all";
@@ -61,6 +77,65 @@ export const Runs: React.FC = () => {
   React.useEffect(() => {
     load();
   }, [load]);
+
+  React.useEffect(() => {
+    if (!currentProjectId) {
+      activeLoadedRef.current = false;
+      setActiveRuns([]);
+      return;
+    }
+    activeLoadedRef.current = false;
+    let cancelled = false;
+
+    const loadActiveRuns = async () => {
+      if (cancelled) return;
+      if (!activeLoadedRef.current) setActiveLoading(true);
+      try {
+        const [runningRes, queuedRes] = await Promise.all([
+          fetchProjectRuns(currentProjectId, { page: 1, pageSize: 100, status: "running" }),
+          fetchProjectRuns(currentProjectId, { page: 1, pageSize: 100, status: "queued" }),
+        ]);
+        if (cancelled) return;
+        const running = (runningRes.runs ?? []) as ActiveRunTile[];
+        const queued = (queuedRes.runs ?? []) as ActiveRunTile[];
+        const runningWithPreview = await Promise.all(
+          running.map(async (run) => {
+            try {
+              const detail = await fetchRun(run.id);
+              const live = (detail?.run?.live_snapshot?.livePreview ??
+                null) as { filename?: string; updatedAt?: number } | null;
+              const filename = live?.filename;
+              const updatedAt = live?.updatedAt;
+              const base = filename ? runScreenshotFileUrl(run.id, filename) : null;
+              return {
+                ...run,
+                status: "running" as const,
+                livePreviewUrl: base && updatedAt ? `${base}?t=${updatedAt}` : base,
+              };
+            } catch {
+              return { ...run, status: "running" as const, livePreviewUrl: null };
+            }
+          }),
+        );
+        setActiveRuns([
+          ...runningWithPreview,
+          ...queued.map((q) => ({ ...q, status: "queued" as const })),
+        ]);
+        activeLoadedRef.current = true;
+      } catch {
+        if (!cancelled) setActiveRuns([]);
+      } finally {
+        if (!cancelled) setActiveLoading(false);
+      }
+    };
+
+    void loadActiveRuns();
+    const interval = window.setInterval(loadActiveRuns, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [currentProjectId]);
 
   // Auto-refresh every 5s while any run is running or queued
   React.useEffect(() => {
@@ -109,6 +184,129 @@ export const Runs: React.FC = () => {
           </Card>
         ) : (
           <div className="space-y-3">
+            {(activeLoading || activeRuns.length > 0) && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
+                    Live runs
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {activeRuns.some((r) => r.status === "running") && (
+                      <button
+                        type="button"
+                        onClick={() => setLiveExpanded((v) => !v)}
+                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {liveExpanded ? (
+                          <CaretDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <CaretRight className="h-3.5 w-3.5" />
+                        )}
+                        {liveExpanded ? "Collapse running tiles" : "Expand running tiles"}
+                      </button>
+                    )}
+                    <span className="text-[10px] font-mono text-muted-foreground/50">
+                      updates every 1s
+                    </span>
+                  </div>
+                </div>
+
+                {activeLoading && activeRuns.length === 0 ? (
+                  <div className="text-[12px] text-muted-foreground">Loading active runs...</div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="warning" className="text-[10px]">
+                        {activeRuns.filter((r) => r.status === "queued").length} queued
+                      </Badge>
+                      {activeRuns
+                        .filter((r) => r.status === "queued")
+                        .map((run) => (
+                          <button
+                            key={run.id}
+                            type="button"
+                            onClick={() => navigate(`/runs/${run.id}`)}
+                            className="h-6 px-2 rounded-md border border-border bg-muted/30 hover:bg-muted/50 text-[10px] font-mono text-muted-foreground/80"
+                            title={runListLabel(run as any)}
+                          >
+                            queued · {run.id.slice(0, 6)}
+                          </button>
+                        ))}
+                    </div>
+
+                    {activeRuns.some((r) => r.status === "running") && (
+                      <>
+                        <div className={cn(
+                          "grid gap-2",
+                          liveExpanded
+                            ? "grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+                            : "grid-cols-2 lg:grid-cols-4",
+                        )}>
+                        {activeRuns
+                          .filter((r) => r.status === "running")
+                          .slice(0, liveExpanded ? undefined : 4)
+                          .map((run) => (
+                            <button
+                              key={run.id}
+                              type="button"
+                              onClick={() => navigate(`/runs/${run.id}`)}
+                              className="rounded-lg border border-border bg-card hover:bg-accent/20 transition-colors overflow-hidden text-left"
+                            >
+                              <div className="aspect-[16/9] bg-black relative">
+                                {run.livePreviewUrl ? (
+                                  <img
+                                    src={run.livePreviewUrl}
+                                    alt="Live preview"
+                                    className="w-full h-full object-contain object-top"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[11px] text-muted-foreground bg-muted/30">
+                                    Preparing live preview...
+                                  </div>
+                                )}
+                                <Badge variant="running" className="absolute top-1.5 left-1.5 text-[10px]">
+                                  running
+                                </Badge>
+                              </div>
+                              <div className="px-2 py-1.5">
+                                <p className="text-[11px] text-foreground truncate">{runListLabel(run as any)}</p>
+                                <div className="mt-1 flex items-center justify-between gap-2">
+                                  <p className="text-[10px] font-mono text-muted-foreground/60 truncate">
+                                    {run.started_at ? relativeTime(run.started_at) : run.id.slice(0, 8)}
+                                  </p>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-5 px-1.5 text-[9px]"
+                                    disabled={stoppingRunId === run.id}
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setStoppingRunId(run.id);
+                                      try {
+                                        await stopRun(run.id);
+                                        await load();
+                                      } catch {
+                                        // no-op
+                                      } finally {
+                                        setStoppingRunId(null);
+                                      }
+                                    }}
+                                  >
+                                    {stoppingRunId === run.id ? "..." : "Stop"}
+                                  </Button>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <Input
                 value={searchInput}

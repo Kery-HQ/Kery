@@ -125,6 +125,8 @@ export type LLMCallRecord = {
   totalTokens: number;
   durationMs: number;
   costUsd: number;
+  /** Set when the LLM call failed (timeout, abort, API error). */
+  error?: string;
   /** Primary user text from the last user turn (full; legacy search field). */
   query: string;
   /** Exact messages sent to the provider (text + image index refs). */
@@ -955,6 +957,7 @@ async function decideNextAction(params: {
   stepIndex: number;
   llmCallSeq: { current: number };
   onLLMCall: (call: LLMCallRecord) => void;
+  signal?: AbortSignal;
 }): Promise<AgentAction> {
   pruneConversation(params.messages);
 
@@ -971,26 +974,58 @@ async function decideNextAction(params: {
 
     if (attempt === 2) await new Promise(r => setTimeout(r, 2000));
 
-    const t0 = Date.now();
-    const { content: raw, usage } = await llmAgentChat(callMessages);
-    const durationMs = Date.now() - t0;
-    const hasVision = attempt === 0;
-
     const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(callMessages);
     const queryText = concatLastUserTextFromWire(callMessages) || "[multi-turn]";
+    const hasVision = attempt === 0;
+    const model = getConfig().agentModel;
+    const t0 = Date.now();
+
+    let raw: string;
+    let usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+
+    try {
+      const result = await llmAgentChat(callMessages, params.signal);
+      raw = result.content;
+      usage = result.usage;
+    } catch (err) {
+      const durationMs = Date.now() - t0;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      params.llmCallSeq.current++;
+      params.onLLMCall({
+        seq: params.llmCallSeq.current,
+        stepIndex: params.stepIndex,
+        model,
+        hasVision,
+        attempt: attempt + 1,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        durationMs,
+        costUsd: 0,
+        error: errMsg,
+        query: queryText,
+        requestMessages,
+        imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
+        response: "",
+        agent: "navigator",
+      });
+      throw err;
+    }
+
+    const durationMs = Date.now() - t0;
 
     params.llmCallSeq.current++;
     params.onLLMCall({
       seq: params.llmCallSeq.current,
       stepIndex: params.stepIndex,
-      model: getConfig().agentModel,
+      model,
       hasVision,
       attempt: attempt + 1,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       totalTokens: usage.totalTokens,
       durationMs,
-      costUsd: calcCostUsd(getConfig().agentModel, usage.inputTokens, usage.outputTokens, "agentModel"),
+      costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "agentModel"),
       query: queryText,
       requestMessages,
       imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
@@ -1465,6 +1500,15 @@ export async function runAgent(
     onLLMCall?.(call);
   };
 
+  // AbortController wired to shouldStop — fires every 100ms, aborts in-flight LLM HTTP requests immediately.
+  const stopController = new AbortController();
+  let stopWatcherId: ReturnType<typeof setInterval> | undefined;
+  if (shouldStop) {
+    stopWatcherId = setInterval(() => {
+      if (shouldStop() && !stopController.signal.aborted) stopController.abort();
+    }, 100);
+  }
+
   let stepCounter = 0;
   const recentActions: RecentAction[] = [];
   let consecutiveLoopWarnings = 0;
@@ -1719,7 +1763,9 @@ export async function runAgent(
         action = await decideNextAction({
           messages, stepIndex: stepCounter + 1, llmCallSeq,
           onLLMCall: handleLLMCall,
+          signal: stopController.signal,
         });
+
         messages.push({ role: "assistant", content: JSON.stringify(action) });
         logger.info(
           {
@@ -1730,6 +1776,10 @@ export async function runAgent(
           "Navigator: LLM returned action",
         );
       } catch (err) {
+        if (stopController.signal.aborted) {
+          steps.push(`[STOPPED] Run stopped by user`);
+          return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: "Stopped by user" };
+        }
         logger.warn(
           { err: String(err), recordedStepCount: stepCounter, loopIteration: i + 1 },
           "Navigator: LLM decision failed; will retry next iteration",
@@ -1749,10 +1799,15 @@ export async function runAgent(
             action = await decideNextAction({
               messages, stepIndex: stepCounter + 1, llmCallSeq,
               onLLMCall: handleLLMCall,
+              signal: stopController.signal,
             });
             messages.push({ role: "assistant", content: JSON.stringify(action) });
             if (!validateAction(action)) { fixed = true; break; }
           } catch {
+            if (stopController.signal.aborted) {
+              steps.push(`[STOPPED] Run stopped by user`);
+              return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: "Stopped by user" };
+            }
             messages.pop();
             break;
           }
@@ -2074,6 +2129,7 @@ export async function runAgent(
   } catch (err) {
     return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: String(err) };
   } finally {
+    if (stopWatcherId) clearInterval(stopWatcherId);
     page.off("dialog", onDialog);
   }
 }

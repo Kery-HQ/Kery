@@ -4,9 +4,7 @@ import type { Bug } from "./types.js";
 export interface StorageAdapter {
   // Memory
   loadProjectMemory(projectId: string): Promise<MemoryEntry[]>;
-  loadPageMemory(destinationId: string): Promise<MemoryEntry[]>;
   saveProjectMemoryEntries(projectId: string, entries: MemoryEntryInsert[]): Promise<void>;
-  savePageMemoryEntries(destinationId: string, entries: MemoryEntryInsert[]): Promise<void>;
   boostConfidence(ids: string[], amount?: number): Promise<void>;
   deleteMemoryEntries(ids: string[]): Promise<void>;
   updateMemoryEntry(

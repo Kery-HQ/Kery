@@ -65,15 +65,19 @@ export async function llmGeminiChat(
   }
 
   const timeoutMs = opts.timeoutMs ?? 45000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+  // Combine external stop signal with internal timeout signal
+  const abortSignal = opts.signal
+    ? AbortSignal.any([opts.signal, timeoutController.signal])
+    : timeoutController.signal;
 
   const ai = new GoogleGenAI({ apiKey });
 
   const config: Record<string, unknown> = {
     temperature: opts.temperature ?? 0.1,
     maxOutputTokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
-    abortSignal: controller.signal,
+    abortSignal,
   };
   if (systemInstruction) config.systemInstruction = systemInstruction;
 
@@ -112,7 +116,11 @@ export async function llmGeminiChat(
       usage: { inputTokens, outputTokens, totalTokens },
     };
   } catch (err: any) {
-    if (err?.name === "AbortError") throw new Error(`Gemini call timed out after ${timeoutMs}ms`);
+    if (err?.name === "AbortError") {
+      // Re-throw external abort as-is so callers can detect it; only wrap timeout aborts.
+      if (opts.signal?.aborted) throw err;
+      throw new Error(`Gemini call timed out after ${timeoutMs}ms`);
+    }
     throw err;
   } finally {
     clearTimeout(timeoutId);

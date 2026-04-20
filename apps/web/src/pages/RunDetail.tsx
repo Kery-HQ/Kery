@@ -107,6 +107,7 @@ type LLMAgentType =
   | "holistic"
   | "summary"
   | "filmstrip"
+  | "bug_triage"
   | "crawl_link_filter"
   | "crawl_route_filter"
   | "crawl_suggested_flows"
@@ -477,25 +478,32 @@ function badgeVariantForStatus(status: string): "success" | "destructive" | "war
   return statusVariant(status);
 }
 
-type LlmAgentDisplay = { label: string; color: string; Icon: React.ComponentType<{ className?: string }> };
+type LlmAgentDisplay = {
+  label: string;
+  color: string;
+  badgeClass: string;
+  Icon: React.ComponentType<{ className?: string }>;
+};
 
 const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
-  navigator:       { label: "Navigator",      color: "text-foreground/75", Icon: Compass },
-  review:          { label: "Review",         color: "text-foreground/75", Icon: Eye },
-  holistic:        { label: "Flow review",    color: "text-foreground/75", Icon: GitBranch },
-  summary:         { label: "Summary",        color: "text-foreground/75", Icon: FileText },
-  filmstrip:       { label: "Filmstrip",      color: "text-foreground/75", Icon: Stack },
-  crawl_link_filter:     { label: "Crawl links",   color: "text-foreground/75", Icon: Funnel },
-  crawl_route_filter:    { label: "Crawl routes",  color: "text-foreground/75", Icon: Funnel },
-  crawl_suggested_flows: { label: "Crawl flows",   color: "text-foreground/75", Icon: FlowArrow },
-  memory_curator:   { label: "Memory",       color: "text-foreground/75", Icon: Brain },
-  script_generator: { label: "Script gen",   color: "text-foreground/75", Icon: Scroll },
-  stagehand:        { label: "Stagehand",    color: "text-foreground/75", Icon: Lightning },
-  regression_heal:  { label: "Heal",         color: "text-foreground/75", Icon: Lightning },
+  navigator:            { label: "Navigator",   color: "text-sky-400", badgeClass: "border-sky-500/35 bg-sky-500/10 text-sky-300", Icon: Compass },
+  review:               { label: "Review",      color: "text-violet-400", badgeClass: "border-violet-500/35 bg-violet-500/10 text-violet-300", Icon: Eye },
+  holistic:             { label: "Flow review", color: "text-fuchsia-400", badgeClass: "border-fuchsia-500/35 bg-fuchsia-500/10 text-fuchsia-300", Icon: GitBranch },
+  summary:              { label: "Summary",     color: "text-indigo-400", badgeClass: "border-indigo-500/35 bg-indigo-500/10 text-indigo-300", Icon: FileText },
+  filmstrip:            { label: "Filmstrip",   color: "text-emerald-400", badgeClass: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300", Icon: Stack },
+  bug_triage:           { label: "Bug triage",  color: "text-red-400", badgeClass: "border-red-500/35 bg-red-500/10 text-red-300", Icon: WarningCircle },
+  crawl_link_filter:    { label: "Crawl links", color: "text-cyan-400", badgeClass: "border-cyan-500/35 bg-cyan-500/10 text-cyan-300", Icon: Funnel },
+  crawl_route_filter:   { label: "Crawl routes", color: "text-teal-400", badgeClass: "border-teal-500/35 bg-teal-500/10 text-teal-300", Icon: Funnel },
+  crawl_suggested_flows:{ label: "Crawl flows", color: "text-green-400", badgeClass: "border-green-500/35 bg-green-500/10 text-green-300", Icon: FlowArrow },
+  memory_curator:       { label: "Memory",      color: "text-amber-400", badgeClass: "border-amber-500/35 bg-amber-500/10 text-amber-300", Icon: Brain },
+  script_generator:     { label: "Script gen",  color: "text-orange-400", badgeClass: "border-orange-500/35 bg-orange-500/10 text-orange-300", Icon: Scroll },
+  stagehand:            { label: "Stagehand",   color: "text-rose-400", badgeClass: "border-rose-500/35 bg-rose-500/10 text-rose-300", Icon: Lightning },
+  regression_heal:      { label: "Heal",        color: "text-pink-400", badgeClass: "border-pink-500/35 bg-pink-500/10 text-pink-300", Icon: Lightning },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
   "navigator", "holistic", "filmstrip", "summary",
+  "bug_triage",
   "regression_heal", "memory_curator", "script_generator", "stagehand",
   "crawl_link_filter", "crawl_route_filter", "crawl_suggested_flows",
 ];
@@ -503,7 +511,12 @@ const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
 /** Legacy or engine-only agents (e.g. memory_curator) still render in the LLM tab. */
 function llmAgentDisplay(agent: string): LlmAgentDisplay {
   const row = (LLM_AGENT_CONFIG as Record<string, LlmAgentDisplay | undefined>)[agent];
-  return row ?? { label: agent, color: "text-muted-foreground", Icon: Brain };
+  return row ?? {
+    label: agent,
+    color: "text-muted-foreground",
+    badgeClass: "border-border/60 bg-muted/20 text-muted-foreground",
+    Icon: Brain,
+  };
 }
 
 // --- Main component ---
@@ -1812,13 +1825,13 @@ function LLMCallRow({
           {call.seq}
         </span>
 
-        {/* Step */}
-        <span className="text-[10px] font-mono text-muted-foreground tabular-nums w-8 flex-shrink-0">
-          s{call.stepIndex}
-        </span>
-
         {/* Agent badge */}
-        <span className={cn("text-[10px] font-medium flex items-center gap-0.5 flex-shrink-0", agentInfo.color)}>
+        <span
+          className={cn(
+            "text-[10px] font-medium flex items-center gap-0.5 flex-shrink-0 rounded-md border px-1.5 py-0.5",
+            agentInfo.badgeClass,
+          )}
+        >
           <agentInfo.Icon className="h-3 w-3" />
           {agentInfo.label}
         </span>
@@ -1910,9 +1923,7 @@ function LLMCallDetailSheet({
             <SheetHeader className="sticky top-0 z-10 border-b border-border bg-popover p-4 space-y-3">
               <SheetTitle className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-mono text-muted-foreground">
-                    #{call.seq}  s{call.stepIndex}
-                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground">#{call.seq}</p>
                   <p className="text-[13px] font-medium text-foreground truncate">
                     {agentInfo.label} · {call.model}
                   </p>

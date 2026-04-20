@@ -13,4 +13,6 @@ export type LlmChatOpts = {
   temperature?: number;
   responseFormat?: unknown;
   timeoutMs?: number;
+  /** External abort signal — provider must cancel the in-flight request when this fires. */
+  signal?: AbortSignal;
 };

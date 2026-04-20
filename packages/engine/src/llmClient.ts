@@ -9,7 +9,7 @@ import {
   hasDirectProviderKey,
   modelUnavailableReason,
 } from "./llmProviders.js";
-import type { LLMUsage } from "./llmTypes.js";
+import type { LLMUsage, LlmChatOpts } from "./llmTypes.js";
 import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 
 export type { LLMUsage } from "./llmTypes.js";
@@ -236,7 +236,7 @@ export function calcCostUsd(
 export async function llmChat(
   messages: any[],
   model: string,
-  opts: { maxTokens?: number; temperature?: number; responseFormat?: any; timeoutMs?: number } = {}
+  opts: LlmChatOpts = {}
 ): Promise<{ content: string; usage: LLMUsage }> {
   const config = getConfig();
   const timeoutMs = opts.timeoutMs ?? config.llmTimeoutMs;
@@ -300,12 +300,13 @@ export async function llmChat(
 
 // ─── Agent decisions (vision + text) ─────────────────────────────────────────
 
-export async function llmAgentChat(messages: any[]): Promise<{ content: string; usage: LLMUsage }> {
+export async function llmAgentChat(messages: any[], signal?: AbortSignal): Promise<{ content: string; usage: LLMUsage }> {
   const model = getConfig().agentModel;
   return llmChat(messages, model, {
     maxTokens: MAX_OUTPUT_TOKENS,
     temperature: 0.5,
     responseFormat: getAgentSchema(model),
+    signal,
   });
 }
 
@@ -331,7 +332,7 @@ const MEMORY_ADD_ITEM_SCHEMA = {
     },
     summary: { type: "string" },
     content: { type: "string" },
-    scope: { type: "string", enum: ["project", "page"] },
+    scope: { type: "string", enum: ["project"] },
     confidence: { type: "integer" },
     regionDescription: { type: ["string", "null"] },
   },
@@ -375,7 +376,7 @@ export type MemoryCurationParsed = {
     type: "learned_path" | "ignore_region" | "avoid_region" | "bug_pattern" | "tip";
     summary: string;
     content: string;
-    scope: "project" | "page";
+    scope: "project";
     confidence: number;
     regionDescription: string | null;
   }>;

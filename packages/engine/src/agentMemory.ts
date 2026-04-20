@@ -8,9 +8,7 @@ export type MemorySource = "agent" | "user";
 
 export type MemoryEntry = {
   id: string;
-  scope: "project" | "page";
   project_id: string | null;
-  destination_id: string | null;
   type: MemoryEntryType;
   summary: string;
   content: string;
@@ -40,14 +38,6 @@ export async function loadProjectMemory(storage: StorageAdapter, projectId: stri
   }
 }
 
-export async function loadPageMemory(storage: StorageAdapter, destinationId: string): Promise<MemoryEntry[]> {
-  try {
-    return await storage.loadPageMemory(destinationId);
-  } catch {
-    return [];
-  }
-}
-
 // ─── Save (via StorageAdapter) ──────────────────────────────────────────────
 
 export async function saveProjectMemoryEntries(
@@ -61,20 +51,6 @@ export async function saveProjectMemoryEntries(
     logger.info({ projectId, count: entries.length }, "Saved project memory entries");
   } catch (err) {
     logger.warn({ err: String(err) }, "Failed to save project memory entries");
-  }
-}
-
-export async function savePageMemoryEntries(
-  storage: StorageAdapter,
-  destinationId: string,
-  entries: MemoryEntryInsert[],
-): Promise<void> {
-  if (entries.length === 0) return;
-  try {
-    await storage.savePageMemoryEntries(destinationId, entries);
-    logger.info({ destinationId, count: entries.length }, "Saved page memory entries");
-  } catch (err) {
-    logger.warn({ err: String(err) }, "Failed to save page memory entries");
   }
 }
 
@@ -246,12 +222,6 @@ export function decayAndPrune(entries: MemoryEntry[]): { surviving: MemoryEntry[
  */
 export async function loadProjectMemoryWithDecay(storage: StorageAdapter, projectId: string): Promise<MemoryEntry[]> {
   const raw = await loadProjectMemory(storage, projectId);
-  const { surviving } = decayAndPrune(raw);
-  return surviving;
-}
-
-export async function loadPageMemoryWithDecay(storage: StorageAdapter, destinationId: string): Promise<MemoryEntry[]> {
-  const raw = await loadPageMemory(storage, destinationId);
   const { surviving } = decayAndPrune(raw);
   return surviving;
 }

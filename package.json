@@ -10,6 +10,7 @@
     "build:libs": "npm run build --workspace=@kery/engine --workspace=@kery/db",
     "postinstall": "npm run build:libs",
     "dev:api": "npm run dev --workspace=apps/api",
+    "dev:worker": "npm run dev --workspace=apps/worker",
     "dev:web": "npm run dev --workspace=apps/web",
     "migrate": "npm run migrate --workspace=packages/db"
   },

@@ -160,9 +160,7 @@ export type MemoryEntryType = "learned_path" | "ignore_region" | "avoid_region" 
 
 export type MemoryEntry = {
   id: string;
-  scope: "project" | "page";
   project_id: string | null;
-  destination_id: string | null;
   type: MemoryEntryType;
   summary: string;
   content: string;
@@ -206,30 +204,6 @@ export async function clearMemory(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/memory`, { method: "DELETE" });
 }
 
-// --- Page memory ---
-
-export async function fetchPageMemory(projectId: string, destinationId: string): Promise<{ entries: MemoryEntry[] }> {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}/memory`);
-}
-
-export async function createPageMemoryEntry(
-  projectId: string,
-  destinationId: string,
-  entry: { type: MemoryEntryType; summary: string; content: string; region?: { description: string } | null; confidence?: number },
-): Promise<{ entry: MemoryEntry }> {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}/memory`, {
-    method: "POST",
-    body: JSON.stringify(entry),
-  });
-}
-
-export async function deletePageMemoryEntry(projectId: string, destinationId: string, entryId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}/memory/${entryId}`, { method: "DELETE" });
-}
-
-export async function clearPageMemory(projectId: string, destinationId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}/memory`, { method: "DELETE" });
-}
 
 export async function resetPageData(projectId: string, destinationId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}/reset`, { method: "DELETE" });
@@ -264,6 +238,13 @@ export async function updateTest(projectId: string, testId: string, payload: {
 /** Clear the saved replay script for a flow (next run discovers steps again). */
 export async function resetTestScript(projectId: string, testId: string) {
   return updateTest(projectId, testId, { reset_script: true });
+}
+
+export async function toggleTest(projectId: string, testId: string, enabled: boolean) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
 }
 
 export async function deleteTest(projectId: string, testId: string) {

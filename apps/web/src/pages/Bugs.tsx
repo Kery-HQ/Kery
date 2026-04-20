@@ -11,7 +11,11 @@ import {
   ComputerTower,
   Calendar,
   Trash,
+  Stack,
+  Flask,
+  FilePdf,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,6 +44,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
+import { downloadIssuesPdf } from "@/lib/export-issues-pdf";
 
 export type BugRecord = {
   id?: string;
@@ -59,6 +64,10 @@ export type BugRecord = {
   reportedAt?: string;
   /** API returns snake_case from DB rows */
   reported_at?: string;
+  /** Joined from test_runs */
+  test_id?: string | null;
+  destination_id?: string | null;
+  test_name?: string | null;
   environment?: string | null;
   index?: number;
 };
@@ -67,6 +76,9 @@ const SEVERITY_FILTERS = ["all", "high", "medium", "low"] as const;
 type SeverityFilter = (typeof SEVERITY_FILTERS)[number];
 
 const CATEGORY_FILTERS = ["all", "visual", "functional", "ux", "other"] as const;
+const SOURCE_FILTERS = ["all", "pages", "flows"] as const;
+type SourceFilter = (typeof SOURCE_FILTERS)[number];
+
 type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -86,10 +98,11 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destru
 
 export const Bugs: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
   const [bugs, setBugs] = React.useState<BugRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = React.useState<SourceFilter>("all");
   const [severityFilter, setSeverityFilter] = React.useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("all");
   const [actionBusy, setActionBusy] = React.useState<string | null>(null);
@@ -98,6 +111,7 @@ export const Bugs: React.FC = () => {
     null | { kind: "all" } | { kind: "one"; bug: BugRecord }
   >(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [exportBusy, setExportBusy] = React.useState(false);
 
   async function load() {
     if (!currentProjectId) return;
@@ -164,9 +178,14 @@ export const Bugs: React.FC = () => {
     if (categoryFilter !== "all") {
       result = result.filter(b => b.category === categoryFilter);
     }
+    if (sourceFilter === "flows") {
+      result = result.filter(b => !!b.test_id);
+    } else if (sourceFilter === "pages") {
+      result = result.filter(b => !!b.destination_id && !b.test_id);
+    }
     result.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     return result;
-  }, [bugs, severityFilter, categoryFilter]);
+  }, [bugs, severityFilter, categoryFilter, sourceFilter]);
 
   if (!currentProjectId) {
     return (
@@ -186,6 +205,23 @@ export const Bugs: React.FC = () => {
       <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues">
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
+        )}
+        {!loading && bugs.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={exportBusy}
+            onClick={() => {
+              setExportBusy(true);
+              downloadIssuesPdf({ projectName: currentProject?.name, issues: bugs })
+                .then(() => toast.success("Exported issues as PDF"))
+                .catch(() => toast.error("Could not export PDF"))
+                .finally(() => setExportBusy(false));
+            }}
+          >
+            <FilePdf className="h-3.5 w-3.5" />
+            {exportBusy ? "Exporting…" : "Export all as PDF"}
+          </Button>
         )}
         {!loading && bugs.length > 0 && (
           <Button
@@ -222,7 +258,27 @@ export const Bugs: React.FC = () => {
             />
           ) : (
             <>
-              {/* Filter bar */}
+              <div className="flex flex-wrap gap-y-2 gap-x-3 items-center">
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-muted-foreground/50 mr-1">Source</span>
+                  {SOURCE_FILTERS.map(s => (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSourceFilter(s)}
+                      className={cn(
+                        "h-7 px-2.5 text-[11px] gap-1",
+                        sourceFilter === s ? "bg-accent text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {s === "pages" && <Stack className="h-3 w-3" />}
+                      {s === "flows" && <Flask className="h-3 w-3" />}
+                      {s === "all" ? "All" : s === "pages" ? "Pages" : "Flows"}
+                    </Button>
+                  ))}
+                </div>
+                <div className="h-4 w-px bg-border" />
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1">
                   <span className="text-[11px] text-muted-foreground/50 mr-1">Severity</span>
@@ -265,6 +321,7 @@ export const Bugs: React.FC = () => {
                     </Button>
                   ))}
                 </div>
+              </div>
               </div>
 
               {/* Bug list */}
@@ -362,13 +419,25 @@ export const Bugs: React.FC = () => {
                               <Calendar className="h-3.5 w-3.5" />
                               {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
                             </span>
-                            <div className="flex flex-wrap items-center gap-2 ml-auto">
+                            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2.5 text-[11px] gap-1.5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/runs/${bug.run_id ?? bug.runId}`);
+                                }}
+                              >
+                                View Run
+                                <ArrowSquareOut className="h-3 w-3" />
+                              </Button>
                               {bug.id && (bug.status === "open" || bug.status === "in_progress") && (
                                 <>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 text-[11px]"
+                                    className="h-7 px-2.5 text-[11px]"
                                     disabled={actionBusy === bug.id}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -379,8 +448,8 @@ export const Bugs: React.FC = () => {
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant="ghost"
-                                    className="h-7 text-[11px]"
+                                    variant="outline"
+                                    className="h-7 px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
                                     disabled={actionBusy === bug.id}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -391,23 +460,11 @@ export const Bugs: React.FC = () => {
                                   </Button>
                                 </>
                               )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-[11px] gap-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/runs/${bug.run_id ?? bug.runId}`);
-                                }}
-                              >
-                                View Run
-                                <ArrowSquareOut className="h-3 w-3" />
-                              </Button>
                               {bug.id && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                                  className="h-7 px-2.5 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
                                   disabled={actionBusy === bug.id}
                                   onClick={(e) => {
                                     e.stopPropagation();

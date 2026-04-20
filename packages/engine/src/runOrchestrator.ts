@@ -18,7 +18,7 @@ import type { ReviewBug } from "./types.js";
 import { executeRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
 import { generateScriptWithLLM } from "./scriptGenerator.js";
 import {
-  loadProjectMemoryWithDecay, loadPageMemoryWithDecay,
+  loadProjectMemoryWithDecay,
   boostConfidence,
   type MemoryEntry,
 } from "./agentMemory.js";
@@ -135,8 +135,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
   }
   const projectMemory = job.projectId ? await loadProjectMemoryWithDecay(storage, job.projectId) : [];
-  const pageMemory = job.destinationId ? await loadPageMemoryWithDecay(storage, job.destinationId) : [];
-  const allMemory = [...pageMemory, ...projectMemory];
+  const allMemory = projectMemory;
 
   // Launch browser
   let browser;
@@ -376,6 +375,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       netMonitor,
     );
 
+    // Skip all post-agent review work if the run was stopped by the user — return immediately.
+    const wasStopped = agentResult.failReason === "Stopped by user";
+
     // Capture the final page state so holistic/filmstrip review sees the end result
     try {
       const finalSS = await page.screenshot({ type: "jpeg", quality: 70 }).catch(() => Buffer.alloc(0));
@@ -390,10 +392,10 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     } catch { /* page may be closed */ }
 
     netMonitor.stop();
-    const netSummary = netMonitor.formatForAgent() || undefined;
-    const netBugs = netMonitor.getBugs();
+    const netSummary = wasStopped ? undefined : (netMonitor.formatForAgent() || undefined);
+    const netBugs = wasStopped ? [] : netMonitor.getBugs();
 
-    const { bugs: holisticBugs } = await runHolisticFlowReview(
+    const { bugs: holisticBugs } = wasStopped ? { bugs: [] } : await runHolisticFlowReview(
       {
         intent: job.intent,
         stepsDetail: agentResult.stepsDetail,
@@ -407,7 +409,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     );
 
     const filmstripCalls: LLMCallRecord[] = [];
-    const { bugs: filmstripBugs } = await runFilmstripReview(filmstripFrames, {
+    const { bugs: filmstripBugs } = wasStopped ? { bugs: [] } : await runFilmstripReview(filmstripFrames, {
       onLLMCall: (call) => filmstripCalls.push({ ...call, seq: 0 }),
     });
     let bugsFound = mergeBugs(
@@ -436,18 +438,23 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       logger.info({ count: netBugs.length }, "Network monitor: action-correlated bugs merged");
     }
     const triageCalls: LLMCallRecord[] = [];
-    const openProjectBugs = job.projectId
-      ? await storage.getOpenBugs(job.projectId, 100_000).catch(() => [])
-      : [];
-    const triageResult = await runBugTriageAgent(
-      {
-        bugs: bugsFound,
-        intent: job.intent,
-        openProjectBugs,
-        memoryEntries: allMemory,
-      },
-      { onLLMCall: (call) => triageCalls.push({ ...call, seq: 0 }) },
-    );
+    let triageResult: Awaited<ReturnType<typeof runBugTriageAgent>>;
+    if (wasStopped) {
+      triageResult = { bugs: bugsFound, skippedCount: 0, llmCall: null };
+    } else {
+      const openProjectBugs = job.projectId
+        ? await storage.getOpenBugs(job.projectId, 100_000).catch(() => [])
+        : [];
+      triageResult = await runBugTriageAgent(
+        {
+          bugs: bugsFound,
+          intent: job.intent,
+          openProjectBugs,
+          memoryEntries: allMemory,
+        },
+        { onLLMCall: (call) => triageCalls.push({ ...call, seq: 0 }) },
+      );
+    }
     bugsFound = triageResult.bugs;
     if (triageResult.skippedCount > 0) {
       logger.info(
@@ -466,10 +473,8 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       runStatus: agentResult.status === "passed" ? "passed" : "failed",
       stepsDetail: agentResult.stepsDetail,
       projectId: job.projectId,
-      destinationId: job.destinationId,
       destinationRoute,
       projectMemory,
-      pageMemory,
       onLLMCall: (call) => {
         memoryCuratorCalls.push(call);
         job.onLLMCall?.(call);

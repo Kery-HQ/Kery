@@ -10,32 +10,30 @@ import {
   CursorClick,
   NavigationArrow,
   Globe,
-  Repeat,
   CheckCircle,
   CaretDown,
   CaretRight,
-  ArrowCounterClockwise,
+  MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { RunList } from "@/components/RunList";
+import { StatusDot } from "@/components/status-dot";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { statusVariant, relativeTime } from "@/lib/formatters";
+import { relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
-  resetTestScript, runProjectTest, fetchProjectRuns,
+  toggleTest, runProjectTest,
 } from "@/projectApi";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -59,10 +57,13 @@ type SavedTest = {
   max_steps?: number | null;
   created_at: string;
   run_count?: number;
+  issues_count?: number;
   regression_plan?: RegressionStep[] | null;
   plan_status?: "none" | "ready" | "stale" | null;
   plan_success_count?: number;
+  enabled: boolean;
 };
+
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
@@ -75,7 +76,6 @@ export const TestsPlans: React.FC = () => {
   const [selectedEnvId, setSelectedEnvId] = React.useState<string | null>(null);
 
   const [tests, setTests] = React.useState<SavedTest[]>([]);
-  const [selectedTest, setSelectedTest] = React.useState<SavedTest | null>(null);
 
   // Create / edit dialog
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -93,15 +93,8 @@ export const TestsPlans: React.FC = () => {
   const [adhocIntent, setAdhocIntent] = React.useState("");
   const [adhocRunning, setAdhocRunning] = React.useState(false);
 
-  // Detail tabs
-  const [testTab, setTestTab] = React.useState<string>("runs");
-
-  // Runs for detail
-  const [flowRuns, setFlowRuns] = React.useState<any[]>([]);
-  const [runsLoading, setRunsLoading] = React.useState(false);
-
   const [running, setRunning] = React.useState<string | null>(null);
-  const [resettingScriptId, setResettingScriptId] = React.useState<string | null>(null);
+  const [runAllBusy, setRunAllBusy] = React.useState(false);
 
   // ─── Init ───────────────────────────────────────────────────────────────
 
@@ -113,7 +106,6 @@ export const TestsPlans: React.FC = () => {
       setSelectedEnvId(envs[0]?.id || null);
     });
     loadTests();
-    setSelectedTest(null);
     setDialogOpen(false);
   }, [currentProjectId]);
 
@@ -123,45 +115,15 @@ export const TestsPlans: React.FC = () => {
     setTests((res.tests || []).filter(Boolean));
   }
 
-  // Open a specific flow when navigated from command palette (or similar).
+  // Navigate to detail when command palette selects a specific flow.
   React.useEffect(() => {
     const id = (location.state as { selectTestId?: string } | null)?.selectTestId;
     if (!id || tests.length === 0) return;
     const match = tests.find((t) => t.id === id);
     if (match) {
-      setSelectedTest(match);
-      setTestTab("runs");
-      navigate(".", { replace: true, state: {} });
+      navigate(`/tests/${match.id}`, { replace: true });
     }
   }, [tests, location.state, navigate]);
-
-  // ─── Load runs for selected test ─────────────────────────────────────────
-
-  React.useEffect(() => {
-    if (testTab !== "runs" || !currentProjectId || !selectedTest) return;
-    setRunsLoading(true);
-    fetchProjectRuns(currentProjectId)
-      .then((res) => {
-        const runs = (res.runs ?? []).filter((r: any) => r.test_id === selectedTest.id);
-        setFlowRuns(runs);
-      })
-      .finally(() => setRunsLoading(false));
-  }, [testTab, currentProjectId, selectedTest?.id]);
-
-  React.useEffect(() => {
-    if (testTab === "memory") setTestTab("runs");
-  }, [testTab]);
-
-  // ─── Select ─────────────────────────────────────────────────────────────
-
-  function selectTest(test: SavedTest) {
-    if (selectedTest?.id === test.id) {
-      setSelectedTest(null);
-      return;
-    }
-    setSelectedTest(test);
-    setTestTab("runs");
-  }
 
   // ─── Create / Edit ──────────────────────────────────────────────────────
 
@@ -194,9 +156,7 @@ export const TestsPlans: React.FC = () => {
           context: formContext.trim() || undefined,
           max_steps: parsedMaxSteps ?? null,
         });
-        const updated = res.test;
-        setTests((prev) => prev.map((t) => t.id === updated.id ? updated : t));
-        if (selectedTest?.id === updated.id) setSelectedTest(updated);
+        setTests((prev) => prev.map((t) => t.id === res.test.id ? res.test : t));
         setEditing(null);
       } else {
         const res = await createTest(currentProjectId, {
@@ -205,7 +165,6 @@ export const TestsPlans: React.FC = () => {
           max_steps: parsedMaxSteps,
         });
         setTests((prev) => [res.test, ...prev]);
-        setSelectedTest(res.test);
       }
       setDialogOpen(false);
     } finally {
@@ -216,24 +175,20 @@ export const TestsPlans: React.FC = () => {
   async function handleDelete(test: SavedTest) {
     await deleteTest(test.project_id, test.id);
     setTests((prev) => prev.filter((t) => t.id !== test.id));
-    if (selectedTest?.id === test.id) setSelectedTest(null);
     setDeleteTarget(null);
   }
 
-  async function handleResetScript(testId: string) {
-    if (!currentProjectId) return;
-    setResettingScriptId(testId);
+  // ─── Run ────────────────────────────────────────────────────────────────
+
+  async function handleToggleEnabled(test: SavedTest, enabled: boolean) {
+    const prev = test.enabled;
+    setTests((prev) => prev.map((t) => (t.id === test.id ? { ...t, enabled } : t)));
     try {
-      const res = await resetTestScript(currentProjectId, testId);
-      const updated = res.test as SavedTest;
-      setTests((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      if (selectedTest?.id === updated.id) setSelectedTest(updated);
-    } finally {
-      setResettingScriptId(null);
+      await toggleTest(test.project_id, test.id, enabled);
+    } catch {
+      setTests((prev) => prev.map((t) => (t.id === test.id ? { ...t, enabled: prev } : t)));
     }
   }
-
-  // ─── Run ────────────────────────────────────────────────────────────────
 
   async function handleRunSaved(test: SavedTest) {
     if (!selectedEnvId) return;
@@ -243,6 +198,21 @@ export const TestsPlans: React.FC = () => {
       navigate(`/runs/${res.runId}`);
     } finally {
       setRunning(null);
+    }
+  }
+
+  async function handleRunAll() {
+    if (!currentProjectId || !selectedEnvId) return;
+    const targets = tests.filter((t) => t.enabled);
+    if (targets.length === 0) return;
+    setRunAllBusy(true);
+    try {
+      for (const t of targets) {
+        await runProjectTest(t.project_id, selectedEnvId, "", t.id);
+      }
+      navigate("/runs");
+    } finally {
+      setRunAllBusy(false);
     }
   }
 
@@ -284,6 +254,43 @@ export const TestsPlans: React.FC = () => {
   }
 
   const canSave = formName.trim().length > 0 && formIntent.trim().length > 0;
+  const enabledCount = tests.filter((t) => t.enabled).length;
+  const readyCount = tests.filter((t) => t.plan_status === "ready").length;
+  const staleCount = tests.filter((t) => t.plan_status === "stale").length;
+  const noScriptCount = tests.filter((t) => !t.plan_status || t.plan_status === "none").length;
+  const totalRunCount = tests.reduce((sum, t) => sum + (t.run_count ?? 0), 0);
+  const totalIssuesFound = tests.reduce((sum, t) => sum + (t.issues_count ?? 0), 0);
+  const flowsWithIssues = tests.filter((t) => (t.issues_count ?? 0) > 0).length;
+
+  const [flowFilter, setFlowFilter] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "ready" | "stale" | "none">("all");
+
+  const filteredTests = React.useMemo(() => {
+    let result = tests;
+    if (statusFilter !== "all") {
+      result = result.filter((t) =>
+        statusFilter === "none"
+          ? !t.plan_status || t.plan_status === "none"
+          : t.plan_status === statusFilter,
+      );
+    }
+    if (flowFilter.trim()) {
+      const q = flowFilter.toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) || t.intent.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [tests, statusFilter, flowFilter]);
+
+  const STATUS_FILTERS = ["all", "ready", "stale", "none"] as const;
+  const STATUS_LABELS: Record<string, string> = {
+    all: "All",
+    ready: "Script ready",
+    stale: "Stale",
+    none: "No script",
+  };
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
@@ -294,196 +301,309 @@ export const TestsPlans: React.FC = () => {
         title="Flows"
         description={tests.length > 0 ? `${tests.length} flow${tests.length !== 1 ? "s" : ""}` : undefined}
       >
-        <Button size="sm" onClick={openCreate} disabled={!currentProjectId} className="gap-1.5 h-7 text-[12px]">
+        <Button
+          size="sm"
+          onClick={openCreate}
+          disabled={!currentProjectId}
+          className="gap-1.5 h-8 text-[12px]"
+        >
           <Plus className="h-3.5 w-3.5" />
           New Flow
         </Button>
       </PageHeader>
 
-      <div className="p-6 animate-fade-in space-y-6">
-        {/* ── Ad-hoc runner ──────────────────────────────────────────── */}
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">
-              Ad-hoc run
-            </p>
-            <div className="flex items-center gap-2">
-              <Input
-                value={adhocIntent}
-                onChange={(e) => setAdhocIntent(e.target.value)}
-                placeholder="Describe what the agent should do..."
-                className="h-8 text-[13px] flex-1"
-                onKeyDown={(e) => { if (e.key === "Enter") handleAdhocRun(); }}
-              />
-              {environments.length > 0 && (
-                <Select
-                  value={selectedEnvId ?? ""}
-                  onChange={(e) => setSelectedEnvId(e.target.value)}
-                  className="w-[160px] h-8 text-[12px]"
-                >
-                  {environments.map((env) => (
-                    <option key={env.id} value={env.id}>{env.name}</option>
-                  ))}
-                </Select>
-              )}
-              <Button
-                size="sm"
-                onClick={handleAdhocRun}
-                disabled={adhocRunning || !adhocIntent.trim() || !selectedEnvId || !currentProjectId}
-                loading={adhocRunning}
-                className="gap-1.5 h-8"
-              >
-                <Play className="h-3 w-3" />
-                Run
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-fade-in">
 
-        {/* ── Flows list ─────────────────────────────────────────────── */}
-        {!currentProjectId ? (
-          <EmptyState title="Select a project" className="py-12" />
-        ) : tests.length === 0 ? (
-          <EmptyState
-            icon={<Flask className="h-5 w-5" />}
-            title="No flows yet"
-            description="Create a test flow to get started."
-            className="py-12"
-          />
-        ) : (
-          <div className="space-y-3">
-            {tests.map((test) => {
-              const isExpanded = selectedTest?.id === test.id;
-              return (
-                <Card key={test.id} className="overflow-hidden">
-                  {/* Card header row */}
-                  <button
-                    onClick={() => selectTest(test)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
-                      isExpanded ? "bg-accent/50" : "hover:bg-accent/30",
-                    )}
+          {/* ── 4 stat cards ──────────────────────────────────────────── */}
+          <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Signal – script coverage donut */}
+            <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
+              {tests.length === 0 ? (
+                <p className="mt-3 text-[13px] text-muted-foreground/50">No flows yet</p>
+              ) : (
+                <div className="mt-2 flex items-center gap-3">
+                  <div
+                    className="relative h-14 w-14 shrink-0 rounded-full"
+                    style={{
+                      background: `conic-gradient(
+                        rgb(16 185 129) 0 ${(readyCount / Math.max(tests.length, 1)) * 360}deg,
+                        rgb(245 158 11) ${(readyCount / Math.max(tests.length, 1)) * 360}deg ${((readyCount + staleCount) / Math.max(tests.length, 1)) * 360}deg,
+                        rgb(148 163 184 / 0.35) ${((readyCount + staleCount) / Math.max(tests.length, 1)) * 360}deg 360deg
+                      )`,
+                    }}
                   >
-                    <CaretDown
-                      className={cn(
-                        "h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 transition-transform duration-150",
-                        isExpanded ? "rotate-0" : "-rotate-90",
-                      )}
+                    <div className="absolute inset-2 rounded-full bg-card flex items-center justify-center">
+                      <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                        {readyCount}/{tests.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                    <p>{readyCount} ready</p>
+                    <p>{staleCount} stale</p>
+                    <p>{noScriptCount} unscripted</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Issues Found */}
+            <div className={cn(
+              "rounded-lg border bg-card px-3 py-3",
+              totalIssuesFound > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-border/60",
+            )}>
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Issues Found</p>
+              <p className={cn(
+                "mt-2 text-[26px] font-semibold tabular-nums",
+                totalIssuesFound > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+              )}>
+                {tests.length === 0 ? "—" : totalIssuesFound}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {totalIssuesFound === 0
+                  ? "No bugs detected"
+                  : `Across ${flowsWithIssues} flow${flowsWithIssues !== 1 ? "s" : ""}`}
+              </p>
+            </div>
+
+            {/* No Script Yet */}
+            <div className={cn(
+              "rounded-lg border bg-card px-3 py-3",
+              noScriptCount > 0 ? "border-orange-400/30 bg-orange-400/5" : "border-border/60",
+            )}>
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">No Script Yet</p>
+              <p className={cn(
+                "mt-2 text-[26px] font-semibold tabular-nums",
+                noScriptCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
+              )}>
+                {tests.length === 0 ? "—" : noScriptCount}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {noScriptCount === 0 ? "All flows have scripts" : "Run these flows to generate scripts"}
+              </p>
+            </div>
+
+            {/* Total Runs */}
+            <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Total Runs</p>
+              <p className="mt-2 text-[26px] font-semibold tabular-nums text-foreground">
+                {tests.length === 0 ? "—" : totalRunCount}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {totalRunCount === 0 ? "No runs yet" : `Across ${tests.length} flow${tests.length !== 1 ? "s" : ""}`}
+              </p>
+            </div>
+          </aside>
+
+          {/* ── Main content ──────────────────────────────────────────── */}
+          <main className="space-y-3">
+            {!currentProjectId ? (
+              <EmptyState title="Select a project" className="py-12" />
+            ) : tests.length === 0 ? (
+              <EmptyState
+                icon={<Flask className="h-5 w-5" />}
+                title="No flows yet"
+                description="Create a test flow to get started."
+                className="py-12"
+              />
+            ) : (
+              <>
+                {/* Filter + search card */}
+                <div className="rounded-lg border border-border/60 bg-card p-3 space-y-3">
+                  <div className="relative w-full">
+                    <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+                    <Input
+                      value={flowFilter}
+                      onChange={(e) => setFlowFilter(e.target.value)}
+                      placeholder="Filter flows..."
+                      className="pl-8"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-medium text-foreground truncate">
-                          {test.name}
-                        </span>
-                        {test.run_count != null && test.run_count > 0 && (
-                          <span className="text-[10px] font-mono text-muted-foreground/50">
-                            {test.run_count} run{test.run_count !== 1 ? "s" : ""}
-                          </span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {STATUS_FILTERS.map((s) => (
+                      <Button
+                        key={s}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setStatusFilter(s)}
+                        className={cn(
+                          "h-7 px-2.5 text-[11px]",
+                          statusFilter === s
+                            ? "bg-accent text-foreground"
+                            : "text-muted-foreground",
                         )}
-                        <span className="text-[10px] font-mono text-muted-foreground/40">
-                          {relativeTime(test.created_at)}
-                        </span>
-                      </div>
-                      {test.intent && (
-                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                          {test.intent.trim().replace(/\s+/g, " ").slice(0, 100)}
-                          {test.intent.trim().replace(/\s+/g, " ").length > 100 ? "..." : ""}
-                        </p>
-                      )}
-                    </div>
+                      >
+                        {STATUS_LABELS[s]}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
 
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {planBadge(test)}
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleRunSaved(test)}
-                          disabled={running === test.id || !selectedEnvId}
-                          className="h-7 gap-1.5 text-[11px]"
-                        >
-                          <Play className="h-3 w-3" />
-                          {running === test.id ? "Starting..." : "Run"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(test)} className="h-7 w-7 p-0">
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleteTarget(test)}
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </button>
+                {/* Section header: Flows title + env + run all */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                    Flows ({filteredTests.length})
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {environments.length > 0 ? (
+                      <Select
+                        value={selectedEnvId ?? ""}
+                        onChange={(e) => setSelectedEnvId(e.target.value)}
+                        className="w-[170px] h-8 text-[12px]"
+                      >
+                        {environments.map((env) => (
+                          <option key={env.id} value={env.id}>{env.name}</option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <span className="text-[12px] text-muted-foreground/70">No environments</span>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!selectedEnvId || enabledCount === 0 || runAllBusy}
+                      loading={runAllBusy}
+                      onClick={() => void handleRunAll()}
+                      className="gap-1.5 h-8"
+                    >
+                      {!runAllBusy && <Play className="h-3.5 w-3.5" />}
+                      Run all{enabledCount > 0 ? ` (${enabledCount})` : ""}
+                    </Button>
+                  </div>
+                </div>
 
-                  {/* Expanded detail tabs */}
-                  {isExpanded && (
-                    <div className="border-t border-border animate-fade-in">
-                      <Tabs value={testTab} onValueChange={setTestTab} className="flex flex-col">
-                        <div className="px-4 flex items-center justify-between gap-3">
-                          <TabsList className="flex-shrink-0 px-0">
-                            <TabsTrigger value="runs">Runs</TabsTrigger>
-                            <TabsTrigger value="script">
-                              Script
-                              {test.plan_status === "ready" && (
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" />
+                {/* Quick adhoc run */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={adhocIntent}
+                    onChange={(e) => setAdhocIntent(e.target.value)}
+                    placeholder="Quick run: describe what the agent should do..."
+                    className="h-8 text-[13px] flex-1"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAdhocRun(); }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleAdhocRun}
+                    disabled={adhocRunning || !adhocIntent.trim() || !selectedEnvId || !currentProjectId}
+                    loading={adhocRunning}
+                    className="gap-1.5 h-8 shrink-0"
+                  >
+                    <Play className="h-3 w-3" />
+                    Run
+                  </Button>
+                </div>
+
+                {/* Flow tiles */}
+                {filteredTests.length === 0 ? (
+                  <EmptyState title="No flows match filters" className="py-8" />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {filteredTests.map((test) => {
+                      const scriptDot =
+                        test.plan_status === "ready"
+                          ? "clean"
+                          : test.plan_status === "stale"
+                            ? "issues"
+                            : "untested";
+                      return (
+                        <div
+                          key={test.id}
+                          className={cn(
+                            "rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[8rem]",
+                            !test.enabled && "opacity-60",
+                          )}
+                        >
+                          {/* Top: dot + name + switch — identical to page tile */}
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/tests/${test.id}`)}
+                              className="min-w-0 flex-1 text-left space-y-1 group/link"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <StatusDot status={scriptDot} />
+                                <span className={cn("text-[13px] font-medium text-foreground truncate", !test.enabled && "line-through")}>
+                                  {test.name}
+                                </span>
+                              </div>
+                              {test.intent && (
+                                <p className="text-[11px] text-muted-foreground/60 truncate">
+                                  {test.intent.trim()}
+                                </p>
                               )}
-                            </TabsTrigger>
-                            <TabsTrigger value="details">Details</TabsTrigger>
-                          </TabsList>
-                          {testTab === "script" &&
-                            ((test.regression_plan?.length ?? 0) > 0 ||
-                              test.plan_status === "ready" ||
-                              test.plan_status === "stale") && (
+                            </button>
+                            <div className="shrink-0 pt-0.5" onClick={e => e.stopPropagation()}>
+                              <Switch
+                                checked={test.enabled}
+                                onCheckedChange={v => { void handleToggleEnabled(test, v); }}
+                                aria-label={test.enabled ? "Disable this flow" : "Enable this flow"}
+                                className="scale-90"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Bottom: issues + run count left, play + trash right */}
+                          <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
+                            <div className="min-w-0 space-y-0.5">
+                              <span className={cn(
+                                "font-medium tabular-nums block",
+                                (test.issues_count ?? 0) > 0
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-muted-foreground/60",
+                              )}>
+                                {test.issues_count ?? 0} issue{(test.issues_count ?? 0) !== 1 ? "s" : ""}
+                              </span>
+                              <span className="text-muted-foreground/60 font-mono block">
+                                {test.run_count != null && test.run_count > 0
+                                  ? `${test.run_count} run${test.run_count !== 1 ? "s" : ""}`
+                                  : relativeTime(test.created_at)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
-                                className="h-7 gap-1.5 text-[11px] shrink-0"
-                                disabled={resettingScriptId === test.id}
-                                loading={resettingScriptId === test.id}
-                                onClick={() => handleResetScript(test.id)}
+                                variant="ghost"
+                                className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={() => navigate(`/tests/${test.id}`)}
                               >
-                                <ArrowCounterClockwise className="h-3.5 w-3.5" />
-                                Reset script
+                                View
                               </Button>
-                            )}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                disabled={running === test.id || !selectedEnvId || !test.enabled}
+                                loading={running === test.id}
+                                onClick={() => handleRunSaved(test)}
+                                aria-label={`Run ${test.name}`}
+                              >
+                                {running !== test.id && <Play className="h-3.5 w-3.5" />}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget(test)}
+                                aria-label={`Delete ${test.name}`}
+                              >
+                                <Trash className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-
-                        <div className="max-h-[500px] overflow-y-auto">
-                          <TabsContent value="runs" className="px-4 pb-4">
-                            <RunList
-                              runs={flowRuns}
-                              title="Recent runs"
-                              loading={runsLoading}
-                              emptyMessage="No runs yet. Hit Run to execute this flow."
-                            />
-                          </TabsContent>
-
-                          <TabsContent value="script" className="px-4 pb-4">
-                            <ScriptTab
-                              plan={test.regression_plan}
-                              planStatus={test.plan_status}
-                            />
-                          </TabsContent>
-
-                          <TabsContent value="details" className="px-4 pb-4">
-                            <DetailsTab test={test} />
-                          </TabsContent>
-                        </div>
-                      </Tabs>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+        </div>
       </div>
 
       {/* ── Create / Edit Dialog ──────────────────────────────────────── */}
@@ -592,78 +712,7 @@ export const TestsPlans: React.FC = () => {
   );
 };
 
-// ─── Script Tab ───────────────────────────────────────────────────────────────
-
-function ScriptTab({
-  plan,
-  planStatus,
-}: {
-  plan?: RegressionStep[] | null;
-  planStatus?: string | null;
-}) {
-  const status = planStatus ?? "none";
-  const steps = plan ?? [];
-  const showEmptyState = status === "none" || steps.length === 0;
-
-  return (
-    <div className="w-full">
-      {showEmptyState ? (
-        <div className="flex justify-center">
-          <EmptyState
-            className="w-full max-w-lg py-16"
-            icon={<Repeat className="h-5 w-5" />}
-            title="No replay plan yet"
-            description="Run this flow successfully once. We’ll save the step sequence and reuse it on the next run."
-          />
-        </div>
-      ) : (
-        <RegressionPlanView steps={steps} />
-      )}
-    </div>
-  );
-}
-
-// ─── Details Tab ──────────────────────────────────────────────────────────────
-
-const DEFAULT_FLOW_MAX_STEPS = 50;
-
-function DetailsTab({ test }: { test: SavedTest }) {
-  return (
-    <div className="space-y-5 max-w-2xl">
-      <div>
-        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Max steps</p>
-        <p className="text-[13px] text-foreground tabular-nums">
-          {test.max_steps != null ? test.max_steps : DEFAULT_FLOW_MAX_STEPS}
-          {test.max_steps == null && (
-            <span className="text-muted-foreground/60 font-normal"> (default)</span>
-          )}
-        </p>
-      </div>
-
-      <div>
-        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">
-          Custom flow description
-        </p>
-        <div className="rounded-md bg-muted/40 border border-border px-4 py-3 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
-          {test.intent}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide mb-2">Context</p>
-        {test.context ? (
-          <div className="rounded-md bg-muted/40 border border-border px-4 py-3 text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
-            {test.context}
-          </div>
-        ) : (
-          <p className="text-[12px] text-muted-foreground/50 italic">No context set</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Shared Regression Plan Step Viewer (exported for PageDetail.tsx) ────────
+// ─── Shared Regression Plan Step Viewer ──────────────────────────────────────
 
 const STEP_ACTION_COLORS: Record<string, string> = {
   click:         "text-foreground/90",
