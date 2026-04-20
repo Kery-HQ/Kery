@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   SquaresFour,
   Stack,
-  Flask,
+  FlowArrow,
   Pulse,
   Warning,
   Globe,
@@ -23,7 +23,7 @@ import { runListLabel } from "@/lib/formatters";
 const NAV_ITEMS = [
   { name: "Overview", href: "/overview", icon: SquaresFour },
   { name: "Routes", href: "/pages", icon: Stack },
-  { name: "Flows", href: "/tests", icon: Flask },
+  { name: "Flows", href: "/tests", icon: FlowArrow },
   { name: "Runs", href: "/runs", icon: Pulse },
   { name: "Issues", href: "/bugs", icon: Warning },
   { name: "Environments", href: "/environments", icon: Globe },
@@ -162,7 +162,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       }}
                       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
                     >
-                      <Flask className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <FlowArrow className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="min-w-0 truncate">{t.name}</span>
                     </Command.Item>
                   ))}

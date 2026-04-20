@@ -6,7 +6,7 @@ import {
   Plus,
   SquaresFour,
   Globe,
-  Flask,
+  FlowArrow,
   Stack,
   Pulse,
   Brain,
@@ -33,7 +33,7 @@ export type { Theme } from "@/lib/hooks";
 const CORE_ITEMS = [
   { name: "Overview",     href: "/overview",      icon: SquaresFour },
   { name: "Routes",       href: "/pages",         icon: Stack },
-  { name: "Flows",        href: "/tests",         icon: Flask },
+  { name: "Flows",        href: "/tests",         icon: FlowArrow },
   { name: "Runs",         href: "/runs",          icon: Pulse },
   { name: "Issues",       href: "/bugs",          icon: Warning },
 ];

@@ -8,7 +8,7 @@ import {
   CaretRight,
   Globe,
   Scan,
-  Flask,
+  FlowArrow,
   Play,
   Circle,
   Check,
@@ -69,7 +69,7 @@ const SETUP_STEPS: SetupStep[] = [
     label: "Run your first test on app",
     description:
       "Create your first custom test, or let the agent explore without a script.",
-    icon: Flask,
+    icon: FlowArrow,
     href: "/tests",
     buttonLabel: "Create flow",
   },

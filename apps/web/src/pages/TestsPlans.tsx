@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  Flask,
+  FlowArrow,
   Plus,
   Play,
   Pencil,
@@ -297,7 +297,7 @@ export const TestsPlans: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        icon={<Flask className="h-4 w-4" />}
+        icon={<FlowArrow className="h-4 w-4" />}
         title="Flows"
         description={tests.length > 0 ? `${tests.length} flow${tests.length !== 1 ? "s" : ""}` : undefined}
       >
@@ -403,7 +403,7 @@ export const TestsPlans: React.FC = () => {
               <EmptyState title="Select a project" className="py-12" />
             ) : tests.length === 0 ? (
               <EmptyState
-                icon={<Flask className="h-5 w-5" />}
+                icon={<FlowArrow className="h-5 w-5" />}
                 title="No flows yet"
                 description="Create a test flow to get started."
                 className="py-12"

@@ -12,7 +12,7 @@ import {
   Calendar,
   Trash,
   Stack,
-  Flask,
+  FlowArrow,
   FilePdf,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -273,7 +273,7 @@ export const Bugs: React.FC = () => {
                       )}
                     >
                       {s === "routes" && <Stack className="h-3 w-3" />}
-                      {s === "flows" && <Flask className="h-3 w-3" />}
+                      {s === "flows" && <FlowArrow className="h-3 w-3" />}
                       {s === "all" ? "All" : s === "routes" ? "Routes" : "Flows"}
                     </Button>
                   ))}
