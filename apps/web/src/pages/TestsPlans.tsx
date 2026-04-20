@@ -561,7 +561,16 @@ export const TestsPlans: React.FC = () => {
                                   : relativeTime(test.created_at)}
                               </span>
                             </div>
-                            <div className="flex items-center gap-0.5 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={() => navigate(`/tests/${test.id}`)}
+                              >
+                                View
+                              </Button>
                               <Button
                                 type="button"
                                 size="sm"

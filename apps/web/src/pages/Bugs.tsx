@@ -13,7 +13,9 @@ import {
   Trash,
   Stack,
   Flask,
+  FilePdf,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +44,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
+import { downloadIssuesPdf } from "@/lib/export-issues-pdf";
 
 export type BugRecord = {
   id?: string;
@@ -95,7 +98,7 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destru
 
 export const Bugs: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
   const [bugs, setBugs] = React.useState<BugRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
@@ -108,6 +111,7 @@ export const Bugs: React.FC = () => {
     null | { kind: "all" } | { kind: "one"; bug: BugRecord }
   >(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [exportBusy, setExportBusy] = React.useState(false);
 
   async function load() {
     if (!currentProjectId) return;
@@ -201,6 +205,23 @@ export const Bugs: React.FC = () => {
       <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues">
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
+        )}
+        {!loading && bugs.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={exportBusy}
+            onClick={() => {
+              setExportBusy(true);
+              downloadIssuesPdf({ projectName: currentProject?.name, issues: bugs })
+                .then(() => toast.success("Exported issues as PDF"))
+                .catch(() => toast.error("Could not export PDF"))
+                .finally(() => setExportBusy(false));
+            }}
+          >
+            <FilePdf className="h-3.5 w-3.5" />
+            {exportBusy ? "Exporting…" : "Export all as PDF"}
+          </Button>
         )}
         {!loading && bugs.length > 0 && (
           <Button
@@ -331,21 +352,6 @@ export const Bugs: React.FC = () => {
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
                           {bug.name}
                         </span>
-                        {bug.test_id ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/tests/${bug.test_id}`); }}
-                            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border border-violet-400/30 bg-violet-400/8 text-violet-600 dark:text-violet-400 hover:bg-violet-400/15 transition-colors flex-shrink-0"
-                          >
-                            <Flask className="h-2.5 w-2.5" />
-                            {bug.test_name ?? "Flow"}
-                          </button>
-                        ) : bug.destination_id ? (
-                          <span className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border border-sky-400/30 bg-sky-400/8 text-sky-600 dark:text-sky-400 flex-shrink-0">
-                            <Stack className="h-2.5 w-2.5" />
-                            Page
-                          </span>
-                        ) : null}
                         <BugCategoryTag category={bug.category} />
                         <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize flex-shrink-0">
                           {bug.status.replace("_", " ")}
@@ -413,13 +419,25 @@ export const Bugs: React.FC = () => {
                               <Calendar className="h-3.5 w-3.5" />
                               {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
                             </span>
-                            <div className="flex flex-wrap items-center gap-2 ml-auto">
+                            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2.5 text-[11px] gap-1.5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/runs/${bug.run_id ?? bug.runId}`);
+                                }}
+                              >
+                                View Run
+                                <ArrowSquareOut className="h-3 w-3" />
+                              </Button>
                               {bug.id && (bug.status === "open" || bug.status === "in_progress") && (
                                 <>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 text-[11px]"
+                                    className="h-7 px-2.5 text-[11px]"
                                     disabled={actionBusy === bug.id}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -430,8 +448,8 @@ export const Bugs: React.FC = () => {
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant="ghost"
-                                    className="h-7 text-[11px]"
+                                    variant="outline"
+                                    className="h-7 px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
                                     disabled={actionBusy === bug.id}
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -442,37 +460,11 @@ export const Bugs: React.FC = () => {
                                   </Button>
                                 </>
                               )}
-                              {bug.test_id && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-[11px] gap-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/tests/${bug.test_id}`);
-                                  }}
-                                >
-                                  <Flask className="h-3 w-3" />
-                                  View Flow
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-[11px] gap-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/runs/${bug.run_id ?? bug.runId}`);
-                                }}
-                              >
-                                View Run
-                                <ArrowSquareOut className="h-3 w-3" />
-                              </Button>
                               {bug.id && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                                  className="h-7 px-2.5 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
                                   disabled={actionBusy === bug.id}
                                   onClick={(e) => {
                                     e.stopPropagation();

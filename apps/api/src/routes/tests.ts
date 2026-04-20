@@ -89,17 +89,6 @@ export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter
     reply.send({ test: rows[0] });
   });
 
-  app.patch("/api/projects/:projectId/tests/:testId", async (req, reply) => {
-    const { testId } = ProjectTestParams.parse(req.params);
-    const body = z.object({ enabled: z.boolean() }).parse(req.body);
-    const { rows } = await pool.query(
-      `UPDATE saved_tests SET enabled = $2 WHERE id = $1 RETURNING *`,
-      [testId, body.enabled],
-    );
-    if (rows.length === 0) { reply.code(404).send({ error: "not found" }); return; }
-    reply.send({ test: rows[0] });
-  });
-
   app.delete("/api/projects/:projectId/tests/:testId", async (req, reply) => {
     const { testId } = ProjectTestParams.parse(req.params);
     await pool.query("DELETE FROM saved_tests WHERE id = $1", [testId]);
