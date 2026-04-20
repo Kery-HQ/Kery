@@ -1,5 +1,5 @@
 import React from "react";
-import { Gear, Trash, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { Gear, Trash, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -49,6 +49,7 @@ export const Settings: React.FC = () => {
   const [modelPrices, setModelPrices] = React.useState<Partial<Record<ModelSlotKey, ModelPriceUsd>>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
+  const [selectedModelKey, setSelectedModelKey] = React.useState<ModelSlotKey>("agentModel");
 
   React.useEffect(() => {
     setProjectName(currentProject?.name ?? "");
@@ -154,6 +155,8 @@ export const Settings: React.FC = () => {
   }
 
   const hasCustomizedModels = Object.values(modelSettings).some((m) => m.customized);
+  const activeModel = MODEL_CONFIG.find((m) => m.key === selectedModelKey) ?? MODEL_CONFIG[0];
+  const activeSetting = modelSettings[activeModel.key];
 
   return (
     <div className="flex flex-col min-h-full">
@@ -226,7 +229,7 @@ export const Settings: React.FC = () => {
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Platform settings</p>
               <p className="text-[11px] text-muted-foreground/70 mt-1">
-                Model configuration applies platform-wide across projects.
+                Model configuration applies platform-wide across projects. Pick an agent type to configure.
               </p>
             </div>
             {hasCustomizedModels && (
@@ -241,33 +244,63 @@ export const Settings: React.FC = () => {
             )}
           </div>
           <Card>
-            <CardContent className="pt-4 space-y-4">
-              {MODEL_CONFIG.map(({ key, label, description, options }, idx) => {
-                const setting = modelSettings[key];
-                if (!setting) return null;
-                return (
-                  <React.Fragment key={key}>
-                    {idx > 0 && <Separator />}
+            <CardContent className="pt-4">
+              <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <aside className="space-y-1 rounded-md border border-border/70 bg-surface-2/60 p-2">
+                  {MODEL_CONFIG.map((model) => {
+                    const setting = modelSettings[model.key];
+                    const selected = model.key === selectedModelKey;
+                    return (
+                      <button
+                        key={model.key}
+                        type="button"
+                        onClick={() => setSelectedModelKey(model.key)}
+                        className={cn(
+                          "w-full rounded-md border px-2.5 py-2 text-left transition-colors",
+                          selected
+                            ? "border-primary/35 bg-primary/10"
+                            : "border-transparent hover:border-border/70 hover:bg-accent/40",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <model.Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                          <p className="text-[12px] font-medium text-foreground">{model.sidebarLabel}</p>
+                        </div>
+                        <p className="mt-1 text-[10px] text-muted-foreground/80">{model.sidebarHint}</p>
+                        {setting?.customized && (
+                          <Badge variant="warning" className="mt-1.5 h-4 text-[9px]">override</Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </aside>
+
+                <div className="space-y-2">
+                  {activeSetting ? (
                     <ModelSelect
-                      key={key}
-                      modelKey={key as ModelSlotKey}
-                      label={label}
-                      description={description}
-                      options={options}
-                      current={setting.current}
-                      defaultValue={setting.default}
-                      customized={setting.customized}
-                      saving={modelSaving === key || modelSaving === "__all__"}
+                      modelKey={activeModel.key}
+                      label={activeModel.label}
+                      description={activeModel.description}
+                      options={activeModel.options}
+                      current={activeSetting.current}
+                      defaultValue={activeSetting.default}
+                      customized={activeSetting.customized}
+                      saving={modelSaving === activeModel.key || modelSaving === "__all__"}
                       onChange={handleModelChange}
                       llmKeys={llmKeys}
-                      modelPrice={modelPrices[key as ModelSlotKey]}
+                      modelPrice={modelPrices[activeModel.key]}
+                      details={activeModel.details}
                     />
-                  </React.Fragment>
-                );
-              })}
+                  ) : (
+                    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-[12px] text-muted-foreground">
+                      Model settings are loading for this agent type.
+                    </div>
+                  )}
+                </div>
+              </div>
               {modelStatus && (
                 <p className={cn(
-                  "text-[12px]",
+                  "text-[12px] mt-3",
                   modelStatus.includes("Failed") ? "text-destructive" : "text-status-pass",
                 )}>
                   {modelStatus}
@@ -391,29 +424,58 @@ const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [
   { value: "openrouter", label: "OpenRouter (any id)" },
 ];
 
-const MODEL_CONFIG: { key: string; label: string; description: string; options: ModelOption[] }[] = [
+const MODEL_CONFIG: {
+  key: ModelSlotKey;
+  sidebarLabel: string;
+  sidebarHint: string;
+  label: string;
+  description: string;
+  details: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  options: ModelOption[];
+}[] = [
   {
     key: "agentModel",
+    sidebarLabel: "Navigator agent",
+    sidebarHint: "Primary browser actions",
     label: "Primary Browser Agent",
     description: "Runs browser actions and tool calls during tests.",
+    details:
+      "This is the model that directly controls browser actions. Favor reliability and tool-use quality here because it has the most impact on run outcomes.",
+    Icon: Robot,
     options: AGENT_OPTIONS,
   },
   {
     key: "auxiliaryModel",
+    sidebarLabel: "Support agent",
+    sidebarHint: "Planning and structured outputs",
     label: "Support Tasks",
     description: "Handles planning, summaries, and structured text/JSON work.",
+    details:
+      "Used for support tasks such as summarization, plan formatting, and structured JSON generation. A faster model often works well.",
+    Icon: NotePencil,
     options: CODE_OPTIONS,
   },
   {
     key: "reviewAgentModel",
+    sidebarLabel: "Review agent",
+    sidebarHint: "Post-run visual/behavior checks",
     label: "Run Reviewer",
     description: "Analyzes screenshots and behavior after each run.",
+    details:
+      "This model evaluates run outputs and screenshots. Prefer stronger reasoning/vision models when you need high-quality issue analysis.",
+    Icon: Eye,
     options: REASONING_VISION_OPTIONS,
   },
   {
     key: "stagehandModel",
+    sidebarLabel: "Element finder",
+    sidebarHint: "UI targeting reliability",
     label: "Element Finder",
     description: "Helps locate and target UI elements reliably.",
+    details:
+      "Used for element-location assistance. Prioritize responsiveness and deterministic behavior for fewer missed interactions.",
+    Icon: CursorClick,
     options: STAGEHAND_OPTIONS,
   },
 ];
@@ -443,6 +505,7 @@ function ModelSelect({
   onChange,
   llmKeys,
   modelPrice,
+  details,
 }: {
   modelKey: ModelSlotKey;
   label: string;
@@ -455,6 +518,7 @@ function ModelSelect({
   onChange: (key: ModelSlotKey, value: string, modelPrice?: ModelPriceUsd | null) => void;
   llmKeys: LlmKeyPresence | null;
   modelPrice?: ModelPriceUsd;
+  details: string;
 }) {
   const presetValues = React.useMemo(() => new Set(options.map((o) => o.value)), [options]);
   const isPresetCurrent = presetValues.has(current);
@@ -546,9 +610,13 @@ function ModelSelect({
       </div>
 
       <p className="text-[11px] text-muted-foreground/70 mb-3">{description}</p>
+      <p className="text-[11px] text-muted-foreground/80 mb-3 leading-relaxed">{details}</p>
 
       {!customOpen && (
         <>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/75 mb-1.5">
+            Preset models
+          </p>
           <div className="rounded-md border border-border/70 bg-surface-3/60 p-2">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1">Selected model</p>
             <Select
@@ -592,6 +660,9 @@ function ModelSelect({
 
       {customOpen && (
         <div className="rounded-md border border-border/80 bg-muted/20 p-3 space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/75">
+            Custom model
+          </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <Select
               value={customProvider}
