@@ -844,7 +844,7 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
           )}
           {hasFilmstrip && (
             <li>
-              <span className="text-foreground/90">Filmstrip</span> — post-run visual journey across visited pages
+              <span className="text-foreground/90">Filmstrip</span> — post-run visual journey across visited routes
             </li>
           )}
           <li className="text-muted-foreground/90">
@@ -1108,6 +1108,34 @@ function OverviewTab({
 
   const [liveFrameOpenAnim, setLiveFrameOpenAnim] = React.useState(false);
   const seenLivePreviewRef = React.useRef(false);
+  const recordingVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [playbackMs, setPlaybackMs] = React.useState(0);
+  const stepTimeline = React.useMemo(() => {
+    const timed = steps
+      .filter((s): s is RunStep & { at: number } => typeof s.at === "number")
+      .sort((a, b) => a.at - b.at);
+    if (timed.length === 0) return [];
+    const startAt = timed[0].at;
+    return timed.map((s) => ({ ...s, relativeMs: Math.max(0, s.at - startAt) }));
+  }, [steps]);
+  const hasPlan = agentPlan.length > 0;
+  const [rightTab, setRightTab] = React.useState<"plan" | "progress">(hasPlan ? "plan" : "progress");
+
+  React.useEffect(() => {
+    if (!hasPlan && rightTab === "plan") setRightTab("progress");
+  }, [hasPlan, rightTab]);
+
+  const replayCurrentIndex = React.useMemo(() => {
+    if (stepTimeline.length === 0) return -1;
+    let idx = -1;
+    for (let i = 0; i < stepTimeline.length; i += 1) {
+      if (stepTimeline[i].relativeMs <= playbackMs) idx = i;
+      else break;
+    }
+    return idx;
+  }, [stepTimeline, playbackMs]);
+  const canReplay = showRecording && stepTimeline.length > 0;
+
   React.useLayoutEffect(() => {
     if ((showLive || showLiveDisk) && !seenLivePreviewRef.current) {
       seenLivePreviewRef.current = true;
@@ -1140,23 +1168,12 @@ function OverviewTab({
               badge={
                 <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/70 bg-card/90 px-2 py-1.5 backdrop-blur-[2px] sm:gap-2 sm:px-2.5 sm:py-2">
                   <Badge
-                    variant={
-                      isRunStarting || showLive || showLiveDisk ? "running" : showRecording ? "secondary" : "neutral"
-                    }
+                    variant={isRunStarting || showLive || showLiveDisk ? "running" : showRecording ? "secondary" : "neutral"}
                     className="text-[10px] uppercase tracking-wider"
                   >
-                    {isRunStarting
-                      ? "starting"
-                      : showLive || showLiveDisk
-                        ? "live"
-                        : showRecording
-                          ? "recording"
-                          : "snapshot"}
+                    {isRunStarting ? "starting" : showLive || showLiveDisk ? "live" : showRecording ? "recording" : "snapshot"}
                   </Badge>
-                  <span
-                    className="hidden h-4 w-px shrink-0 bg-border/70 sm:block"
-                    aria-hidden
-                  />
+                  <span className="hidden h-4 w-px shrink-0 bg-border/70 sm:block" aria-hidden />
                   <span className="text-[11px] font-mono font-medium tabular-nums text-foreground/90 sm:text-[12px]">
                     live preview
                   </span>
@@ -1167,34 +1184,24 @@ function OverviewTab({
                 <div className="flex max-w-[min(100%,22rem)] items-center gap-2 rounded-lg border border-border/70 bg-card/92 px-3 py-2 backdrop-blur-[2px]">
                   <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" weight="bold" />
                   <p className="font-display text-[11px] font-medium leading-snug tracking-tight text-foreground">
-                    Launching a browser for this run…
+                    Launching a browser for this run...
                   </p>
                 </div>
               ) : showLive ? (
-                <img
-                  src={`data:image/jpeg;base64,${liveScreenshot}`}
-                  alt="Live browser"
-                  className="h-full w-full min-h-0 flex-1 object-contain"
-                />
+                <img src={`data:image/jpeg;base64,${liveScreenshot}`} alt="Live browser" className="h-full w-full min-h-0 flex-1 object-contain" />
               ) : showLiveDisk ? (
-                <img
-                  src={livePreviewDiskUrl!}
-                  alt="Live browser"
-                  className="h-full w-full min-h-0 flex-1 object-contain"
-                />
+                <img src={livePreviewDiskUrl!} alt="Live browser" className="h-full w-full min-h-0 flex-1 object-contain" />
               ) : showRecording ? (
                 <video
+                  ref={recordingVideoRef}
                   src={apiMediaUrl(run.video_url!)}
                   controls
                   className="h-full w-full min-h-0 flex-1 object-contain"
                   preload="metadata"
+                  onTimeUpdate={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
                 />
               ) : snapshotSrc ? (
-                <img
-                  src={snapshotSrc}
-                  alt="Run browser preview"
-                  className="h-full w-full min-h-0 flex-1 object-contain"
-                />
+                <img src={snapshotSrc} alt="Run browser preview" className="h-full w-full min-h-0 flex-1 object-contain" />
               ) : (
                 <p className="px-4 text-center text-[12px] text-muted-foreground">No preview yet</p>
               )}
@@ -1208,171 +1215,131 @@ function OverviewTab({
               <div className="grid grid-cols-2 gap-2">
                 <MetricCard label="Duration" value={duration(run.started_at, run.completed_at) || "--"} mono />
                 <MetricCard label="Steps" value={String(steps.length)} sub={`${okCount} ok / ${failCount} fail`} />
-                <MetricCard
-                  label="Bugs"
-                  value={String(bugsFound.length)}
-                  variant={bugsFound.length > 0 ? "destructive" : undefined}
-                />
+                <MetricCard label="Bugs" value={String(bugsFound.length)} variant={bugsFound.length > 0 ? "destructive" : undefined} />
                 <MetricCard label="LLM Cost" value={formatCost(totalCost)} mono />
               </div>
             </CardContent>
           </Card>
 
           <Card className="min-h-0 flex-[1.05] flex flex-col overflow-hidden border-border/60 bg-card/90">
-            <CardContent className="flex flex-1 min-h-0 flex-col p-0">
-              <div className="shrink-0 border-b border-border/40 bg-surface-2/35 px-3 py-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <SectionLabel className="mb-0 min-w-0" icon={<Path className="h-3.5 w-3.5" />} text="Plan" />
-                  {planProgress && (
-                    <div className="shrink-0 text-right">
-                      <p className="text-[11px] tabular-nums text-muted-foreground">
-                        <span className="text-foreground/80">{planProgress.done}</span>
-                        <span className="text-muted-foreground/50"> / {planProgress.n}</span>
-                        {run.status === "running" && agentPlan.some((i) => i.status === "current") && (
-                          <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
-                            live
-                          </span>
-                        )}
-                      </p>
-                      {planProgress.failed > 0 && (
-                        <p className="text-[10px] text-destructive/75 mt-0.5">{planProgress.failed} blocked</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {planProgress && planProgress.n > 0 && (
-                  <div
-                    className="mt-2.5 h-1 overflow-hidden rounded-full bg-muted/50"
-                    role="progressbar"
-                    aria-valuenow={planProgress.pct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div className="plan-progress-glow h-full rounded-full bg-foreground/25 transition-[width] duration-200 ease-out" style={{ width: `${planProgress.pct}%` }} />
-                  </div>
-                )}
-              </div>
-              <div className="min-h-0 flex-1 basis-0 min-h-[88px] max-h-[min(38vh,300px)] overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
-                {agentPlan.length === 0 ? (
-                  <div className="flex animate-fade-in flex-col items-center justify-center gap-2.5 py-7 text-center">
-                    <div className="rounded-full bg-muted/35 p-3 ring-1 ring-border/30">
-                      <Path className="h-6 w-6 text-muted-foreground/35" weight="duotone" />
-                    </div>
-                    <p className="max-w-[220px] text-[12px] leading-relaxed text-muted-foreground">
-                      Checklist steps appear here as the agent streams its plan.
-                    </p>
-                  </div>
-                ) : (
-                  <ol className="m-0 list-none p-0">
-                    {agentPlan.map((item, idx) => (
-                      <PlanChecklistRow
-                        key={`${idx}-${item.text.slice(0, 96)}`}
-                        item={item}
-                        isLast={idx === agentPlan.length - 1}
-                      />
-                    ))}
-                  </ol>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="min-h-0 flex-[0.75] flex flex-col overflow-hidden">
             <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-0">
-              <SectionLabel icon={<Pulse className="h-3.5 w-3.5" />} text="Recent activity" />
-              <div className="rounded border border-border/60 bg-muted/20 px-3 py-2 mt-2 mb-2 shrink-0 transition-all duration-200 animate-fade-in">
-                {latestEntry?.type === "activity" ? (
-                  <>
-                    <p className="text-[13px] text-foreground">Observing {latestEntry.activity.text}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Agent observation</p>
-                  </>
-                ) : latestEntry?.type === "plan" ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Path className="h-3.5 w-3.5 shrink-0 text-primary/60" weight="duotone" />
-                      <p className="text-[12px] text-foreground">
-                        Plan refreshed · {latestEntry.items.length}{" "}
-                        {latestEntry.items.length === 1 ? "step" : "steps"}
-                      </p>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-1 pl-[22px]">Navigator checklist</p>
-                  </>
-                ) : latestHumanized ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <latestHumanized.icon
-                        className={cn(
-                          "h-4 w-4 transition-colors duration-200",
-                          run.status === "running" ? "text-status-running" : "text-muted-foreground",
-                        )}
-                      />
-                      <p className="text-[13px] text-foreground">{latestHumanized.title}</p>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {latestHumanized.detail || latestStep?.url || "No details"}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[12px] text-muted-foreground">Waiting for activity...</p>
-                )}
-              </div>
-              <div className="min-h-0 flex-1 basis-0 min-h-[120px] max-h-[min(50vh,420px)] overflow-y-auto overflow-x-hidden pr-1 pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
-                <div className="space-y-1.5 pr-1">
-                  {activityNewestFirst.length === 0 && (
-                    <p className="text-[12px] text-muted-foreground">No live actions yet.</p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1 rounded-md border border-border/60 bg-muted/20 p-0.5">
+                  {hasPlan && (
+                    <button
+                      type="button"
+                      onClick={() => setRightTab("plan")}
+                      className={cn("h-7 rounded px-2.5 text-[11px] transition-colors", rightTab === "plan" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      Plan
+                    </button>
                   )}
-                  {activityNewestFirst.map((entry, idx) => {
-                    const delay = Math.min(idx, 12) * 22;
-                    if (entry.type === "plan") {
-                      return (
-                        <div key={`plan-${entry.at}-${idx}`} className="animate-slide-up rounded-lg border border-border/35 bg-muted/10 px-2.5 py-2 transition-colors duration-150 hover:bg-muted/14" style={{ animationDelay: `${delay}ms` }}>
-                          <div className="flex items-start gap-2">
-                            <Path className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/60" weight="duotone" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[12px] text-foreground/95">
-                                Plan · {entry.items.length} {entry.items.length === 1 ? "step" : "steps"}
-                              </p>
-                              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/80">
-                                {new Date(entry.at).toLocaleTimeString()}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    if (entry.type === "activity") {
-                      return (
-                        <div
-                          key={`act-${entry.at}-${idx}`}
-                          className="text-[12px] rounded border border-border/50 px-2 py-1.5 bg-card/40 animate-slide-up transition-colors duration-200"
-                          style={{ animationDelay: `${delay}ms` }}
-                        >
-                          <p className="text-foreground">Observing: {entry.activity.text}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">
-                            {new Date(entry.at).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      );
-                    }
-                    const h = humanizeRunStep(entry.step);
-                    return (
-                      <div
-                        key={`step-${entry.step.index}-${entry.at}-${idx}`}
-                        className="text-[12px] rounded border border-border/50 px-2 py-1.5 bg-card/40 animate-slide-up transition-colors duration-200"
-                        style={{ animationDelay: `${delay}ms` }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <h.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                          <p className="text-foreground">{h.title}</p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground font-mono">
-                          {new Date(entry.at).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    );
-                  })}
+                  <button
+                    type="button"
+                    onClick={() => setRightTab("progress")}
+                    className={cn("h-7 rounded px-2.5 text-[11px] transition-colors", rightTab === "progress" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
+                  >
+                    Progress
+                  </button>
                 </div>
+                <div className="text-[11px] font-mono text-muted-foreground">{formatCost(totalCost)}</div>
               </div>
+
+              {rightTab === "plan" ? (
+                <>
+                  {planProgress && planProgress.n > 0 && (
+                    <div className="mb-2 h-1 overflow-hidden rounded-full bg-muted/50">
+                      <div className="plan-progress-glow h-full rounded-full bg-foreground/25 transition-[width] duration-200 ease-out" style={{ width: `${planProgress.pct}%` }} />
+                    </div>
+                  )}
+                  <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pr-1 pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
+                    {agentPlan.length === 0 ? (
+                      <p className="text-[12px] text-muted-foreground">No plan captured for this run.</p>
+                    ) : (
+                      <ol className="m-0 list-none p-0">
+                        {agentPlan.map((item, idx) => (
+                          <PlanChecklistRow key={`${idx}-${item.text.slice(0, 96)}`} item={item} isLast={idx === agentPlan.length - 1} />
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-2 rounded border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                    {latestEntry?.type === "activity"
+                      ? `Observing ${latestEntry.activity.text}`
+                      : latestEntry?.type === "plan"
+                        ? `Plan refreshed (${latestEntry.items.length} steps)`
+                        : latestHumanized?.title ?? "Waiting for activity..."}
+                  </div>
+                  {canReplay && (
+                    <div className="mb-2 flex items-center justify-between gap-2 rounded border border-border/60 bg-muted/10 px-2.5 py-2">
+                      <p className="text-[10px] text-muted-foreground">Replay with video time</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => {
+                          const node = recordingVideoRef.current;
+                          if (!node) return;
+                          node.currentTime = 0;
+                          void node.play().catch(() => {});
+                          setPlaybackMs(0);
+                        }}
+                      >
+                        Replay from start
+                      </Button>
+                    </div>
+                  )}
+                  <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pr-1 pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
+                    <div className="space-y-1.5 pr-1">
+                      {activityNewestFirst.length === 0 && <p className="text-[12px] text-muted-foreground">No activity yet.</p>}
+                      {activityNewestFirst.map((entry, idx) => {
+                        const delay = Math.min(idx, 12) * 22;
+                        if (entry.type !== "step") {
+                          return (
+                            <div
+                              key={`${entry.type}-${entry.at}-${idx}`}
+                              className="rounded border border-border/40 px-2 py-1.5 text-[11px] text-muted-foreground/90 bg-card/30"
+                              style={{ animationDelay: `${delay}ms` }}
+                            >
+                              {entry.type === "activity" ? `Observe: ${entry.activity.text}` : `Plan update (${entry.items.length})`}
+                            </div>
+                          );
+                        }
+                        const h = humanizeRunStep(entry.step);
+                        const timelineMatch = stepTimeline.find((s) => s.index === entry.step.index);
+                        const isReplayCurrent = timelineMatch != null && replayCurrentIndex >= 0
+                          ? stepTimeline[replayCurrentIndex]?.index === timelineMatch.index
+                          : false;
+                        return (
+                          <div
+                            key={`step-${entry.step.index}-${entry.at}-${idx}`}
+                            className={cn(
+                              "text-[12px] rounded border border-border/50 px-2 py-1.5 bg-card/40 animate-slide-up transition-colors duration-200",
+                              isReplayCurrent && "border-primary/45 bg-primary/10",
+                            )}
+                            style={{ animationDelay: `${delay}ms` }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <h.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                              <p className="text-foreground">{h.title}</p>
+                              {timelineMatch && (
+                                <span className="ml-auto text-[10px] font-mono text-muted-foreground/70">
+                                  {formatMs(timelineMatch.relativeMs)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground font-mono">{new Date(entry.at).toLocaleTimeString()}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
