@@ -110,10 +110,22 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
 
   app.put("/api/projects/:projectId", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
-    const { name } = ProjectUpdateBody.parse(req.body);
+    const body = ProjectUpdateBody.parse(req.body);
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let i = 1;
+    if (body.name !== undefined) {
+      sets.push(`name = $${i++}`);
+      vals.push(body.name);
+    }
+    if (body.domain !== undefined) {
+      sets.push(`domain = $${i++}`);
+      vals.push(body.domain ? body.domain.trim() || null : null);
+    }
+    vals.push(projectId);
     const { rows } = await pool.query(
-      "UPDATE projects SET name = $1 WHERE id = $2 RETURNING *",
-      [name, projectId],
+      `UPDATE projects SET ${sets.join(", ")} WHERE id = $${i++} RETURNING *`,
+      vals,
     );
     reply.send({ project: rows[0] });
   });

@@ -24,10 +24,10 @@ export async function createProject(name: string, domain?: string | null) {
   });
 }
 
-export async function updateProject(projectId: string, name: string) {
+export async function updateProject(projectId: string, payload: { name?: string; domain?: string | null }) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}`, {
     method: "PUT",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(payload),
   });
 }
 

@@ -36,6 +36,7 @@ export const Settings: React.FC = () => {
   const { currentProjectId, currentProject, refreshProjects, setCurrentProjectId, projects } = useProject();
 
   const [projectName, setProjectName] = React.useState("");
+  const [projectDomain, setProjectDomain] = React.useState("");
   const [nameSaving, setNameSaving] = React.useState(false);
   const [nameStatus, setNameStatus] = React.useState("");
 
@@ -51,6 +52,7 @@ export const Settings: React.FC = () => {
 
   React.useEffect(() => {
     setProjectName(currentProject?.name ?? "");
+    setProjectDomain(currentProject?.domain ?? "");
     setNameStatus("");
     setDeleteConfirm("");
   }, [currentProject?.id]);
@@ -103,15 +105,23 @@ export const Settings: React.FC = () => {
     }
   }
 
-  async function handleRename() {
-    if (!currentProjectId || !projectName.trim() || projectName.trim() === currentProject?.name) return;
+  async function handleSaveProject() {
+    if (!currentProjectId) return;
+    const nextName = projectName.trim();
+    const nextDomain = projectDomain.trim();
+    const hasNameChange = !!nextName && nextName !== currentProject?.name;
+    const hasDomainChange = (nextDomain || null) !== (currentProject?.domain || null);
+    if (!hasNameChange && !hasDomainChange) return;
     setNameSaving(true);
     try {
-      await updateProject(currentProjectId, projectName.trim());
+      await updateProject(currentProjectId, {
+        ...(hasNameChange ? { name: nextName } : {}),
+        ...(hasDomainChange ? { domain: nextDomain || null } : {}),
+      });
       await refreshProjects();
-      setNameStatus("Project renamed.");
+      setNameStatus("Project settings updated.");
     } catch {
-      setNameStatus("Failed to rename.");
+      setNameStatus("Failed to update project settings.");
     } finally {
       setNameSaving(false);
     }
@@ -150,17 +160,17 @@ export const Settings: React.FC = () => {
       <PageHeader
         icon={<Gear className="h-4 w-4" />}
         title="Settings"
-        description="Project identity, model routing, and destructive actions."
+        description="Project settings and platform model controls."
       />
 
       <div className="px-6 py-5 animate-fade-in max-w-3xl space-y-6 mx-auto w-full">
 
         <section>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Project</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Project settings</p>
           <Card>
             <CardContent className="pt-4 space-y-4">
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Display name</label>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Project name</label>
                 <p className="text-[11px] text-muted-foreground/70 mb-2">
                   Shown across the app and in run reports.
                 </p>
@@ -168,16 +178,34 @@ export const Settings: React.FC = () => {
                   <Input
                     value={projectName}
                     onChange={(e) => { setProjectName(e.target.value); setNameStatus(""); }}
-                    onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveProject()}
                     className="flex-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Base URL</label>
+                <p className="text-[11px] text-muted-foreground/70 mb-2">
+                  Used for project icon/domain context. Leave blank if not needed.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={projectDomain}
+                    onChange={(e) => { setProjectDomain(e.target.value); setNameStatus(""); }}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveProject()}
+                    placeholder="example.com"
+                    className="flex-1 mono-ui"
                   />
                   <Button
                     size="sm"
-                    onClick={handleRename}
+                    onClick={handleSaveProject}
                     loading={nameSaving}
-                    disabled={!projectName.trim() || projectName.trim() === currentProject.name}
+                    disabled={
+                      (!projectName.trim() || projectName.trim() === currentProject.name)
+                      && ((projectDomain.trim() || null) === (currentProject.domain || null))
+                    }
                   >
-                    Rename
+                    Save
                   </Button>
                 </div>
                 {nameStatus && (
@@ -196,9 +224,9 @@ export const Settings: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Models</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Platform settings</p>
               <p className="text-[11px] text-muted-foreground/70 mt-1">
-                Recommended defaults are already set. Change a slot only when you need different speed, quality, or cost.
+                Model configuration applies platform-wide across projects.
               </p>
             </div>
             {hasCustomizedModels && (

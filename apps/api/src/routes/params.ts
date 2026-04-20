@@ -58,5 +58,8 @@ export const TestUpdateBody = z.object({
 });
 
 export const ProjectUpdateBody = z.object({
-  name: z.string().min(2),
+  name: z.string().min(2).optional(),
+  domain: z.string().nullable().optional(),
+}).refine((b) => b.name !== undefined || b.domain !== undefined, {
+  message: "at least one of name, domain required",
 });
