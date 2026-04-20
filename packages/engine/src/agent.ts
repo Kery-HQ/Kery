@@ -1376,25 +1376,28 @@ export async function handleAuth(
     return { ok: true, llmCalls: [] };
   }
 
-  if (!auth.loginUrl || !auth.credentials) return { ok: false, llmCalls: [] };
+  if (!auth.credentials) return { ok: false, llmCalls: [] };
+  const authStartUrl = auth.loginUrl || baseUrl || page.url();
 
-  logger.info({ url: auth.loginUrl }, "Authenticating");
-  await page.goto(auth.loginUrl, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+  logger.info({ url: authStartUrl }, "Authenticating");
+  if (page.url() !== authStartUrl) {
+    await page.goto(authStartUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+  }
 
   if (auth.selectors) {
-    const ok = await trySelectorsAuth(page, auth);
+    const ok = await trySelectorsAuth(page, auth, authStartUrl);
     if (ok) {
       logger.info({ url: page.url() }, "Auth complete (selectors)");
       return { ok: true, llmCalls: [] };
     }
-    logger.info({ url: auth.loginUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
+    logger.info({ url: authStartUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
   }
 
-  return await tryAgentAuthViaRunAgent(page, auth, context, baseUrl, onLLMCall);
+  return await tryAgentAuthViaRunAgent(page, auth, context, baseUrl, authStartUrl, onLLMCall);
 }
 
-async function trySelectorsAuth(page: Page, auth: AuthConfig): Promise<boolean> {
+async function trySelectorsAuth(page: Page, auth: AuthConfig, authStartUrl: string): Promise<boolean> {
   const { usernameField, passwordField, submitButton } = auth.selectors!;
   const { username, password } = auth.credentials!;
 
@@ -1423,11 +1426,11 @@ async function trySelectorsAuth(page: Page, auth: AuthConfig): Promise<boolean> 
     }
   }
 
-  await page.waitForURL(url => url.href !== auth.loginUrl!, { timeout: 15000 }).catch(() => {});
+  await page.waitForURL(url => url.href !== authStartUrl, { timeout: 15000 }).catch(() => {});
   await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
   const finalUrl = page.url();
-  return finalUrl !== auth.loginUrl!;
+  return finalUrl !== authStartUrl;
 }
 
 /** Full Navigator pipeline for login when CSS selectors fail or are wrong. */
@@ -1436,6 +1439,7 @@ async function tryAgentAuthViaRunAgent(
   auth: AuthConfig,
   context: string | undefined,
   baseUrl: string | undefined,
+  authStartUrl: string,
   onLLMCall?: (call: LLMCallRecord) => void,
 ): Promise<AuthHandleResult> {
   const { username, password } = auth.credentials!;
@@ -1461,7 +1465,7 @@ async function tryAgentAuthViaRunAgent(
     undefined,
   );
 
-  const success = page.url() !== auth.loginUrl!;
+  const success = page.url() !== authStartUrl;
   logger.info({ success, url: page.url(), status: result.status }, "Agent auth (full runAgent) complete");
   return { ok: success, llmCalls: result.llmCalls };
 }

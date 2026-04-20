@@ -17,6 +17,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -202,6 +203,7 @@ function AuthModeField({
 }
 
 type UiAuthForm = {
+  autoDetectLogin: boolean;
   loginUrl: string;
   usernameField: string;
   passwordField: string;
@@ -211,6 +213,7 @@ type UiAuthForm = {
 };
 
 const DEFAULT_UI_FORM: UiAuthForm = {
+  autoDetectLogin: true,
   loginUrl: "",
   usernameField: "#email",
   passwordField: "#password",
@@ -237,6 +240,7 @@ function uiFormFromConfig(config: Record<string, any>): UiAuthForm {
   const s = config?.selectors ?? {};
   const c = config?.credentials ?? {};
   return {
+    autoDetectLogin: config?.autoDetectLogin ?? !config?.loginUrl,
     loginUrl: config?.loginUrl ?? "",
     usernameField: s.usernameField ?? DEFAULT_UI_FORM.usernameField,
     passwordField: s.passwordField ?? DEFAULT_UI_FORM.passwordField,
@@ -248,7 +252,8 @@ function uiFormFromConfig(config: Record<string, any>): UiAuthForm {
 
 function configFromUiForm(f: UiAuthForm): Record<string, any> {
   return {
-    loginUrl: f.loginUrl.trim() || undefined,
+    autoDetectLogin: f.autoDetectLogin,
+    loginUrl: f.autoDetectLogin ? undefined : f.loginUrl.trim() || undefined,
     selectors: {
       usernameField: f.usernameField.trim() || undefined,
       passwordField: f.passwordField.trim() || undefined,
@@ -673,6 +678,21 @@ export const Environments: React.FC = () => {
 
                         {authMode === "ui" && (
                           <div className="space-y-3">
+                            <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[12px] font-medium text-foreground">Auto-detect login page</p>
+                                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                                    Start from the environment base URL and let Kery find the login route.
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={uiForm.autoDetectLogin}
+                                  onCheckedChange={(checked) => setUiForm((f) => ({ ...f, autoDetectLogin: checked }))}
+                                  aria-label="Auto-detect login page"
+                                />
+                              </div>
+                            </div>
                             <div>
                               <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Login URL</label>
                               <Input
@@ -681,7 +701,13 @@ export const Environments: React.FC = () => {
                                 value={uiForm.loginUrl}
                                 onChange={(e) => setUiForm((f) => ({ ...f, loginUrl: e.target.value }))}
                                 className="font-mono text-[12px]"
+                                disabled={uiForm.autoDetectLogin}
                               />
+                              {uiForm.autoDetectLogin && (
+                                <p className="mt-1 text-[10px] text-muted-foreground/70">
+                                  Optional when auto-detect is enabled.
+                                </p>
+                              )}
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                               <div>
