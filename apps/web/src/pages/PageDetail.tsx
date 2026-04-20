@@ -67,7 +67,7 @@ export function PageDetail() {
       setData(detailRes as PageData);
       setEnvironments((envsRes as { environments: any[] }).environments || []);
     } catch (e: any) {
-      setError(e?.message || "Failed to load page");
+      setError(e?.message || "Failed to load route");
       setData(null);
       setEnvironments([]);
     }
@@ -129,12 +129,12 @@ export function PageDetail() {
             className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Pages
+            Routes
           </button>
         </div>
         <div className="px-6 py-5">
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-foreground">
-            {error || "Page not found"}
+            {error || "Route not found"}
           </div>
         </div>
       </div>
@@ -163,7 +163,7 @@ export function PageDetail() {
             className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Pages
+            Routes
           </button>
           <span className="select-none text-muted-foreground/35 text-[14px]" aria-hidden>/</span>
           <StatusDot status={page.health_status} />
@@ -181,7 +181,7 @@ export function PageDetail() {
               variant="ghost"
               onClick={() => setConfirmReset(true)}
               className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-              aria-label="Reset page data"
+              aria-label="Reset route data"
             >
               <Trash className="h-3.5 w-3.5" />
             </Button>
@@ -194,7 +194,7 @@ export function PageDetail() {
             className="h-8 gap-1.5 text-[12px]"
           >
             {!running && <Play className="h-3.5 w-3.5" />}
-            Run this page
+            Run this route
           </Button>
         </div>
       </div>
@@ -202,7 +202,7 @@ export function PageDetail() {
       {/* Confirm reset banner */}
       {confirmReset && (
         <div className="flex flex-wrap items-center gap-2 px-6 py-2 border-b border-border bg-destructive/5">
-          <span className="text-[11px] text-destructive/90 flex-1">Delete all runs and data for this page?</span>
+          <span className="text-[11px] text-destructive/90 flex-1">Delete all runs and data for this route?</span>
           <Button size="sm" variant="destructive" onClick={handleReset} loading={resetting} className="h-7 text-[11px]">
             Yes, reset
           </Button>
@@ -308,7 +308,7 @@ export function PageDetail() {
                 <EmptyState
                   icon={<Play className="h-5 w-5" />}
                   title="No runs yet"
-                  description="Hit Run to execute this page and see results here."
+                  description="Hit Run to execute this route and see results here."
                   className="py-16"
                 />
               ) : (

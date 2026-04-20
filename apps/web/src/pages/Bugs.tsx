@@ -12,7 +12,7 @@ import {
   Calendar,
   Trash,
   Stack,
-  Flask,
+  FlowArrow,
   FilePdf,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -76,7 +76,7 @@ const SEVERITY_FILTERS = ["all", "high", "medium", "low"] as const;
 type SeverityFilter = (typeof SEVERITY_FILTERS)[number];
 
 const CATEGORY_FILTERS = ["all", "visual", "functional", "ux", "other"] as const;
-const SOURCE_FILTERS = ["all", "pages", "flows"] as const;
+const SOURCE_FILTERS = ["all", "routes", "flows"] as const;
 type SourceFilter = (typeof SOURCE_FILTERS)[number];
 
 type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
@@ -180,7 +180,7 @@ export const Bugs: React.FC = () => {
     }
     if (sourceFilter === "flows") {
       result = result.filter(b => !!b.test_id);
-    } else if (sourceFilter === "pages") {
+    } else if (sourceFilter === "routes") {
       result = result.filter(b => !!b.destination_id && !b.test_id);
     }
     result.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
@@ -272,9 +272,9 @@ export const Bugs: React.FC = () => {
                         sourceFilter === s ? "bg-accent text-foreground" : "text-muted-foreground",
                       )}
                     >
-                      {s === "pages" && <Stack className="h-3 w-3" />}
-                      {s === "flows" && <Flask className="h-3 w-3" />}
-                      {s === "all" ? "All" : s === "pages" ? "Pages" : "Flows"}
+                      {s === "routes" && <Stack className="h-3 w-3" />}
+                      {s === "flows" && <FlowArrow className="h-3 w-3" />}
+                      {s === "all" ? "All" : s === "routes" ? "Routes" : "Flows"}
                     </Button>
                   ))}
                 </div>
