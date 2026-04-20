@@ -1,20 +1,12 @@
 import React from "react";
-import { Gear, Trash, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogClose,
-} from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
-import { EmptyState } from "@/components/empty-state";
-import { useProject } from "@/lib/projectContext";
 import {
-  updateProject, deleteProject,
   fetchModelSettings, saveModelSettings, resetModelSettings,
   type LlmKeyPresence,
   type ModelPriceUsd,
@@ -28,32 +20,15 @@ import {
   parseStoredModelForCustomUi,
   type CustomProviderId,
 } from "@/lib/llmModelAvailability";
-import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 export const Settings: React.FC = () => {
-  const navigate = useNavigate();
-  const { currentProjectId, currentProject, refreshProjects, setCurrentProjectId, projects } = useProject();
-
-  const [projectName, setProjectName] = React.useState("");
-  const [nameSaving, setNameSaving] = React.useState(false);
-  const [nameStatus, setNameStatus] = React.useState("");
-
-  const [deleteConfirm, setDeleteConfirm] = React.useState("");
-  const [deleting, setDeleting] = React.useState(false);
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-
   const [modelSettings, setModelSettings] = React.useState<Record<string, { current: string; default: string; customized: boolean }>>({});
   const [llmKeys, setLlmKeys] = React.useState<LlmKeyPresence | null>(null);
   const [modelPrices, setModelPrices] = React.useState<Partial<Record<ModelSlotKey, ModelPriceUsd>>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
-
-  React.useEffect(() => {
-    setProjectName(currentProject?.name ?? "");
-    setNameStatus("");
-    setDeleteConfirm("");
-  }, [currentProject?.id]);
+  const [selectedModelKey, setSelectedModelKey] = React.useState<ModelSlotKey>("agentModel");
 
   React.useEffect(() => {
     fetchModelSettings()
@@ -103,103 +78,23 @@ export const Settings: React.FC = () => {
     }
   }
 
-  async function handleRename() {
-    if (!currentProjectId || !projectName.trim() || projectName.trim() === currentProject?.name) return;
-    setNameSaving(true);
-    try {
-      await updateProject(currentProjectId, projectName.trim());
-      await refreshProjects();
-      setNameStatus("Project renamed.");
-    } catch {
-      setNameStatus("Failed to rename.");
-    } finally {
-      setNameSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!currentProjectId || deleteConfirm !== currentProject?.name) return;
-    setDeleting(true);
-    await deleteProject(currentProjectId);
-    await refreshProjects();
-    const next = projects.find((p) => p.id !== currentProjectId);
-    if (next) {
-      setCurrentProjectId(next.id);
-    }
-    navigate("/overview");
-  }
-
-  if (!currentProjectId || !currentProject) {
-    return (
-      <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Gear className="h-4 w-4" />} title="Settings" />
-        <EmptyState
-          icon={<Gear className="h-8 w-8" />}
-          title="No project selected"
-          description="Select a project to view settings."
-          className="flex-1"
-        />
-      </div>
-    );
-  }
-
   const hasCustomizedModels = Object.values(modelSettings).some((m) => m.customized);
+  const activeModel = MODEL_CONFIG.find((m) => m.key === selectedModelKey) ?? MODEL_CONFIG[0];
+  const activeSetting = modelSettings[activeModel.key];
 
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
         icon={<Gear className="h-4 w-4" />}
-        title="Settings"
-        description="Project identity, model routing, and destructive actions."
+        title="Platform Settings"
+        description="Pick a model mode per agent: preset or custom."
       />
 
-      <div className="px-6 py-5 animate-fade-in max-w-3xl space-y-6 mx-auto w-full">
-
-        <section>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Project</p>
-          <Card>
-            <CardContent className="pt-4 space-y-4">
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Display name</label>
-                <p className="text-[11px] text-muted-foreground/70 mb-2">
-                  Shown across the app and in run reports.
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={projectName}
-                    onChange={(e) => { setProjectName(e.target.value); setNameStatus(""); }}
-                    onKeyDown={(e) => e.key === "Enter" && handleRename()}
-                    className="flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleRename}
-                    loading={nameSaving}
-                    disabled={!projectName.trim() || projectName.trim() === currentProject.name}
-                  >
-                    Rename
-                  </Button>
-                </div>
-                {nameStatus && (
-                  <p className={cn(
-                    "text-[12px] mt-1.5",
-                    nameStatus.includes("Failed") ? "text-destructive" : "text-status-pass",
-                  )}>
-                    {nameStatus}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
+      <div className="px-6 py-5 animate-fade-in space-y-6 w-full">
         <section>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Models</p>
-              <p className="text-[11px] text-muted-foreground/70 mt-1">
-                Recommended defaults are already set. Change a slot only when you need different speed, quality, or cost.
-              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Global model controls</p>
             </div>
             {hasCustomizedModels && (
               <button
@@ -213,33 +108,63 @@ export const Settings: React.FC = () => {
             )}
           </div>
           <Card>
-            <CardContent className="pt-4 space-y-4">
-              {MODEL_CONFIG.map(({ key, label, description, options }, idx) => {
-                const setting = modelSettings[key];
-                if (!setting) return null;
-                return (
-                  <React.Fragment key={key}>
-                    {idx > 0 && <Separator />}
-                    <ModelSelect
-                      key={key}
-                      modelKey={key as ModelSlotKey}
-                      label={label}
-                      description={description}
-                      options={options}
-                      current={setting.current}
-                      defaultValue={setting.default}
-                      customized={setting.customized}
-                      saving={modelSaving === key || modelSaving === "__all__"}
+            <CardContent className="pt-4">
+              <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+                <aside className="space-y-1 rounded-md border border-border/70 bg-surface-2/60 p-2">
+                  {MODEL_CONFIG.map((model) => {
+                    const setting = modelSettings[model.key];
+                    const selected = model.key === selectedModelKey;
+                    return (
+                      <button
+                        key={model.key}
+                        type="button"
+                        onClick={() => setSelectedModelKey(model.key)}
+                        className={cn(
+                          "w-full rounded-md border px-2.5 py-2 text-left transition-colors",
+                          selected
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-transparent hover:border-border/70 hover:bg-accent/40",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <model.Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                          <p className="text-[12px] font-medium text-foreground">{model.label}</p>
+                        </div>
+                        <p className="mt-1 text-[10px] text-muted-foreground/80">{model.hint}</p>
+                        {setting?.customized && (
+                          <Badge variant="warning" className="mt-1.5 h-4 text-[9px]">override</Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </aside>
+
+                <div>
+                  {activeSetting ? (
+                    <ModelSlotCard
+                      modelKey={activeModel.key}
+                      label={activeModel.label}
+                      hint={activeModel.hint}
+                      Icon={activeModel.Icon}
+                      options={activeModel.options}
+                      current={activeSetting.current}
+                      defaultValue={activeSetting.default}
+                      customized={activeSetting.customized}
+                      saving={modelSaving === activeModel.key || modelSaving === "__all__"}
                       onChange={handleModelChange}
                       llmKeys={llmKeys}
-                      modelPrice={modelPrices[key as ModelSlotKey]}
+                      modelPrice={modelPrices[activeModel.key]}
                     />
-                  </React.Fragment>
-                );
-              })}
+                  ) : (
+                    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-[12px] text-muted-foreground">
+                      Loading {activeModel.label}...
+                    </div>
+                  )}
+                </div>
+              </div>
               {modelStatus && (
                 <p className={cn(
-                  "text-[12px]",
+                  "text-[12px] mt-3",
                   modelStatus.includes("Failed") ? "text-destructive" : "text-status-pass",
                 )}>
                   {modelStatus}
@@ -248,60 +173,6 @@ export const Settings: React.FC = () => {
             </CardContent>
           </Card>
         </section>
-
-        <section>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive/60 mb-3">Danger zone</p>
-          <Card className="border-destructive/30">
-            <CardContent className="pt-4">
-              <p className="text-[13px] font-semibold text-foreground">Delete project</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">
-                This permanently deletes the project and all its environments, tests, runs, and memory. This cannot be undone.
-              </p>
-              <Dialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) setDeleteConfirm(""); }}>
-                <DialogTrigger asChild>
-                  <Button variant="destructive" size="sm" className="gap-1.5">
-                    <Trash className="h-3 w-3" />
-                    Delete project
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Delete Project</DialogTitle>
-                    <DialogDescription>
-                      This will permanently delete <span className="font-semibold text-foreground">"{currentProject.name}"</span> and all associated data.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div>
-                    <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                      Type <span className="mono-ui font-semibold text-foreground">"{currentProject.name}"</span> to confirm
-                    </label>
-                    <Input
-                      value={deleteConfirm}
-                      onChange={(e) => setDeleteConfirm(e.target.value)}
-                      placeholder={currentProject.name}
-                      className="border-destructive/30"
-                    />
-                  </div>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="ghost" size="sm">Cancel</Button>
-                    </DialogClose>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleDelete}
-                      loading={deleting}
-                      disabled={deleteConfirm !== currentProject.name}
-                    >
-                      Delete project
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </CardContent>
-          </Card>
-        </section>
-
       </div>
     </div>
   );
@@ -363,29 +234,39 @@ const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [
   { value: "openrouter", label: "OpenRouter (any id)" },
 ];
 
-const MODEL_CONFIG: { key: string; label: string; description: string; options: ModelOption[] }[] = [
+const MODEL_CONFIG: {
+  key: ModelSlotKey;
+  label: string;
+  hint: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  options: ModelOption[];
+}[] = [
   {
     key: "agentModel",
-    label: "Primary Browser Agent",
-    description: "Runs browser actions and tool calls during tests.",
+    label: "Navigator agent",
+    hint: "Primary browser actions",
+    Icon: Robot,
     options: AGENT_OPTIONS,
   },
   {
     key: "auxiliaryModel",
-    label: "Support Tasks",
-    description: "Handles planning, summaries, and structured text/JSON work.",
+    label: "Support agent",
+    hint: "Planning and structured outputs",
+    Icon: NotePencil,
     options: CODE_OPTIONS,
   },
   {
     key: "reviewAgentModel",
-    label: "Run Reviewer",
-    description: "Analyzes screenshots and behavior after each run.",
+    label: "Review agent",
+    hint: "Post-run visual checks",
+    Icon: Eye,
     options: REASONING_VISION_OPTIONS,
   },
   {
     key: "stagehandModel",
-    label: "Element Finder",
-    description: "Helps locate and target UI elements reliably.",
+    label: "Element finder",
+    hint: "UI targeting reliability",
+    Icon: CursorClick,
     options: STAGEHAND_OPTIONS,
   },
 ];
@@ -403,10 +284,24 @@ function customModelPlaceholder(provider: CustomProviderId): string {
   }
 }
 
-function ModelSelect({
+function normalizeModelIdForCompare(modelId: string): string {
+  const value = modelId.trim().toLowerCase();
+  if (!value) return "";
+  if (value.startsWith("openai/")) return value.slice("openai/".length);
+  if (value.startsWith("anthropic/")) return value.slice("anthropic/".length);
+  if (value.startsWith("google/")) return value.slice("google/".length);
+  return value;
+}
+
+function modelIdsEquivalent(a: string, b: string): boolean {
+  return normalizeModelIdForCompare(a) === normalizeModelIdForCompare(b);
+}
+
+function ModelSlotCard({
   modelKey,
   label,
-  description,
+  hint,
+  Icon,
   options,
   current,
   defaultValue,
@@ -418,7 +313,8 @@ function ModelSelect({
 }: {
   modelKey: ModelSlotKey;
   label: string;
-  description: string;
+  hint: string;
+  Icon: React.ComponentType<{ className?: string }>;
   options: ModelOption[];
   current: string;
   defaultValue: string;
@@ -429,10 +325,17 @@ function ModelSelect({
   modelPrice?: ModelPriceUsd;
 }) {
   const presetValues = React.useMemo(() => new Set(options.map((o) => o.value)), [options]);
-  const isPresetCurrent = presetValues.has(current);
-  const currentOption = React.useMemo(() => options.find((o) => o.value === current), [options, current]);
+  const presetMatchForCurrent = React.useMemo(
+    () => options.find((o) => modelIdsEquivalent(o.value, current))?.value ?? "",
+    [options, current],
+  );
+  const isPresetCurrent = Boolean(presetMatchForCurrent);
+  const currentOption = React.useMemo(
+    () => options.find((o) => modelIdsEquivalent(o.value, current)),
+    [options, current],
+  );
 
-  const [customOpen, setCustomOpen] = React.useState(!isPresetCurrent && current.length > 0);
+  const [mode, setMode] = React.useState<"preset" | "custom">(!isPresetCurrent && current.length > 0 ? "custom" : "preset");
   const [customProvider, setCustomProvider] = React.useState<CustomProviderId>("openai");
   const [customRaw, setCustomRaw] = React.useState("");
   const [customError, setCustomError] = React.useState("");
@@ -440,8 +343,8 @@ function ModelSelect({
   const [priceOut, setPriceOut] = React.useState("");
 
   React.useEffect(() => {
-    if (!presetValues.has(current) && current.length > 0) setCustomOpen(true);
-    if (presetValues.has(current)) setCustomOpen(false);
+    if (!presetValues.has(current) && current.length > 0) setMode("custom");
+    if (presetValues.has(current)) setMode("preset");
   }, [current, presetValues]);
 
   React.useEffect(() => {
@@ -462,13 +365,13 @@ function ModelSelect({
 
   function optionSelectable(optValue: string): boolean {
     if (!llmKeys) return true;
-    if (optValue === current) return true;
+    if (modelIdsEquivalent(optValue, current)) return true;
     return isModelSelectable(optValue, llmKeys);
   }
 
   function handlePresetChange(value: string) {
     if (!value) return;
-    setCustomOpen(false);
+    setMode("preset");
     setCustomError("");
     onChange(modelKey, value, null);
   }
@@ -492,16 +395,22 @@ function ModelSelect({
       return;
     }
     onChange(modelKey, composed, { input: pi, output: po });
-    setCustomOpen(false);
+    setMode("custom");
   }
 
-  const presetSelectValue = isPresetCurrent ? current : "";
+  const presetSelectValue = isPresetCurrent ? presetMatchForCurrent : "";
 
   return (
-    <div className="rounded-md border border-border/80 bg-surface-2/70 p-4">
+    <div className="rounded-md border border-border/80 bg-surface-2 p-3">
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <label className="text-[13px] font-semibold text-foreground">{label}</label>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <label className="text-[13px] font-semibold text-foreground block truncate">{label}</label>
+            <p className="text-[10px] text-muted-foreground/80 truncate">{hint}</p>
+          </div>
           {customized && <Badge variant="warning" className="text-[9px] px-1.5 py-0">override</Badge>}
         </div>
         {customized && (
@@ -517,12 +426,34 @@ function ModelSelect({
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground/70 mb-3">{description}</p>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <button
+          type="button"
+          onClick={() => setMode("preset")}
+          className={cn(
+            "rounded-md border px-3 py-2 text-left transition-colors",
+            mode === "preset" ? "border-primary/40 bg-primary/10" : "border-border/70 bg-surface-3/40 hover:bg-surface-3/70",
+          )}
+        >
+          <p className="text-[11px] font-semibold">Preset</p>
+          <p className="text-[10px] text-muted-foreground/80">Choose from curated models</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("custom")}
+          className={cn(
+            "rounded-md border px-3 py-2 text-left transition-colors",
+            mode === "custom" ? "border-primary/40 bg-primary/10" : "border-border/70 bg-surface-3/40 hover:bg-surface-3/70",
+          )}
+        >
+          <p className="text-[11px] font-semibold">Custom</p>
+          <p className="text-[10px] text-muted-foreground/80">Use provider + model id</p>
+        </button>
+      </div>
 
-      {!customOpen && (
-        <>
-          <div className="rounded-md border border-border/70 bg-surface-3/60 p-2">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1">Selected model</p>
+      {mode === "preset" && (
+        <div className="rounded-md border border-border/70 bg-surface-3/60 p-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1">Model</p>
             <Select
               value={presetSelectValue}
               onChange={(e) => handlePresetChange(e.target.value)}
@@ -536,33 +467,21 @@ function ModelSelect({
                   llmKeys && !sel && opt.value !== current ? modelMissingKeyLabel(opt.value, llmKeys) : null;
                 return (
                   <option key={opt.value} value={opt.value} disabled={!sel}>
-                    {opt.label}{opt.value === defaultValue ? " (default)" : ""}
+                    {opt.label}{modelIdsEquivalent(opt.value, defaultValue) ? " (default)" : ""}
                     {missing ? ` — ${missing}` : ""}
                   </option>
                 );
               })}
             </Select>
-          </div>
           {currentOption?.price ? (
             <p className="mt-2 text-[10px] text-muted-foreground/70">
-              Estimated price: {currentOption.price} in/out
+              {currentOption.price} in/out
             </p>
           ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              setCustomOpen(true);
-              setCustomError("");
-            }}
-            disabled={saving}
-            className="mt-2 text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            Advanced: use custom model
-          </button>
-        </>
+        </div>
       )}
 
-      {customOpen && (
+      {mode === "custom" && (
         <div className="rounded-md border border-border/80 bg-muted/20 p-3 space-y-2">
           <div className="flex flex-col sm:flex-row gap-2">
             <Select
@@ -597,7 +516,7 @@ function ModelSelect({
           </div>
           {customProvider === "openrouter" && (
             <p className="text-[10px] text-muted-foreground/70 leading-snug">
-              Use the full OpenRouter slug (vendor/model). Requires OPENROUTER_API_KEY unless another rule matches.
+              Use full slug: vendor/model
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">
@@ -634,9 +553,6 @@ function ModelSelect({
               />
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground/70 leading-snug">
-            Required for cost estimates. Use your provider’s published pricing (USD per million tokens).
-          </p>
           {customError && (
             <p className="text-[11px] text-destructive">{customError}</p>
           )}
@@ -649,7 +565,7 @@ function ModelSelect({
               variant="ghost"
               size="sm"
               onClick={() => {
-                setCustomOpen(false);
+                setMode(isPresetCurrent ? "preset" : "custom");
                 setCustomError("");
                 const p = parseStoredModelForCustomUi(current);
                 setCustomProvider(p.provider);
@@ -657,13 +573,13 @@ function ModelSelect({
               }}
               disabled={saving}
             >
-              {isPresetCurrent ? "Cancel" : "Use presets"}
+              Reset form
             </Button>
           </div>
         </div>
       )}
 
-      {!isPresetCurrent && !customOpen && current && (
+      {!isPresetCurrent && mode === "preset" && current && (
         <p className="text-[11px] mono-ui text-muted-foreground/80 mt-2 break-all rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
           Active: {current}
           {modelPrice?.input != null && modelPrice?.output != null && (
