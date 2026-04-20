@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { name: "Issues", href: "/bugs", icon: Warning },
   { name: "Environments", href: "/environments", icon: Globe },
   { name: "Memory", href: "/memory", icon: Brain },
-  { name: "Settings", href: "/settings", icon: Gear },
+  { name: "Platform Settings", href: "/settings", icon: Gear },
 ];
 
 interface CommandPaletteProps {

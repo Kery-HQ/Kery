@@ -17,6 +17,7 @@ import { Runs } from "@/pages/Runs";
 import { TestsPlans } from "@/pages/TestsPlans";
 import { Memory } from "@/pages/Memory";
 import { Settings } from "@/pages/Settings";
+import { ProjectSettings } from "@/pages/ProjectSettings";
 import { RunDetail } from "@/pages/RunDetail";
 import { Bugs } from "@/pages/Bugs";
 import { Pages } from "@/pages/Pages";
@@ -66,6 +67,7 @@ function App() {
               <Route path="bugs" element={<Bugs />} />
               <Route path="memory" element={<Memory />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="project-settings" element={<ProjectSettings />} />
             </Route>
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>

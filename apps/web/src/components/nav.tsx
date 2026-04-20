@@ -43,10 +43,6 @@ const TOOLS_ITEMS = [
   { name: "Memory",       href: "/memory",        icon: Brain },
 ];
 
-const SETTINGS_ITEMS = [
-  { name: "Settings",     href: "/settings",      icon: Gear },
-];
-
 function Logo() {
   return (
     <img
@@ -178,20 +174,31 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
       {!collapsed && (
         <div className="px-2 pt-3 pb-1">
           <div ref={dropdownRef} className="relative">
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className={cn(
-                "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors",
-                "text-sidebar-foreground hover:bg-sidebar-accent",
-                dropdownOpen && "bg-sidebar-accent",
-              )}
-            >
-              {currentProject ? <ProjectIcon project={currentProject} size={5} /> : (
-                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-muted-foreground font-semibold text-[10px]">?</div>
-              )}
-              <span className="flex-1 text-left truncate text-[13px]">{currentProject?.name ?? "Select project"}</span>
-              <CaretDown className={cn("h-3 w-3 text-muted-foreground/40 transition-transform", dropdownOpen && "rotate-180")} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className={cn(
+                  "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors",
+                  "text-sidebar-foreground hover:bg-sidebar-accent",
+                  dropdownOpen && "bg-sidebar-accent",
+                )}
+              >
+                {currentProject ? <ProjectIcon project={currentProject} size={5} /> : (
+                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-muted-foreground font-semibold text-[10px]">?</div>
+                )}
+                <span className="flex-1 text-left truncate text-[13px]">{currentProject?.name ?? "Select project"}</span>
+                <CaretDown className={cn("h-3 w-3 text-muted-foreground/40 transition-transform", dropdownOpen && "rotate-180")} />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/project-settings")}
+                className="h-8 w-8 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent hover:text-foreground transition-colors"
+                aria-label="Project settings"
+                title="Project settings"
+              >
+                <Gear className="h-3.5 w-3.5 mx-auto" />
+              </button>
+            </div>
 
             {dropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-border bg-popover ring-1 ring-border/50 overflow-hidden animate-fade-in">
@@ -286,12 +293,17 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
           {collapsed && <div className="h-px bg-sidebar-border my-2 mx-1" />}
           <NavGroup items={TOOLS_ITEMS} location={location} collapsed={collapsed} />
 
-          <div className="mt-auto pt-3 pb-1">
-            <div className="h-px bg-sidebar-border mb-2 mx-1" />
-            <NavGroup items={SETTINGS_ITEMS} location={location} collapsed={collapsed} />
-          </div>
         </div>
       </ScrollArea>
+
+      {/* Bottom settings */}
+      <div className="px-2 pt-2 pb-1 border-t border-sidebar-border">
+        <NavItem
+          item={{ name: "Platform Settings", href: "/settings", icon: Gear }}
+          active={location.pathname.startsWith("/settings")}
+          collapsed={collapsed}
+        />
+      </div>
 
       {/* Theme footer */}
       <div className="border-t border-sidebar-border p-2">
