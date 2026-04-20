@@ -375,11 +375,11 @@ export function Pages() {
   if (!pid) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Stack className="h-4 w-4" />} title="Pages" />
+        <PageHeader icon={<Stack className="h-4 w-4" />} title="Routes" />
         <EmptyState
           icon={<Stack className="h-8 w-8" />}
           title="No project selected"
-          description="Select a project to view pages."
+          description="Select a project to view routes."
         />
       </div>
     );
@@ -387,7 +387,7 @@ export function Pages() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Stack className="h-4 w-4" />} title="Pages">
+      <PageHeader icon={<Stack className="h-4 w-4" />} title="Routes">
         <Button
           size="sm"
           variant="outline"
@@ -453,7 +453,7 @@ export function Pages() {
                 <p className="text-[11px] text-muted-foreground">
                   {totalIssuesFound === 0
                     ? "No bugs detected"
-                    : `Across ${issuesPageCount} page${issuesPageCount !== 1 ? "s" : ""}`}
+                    : `Across ${issuesPageCount} route${issuesPageCount !== 1 ? "s" : ""}`}
                 </p>
               </div>
 
@@ -471,8 +471,8 @@ export function Pages() {
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {needsAttentionCount === 0
-                    ? "All pages are clean"
-                    : "Pages with issues or stale results"}
+                    ? "All routes are clean"
+                    : "Routes with issues or stale results"}
                 </p>
               </div>
 
@@ -484,7 +484,7 @@ export function Pages() {
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   {lastScan?.completed_at
-                    ? `Pages · ${relativeTime(lastScan.completed_at)}`
+                    ? `Routes · ${relativeTime(lastScan.completed_at)}`
                     : "Never scanned"}
                 </p>
               </div>
@@ -528,8 +528,8 @@ export function Pages() {
               ) : pages.length === 0 ? (
                 <EmptyState
                   icon={<Stack className="h-8 w-8" />}
-                  title="No pages discovered yet"
-                  description="Click 'Scan my app' to discover all pages, forms, and interactions."
+                  title="No routes discovered yet"
+                  description="Click 'Scan my app' to discover app routes, forms, and interactions."
                   action={
                     environments.length === 0
                       ? { label: "Add environment first", onClick: () => navigate("/environments") }
@@ -544,7 +544,7 @@ export function Pages() {
                       <Input
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
-                        placeholder="Filter pages..."
+                        placeholder="Filter routes..."
                         className="pl-8"
                       />
                     </div>
@@ -568,12 +568,12 @@ export function Pages() {
                     </div>
                   </div>
 
-                  {/* Enabled page tiles */}
+                  {/* Enabled route tiles */}
                   {enabledFilteredPages.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                          Enabled pages ({enabledFilteredPages.length})
+                          Enabled routes ({enabledFilteredPages.length})
                         </p>
                         <div className="flex items-center gap-2">
                           {environments.length > 0 && (
@@ -703,11 +703,11 @@ export function Pages() {
                     </div>
                   )}
 
-                  {/* Disabled page tiles */}
+                  {/* Disabled route tiles */}
                   {disabledFilteredPages.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                        Disabled pages ({disabledFilteredPages.length})
+                        Disabled routes ({disabledFilteredPages.length})
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         {disabledFilteredPages.map(page => (
@@ -800,7 +800,7 @@ export function Pages() {
 
                   {filteredPages.length === 0 && (filter || healthFilter !== "all") && (
                     <div className="text-center py-8 text-[13px] text-muted-foreground">
-                      No pages matching current filters
+                      No routes matching current filters
                     </div>
                   )}
                 </>
@@ -813,7 +813,7 @@ export function Pages() {
       <Dialog open={deleteTarget != null} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove page from project?</DialogTitle>
+            <DialogTitle>Remove route from project?</DialogTitle>
             <DialogDescription>
               {deleteTarget && (
                 <>

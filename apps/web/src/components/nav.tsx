@@ -32,7 +32,7 @@ export type { Theme } from "@/lib/hooks";
 
 const CORE_ITEMS = [
   { name: "Overview",     href: "/overview",      icon: SquaresFour },
-  { name: "Pages",        href: "/pages",         icon: Stack },
+  { name: "Routes",       href: "/pages",         icon: Stack },
   { name: "Flows",        href: "/tests",         icon: Flask },
   { name: "Runs",         href: "/runs",          icon: Pulse },
   { name: "Issues",       href: "/bugs",          icon: Warning },
