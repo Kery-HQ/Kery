@@ -26,6 +26,8 @@ type ActiveRunTile = {
   source_label?: string | null;
   display_name?: string | null;
   livePreviewUrl?: string | null;
+  liveSteps?: number;
+  livePlanItems?: number;
 };
 
 export const Runs: React.FC = () => {
@@ -40,10 +42,15 @@ export const Runs: React.FC = () => {
   const [search, setSearch] = React.useState("");
   const [status, setStatus] = React.useState<(typeof STATUS_FILTERS)[number]>("all");
   const [activeRuns, setActiveRuns] = React.useState<ActiveRunTile[]>([]);
+  const activeRunsRef = React.useRef<ActiveRunTile[]>([]);
   const [activeLoading, setActiveLoading] = React.useState(false);
   const activeLoadedRef = React.useRef(false);
   const [liveExpanded, setLiveExpanded] = React.useState(false);
   const [stoppingRunId, setStoppingRunId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    activeRunsRef.current = activeRuns;
+  }, [activeRuns]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = search.length > 0 || status !== "all";
@@ -98,12 +105,17 @@ export const Runs: React.FC = () => {
         if (cancelled) return;
         const running = (runningRes.runs ?? []) as ActiveRunTile[];
         const queued = (queuedRes.runs ?? []) as ActiveRunTile[];
+        const prevById = new Map(activeRunsRef.current.map((r) => [r.id, r]));
         const runningWithPreview = await Promise.all(
           running.map(async (run) => {
             try {
               const detail = await fetchRun(run.id);
               const live = (detail?.run?.live_snapshot?.livePreview ??
                 null) as { filename?: string; updatedAt?: number } | null;
+              const liveSteps = Array.isArray(detail?.run?.steps_json) ? detail.run.steps_json.length : 0;
+              const livePlanItems = Array.isArray(detail?.run?.live_snapshot?.agentPlan?.items)
+                ? detail.run.live_snapshot.agentPlan.items.length
+                : 0;
               const filename = live?.filename;
               const updatedAt = live?.updatedAt;
               const base = filename ? runScreenshotFileUrl(run.id, filename) : null;
@@ -111,9 +123,18 @@ export const Runs: React.FC = () => {
                 ...run,
                 status: "running" as const,
                 livePreviewUrl: base && updatedAt ? `${base}?t=${updatedAt}` : base,
+                liveSteps,
+                livePlanItems,
               };
             } catch {
-              return { ...run, status: "running" as const, livePreviewUrl: null };
+              const prev = prevById.get(run.id);
+              return {
+                ...run,
+                status: "running" as const,
+                livePreviewUrl: prev?.livePreviewUrl ?? null,
+                liveSteps: prev?.liveSteps ?? 0,
+                livePlanItems: prev?.livePlanItems ?? 0,
+              };
             }
           }),
         );
@@ -123,7 +144,7 @@ export const Runs: React.FC = () => {
         ]);
         activeLoadedRef.current = true;
       } catch {
-        if (!cancelled) setActiveRuns([]);
+        // Keep previous active run state if transient polling fails.
       } finally {
         if (!cancelled) setActiveLoading(false);
       }
@@ -274,6 +295,18 @@ export const Runs: React.FC = () => {
                                   <p className="text-[10px] font-mono text-muted-foreground/60 truncate">
                                     {run.started_at ? relativeTime(run.started_at) : run.id.slice(0, 8)}
                                   </p>
+                                  <div className="flex items-center gap-1">
+                                    {(run.livePlanItems ?? 0) > 0 && (
+                                      <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                                        plan {(run.livePlanItems ?? 0)}
+                                      </Badge>
+                                    )}
+                                    {(run.liveSteps ?? 0) > 0 && (
+                                      <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                                        steps {(run.liveSteps ?? 0)}
+                                      </Badge>
+                                    )}
+                                  </div>
                                   <Button
                                     size="sm"
                                     variant="destructive"
