@@ -1,6 +1,8 @@
 export type AuthConfig = {
   mode: "ui" | "apiToken" | "oauthToken" | "tokenProvider";
   loginUrl?: string;
+  autoDetectLogin?: boolean;
+  autoDetectSelectors?: boolean;
   selectors?: {
     usernameField?: string;
     passwordField?: string;

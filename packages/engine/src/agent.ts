@@ -1385,8 +1385,11 @@ export async function handleAuth(
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
   }
 
-  if (auth.selectors) {
-    const ok = await trySelectorsAuth(page, auth, authStartUrl);
+  const selectorOverrides = normalizeSelectorOverrides(auth.selectors);
+  const shouldAutoDetectSelectors = auth.autoDetectSelectors !== false;
+  const selectors = selectorOverrides ?? (shouldAutoDetectSelectors ? await detectLoginSelectors(page) : null);
+  if (selectors) {
+    const ok = await trySelectorsAuth(page, selectors, auth, authStartUrl);
     if (ok) {
       logger.info({ url: page.url() }, "Auth complete (selectors)");
       return { ok: true, llmCalls: [] };
@@ -1397,8 +1400,67 @@ export async function handleAuth(
   return await tryAgentAuthViaRunAgent(page, auth, context, baseUrl, authStartUrl, onLLMCall);
 }
 
-async function trySelectorsAuth(page: Page, auth: AuthConfig, authStartUrl: string): Promise<boolean> {
-  const { usernameField, passwordField, submitButton } = auth.selectors!;
+function normalizeSelectorOverrides(selectors: AuthConfig["selectors"] | undefined):
+  { usernameField?: string; passwordField?: string; submitButton?: string } | null {
+  if (!selectors) return null;
+  const normalized = {
+    usernameField: selectors.usernameField?.trim() || undefined,
+    passwordField: selectors.passwordField?.trim() || undefined,
+    submitButton: selectors.submitButton?.trim() || undefined,
+  };
+  return normalized.usernameField || normalized.passwordField || normalized.submitButton ? normalized : null;
+}
+
+async function detectLoginSelectors(page: Page): Promise<{ usernameField?: string; passwordField?: string; submitButton?: string } | null> {
+  try {
+    const detected = await page.evaluate(() => {
+      function isVisible(el: Element | null): el is HTMLElement {
+        if (!el || !(el instanceof HTMLElement)) return false;
+        const style = getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }
+      function cssPath(el: Element): string {
+        if ((el as HTMLElement).id) return `#${CSS.escape((el as HTMLElement).id)}`;
+        const tag = el.tagName.toLowerCase();
+        const name = el.getAttribute("name");
+        if (name) return `${tag}[name="${CSS.escape(name)}"]`;
+        return tag;
+      }
+
+      const usernameCandidate = document.querySelector(
+        'input[type="email"], input[name*="email" i], input[autocomplete="username"], input[name*="user" i], input[type="text"]'
+      );
+      const passwordCandidate = document.querySelector(
+        'input[type="password"], input[name*="password" i], input[autocomplete="current-password"]'
+      );
+      const submitCandidate = document.querySelector(
+        'button[type="submit"], input[type="submit"], button[name*="login" i], button[id*="login" i], button[aria-label*="sign in" i], button'
+      );
+
+      const usernameField = isVisible(usernameCandidate) ? cssPath(usernameCandidate) : undefined;
+      const passwordField = isVisible(passwordCandidate) ? cssPath(passwordCandidate) : undefined;
+      const submitButton = isVisible(submitCandidate) ? cssPath(submitCandidate) : undefined;
+      return { usernameField, passwordField, submitButton };
+    });
+
+    if (!detected.passwordField) return null;
+    logger.info({ detected }, "Auth: auto-detected selectors");
+    return detected;
+  } catch (err) {
+    logger.warn({ err: String(err).split("\n")[0] }, "Auth: selector auto-detection failed");
+    return null;
+  }
+}
+
+async function trySelectorsAuth(
+  page: Page,
+  selectors: { usernameField?: string; passwordField?: string; submitButton?: string },
+  auth: AuthConfig,
+  authStartUrl: string,
+): Promise<boolean> {
+  const { usernameField, passwordField, submitButton } = selectors;
   const { username, password } = auth.credentials!;
 
   if (usernameField && username) {
@@ -1424,13 +1486,20 @@ async function trySelectorsAuth(page: Page, auth: AuthConfig, authStartUrl: stri
       logger.warn({ selector: "submitButton", err: String(err).split("\n")[0] }, "Auth: submit selector failed");
       return false;
     }
+  } else if (passwordField) {
+    await page.locator(passwordField).first().press("Enter").catch(() => {});
   }
 
   await page.waitForURL(url => url.href !== authStartUrl, { timeout: 15000 }).catch(() => {});
   await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
   const finalUrl = page.url();
-  return finalUrl !== authStartUrl;
+  if (finalUrl !== authStartUrl) return true;
+  if (passwordField) {
+    const passwordStillVisible = await page.locator(passwordField).first().isVisible().catch(() => false);
+    return !passwordStillVisible;
+  }
+  return false;
 }
 
 /** Full Navigator pipeline for login when CSS selectors fail or are wrong. */
