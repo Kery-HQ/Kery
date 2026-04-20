@@ -6,7 +6,7 @@ import { duration } from "@/lib/formatters";
 type ScanPhase = "crawling" | "route_filter" | "suggested_flows" | undefined;
 
 const PHASE_LABELS: Record<string, string> = {
-  crawling: "Crawling pages",
+  crawling: "Crawling routes",
   route_filter: "Filtering routes",
   suggested_flows: "Generating test flows",
 };
@@ -116,7 +116,7 @@ export function ScanBanner({ run, live = false, className }: Props) {
         <span>{live ? phaseLabel : ""}</span>
         {typeof pagesVisited === "number" && pagesVisited > 0 && (
           <span className="tabular-nums font-mono">
-            {pagesVisited} page{pagesVisited !== 1 ? "s" : ""}
+            {pagesVisited} route{pagesVisited !== 1 ? "s" : ""}
           </span>
         )}
       </div>

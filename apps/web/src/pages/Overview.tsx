@@ -59,10 +59,10 @@ const SETUP_STEPS: SetupStep[] = [
     key: "scan",
     label: "Scan your app",
     description:
-      "Kery scans your app and learns its pages, flows, and interactions so testing knows where to focus.",
+      "Kery scans your app and learns its routes, flows, and interactions so testing knows where to focus.",
     icon: Scan,
     href: "/pages",
-    buttonLabel: "Scan pages",
+    buttonLabel: "Scan routes",
   },
   {
     key: "flow",
@@ -241,12 +241,12 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
     <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-2 min-h-[88px]">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Page coverage
+          Route coverage
         </span>
         <ChartPie className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
       {total === 0 ? (
-        <p className="text-[12px] text-muted-foreground leading-snug">No scanned pages yet. Run a crawl to map your app.</p>
+        <p className="text-[12px] text-muted-foreground leading-snug">No scanned routes yet. Run a crawl to map your app.</p>
       ) : (
         <>
           <div className="flex items-baseline gap-1">
@@ -293,7 +293,7 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
             <span className="text-status-fail">{fail} fail</span>
             {" · "}
             <span className="text-muted-foreground">{untested} untested</span>
-            <span className="text-muted-foreground/70"> · {total} pages</span>
+            <span className="text-muted-foreground/70"> · {total} routes</span>
           </p>
         </>
       )}
