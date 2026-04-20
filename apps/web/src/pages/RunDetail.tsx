@@ -578,7 +578,29 @@ export const RunDetail: React.FC = () => {
         setLoading(false);
       }
 
-      if (!initialRun || initialRun.status !== "running") return;
+      if (!initialRun) return;
+      if (initialRun.status === "queued") {
+        pollInterval = setInterval(async () => {
+          const res = await fetchRun(runId!);
+          if (!res.run) return;
+          setRun(res.run);
+          const ui = liveUiFromRun(res.run);
+          setSteps(ui.steps);
+          setLlmCalls(ui.llmCalls);
+          setAgentPlan(ui.agentPlan);
+          setActivityFeed(ui.activityFeed);
+          setLivePreviewDisk(ui.livePreviewDisk);
+          if (res.run.status !== "queued" && res.run.status !== "running") {
+            fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          }
+        }, 1000);
+        return;
+      }
+      if (initialRun.status !== "running") return;
 
       const streamUrl = getRunStreamUrl(runId!);
       es = new EventSource(streamUrl);
