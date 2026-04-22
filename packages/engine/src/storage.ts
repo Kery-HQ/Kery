@@ -29,6 +29,10 @@ export interface StorageAdapter {
   getTestRun(runId: string): Promise<any>;
   updateTestRun(runId: string, data: Record<string, any>): Promise<void>;
   createTestRun(data: Record<string, any>): Promise<any>;
+  /** Incrementally append steps mid-run (crash-safe persistence). */
+  appendRunSteps(runId: string, steps: any[]): Promise<void>;
+  /** Incrementally append LLM calls mid-run (crash-safe persistence). */
+  appendRunLlmCalls(runId: string, calls: any[]): Promise<void>;
 
   // Destinations
   getDestination(id: string): Promise<any>;

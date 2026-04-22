@@ -179,9 +179,91 @@ const GEMINI_AGENT_SCHEMA = {
   },
 };
 
-function getAgentSchema(model: string): any | undefined {
+// Anthropic tool schemas support standard JSON Schema Draft 7 including anyOf/enum.
+// Re-use the same shape as OpenAI so all fields are enforced.
+const ANTHROPIC_AGENT_SCHEMA = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "agent_action",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        action:      { type: "string", enum: ACTION_ENUM },
+        element:     { anyOf: [{ type: "integer" }, { type: "null" }] },
+        target:      { anyOf: [{ type: "string" }, { type: "null" }] },
+        value:       { anyOf: [{ type: "string" }, { type: "null" }] },
+        x:           { anyOf: [{ type: "integer" }, { type: "null" }] },
+        y:           { anyOf: [{ type: "integer" }, { type: "null" }] },
+        toX:         { anyOf: [{ type: "integer" }, { type: "null" }] },
+        toY:         { anyOf: [{ type: "integer" }, { type: "null" }] },
+        assertion:   { anyOf: [{ type: "string" }, { type: "null" }] },
+        observation: { anyOf: [{ type: "string" }, { type: "null" }] },
+        result:      { anyOf: [{ type: "string", enum: ["completed", "blocked"] }, { type: "null" }] },
+        planItems: {
+          anyOf: [
+            {
+              type: "array",
+              items: {
+                anyOf: [
+                  { type: "string" },
+                  {
+                    type: "object",
+                    properties: {
+                      text:   { type: "string" },
+                      status: { type: "string", enum: ["pending", "done", "current", "failed"] },
+                    },
+                    required: ["text", "status"],
+                  },
+                ],
+              },
+            },
+            { type: "null" },
+          ],
+        },
+        bugDescription: { anyOf: [{ type: "string" }, { type: "null" }] },
+        bugType:     { anyOf: [{ type: "string", enum: ["visual", "functional", "ux", "other"] }, { type: "null" }] },
+        severity:    { anyOf: [{ type: "string", enum: ["low", "medium", "high"] }, { type: "null" }] },
+        reasoning:   { type: "string" },
+      },
+      required: ["action", "reasoning"],
+    },
+  },
+};
+
+/**
+ * Anthropic models that support json_schema structured output via OpenRouter.
+ * OpenRouter translates the OpenAI-format json_schema to Anthropic tool calls internally.
+ * Models NOT in this set (e.g. haiku-4.5) return a malformed response with no `choices`.
+ * Source: https://openrouter.ai/docs/guides/features/structured-outputs
+ */
+const OPENROUTER_ANTHROPIC_STRUCTURED_MODELS = new Set([
+  "anthropic/claude-sonnet-4-5",
+  "anthropic/claude-sonnet-4.5",
+  "anthropic/claude-sonnet-4.6",
+  "anthropic/claude-opus-4.1",
+  "anthropic/claude-opus-4.5",
+  "anthropic/claude-opus-4.6",
+]);
+
+/**
+ * Returns the structured-output schema for the agent, taking the actual routing into account.
+ *
+ * - OpenAI direct / OpenRouter OpenAI models → OpenAI json_schema
+ * - Anthropic direct SDK → Anthropic tool-call schema (handled in llmAnthropic.ts)
+ * - Anthropic via OpenRouter, supported models → OpenAI json_schema format
+ *   (OpenRouter translates this to Anthropic tool calls internally)
+ * - Anthropic via OpenRouter, unsupported models (e.g. haiku-4.5) → no schema
+ *   (prompt-based JSON enforcement handles format correctness)
+ * - Gemini → Gemini json_schema
+ */
+function getAgentSchema(model: string, routeKind: LlmRoute["kind"]): any | undefined {
+  if (isAnthropicModel(model)) {
+    if (routeKind === "anthropic") return ANTHROPIC_AGENT_SCHEMA;
+    if (routeKind === "openrouter" && OPENROUTER_ANTHROPIC_STRUCTURED_MODELS.has(model)) return OPENAI_AGENT_SCHEMA;
+    return undefined;
+  }
   if (isOpenAIModel(model)) return OPENAI_AGENT_SCHEMA;
-  if (isAnthropicModel(model)) return undefined;
   return GEMINI_AGENT_SCHEMA;
 }
 
@@ -301,11 +383,13 @@ export async function llmChat(
 // ─── Agent decisions (vision + text) ─────────────────────────────────────────
 
 export async function llmAgentChat(messages: any[], signal?: AbortSignal): Promise<{ content: string; usage: LLMUsage }> {
-  const model = getConfig().agentModel;
+  const config = getConfig();
+  const model = config.agentModel;
+  const route = pickLlmRoute(model, config);
   return llmChat(messages, model, {
     maxTokens: MAX_OUTPUT_TOKENS,
     temperature: 0.5,
-    responseFormat: getAgentSchema(model),
+    responseFormat: getAgentSchema(model, route.kind),
     signal,
   });
 }

@@ -566,7 +566,20 @@ RULES:
 - Keep one clear goal: satisfy the Intent exactly and do not wander to unrelated flows.
 - Before calling done, ALWAYS verify final state with at least one observe action and confirm expected evidence (counts, labels, destination page state).
 
-IMPORTANT: Reply with EXACTLY ONE JSON object. Do NOT output multiple actions — only the single next action to take.`;
+OUTPUT FORMAT — CRITICAL:
+Your entire response MUST be a single valid JSON object and nothing else.
+No markdown code fences (\`\`\`), no prose, no explanation before or after — just the raw JSON object.
+Required fields: "action" (one of the action names above) and "reasoning" (brief explanation).
+All other fields are optional and should be omitted if not applicable.
+
+EXAMPLE — correct:
+{"action":"click","element":3,"reasoning":"Click the Login button to submit credentials"}
+
+EXAMPLE — WRONG (do NOT do this):
+\`\`\`json
+{"action":"click","element":3,"reasoning":"..."}
+\`\`\`
+(No code fences, no prose, raw JSON only.)`;
 }
 
 // ─── Observation builder ──────────────────────────────────────────────────────
@@ -961,15 +974,36 @@ async function decideNextAction(params: {
 }): Promise<AgentAction> {
   pruneConversation(params.messages);
 
+  // Inject a reminder as the very last user message part so the model sees it immediately before replying.
+  const JSON_FORMAT_REMINDER =
+    "REMINDER: Reply with exactly one raw JSON object — no markdown fences, no prose, just the JSON.";
+
   for (let attempt = 0; attempt < 3; attempt++) {
-    let callMessages = params.messages;
-    if (attempt > 0) {
-      callMessages = params.messages.map((m, idx) => {
-        if (idx === params.messages.length - 1 && m.role === "user" && Array.isArray(m.content)) {
-          return { ...m, content: m.content.filter((p: any) => p.type !== "image_url") };
-        }
-        return m;
-      });
+    // Build call messages: optionally strip images on retry, and append reminder
+    let callMessages = params.messages.map((m, idx) => {
+      if (attempt > 0 && idx === params.messages.length - 1 && m.role === "user" && Array.isArray(m.content)) {
+        return { ...m, content: m.content.filter((p: any) => p.type !== "image_url") };
+      }
+      return m;
+    });
+
+    // Append reminder to the last user message
+    const lastMsg = callMessages[callMessages.length - 1];
+    if (lastMsg?.role === "user") {
+      if (typeof lastMsg.content === "string") {
+        callMessages = [
+          ...callMessages.slice(0, -1),
+          { ...lastMsg, content: lastMsg.content + "\n\n" + JSON_FORMAT_REMINDER },
+        ];
+      } else if (Array.isArray(lastMsg.content)) {
+        callMessages = [
+          ...callMessages.slice(0, -1),
+          {
+            ...lastMsg,
+            content: [...lastMsg.content, { type: "text", text: JSON_FORMAT_REMINDER }],
+          },
+        ];
+      }
     }
 
     if (attempt === 2) await new Promise(r => setTimeout(r, 2000));

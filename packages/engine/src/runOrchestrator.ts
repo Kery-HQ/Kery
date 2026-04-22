@@ -60,6 +60,8 @@ export type RunResult = {
   bugsFound: RunStep[];
   llmCalls: LLMCallRecord[];
   videoUrl?: string;
+  /** Epoch ms when Playwright started recording — used to sync video time with step timestamps. */
+  recordingStartedAt?: number;
   error?: string;
 };
 
@@ -211,6 +213,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
     await page.setDefaultTimeout(10000);
 
+    // Capture recording start epoch so the frontend can sync video time with step timestamps.
+    const recordingStartedAt = videoEnabled ? Date.now() : undefined;
+
     const netMonitor = attachNetworkMonitor(page);
 
     // Try regression replay
@@ -289,6 +294,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
             steps: stepsDetail.map(s => `[${s.index}] ${s.action} \u2192 ${s.target ?? ""}`),
             stepsDetail, bugsFound, llmCalls: regResult.healCalls,
             memoryLoaded: allMemory, memoryProposed: 0, videoUrl,
+            recordingStartedAt,
           };
         }
 
@@ -537,6 +543,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       stepsDetail: combinedStepsDetail,
       memoryLoaded: allMemory, memoryProposed: memoryProposed,
       bugsFound, llmCalls: mergedCalls, videoUrl,
+      recordingStartedAt,
     };
   } catch (err) {
     logger.error({ err: String(err) }, "Run failed");

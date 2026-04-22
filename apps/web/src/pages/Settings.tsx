@@ -3,7 +3,6 @@ import { Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick } from
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -107,8 +106,7 @@ export const Settings: React.FC = () => {
               </button>
             )}
           </div>
-          <Card>
-            <CardContent className="pt-4">
+          <div>
               <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
                 <aside className="space-y-1 rounded-md border border-border/70 bg-surface-2/60 p-2">
                   {MODEL_CONFIG.map((model) => {
@@ -170,8 +168,7 @@ export const Settings: React.FC = () => {
                   {modelStatus}
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </div>
         </section>
       </div>
     </div>
@@ -435,8 +432,16 @@ function ModelSlotCard({
             mode === "preset" ? "border-primary/40 bg-primary/10" : "border-border/70 bg-surface-3/40 hover:bg-surface-3/70",
           )}
         >
-          <p className="text-[11px] font-semibold">Preset</p>
-          <p className="text-[10px] text-muted-foreground/80">Choose from curated models</p>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={cn(
+              "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+              mode === "preset" ? "border-primary" : "border-border",
+            )}>
+              {mode === "preset" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+            </span>
+            <p className="text-[11px] font-semibold">Preset</p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/80 pl-5">Choose from curated models</p>
         </button>
         <button
           type="button"
@@ -446,8 +451,16 @@ function ModelSlotCard({
             mode === "custom" ? "border-primary/40 bg-primary/10" : "border-border/70 bg-surface-3/40 hover:bg-surface-3/70",
           )}
         >
-          <p className="text-[11px] font-semibold">Custom</p>
-          <p className="text-[10px] text-muted-foreground/80">Use provider + model id</p>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={cn(
+              "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+              mode === "custom" ? "border-primary" : "border-border",
+            )}>
+              {mode === "custom" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+            </span>
+            <p className="text-[11px] font-semibold">Custom</p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/80 pl-5">Use provider + model id</p>
         </button>
       </div>
 

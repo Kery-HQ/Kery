@@ -1,4 +1,5 @@
 import React from "react";
+import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun, patchProjectBug, createMemoryEntry } from "@/projectApi";
 import { apiMediaUrl, runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
@@ -57,6 +58,8 @@ import {
   ComputerTower,
   Lightning,
   Scroll,
+  ShieldCheck,
+  Link,
 } from "@phosphor-icons/react";
 
 // --- Types ---
@@ -165,6 +168,8 @@ type Run = {
   completed_at?: string;
   trigger_ref?: string;
   video_url?: string;
+  /** Epoch ms when Playwright started recording — used to sync video time with step timestamps. */
+  recording_started_at?: number | null;
   test_id?: string | null;
   environment?: string | null;
   project_id?: string | null;
@@ -172,12 +177,15 @@ type Run = {
   source_label?: string;
   source_back_path?: string | null;
   steps_json?: RunStep[];
+  activity_json?: ActivityEntry[];
+  agent_plan_json?: AgentPlanItem[];
   memory_loaded?: MemoryEntryBrief[];
   bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "filmstrip" })[];
   llm_calls_json?: LLMCallRecord[];
   /** Present while `status === "running"` when Redis live snapshot exists (see `@kery/engine` `LiveRunSnapshot`). */
   live_snapshot?: {
     agentPlan: { items: AgentPlanItem[]; at: number } | null;
+    replayProgress?: { stepIndex: number | null; planIndex: number | null; at: number } | null;
     activity: ActivityEntry[];
     livePreview: { filename: string; updatedAt: number } | null;
     observability?: Record<string, unknown>;
@@ -192,6 +200,7 @@ function liveUiFromRun(run: Run): {
   llmCalls: LLMCallRecord[];
   agentPlan: AgentPlanItem[];
   activityFeed: ActivityEntry[];
+  replayProgress: { stepIndex: number | null; planIndex: number | null; at: number } | null;
   livePreviewDisk: { filename: string; updatedAt: number } | null;
 } {
   const steps = (run.steps_json ?? []) as RunStep[];
@@ -200,15 +209,18 @@ function liveUiFromRun(run: Run): {
   let activityFeed: ActivityEntry[];
   if (ls?.activity != null && ls.activity.length > 0) {
     activityFeed = ls.activity as ActivityEntry[];
+  } else if ((run.activity_json ?? []).length > 0) {
+    activityFeed = run.activity_json as ActivityEntry[];
   } else {
     activityFeed = steps.map((step) => ({ type: "step" as const, step, at: step.at ?? Date.now() }));
   }
-  const agentPlan = ls?.agentPlan?.items ?? [];
+  const agentPlan = ls?.agentPlan?.items ?? (run.agent_plan_json ?? []);
+  const replayProgress = ls?.replayProgress ?? null;
   const livePreviewDisk =
     run.status === "running" && ls?.livePreview?.filename
       ? ls.livePreview
       : null;
-  return { steps, llmCalls, agentPlan, activityFeed, livePreviewDisk };
+  return { steps, llmCalls, agentPlan, activityFeed, replayProgress, livePreviewDisk };
 }
 
 // --- Helpers ---
@@ -335,6 +347,14 @@ function formatStepTime(at: number): string {
   const s = d.getSeconds().toString().padStart(2, "0");
   const ms = d.getMilliseconds().toString().padStart(3, "0");
   return `${h}:${m}:${s}.${ms}`;
+}
+
+/** Convert common LLM pseudo-list text into valid markdown for readable rendering. */
+function normalizeReasoningMarkdown(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed === "") return "";
+  const normalizedNumbered = trimmed.replace(/\s+\((\d+)\)\s+/g, "\n$1. ");
+  return normalizedNumbered;
 }
 
 function llmRoleLabel(role: string): string {
@@ -544,6 +564,11 @@ export const RunDetail: React.FC = () => {
     filename: string;
     updatedAt: number;
   } | null>(null);
+  const [replayProgress, setReplayProgress] = React.useState<{
+    stepIndex: number | null;
+    planIndex: number | null;
+    at: number;
+  } | null>(null);
   const [agentPlan, setAgentPlan] = React.useState<AgentPlanItem[]>([]);
   const [activityFeed, setActivityFeed] = React.useState<ActivityEntry[]>([]);
   const [tab, setTab] = React.useState<Tab>("overview");
@@ -569,6 +594,7 @@ export const RunDetail: React.FC = () => {
           setLlmCalls(ui.llmCalls);
           setAgentPlan(ui.agentPlan);
           setActivityFeed(ui.activityFeed);
+          setReplayProgress(ui.replayProgress);
           setLivePreviewDisk(ui.livePreviewDisk);
           if (res.run.status !== "running") {
             fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
@@ -589,6 +615,7 @@ export const RunDetail: React.FC = () => {
           setLlmCalls(ui.llmCalls);
           setAgentPlan(ui.agentPlan);
           setActivityFeed(ui.activityFeed);
+          setReplayProgress(ui.replayProgress);
           setLivePreviewDisk(ui.livePreviewDisk);
           if (res.run.status !== "queued" && res.run.status !== "running") {
             fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
@@ -622,6 +649,13 @@ export const RunDetail: React.FC = () => {
           if (msg.type === "screenshot") {
             setLiveScreenshot(msg.data);
           }
+          if (msg.type === "replay_progress") {
+            setReplayProgress({
+              stepIndex: typeof msg.stepIndex === "number" ? msg.stepIndex : null,
+              planIndex: typeof msg.planIndex === "number" ? msg.planIndex : null,
+              at: Number(msg.at) || Date.now(),
+            });
+          }
           if (msg.type === "llm_call") {
             setLlmCalls((prev) => [...prev, msg.call]);
           }
@@ -633,6 +667,7 @@ export const RunDetail: React.FC = () => {
               setLlmCalls(ui.llmCalls);
               setAgentPlan(ui.agentPlan);
               setActivityFeed(ui.activityFeed);
+              setReplayProgress(ui.replayProgress);
             }
             setLivePreviewDisk(null);
             setLiveScreenshot(null);
@@ -654,6 +689,7 @@ export const RunDetail: React.FC = () => {
             setLlmCalls(ui.llmCalls);
             setAgentPlan(ui.agentPlan);
             setActivityFeed(ui.activityFeed);
+            setReplayProgress(ui.replayProgress);
             setLivePreviewDisk(ui.livePreviewDisk);
             if (res.run.status !== "running") {
               fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
@@ -818,6 +854,7 @@ export const RunDetail: React.FC = () => {
               totalCost={totalCost}
               agentPlan={agentPlan}
               activityFeed={activityFeed}
+              replayProgress={replayProgress}
             />
           </TabsContent>
 
@@ -910,6 +947,227 @@ function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
 // Overview tab
 // ============================================================
 
+// ============================================================
+// Step timeline (Progress tab)
+// ============================================================
+
+type StepTimelineEntry = RunStep & { relativeMs: number };
+
+function stepActionLabel(action: string): string {
+  const map: Record<string, string> = {
+    click: "Click",
+    fill: "Fill",
+    navigate: "Navigate",
+    back: "Back",
+    scroll: "Scroll",
+    hover: "Hover",
+    pressKey: "Key",
+    selectOption: "Select",
+    setDate: "Date",
+    assert: "Assert",
+    observe: "Observe",
+    plan: "Plan",
+    auth: "Auth",
+    bug: "Bug",
+    wait: "Wait",
+    dragAndDrop: "Drag",
+    done: "Done",
+  };
+  return map[action] ?? action;
+}
+
+function stepActionColor(action: string): string {
+  if (["click", "hover", "dragAndDrop"].includes(action)) return "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20";
+  if (["fill", "pressKey", "selectOption", "setDate"].includes(action)) return "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20";
+  if (["navigate", "back"].includes(action)) return "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20";
+  if (action === "assert") return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+  if (action === "auth") return "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20";
+  if (action === "bug") return "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20";
+  if (action === "done") return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+  return "bg-muted/60 text-muted-foreground border-border/40";
+}
+
+function StepCard({
+  entry,
+  timelineEntry,
+  isReplayCurrent,
+  replayActiveStepRef,
+  stepNumber,
+}: {
+  entry: { type: "step"; at: number; step: RunStep };
+  timelineEntry?: StepTimelineEntry;
+  isReplayCurrent: boolean;
+  replayActiveStepRef: React.RefObject<HTMLDivElement | null>;
+  stepNumber: number;
+}) {
+  const { step } = entry;
+  const h = humanizeRunStep(step);
+  const isFailed = step.status === "failed";
+  const isAuth = step.action === "auth";
+
+  const detail = step.target ?? step.value ?? step.assertion ?? step.reasoning;
+
+  return (
+    <div
+      ref={isReplayCurrent ? replayActiveStepRef : undefined}
+      className={cn(
+        "group relative rounded-lg border px-3 py-2.5 transition-colors duration-150 animate-slide-up",
+        isFailed
+          ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/8"
+          : isReplayCurrent
+            ? "border-primary/70 bg-primary/15 dark:bg-primary/22 shadow-sm ring-1 ring-primary/35"
+            : "border-border/50 bg-card/50 hover:bg-card/80 hover:border-border/70",
+      )}
+    >
+      {isReplayCurrent && (
+        <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-primary/80" aria-hidden />
+      )}
+      <div className="flex items-start gap-2.5">
+        {/* Step number + status indicator */}
+        <div className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
+          <div
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold",
+              isFailed
+                ? "bg-red-500/20 text-red-600 dark:text-red-400"
+                : "bg-muted/60 text-muted-foreground",
+            )}
+          >
+            {stepNumber}
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          {/* Header row: action badge + title + time */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isAuth ? (
+              <span className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium leading-none", stepActionColor("auth"))}>
+                <ShieldCheck className="h-2.5 w-2.5" />
+                Auth
+              </span>
+            ) : (
+              <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium leading-none", stepActionColor(step.action))}>
+                {stepActionLabel(step.action)}
+              </span>
+            )}
+            <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">{h.title}</p>
+            {timelineEntry && (
+              <span className="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground/60">
+                {formatMs(timelineEntry.relativeMs)}
+              </span>
+            )}
+          </div>
+
+          {/* Detail line */}
+          {detail && (
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{detail}</p>
+          )}
+
+          {/* Error line */}
+          {isFailed && step.error && (
+            <p className="mt-1 rounded bg-red-500/10 px-2 py-1 text-[10px] text-red-600 dark:text-red-400">
+              {step.error}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepTimeline({
+  activityFeed,
+  stepTimeline,
+  replayCurrentIndex,
+  replayActiveStepRef,
+}: {
+  activityFeed: ActivityEntry[];
+  stepTimeline: StepTimelineEntry[];
+  replayCurrentIndex: number;
+  replayActiveStepRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  if (activityFeed.length === 0) {
+    return <p className="pt-2 text-[12px] text-muted-foreground">No steps yet.</p>;
+  }
+
+  // Group consecutive steps by URL
+  const groups: { url: string | null; entries: typeof activityFeed }[] = [];
+  for (const entry of activityFeed) {
+    const url = entry.type === "step" ? (entry.step.url ?? null) : null;
+    const last = groups[groups.length - 1];
+    if (!last || last.url !== url) {
+      groups.push({ url, entries: [entry] });
+    } else {
+      last.entries.push(entry);
+    }
+  }
+
+  let globalStepIdx = 0;
+
+  return (
+    <div className="space-y-3 pr-1 pt-1">
+      {groups.map((group, gi) => {
+        const urlLabel = group.url
+          ? (() => { try { return new URL(group.url).pathname || group.url; } catch { return group.url; } })()
+          : null;
+
+        return (
+          <div key={gi}>
+            {/* URL section header */}
+            {urlLabel && (
+              <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                <Link className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                <span className="truncate font-mono text-[10px] text-muted-foreground/70">{urlLabel}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              {group.entries.map((entry, ei) => {
+                if (entry.type !== "step") {
+                  // Inline observe / plan note
+                  return (
+                    <div
+                      key={`${entry.type}-${entry.at}-${ei}`}
+                      className="flex items-center gap-2 px-1 py-0.5"
+                    >
+                      {entry.type === "activity" ? (
+                        <Eye className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+                      ) : (
+                        <Path className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+                      )}
+                      <p className="truncate text-[10px] text-muted-foreground/70">
+                        {entry.type === "activity" ? entry.activity.text : `Plan updated (${entry.items.length} items)`}
+                      </p>
+                    </div>
+                  );
+                }
+
+                const stepNum = ++globalStepIdx;
+                const timelineEntry = stepTimeline.find((s) => s.index === entry.step.index);
+                const isReplayCurrent =
+                  timelineEntry != null && replayCurrentIndex >= 0
+                    ? stepTimeline[replayCurrentIndex]?.index === timelineEntry.index
+                    : false;
+
+                return (
+                  <StepCard
+                    key={`step-${entry.step.index}-${entry.at}-${ei}`}
+                    entry={entry}
+                    timelineEntry={timelineEntry}
+                    isReplayCurrent={isReplayCurrent}
+                    replayActiveStepRef={replayActiveStepRef}
+                    stepNumber={stepNum}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boolean }) {
   const isDone = item.status === "done";
   const isCurrent = item.status === "current";
@@ -945,7 +1203,7 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
         <div
           className={cn(
             "min-w-0 flex-1 pb-3 transition-colors duration-150 ease-out",
-            isCurrent && "plan-current-pulse rounded-md bg-muted/25 -mx-1 -mt-0.5 px-2.5 py-1.5",
+            isCurrent && "plan-current-underline",
           )}
         >
           <p
@@ -964,15 +1222,12 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
   );
 }
 
-const RUN_PREVIEW_WALLPAPER = "/wallpaper/run_details_wallpaper.png";
-
-/** Wallpaper + optional liquid-glass frame. `crisp` desk = full-bleed art (run starting). `blurred` = softened desk + grain + darken. */
+/** Clean browser preview stage — no wallpaper. */
 function BrowserPreviewStage({
   badge,
   children,
   tabLabel,
   empty,
-  wallpaperTreatment,
   framed,
   liveFrameOpenAnim,
   onLiveFrameOpenAnimEnd,
@@ -981,36 +1236,12 @@ function BrowserPreviewStage({
   children: React.ReactNode;
   tabLabel: string;
   empty?: boolean;
-  wallpaperTreatment: "crisp" | "blurred";
   framed: boolean;
   liveFrameOpenAnim?: boolean;
   onLiveFrameOpenAnimEnd?: () => void;
 }) {
-  const deskWallpaper = (
-    <div
-      className="pointer-events-none absolute inset-0 bg-cover bg-center"
-      style={{ backgroundImage: `url(${RUN_PREVIEW_WALLPAPER})` }}
-      aria-hidden
-    />
-  );
-
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      {wallpaperTreatment === "crisp" ? (
-        deskWallpaper
-      ) : (
-        <>
-          <div className="pointer-events-none absolute inset-0 bg-muted/45 dark:bg-surface-2/78" aria-hidden />
-          <div className="run-preview-wallpaper-blur-wrap" aria-hidden>
-            <div
-              className="run-preview-wallpaper-blurred opacity-[0.92] dark:opacity-[0.72]"
-              style={{ backgroundImage: `url(${RUN_PREVIEW_WALLPAPER})` }}
-            />
-          </div>
-          <div className="run-preview-wallpaper-grain" aria-hidden />
-          <div className="pointer-events-none absolute inset-0 bg-black/18 dark:bg-black/28" aria-hidden />
-        </>
-      )}
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/20 dark:bg-surface-2/50">
 
       <div className="absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] sm:left-3 sm:top-3 sm:max-w-[calc(100%-1.5rem)]">
         {badge}
@@ -1040,17 +1271,7 @@ function BrowserPreviewStage({
                 )}
               >
                 {!empty && (
-                  <>
-                    <div className="pointer-events-none absolute inset-0 bg-muted/32 dark:bg-surface-2/58" aria-hidden />
-                    <div className="run-preview-wallpaper-blur-wrap" aria-hidden>
-                      <div
-                        className="run-preview-wallpaper-blurred opacity-[0.88] dark:opacity-[0.68]"
-                        style={{ backgroundImage: `url(${RUN_PREVIEW_WALLPAPER})` }}
-                      />
-                    </div>
-                    <div className="run-preview-wallpaper-grain" aria-hidden />
-                    <div className="pointer-events-none absolute inset-0 bg-black/16 dark:bg-black/24" aria-hidden />
-                  </>
+                  <div className="pointer-events-none absolute inset-0 bg-muted/20 dark:bg-surface-2/40" aria-hidden />
                 )}
                 <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
               </div>
@@ -1067,7 +1288,7 @@ function BrowserPreviewStage({
 }
 
 function OverviewTab({
-  run, steps, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed,
+  run, steps, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed, replayProgress,
 }: {
   run: Run;
   steps: RunStep[];
@@ -1078,6 +1299,7 @@ function OverviewTab({
   totalCost: number;
   agentPlan: AgentPlanItem[];
   activityFeed: ActivityEntry[];
+  replayProgress: { stepIndex: number | null; planIndex: number | null; at: number } | null;
 }) {
   const okCount = steps.filter((s) => s.status === "ok" && s.action !== "bug").length;
   const failCount = steps.filter((s) => s.status === "failed").length;
@@ -1087,6 +1309,12 @@ function OverviewTab({
 
   const activityNewestFirst = React.useMemo(
     () => [...activityFeed].reverse(),
+    [activityFeed],
+  );
+
+  // Oldest-first ordered step entries (non-steps collapsed into timeline)
+  const activityOldestFirst = React.useMemo(
+    () => [...activityFeed],
     [activityFeed],
   );
 
@@ -1132,14 +1360,30 @@ function OverviewTab({
   const seenLivePreviewRef = React.useRef(false);
   const recordingVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const [playbackMs, setPlaybackMs] = React.useState(0);
+  const [videoDurationMs, setVideoDurationMs] = React.useState(0);
+  const replayActiveStepRef = React.useRef<HTMLDivElement | null>(null);
   const stepTimeline = React.useMemo(() => {
     const timed = steps
       .filter((s): s is RunStep & { at: number } => typeof s.at === "number")
       .sort((a, b) => a.at - b.at);
     if (timed.length === 0) return [];
-    const startAt = timed[0].at;
-    return timed.map((s) => ({ ...s, relativeMs: Math.max(0, s.at - startAt) }));
-  }, [steps]);
+    // Use recording_started_at (epoch ms when Playwright started recording) as the video origin so that
+    // video currentTime (seconds since recording start) maps correctly to step timestamps.
+    // Fall back to first step time if not available.
+    const videoOriginMs = run.recording_started_at
+      ? run.recording_started_at
+      : timed[0].at;
+    return timed.map((s) => ({ ...s, relativeMs: Math.max(0, s.at - videoOriginMs) }));
+  }, [steps, run.recording_started_at]);
+  const replayCursorRelativeMs = React.useMemo(() => {
+    if (stepTimeline.length === 0) return playbackMs;
+    if (videoDurationMs <= 0) return playbackMs;
+    const first = stepTimeline[0].relativeMs;
+    const last = stepTimeline[stepTimeline.length - 1].relativeMs;
+    if (last <= first) return playbackMs;
+    const ratio = Math.max(0, Math.min(1, playbackMs / videoDurationMs));
+    return first + ratio * (last - first);
+  }, [stepTimeline, playbackMs, videoDurationMs]);
   const hasPlan = agentPlan.length > 0;
   const [rightTab, setRightTab] = React.useState<"plan" | "progress">(hasPlan ? "plan" : "progress");
 
@@ -1149,14 +1393,96 @@ function OverviewTab({
 
   const replayCurrentIndex = React.useMemo(() => {
     if (stepTimeline.length === 0) return -1;
+    const hasDistinctTimes = stepTimeline.some((s, i) => i > 0 && s.relativeMs > stepTimeline[i - 1].relativeMs);
+    if (!hasDistinctTimes && videoDurationMs > 0) {
+      const ratio = Math.max(0, Math.min(1, playbackMs / videoDurationMs));
+      const proportional = Math.floor(ratio * stepTimeline.length);
+      return Math.max(0, Math.min(stepTimeline.length - 1, proportional));
+    }
     let idx = -1;
     for (let i = 0; i < stepTimeline.length; i += 1) {
-      if (stepTimeline[i].relativeMs <= playbackMs) idx = i;
+      if (stepTimeline[i].relativeMs <= replayCursorRelativeMs) idx = i;
       else break;
     }
     return idx;
-  }, [stepTimeline, playbackMs]);
+  }, [stepTimeline, playbackMs, replayCursorRelativeMs, videoDurationMs]);
+  const replayCurrentPlanIndex = React.useMemo(() => {
+    if (run.status === "running") {
+      return replayProgress?.planIndex ?? null;
+    }
+    if (stepTimeline.length === 0 || agentPlan.length === 0) return null;
+    const planEvents = activityOldestFirst
+      .filter((e): e is { type: "plan"; at: number; items: AgentPlanItem[] } => e.type === "plan")
+      .sort((a, b) => a.at - b.at);
+    if (planEvents.length === 0) return null;
+    const videoOriginMs = run.recording_started_at ? run.recording_started_at : stepTimeline[0].at;
+    const playbackAtEpoch = videoOriginMs + replayCursorRelativeMs;
+    let lastPlan: AgentPlanItem[] | null = null;
+    for (const ev of planEvents) {
+      if (ev.at <= playbackAtEpoch) lastPlan = ev.items;
+      else break;
+    }
+    if (!lastPlan) {
+      if (videoDurationMs > 0 && agentPlan.length > 0) {
+        const ratio = Math.max(0, Math.min(1, playbackMs / videoDurationMs));
+        return Math.max(0, Math.min(agentPlan.length - 1, Math.floor(ratio * agentPlan.length)));
+      }
+      return null;
+    }
+    const idx = lastPlan.findIndex((i) => i.status === "current");
+    if (idx >= 0) return idx;
+    if (videoDurationMs > 0 && agentPlan.length > 0) {
+      const ratio = Math.max(0, Math.min(1, playbackMs / videoDurationMs));
+      return Math.max(0, Math.min(agentPlan.length - 1, Math.floor(ratio * agentPlan.length)));
+    }
+    return null;
+  }, [run.status, replayProgress?.planIndex, stepTimeline, agentPlan.length, activityOldestFirst, run.recording_started_at, playbackMs, replayCursorRelativeMs, videoDurationMs]);
   const canReplay = showRecording && stepTimeline.length > 0;
+  const replayStepLabel = React.useMemo(() => {
+    if (run.status === "running") {
+      if (typeof replayProgress?.stepIndex === "number" && replayProgress.stepIndex > 0) {
+        return `Step ${replayProgress.stepIndex}`;
+      }
+      return steps.length > 0 ? `Step ${steps.length}` : "Starting";
+    }
+    if (!canReplay) return null;
+    if (replayCurrentIndex < 0) return "Step 0";
+    return `Step ${replayCurrentIndex + 1}/${stepTimeline.length}`;
+  }, [run.status, replayProgress?.stepIndex, steps.length, canReplay, replayCurrentIndex, stepTimeline.length]);
+  const replayPlanLabel = React.useMemo(() => {
+    if (agentPlan.length === 0) return null;
+    if (run.status === "running") {
+      if (typeof replayProgress?.planIndex === "number" && replayProgress.planIndex >= 0) {
+        return `Plan ${replayProgress.planIndex + 1}/${agentPlan.length}`;
+      }
+      return null;
+    }
+    if (!canReplay || replayCurrentPlanIndex == null || replayCurrentPlanIndex < 0) return null;
+    return `Plan ${replayCurrentPlanIndex + 1}/${agentPlan.length}`;
+  }, [agentPlan.length, run.status, replayProgress?.planIndex, canReplay, replayCurrentPlanIndex]);
+  const displayStep = React.useMemo(() => {
+    if (canReplay && replayCurrentIndex >= 0) {
+      return stepTimeline[replayCurrentIndex] ?? latestStep;
+    }
+    return latestStep;
+  }, [canReplay, replayCurrentIndex, stepTimeline, latestStep]);
+  const displayStepHumanized = displayStep ? humanizeRunStep(displayStep) : null;
+  const displayStepReasoning = (displayStep?.reasoning ?? "").trim();
+  const displayActionLabel = displayStepHumanized?.title ?? "Waiting for activity...";
+  const statusPrimaryText = React.useMemo(() => {
+    if (run.status === "running" && latestEntry?.type === "activity") return latestEntry.activity.text;
+    return displayStepReasoning || displayActionLabel;
+  }, [run.status, latestEntry, displayStepReasoning, displayActionLabel]);
+  const latestReasoningMarkdown = React.useMemo(
+    () => normalizeReasoningMarkdown(statusPrimaryText),
+    [statusPrimaryText],
+  );
+
+  React.useEffect(() => {
+    if (replayCurrentIndex >= 0 && replayActiveStepRef.current) {
+      replayActiveStepRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [replayCurrentIndex]);
 
   React.useLayoutEffect(() => {
     if ((showLive || showLiveDisk) && !seenLivePreviewRef.current) {
@@ -1175,6 +1501,16 @@ function OverviewTab({
     return () => window.clearTimeout(id);
   }, [liveFrameOpenAnim]);
 
+  React.useEffect(() => {
+    if (!canReplay) return;
+    const node = recordingVideoRef.current;
+    if (!node) return;
+    node.currentTime = 0;
+    setPlaybackMs(0);
+    void node.play().catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canReplay]);
+
   return (
     <div className="px-6 py-5 flex flex-col flex-1 min-h-0 h-full overflow-hidden animate-fade-in">
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-hidden">
@@ -1183,23 +1519,33 @@ function OverviewTab({
             <BrowserPreviewStage
               tabLabel={previewTabLabel}
               empty={previewEmpty}
-              wallpaperTreatment={isRunStarting ? "crisp" : "blurred"}
               framed={!isRunStarting}
               liveFrameOpenAnim={liveFrameOpenAnim}
               onLiveFrameOpenAnimEnd={() => setLiveFrameOpenAnim(false)}
               badge={
-                <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/70 bg-card/90 px-2 py-1.5 backdrop-blur-[2px] sm:gap-2 sm:px-2.5 sm:py-2">
-                  <Badge
-                    variant={isRunStarting || showLive || showLiveDisk ? "running" : showRecording ? "secondary" : "neutral"}
-                    className="text-[10px] uppercase tracking-wider"
-                  >
-                    {isRunStarting ? "starting" : showLive || showLiveDisk ? "live" : showRecording ? "recording" : "snapshot"}
-                  </Badge>
-                  <span className="hidden h-4 w-px shrink-0 bg-border/70 sm:block" aria-hidden />
-                  <span className="text-[11px] font-mono font-medium tabular-nums text-foreground/90 sm:text-[12px]">
-                    live preview
-                  </span>
-                </div>
+                (showLive || showLiveDisk || replayStepLabel || replayPlanLabel) ? (
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/70 bg-card/90 px-2 py-1 backdrop-blur-[2px]">
+                    {(showLive || showLiveDisk) && (
+                      <>
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                        </span>
+                        <span className="text-[11px] font-medium text-foreground/90">live</span>
+                      </>
+                    )}
+                    {replayStepLabel && (
+                      <span className="rounded border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] font-mono text-foreground/85">
+                        {replayStepLabel}
+                      </span>
+                    )}
+                    {replayPlanLabel && (
+                      <span className="rounded border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] font-mono text-foreground/85">
+                        {replayPlanLabel}
+                      </span>
+                    )}
+                  </div>
+                ) : null
               }
             >
               {isRunStarting ? (
@@ -1220,7 +1566,13 @@ function OverviewTab({
                   controls
                   className="h-full w-full min-h-0 flex-1 object-contain"
                   preload="metadata"
+                  onLoadedMetadata={(e) => {
+                    const d = e.currentTarget.duration;
+                    setVideoDurationMs(Number.isFinite(d) && d > 0 ? Math.round(d * 1000) : 0);
+                  }}
                   onTimeUpdate={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
+                  onSeeking={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
+                  onSeeked={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
                 />
               ) : snapshotSrc ? (
                 <img src={snapshotSrc} alt="Run browser preview" className="h-full w-full min-h-0 flex-1 object-contain" />
@@ -1232,17 +1584,6 @@ function OverviewTab({
         </Card>
 
         <div className="xl:col-span-2 h-full min-h-0 flex flex-col gap-3 overflow-hidden">
-          <Card className="shrink-0">
-            <CardContent className="p-3">
-              <div className="grid grid-cols-2 gap-2">
-                <MetricCard label="Duration" value={duration(run.started_at, run.completed_at) || "--"} mono />
-                <MetricCard label="Steps" value={String(steps.length)} sub={`${okCount} ok / ${failCount} fail`} />
-                <MetricCard label="Bugs" value={String(bugsFound.length)} variant={bugsFound.length > 0 ? "destructive" : undefined} />
-                <MetricCard label="LLM Cost" value={formatCost(totalCost)} mono />
-              </div>
-            </CardContent>
-          </Card>
-
           <Card className="min-h-0 flex-[1.05] flex flex-col overflow-hidden border-border/60 bg-card/90">
             <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-0">
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -1264,7 +1605,13 @@ function OverviewTab({
                     Progress
                   </button>
                 </div>
-                <div className="text-[11px] font-mono text-muted-foreground">{formatCost(totalCost)}</div>
+                <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
+                  <span>{duration(run.started_at, run.completed_at) || "--"}</span>
+                  <span className="text-border">·</span>
+                  <span>{steps.length} steps</span>
+                  <span className="text-border">·</span>
+                  <span>{formatCost(totalCost)}</span>
+                </div>
               </div>
 
               {rightTab === "plan" ? (
@@ -1279,86 +1626,68 @@ function OverviewTab({
                       <p className="text-[12px] text-muted-foreground">No plan captured for this run.</p>
                     ) : (
                       <ol className="m-0 list-none p-0">
-                        {agentPlan.map((item, idx) => (
-                          <PlanChecklistRow key={`${idx}-${item.text.slice(0, 96)}`} item={item} isLast={idx === agentPlan.length - 1} />
-                        ))}
+                        {agentPlan.map((item, idx) => {
+                          const replayStatus =
+                            run.status !== "running" && canReplay && replayCurrentPlanIndex != null
+                              ? (idx < replayCurrentPlanIndex
+                                  ? "done"
+                                  : idx === replayCurrentPlanIndex
+                                    ? "current"
+                                    : "pending")
+                              : item.status;
+                          return (
+                            <PlanChecklistRow
+                              key={`${idx}-${item.text.slice(0, 96)}`}
+                              item={{ ...item, status: replayStatus }}
+                              isLast={idx === agentPlan.length - 1}
+                            />
+                          );
+                        })}
                       </ol>
                     )}
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="mb-2 rounded border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                    {latestEntry?.type === "activity"
-                      ? `Observing ${latestEntry.activity.text}`
-                      : latestEntry?.type === "plan"
-                        ? `Plan refreshed (${latestEntry.items.length} steps)`
-                        : latestHumanized?.title ?? "Waiting for activity..."}
+                  {/* Latest activity status bar */}
+                  <div className="mb-3 flex items-start gap-2.5 rounded-md border border-border/70 bg-muted/35 px-3.5 py-2.5 shadow-sm">
+                    {run.status === "running" ? (
+                      <Spinner className="mt-0.5 h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                    ) : (
+                      <CheckCircle className="mt-0.5 h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="min-w-0 text-[13px] font-medium leading-snug text-foreground break-words space-y-1">
+                        <ReactMarkdown
+                          components={{
+                          p: ({ children }) => <p className="whitespace-pre-wrap break-words mb-1">{children}</p>,
+                          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                          em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
+                          code: ({ children }) => <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-[12px]">{children}</code>,
+                          ul: ({ children }) => <ul className="list-disc space-y-0.5 pl-4">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal space-y-0.5 pl-4">{children}</ol>,
+                          li: ({ children }) => <li className="leading-snug">{children}</li>,
+                          }}
+                        >
+                          {latestReasoningMarkdown}
+                        </ReactMarkdown>
+                      </div>
+                      {(run.status !== "running" || latestEntry?.type !== "activity") && (
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          Action: {displayActionLabel}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  {canReplay && (
-                    <div className="mb-2 flex items-center justify-between gap-2 rounded border border-border/60 bg-muted/10 px-2.5 py-2">
-                      <p className="text-[10px] text-muted-foreground">Replay with video time</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-6 px-2 text-[10px]"
-                        onClick={() => {
-                          const node = recordingVideoRef.current;
-                          if (!node) return;
-                          node.currentTime = 0;
-                          void node.play().catch(() => {});
-                          setPlaybackMs(0);
-                        }}
-                      >
-                        Replay from start
-                      </Button>
-                    </div>
-                  )}
-                  <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pr-1 pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
-                    <div className="space-y-1.5 pr-1">
-                      {activityNewestFirst.length === 0 && <p className="text-[12px] text-muted-foreground">No activity yet.</p>}
-                      {activityNewestFirst.map((entry, idx) => {
-                        const delay = Math.min(idx, 12) * 22;
-                        if (entry.type !== "step") {
-                          return (
-                            <div
-                              key={`${entry.type}-${entry.at}-${idx}`}
-                              className="rounded border border-border/40 px-2 py-1.5 text-[11px] text-muted-foreground/90 bg-card/30"
-                              style={{ animationDelay: `${delay}ms` }}
-                            >
-                              {entry.type === "activity" ? `Observe: ${entry.activity.text}` : `Plan update (${entry.items.length})`}
-                            </div>
-                          );
-                        }
-                        const h = humanizeRunStep(entry.step);
-                        const timelineMatch = stepTimeline.find((s) => s.index === entry.step.index);
-                        const isReplayCurrent = timelineMatch != null && replayCurrentIndex >= 0
-                          ? stepTimeline[replayCurrentIndex]?.index === timelineMatch.index
-                          : false;
-                        return (
-                          <div
-                            key={`step-${entry.step.index}-${entry.at}-${idx}`}
-                            className={cn(
-                              "text-[12px] rounded border border-border/50 px-2 py-1.5 bg-card/40 animate-slide-up transition-colors duration-200",
-                              isReplayCurrent && "border-primary/45 bg-primary/10",
-                            )}
-                            style={{ animationDelay: `${delay}ms` }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <h.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                              <p className="text-foreground">{h.title}</p>
-                              {timelineMatch && (
-                                <span className="ml-auto text-[10px] font-mono text-muted-foreground/70">
-                                  {formatMs(timelineMatch.relativeMs)}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground font-mono">{new Date(entry.at).toLocaleTimeString()}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
+
+
+                  <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
+                    <StepTimeline
+                      activityFeed={activityOldestFirst}
+                      stepTimeline={stepTimeline}
+                      replayCurrentIndex={replayCurrentIndex}
+                      replayActiveStepRef={replayActiveStepRef}
+                    />
                   </div>
                 </>
               )}

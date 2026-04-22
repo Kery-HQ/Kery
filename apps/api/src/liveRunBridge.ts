@@ -42,6 +42,7 @@ export function mergeDbRunWithLiveSnapshot(dbRun: Record<string, unknown>, live:
     llm_calls_json: live.llmCalls.length > 0 ? live.llmCalls : dbRun.llm_calls_json,
     live_snapshot: {
       agentPlan: live.agentPlan,
+      replayProgress: live.replayProgress,
       activity: live.activity,
       livePreview: live.livePreview,
       observability: live.observability,

@@ -78,22 +78,7 @@ const AUTH_MODES: readonly {
     setupHelp:
       "Provide your project URL, anon (or service) key, and a test user email and password. Kery signs in via Supabase Auth and attaches the returned JWT for the session.",
   },
-  {
-    value: "apiToken",
-    label: "API token (custom)",
-    subtitle: "Bring your own JSON config for headers or bearer tokens",
-    icon: Key,
-    setupHelp:
-      "Use the JSON below to describe how Kery should obtain or send a static API token or custom headers. Shape the config to match what your backend expects for authenticated requests.",
-  },
-  {
-    value: "oauthToken",
-    label: "OAuth token (custom)",
-    subtitle: "Client credentials or other OAuth flows in JSON",
-    icon: LockKey,
-    setupHelp:
-      "Paste a JSON config that defines token URL, client credentials, scopes, and how to read the access token. Kery uses it to fetch a fresh bearer token before runs when your API requires OAuth.",
-  },
+  // "apiToken" and "oauthToken" options hidden for now
 ];
 
 function AuthModeSelect({

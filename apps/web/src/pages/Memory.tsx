@@ -369,12 +369,6 @@ export const Memory: React.FC = () => {
                             {info.icon}
                             {info.label}
                           </Badge>
-                          <Badge variant={entry.source === "agent" ? "outline" : "neutral"}>
-                            {entry.source}
-                          </Badge>
-                          <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums">
-                            {entry.confidence}%
-                          </span>
                         </div>
                         <p className="text-[13px] font-medium text-foreground">{entry.summary}</p>
                         <p className="text-[12px] text-muted-foreground mt-0.5 whitespace-pre-wrap line-clamp-3">{entry.content}</p>
@@ -382,7 +376,13 @@ export const Memory: React.FC = () => {
                           <p className="text-[11px] text-muted-foreground/50 mt-1 italic">Region: {entry.region.description}</p>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
+                      <div className="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
+                        <Badge variant={entry.source === "agent" ? "outline" : "neutral"} className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          {entry.source}
+                        </Badge>
+                        <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums">
+                          {entry.confidence}%
+                        </span>
                         <button
                           onClick={() => openEdit(entry)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent text-muted-foreground/50 hover:text-foreground"

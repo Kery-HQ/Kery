@@ -172,6 +172,34 @@ export class PostgresAdapter implements StorageAdapter {
     await this.db.query(`UPDATE test_runs SET ${sets} WHERE id = $1`, [runId, ...values]);
   }
 
+  /**
+   * Incrementally append steps to steps_json (JSONB concat).
+   * Safe to call mid-run — COALESCE initializes if null.
+   */
+  async appendRunSteps(runId: string, steps: any[]): Promise<void> {
+    if (steps.length === 0) return;
+    await this.db.query(
+      `UPDATE test_runs
+          SET steps_json = COALESCE(steps_json, '[]'::jsonb) || $2::jsonb
+        WHERE id = $1`,
+      [runId, JSON.stringify(steps)],
+    );
+  }
+
+  /**
+   * Incrementally append LLM calls to llm_calls_json (JSONB concat).
+   * Safe to call mid-run — COALESCE initializes if null.
+   */
+  async appendRunLlmCalls(runId: string, calls: any[]): Promise<void> {
+    if (calls.length === 0) return;
+    await this.db.query(
+      `UPDATE test_runs
+          SET llm_calls_json = COALESCE(llm_calls_json, '[]'::jsonb) || $2::jsonb
+        WHERE id = $1`,
+      [runId, JSON.stringify(calls)],
+    );
+  }
+
   async createTestRun(data: Record<string, any>) {
     const keys = Object.keys(data);
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);

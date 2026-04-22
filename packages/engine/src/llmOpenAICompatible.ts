@@ -42,9 +42,9 @@ export async function openAIStyleChat(
     opts.signal ? { signal: opts.signal } : undefined
   );
 
-  const choice = completion.choices[0];
+  const choice = completion.choices?.[0];
   if (!choice) {
-    throw new Error(`LLM returned no choices: ${JSON.stringify(completion).slice(0, 200)}`);
+    throw new Error(`LLM returned no choices: ${JSON.stringify(completion).slice(0, 300)}`);
   }
 
   const fr = choice.finish_reason as string | null | undefined;
