@@ -67,6 +67,9 @@ export type RunResult = {
 
 export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): Promise<RunResult> {
   const config = getConfig();
+  const emitActivity = (text: string) => {
+    job.onActivity?.({ kind: "observe", text, at: Date.now() });
+  };
 
   // When running inside Docker, the browser cannot reach `localhost` — that resolves to the
   // container itself, not the host machine. Historically we rewrote URLs to
@@ -347,7 +350,6 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const holisticCalls: LLMCallRecord[] = [];
     let lastFrameDomHash: string | null = null;
     const filmstripFrames: FilmstripFrame[] = [];
-    const FILMSTRIP_MAX = 30;
     const screenshotsByStep = new Map<number, string>(); // Keyed by agent step.index
     let latestCleanScreenshot: string | undefined;
 
@@ -366,11 +368,11 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         if (cleanScreenshot.length > 0) {
           latestCleanScreenshot = cleanScreenshot.toString("base64");
           if (domHash !== lastFrameDomHash) {
+            // Collect all unique frames without dropping — capFilmstripFrames
+            // does stride-based subsampling at send time, preserving coverage
+            // across the full journey rather than losing early pages.
             filmstripFrames.push({ url, base64: latestCleanScreenshot });
             lastFrameDomHash = domHash;
-            while (filmstripFrames.length > FILMSTRIP_MAX) {
-              filmstripFrames.shift();
-            }
           }
         }
       },
@@ -384,14 +386,17 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     // Skip all post-agent review work if the run was stopped by the user — return immediately.
     const wasStopped = agentResult.failReason === "Stopped by user";
 
-    // Capture the final page state so holistic/filmstrip review sees the end result
+    // Capture the final page state for holistic review (uses clean screenshot from agent
+    // if available; raw fallback only goes to holistic, not filmstrip, since filmstrip
+    // already has clean coverage from the run and the final raw frame may have overlays).
+    let holisticFinalFrames = [...filmstripFrames];
     try {
       const finalSS = await page.screenshot({ type: "jpeg", quality: 70 }).catch(() => Buffer.alloc(0));
       if (finalSS.length > 0) {
         const finalB64 = finalSS.toString("base64");
         const finalUrl = page.url();
         if (finalB64 !== latestCleanScreenshot) {
-          filmstripFrames.push({ url: finalUrl, base64: finalB64 });
+          holisticFinalFrames = [...filmstripFrames, { url: finalUrl, base64: finalB64 }];
           latestCleanScreenshot = finalB64;
         }
       }
@@ -401,23 +406,30 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const netSummary = wasStopped ? undefined : (netMonitor.formatForAgent() || undefined);
     const netBugs = wasStopped ? [] : netMonitor.getBugs();
 
-    const { bugs: holisticBugs } = wasStopped ? { bugs: [] } : await runHolisticFlowReview(
-      {
-        intent: job.intent,
-        stepsDetail: agentResult.stepsDetail,
-        frames: filmstripFrames,
-        navigatorStatus: agentResult.status === "passed" ? "passed" : "failed",
-        networkSummary: netSummary,
-      },
-      {
-        onLLMCall: (call) => holisticCalls.push({ ...call, seq: 0 }),
-      },
-    );
-
     const filmstripCalls: LLMCallRecord[] = [];
-    const { bugs: filmstripBugs } = wasStopped ? { bugs: [] } : await runFilmstripReview(filmstripFrames, {
-      onLLMCall: (call) => filmstripCalls.push({ ...call, seq: 0 }),
-    });
+    const navigatorStatus = agentResult.status === "passed" ? "passed" : "failed";
+
+    emitActivity("Running post-run review agents...");
+    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = wasStopped
+      ? [{ bugs: [] }, { bugs: [] }]
+      : await Promise.all([
+          runHolisticFlowReview(
+            {
+              intent: job.intent,
+              stepsDetail: agentResult.stepsDetail,
+              frames: holisticFinalFrames,
+              navigatorStatus,
+              networkSummary: netSummary,
+            },
+            { onLLMCall: (call) => holisticCalls.push({ ...call, seq: 0 }) },
+          ),
+          runFilmstripReview(filmstripFrames, {
+            onLLMCall: (call) => filmstripCalls.push({ ...call, seq: 0 }),
+            intent: job.intent,
+            navigatorStatus,
+          }),
+        ]);
+    emitActivity("Post-run review complete.");
     let bugsFound = mergeBugs(
       agentResult.stepsDetail,
       [...holisticBugs, ...filmstripBugs],
@@ -451,6 +463,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       const openProjectBugs = job.projectId
         ? await storage.getOpenBugs(job.projectId, 100_000).catch(() => [])
         : [];
+      emitActivity("Running bug triage agent...");
       triageResult = await runBugTriageAgent(
         {
           bugs: bugsFound,
@@ -460,6 +473,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         },
         { onLLMCall: (call) => triageCalls.push({ ...call, seq: 0 }) },
       );
+      emitActivity("Bug triage complete.");
     }
     bugsFound = triageResult.bugs;
     if (triageResult.skippedCount > 0) {
@@ -474,6 +488,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       await boostConfidence(storage, allMemory.map((e) => e.id), 3);
     }
 
+    emitActivity("Running memory curator...");
     const { proposed: memoryProposed } = await curateMemoryAfterRun(storage, {
       intent: job.intent,
       runStatus: agentResult.status === "passed" ? "passed" : "failed",
@@ -486,6 +501,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         job.onLLMCall?.(call);
       },
     });
+    emitActivity("Memory curation complete.");
 
     const handoffHealCalls: LLMCallRecord[] = (job as any).__handoffHealCalls ?? [];
     const mergedCalls = mergeLLMCalls(
@@ -510,6 +526,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     // If the Navigator completed the flow successfully after a handoff, save a
     // fresh regression plan from the combined trace so the script is repaired.
     if (handoffCompleted.length > 0 && agentResult.status === "passed" && regressionSource) {
+      emitActivity("Regenerating replay script from repaired flow...");
       const { plan: freshPlan } = await generateScriptWithLLM(job.intent, combinedStepsDetail, job.onLLMCall);
       if (freshPlan.length > 0) {
         await storage.updateRegressionPlan(regressionSource.table, regressionSource.id, {
@@ -522,6 +539,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           "Regression: script regenerated from handoff+navigator combined trace",
         );
       }
+      emitActivity("Replay script regeneration complete.");
     }
 
     if (shSession) {

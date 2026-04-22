@@ -14,23 +14,26 @@ export type FilmstripFrame = { url: string; base64: string };
 const CHUNK_SIZE = 12;
 const MAX_FRAMES = 30;
 
-const FILMSTRIP_SYSTEM = `You are an expert QA agent reviewing an ORDERED sequence of screenshots from a single automated test run. Each image is the first view after navigating to a distinct URL (one frame per page).
+const FILMSTRIP_SYSTEM = `You are an expert QA agent reviewing an ORDERED sequence of screenshots from a single automated test run. Each image captures the page after a distinct visual state change during the test.
 
 IMPORTANT: Another AI drove the browser. Automation overlays (green markers, numbered circles) are NOT app bugs if visible — ignore them.
 
-YOUR JOB: Find issues that only make sense ACROSS the journey or when comparing pages:
-- Inconsistent typography, spacing, or component styling between routes (e.g. button sizes, header layout)
-- Navigation or IA that feels broken across steps (e.g. misleading breadcrumbs, dead-end flows)
-- Branding or layout regressions between pages (different nav height, logo treatment)
-- Data or state that should reset between pages but appears to leak incorrectly (when visible across frames)
-- Accessibility patterns that break only in multi-page context (e.g. focus order implied by flow)
+YOUR JOB — visual quality across the journey:
+- Broken or malformed components: overlapping elements, clipped text, images that failed to load, components that are clearly rendering incorrectly
+- Uneven or broken spacing and alignment: misaligned buttons, inconsistent padding, elements that are out of place relative to their surroundings
+- Inconsistent typography, spacing, or component styling between pages (e.g. button sizes differ across routes, header layout shifts)
+- Branding or layout regressions between pages (nav bar changes height, logo treatment differs, colour scheme inconsistent)
+- Navigation or information architecture that looks broken when comparing pages (misleading breadcrumbs, dead-end flows visible in screenshots)
+- State visible in screenshots that should have reset between pages but appears to carry over
 
-Do NOT report issues that are clearly about a single static frame only — the flow reviewer handles behavioral gaps from the trace.
-Do NOT blame the automation driver for wrong clicks.
+STRICT SCOPE — do NOT report these (other agents handle them):
+- Functional failures: clicks that did nothing, forms that did not submit, counts that did not update — you do not have the action trace; the flow reviewer does
+- Performance, network, or data correctness issues
+- Blame the automation driver for navigating incorrectly
 
-Return JSON: { "bugs": [ { "type": "visual"|"ux"|"behavioral"|"a11y"|"performance"|"data", "description": string (max 100 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
+Return JSON: { "bugs": [ { "type": "visual"|"ux", "description": string (max 120 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
-Be selective. 0 bugs is fine.
+Be selective — only report what you are confident is a cross-page inconsistency.
 If you include "region", coordinates MUST use a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.`;
 
 function chunkFrames(frames: FilmstripFrame[], size: number): FilmstripFrame[][] {
@@ -84,7 +87,7 @@ function parseFilmstripResponse(
       const b = list[i];
       const t = (b.type ?? "").trim();
       const type: ReviewBug["type"] =
-        t === "visual" || t === "ux" || t === "behavioral" || t === "a11y" || t === "performance" || t === "data"
+        t === "visual" || t === "ux"
           ? t
           : "visual";
       const severity = b.severity === "low" || b.severity === "medium" || b.severity === "high" ? b.severity : "medium";
@@ -114,15 +117,21 @@ function parseFilmstripResponse(
 async function analyzeChunk(
   chunk: FilmstripFrame[],
   chunkIndex: number,
+  intent: string | undefined,
+  navigatorStatus: "passed" | "failed" | undefined,
   onLLMCall?: (call: Omit<LLMCallRecord, "seq">) => void,
 ): Promise<ReviewBug[]> {
   const config = getConfig();
   const model = config.reviewAgentModel;
   const baseStepIndex = 50_000 + chunkIndex * 1_000;
 
+  const intentLine = intent
+    ? `Test goal: "${intent}" — Navigator finished: ${navigatorStatus ?? "unknown"}.\n`
+    : "";
   const textIntro =
+    intentLine +
     `Batch ${chunkIndex + 1}. Images are in visit order (earlier = earlier in the test). ` +
-    `URLs in order:\n${chunk.map((f, i) => `${i}. ${f.url}`).join("\n")}`;
+    `Pages in order (one screenshot per distinct visual state):\n${chunk.map((f, i) => `${i}. ${f.url}`).join("\n")}`;
 
   const content: any[] = [{ type: "text", text: textIntro }];
   for (const f of chunk) {
@@ -176,16 +185,20 @@ async function analyzeChunk(
 
 export async function runFilmstripReview(
   frames: FilmstripFrame[],
-  opts?: { onLLMCall?: (call: Omit<LLMCallRecord, "seq">) => void },
+  opts?: {
+    onLLMCall?: (call: Omit<LLMCallRecord, "seq">) => void;
+    intent?: string;
+    navigatorStatus?: "passed" | "failed";
+  },
 ): Promise<{ bugs: ReviewBug[] }> {
   const capped = capFilmstripFrames(frames);
   if (capped.length < 2) return { bugs: [] };
 
   const chunks = chunkFrames(capped, CHUNK_SIZE);
-  const allBugs: ReviewBug[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const chunkBugs = await analyzeChunk(chunks[i]!, i, opts?.onLLMCall);
-    allBugs.push(...chunkBugs);
-  }
-  return { bugs: allBugs };
+  const chunkResults = await Promise.all(
+    chunks.map((chunk, i) =>
+      analyzeChunk(chunk, i, opts?.intent, opts?.navigatorStatus, opts?.onLLMCall),
+    ),
+  );
+  return { bugs: chunkResults.flat() };
 }

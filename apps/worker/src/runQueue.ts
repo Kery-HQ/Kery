@@ -182,14 +182,34 @@ export function createRunWorker(
 
         let destRegPlan: any[] | null = null;
         if (data.destinationId && result.status === "passed" && result.stepsDetail?.length > 0) {
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Generating destination replay script...",
+            at: Date.now(),
+          });
           const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
           if (plan.length > 0) destRegPlan = plan;
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Destination replay script generation complete.",
+            at: Date.now(),
+          });
         }
 
         let testRegPlan: any[] | null = null;
         if (data.testId && result.status === "passed" && result.stepsDetail?.length > 0) {
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Generating saved-test replay script...",
+            at: Date.now(),
+          });
           const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
           if (plan.length > 0) testRegPlan = plan;
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Saved-test replay script generation complete.",
+            at: Date.now(),
+          });
         }
 
         const allLLMCalls = [...result.llmCalls, ...scriptLLMCalls].map((c, i) => ({ ...c, seq: i + 1 }));

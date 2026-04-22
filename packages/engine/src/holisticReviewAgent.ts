@@ -30,18 +30,25 @@ KEY ANALYSIS PATTERN:
 - Check the final screenshot carefully: does it match the expected end state for the intent?
 - Cross-reference element lists (e.g. buttons saying "Add to cart" vs "Remove") with the Navigator's claims about what was accomplished.
 
-YOUR JOB — find REAL application defects in FUNCTION, BEHAVIOR, NAVIGATION, or INTENT GAPS:
+YOUR JOB — find REAL application defects in FUNCTION, BEHAVIOR, or INTENT:
 - Silent failures: actions reported ok but domChanged=NO, repeated clicks on same control, or counts/state not updating
 - Intent not met: e.g. user asked to add N items but element state or cart count shows fewer were actually added
 - State inconsistency: Navigator claims success but elements/screenshots contradict it
-- Do NOT report pure pixel/layout issues unless tied to a functional problem (a separate Visual agent handles cross-page visuals)
+- Data correctness: wrong values shown, state that persists when it should have cleared
+- Performance or accessibility issues that are revealed by the action trace
+
+STRICT SCOPE — do NOT report these (other agents handle them):
+- Pure visual/layout inconsistencies across pages (different button sizes between routes, header height shifts, branding differences) — a dedicated filmstrip agent reviews all screenshots specifically for cross-page visual consistency
+- Single-frame pixel issues unrelated to a functional failure
+- Anything the automation driver did wrong (wrong click, wrong element)
 
 Rules:
 - Automation overlays (green circles, numbered markers) are NOT bugs.
 - The Navigator can hallucinate. Trust domChanged flags and element state over Navigator reasoning.
+- A visual difference is only worth reporting here if it is directly caused by a functional failure (e.g. an error state that should not be visible, a missing success message).
 
 Return JSON only:
-{ "bugs": [ { "type": "visual"|"ux"|"behavioral"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
+{ "bugs": [ { "type": "behavioral"|"ux"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
 Use frameIndex to tie a bug to the screenshot that best shows the issue.
 If you include "region", coordinates MUST be on a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.`;
@@ -110,7 +117,7 @@ function parseHolisticResponse(
       const b = list[i];
       const t = (b.type ?? "").trim();
       const type: ReviewBug["type"] =
-        t === "visual" || t === "ux" || t === "behavioral" || t === "a11y" || t === "performance" || t === "data"
+        t === "behavioral" || t === "ux" || t === "a11y" || t === "performance" || t === "data"
           ? t
           : "behavioral";
       const severity = b.severity === "low" || b.severity === "medium" || b.severity === "high" ? b.severity : "medium";

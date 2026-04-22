@@ -868,7 +868,13 @@ export const RunDetail: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="llm" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
-            <LLMTab runId={run.id} llmCalls={llmCalls} totalCost={totalCost} />
+            <LLMTab
+              runId={run.id}
+              llmCalls={llmCalls}
+              totalCost={totalCost}
+              runStatus={run.status}
+              activityFeed={activityFeed}
+            />
           </TabsContent>
 
           <TabsContent value="memory" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
@@ -1660,13 +1666,13 @@ function OverviewTab({
                       <div className="min-w-0 text-[13px] font-medium leading-snug text-foreground break-words space-y-1">
                         <ReactMarkdown
                           components={{
-                          p: ({ children }) => <p className="whitespace-pre-wrap break-words mb-1">{children}</p>,
-                          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-                          em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
-                          code: ({ children }) => <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-[12px]">{children}</code>,
-                          ul: ({ children }) => <ul className="list-disc space-y-0.5 pl-4">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal space-y-0.5 pl-4">{children}</ol>,
-                          li: ({ children }) => <li className="leading-snug">{children}</li>,
+                            p: ({ children }) => <p className="whitespace-pre-wrap break-words mb-1">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                            em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
+                            code: ({ children }) => <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-[12px]">{children}</code>,
+                            ul: ({ children }) => <ul className="list-disc space-y-0.5 pl-4">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal space-y-0.5 pl-4">{children}</ol>,
+                            li: ({ children }) => <li className="leading-snug">{children}</li>,
                           }}
                         >
                           {latestReasoningMarkdown}
@@ -1967,7 +1973,19 @@ function BugCard({
 // LLM Calls tab
 // ============================================================
 
-function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCallRecord[]; totalCost: number }) {
+function LLMTab({
+  runId,
+  llmCalls,
+  totalCost,
+  runStatus,
+  activityFeed,
+}: {
+  runId: string;
+  llmCalls: LLMCallRecord[];
+  totalCost: number;
+  runStatus: string;
+  activityFeed: ActivityEntry[];
+}) {
   const [agentFilter, setAgentFilter] = React.useState<LLMAgentType | "all">("all");
   const [selectedCall, setSelectedCall] = React.useState<LLMCallRecord | null>(null);
 
@@ -2007,6 +2025,13 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
   }, [llmCalls]);
 
   const agentsWithCalls = LLM_TAB_AGENT_ORDER.filter((a) => (agentCounts[a] ?? 0) > 0);
+  const latestActivityText = React.useMemo(() => {
+    for (let i = activityFeed.length - 1; i >= 0; i -= 1) {
+      const item = activityFeed[i];
+      if (item.type === "activity" && item.activity?.text) return item.activity.text;
+    }
+    return null;
+  }, [activityFeed]);
 
   return (
     <div className="px-6 py-5 max-w-5xl w-full mx-auto space-y-4 animate-fade-in">
@@ -2018,6 +2043,14 @@ function LLMTab({ runId, llmCalls, totalCost }: { runId: string; llmCalls: LLMCa
         <MetricCard label="Tokens In" value={totalInput.toLocaleString()} mono />
         <MetricCard label="Tokens Out" value={totalOutput.toLocaleString()} mono />
       </div>
+      {runStatus === "running" && latestActivityText && (
+        <Card className="border-border/60 bg-muted/20">
+          <CardContent className="px-3 py-2 flex items-center gap-2">
+            <Spinner className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+            <p className="text-[11px] text-foreground/90 truncate">{latestActivityText}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {llmCalls.length === 0 ? (
         <EmptyState
