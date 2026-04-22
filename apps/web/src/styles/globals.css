@@ -271,57 +271,6 @@
     }
   }
 
-  /* Blurred wallpaper + fine grain (run preview desk + inner letterbox) */
-  .run-preview-wallpaper-blur-wrap {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-  }
-
-  .run-preview-wallpaper-blurred {
-    position: absolute;
-    left: -2%;
-    top: -2%;
-    width: 104%;
-    height: 104%;
-    background-size: cover;
-    background-position: center;
-    transform: translateZ(0);
-    filter: blur(6px) saturate(1.04) contrast(1.02);
-  }
-
-  /* Coarse + fine fractal noise for visible film grain */
-  .run-preview-wallpaper-grain {
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    opacity: 0.28;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 192px 192px;
-  }
-
-  .run-preview-wallpaper-grain::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    opacity: 0.55;
-    mix-blend-mode: soft-light;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
-    background-size: 88px 88px;
-  }
-
-  .dark .run-preview-wallpaper-grain {
-    opacity: 0.2;
-    mix-blend-mode: soft-light;
-  }
-
-  .dark .run-preview-wallpaper-grain::after {
-    opacity: 0.45;
-    mix-blend-mode: overlay;
-  }
-
   /* First live screenshot: macOS-style window open */
   @keyframes run-preview-window-open {
     from {
@@ -339,11 +288,31 @@
     transform-origin: 50% 45%;
   }
 
+  @keyframes plan-progress-glow {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .plan-progress-glow {
+    animation: plan-progress-glow 1.8s ease-in-out infinite;
+  }
+
+  .plan-current-underline {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: color-mix(in oklch, var(--primary) 52%, transparent);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .run-preview-window-open-anim {
       animation: none;
       opacity: 1;
       transform: none;
+    }
+    .plan-progress-glow,
+    .plan-current-underline {
+      animation: none;
     }
   }
 }

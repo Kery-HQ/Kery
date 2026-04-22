@@ -41,6 +41,7 @@ export type RunLiveBridge = {
   forwardAgentPlan: (items: AgentPlanItem[]) => Promise<void>;
   forwardActivity: (activity: { kind: "observe"; text: string; at: number }) => Promise<void>;
   forwardLlmCall: (call: unknown) => Promise<void>;
+  forwardReplayProgress: (stepIndex: number | null, planIndex: number | null, at?: number) => Promise<void>;
   forwardScreenshot: (buf: Buffer) => Promise<void>;
   patchObservability: (patch: Record<string, unknown>) => Promise<void>;
   /** Publish the final "done" event so SSE clients in the API process terminate cleanly. */
@@ -121,6 +122,13 @@ export function createRunLiveBridge(options: {
       return enqueuePersist(async () => {
         await persistSnapshot({ type: "llm_call", call });
         await publish({ type: "llm_call", call });
+      });
+    },
+
+    forwardReplayProgress(stepIndex, planIndex, at = Date.now()) {
+      return enqueuePersist(async () => {
+        await persistSnapshot({ type: "replay_progress", stepIndex, planIndex, at });
+        await publish({ type: "replay_progress", stepIndex, planIndex, at });
       });
     },
 

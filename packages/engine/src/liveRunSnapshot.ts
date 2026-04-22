@@ -22,6 +22,7 @@ export interface LiveRunSnapshot {
   steps: unknown[];
   llmCalls: unknown[];
   agentPlan: { items: AgentPlanItem[]; at: number } | null;
+  replayProgress: { stepIndex: number | null; planIndex: number | null; at: number } | null;
   activity: LiveActivityEntry[];
   /** Latest throttled live preview frame on disk (under SCREENSHOTS_DIR/<runId>/). */
   livePreview: { filename: string; updatedAt: number } | null;
@@ -45,6 +46,7 @@ export function emptyLiveRunSnapshot(): LiveRunSnapshot {
     steps: [],
     llmCalls: [],
     agentPlan: null,
+    replayProgress: null,
     activity: [],
     livePreview: null,
   };
@@ -56,6 +58,7 @@ export type LiveRunReduceEvent =
   | { type: "plan"; items: AgentPlanItem[]; at: number }
   | { type: "activity"; activity: { kind: "observe"; text: string; at: number } }
   | { type: "llm_call"; call: unknown }
+  | { type: "replay_progress"; stepIndex: number | null; planIndex: number | null; at: number }
   | { type: "live_preview"; filename: string; at: number }
   | { type: "observability_patch"; patch: Record<string, unknown> };
 
@@ -92,6 +95,12 @@ export function applyLiveRunEvent(state: LiveRunSnapshot, event: LiveRunReduceEv
     case "llm_call": {
       return { ...state, llmCalls: [...state.llmCalls, event.call] };
     }
+    case "replay_progress": {
+      return {
+        ...state,
+        replayProgress: { stepIndex: event.stepIndex, planIndex: event.planIndex, at: event.at },
+      };
+    }
     case "live_preview": {
       return {
         ...state,
@@ -119,6 +128,7 @@ export function parseLiveRunSnapshot(raw: string | null | undefined): LiveRunSna
       steps: v.steps,
       llmCalls: v.llmCalls,
       agentPlan: v.agentPlan ?? null,
+      replayProgress: v.replayProgress ?? null,
       activity: v.activity as LiveActivityEntry[],
       livePreview: v.livePreview ?? null,
       observability: v.observability && typeof v.observability === "object" ? v.observability : undefined,

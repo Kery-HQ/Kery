@@ -566,7 +566,20 @@ RULES:
 - Keep one clear goal: satisfy the Intent exactly and do not wander to unrelated flows.
 - Before calling done, ALWAYS verify final state with at least one observe action and confirm expected evidence (counts, labels, destination page state).
 
-IMPORTANT: Reply with EXACTLY ONE JSON object. Do NOT output multiple actions — only the single next action to take.`;
+OUTPUT FORMAT — CRITICAL:
+Your entire response MUST be a single valid JSON object and nothing else.
+No markdown code fences (\`\`\`), no prose, no explanation before or after — just the raw JSON object.
+Required fields: "action" (one of the action names above) and "reasoning" (brief explanation).
+All other fields are optional and should be omitted if not applicable.
+
+EXAMPLE — correct:
+{"action":"click","element":3,"reasoning":"Click the Login button to submit credentials"}
+
+EXAMPLE — WRONG (do NOT do this):
+\`\`\`json
+{"action":"click","element":3,"reasoning":"..."}
+\`\`\`
+(No code fences, no prose, raw JSON only.)`;
 }
 
 // ─── Observation builder ──────────────────────────────────────────────────────
@@ -961,15 +974,36 @@ async function decideNextAction(params: {
 }): Promise<AgentAction> {
   pruneConversation(params.messages);
 
+  // Inject a reminder as the very last user message part so the model sees it immediately before replying.
+  const JSON_FORMAT_REMINDER =
+    "REMINDER: Reply with exactly one raw JSON object — no markdown fences, no prose, just the JSON.";
+
   for (let attempt = 0; attempt < 3; attempt++) {
-    let callMessages = params.messages;
-    if (attempt > 0) {
-      callMessages = params.messages.map((m, idx) => {
-        if (idx === params.messages.length - 1 && m.role === "user" && Array.isArray(m.content)) {
-          return { ...m, content: m.content.filter((p: any) => p.type !== "image_url") };
-        }
-        return m;
-      });
+    // Build call messages: optionally strip images on retry, and append reminder
+    let callMessages = params.messages.map((m, idx) => {
+      if (attempt > 0 && idx === params.messages.length - 1 && m.role === "user" && Array.isArray(m.content)) {
+        return { ...m, content: m.content.filter((p: any) => p.type !== "image_url") };
+      }
+      return m;
+    });
+
+    // Append reminder to the last user message
+    const lastMsg = callMessages[callMessages.length - 1];
+    if (lastMsg?.role === "user") {
+      if (typeof lastMsg.content === "string") {
+        callMessages = [
+          ...callMessages.slice(0, -1),
+          { ...lastMsg, content: lastMsg.content + "\n\n" + JSON_FORMAT_REMINDER },
+        ];
+      } else if (Array.isArray(lastMsg.content)) {
+        callMessages = [
+          ...callMessages.slice(0, -1),
+          {
+            ...lastMsg,
+            content: [...lastMsg.content, { type: "text", text: JSON_FORMAT_REMINDER }],
+          },
+        ];
+      }
     }
 
     if (attempt === 2) await new Promise(r => setTimeout(r, 2000));
@@ -1376,26 +1410,91 @@ export async function handleAuth(
     return { ok: true, llmCalls: [] };
   }
 
-  if (!auth.loginUrl || !auth.credentials) return { ok: false, llmCalls: [] };
+  if (!auth.credentials) return { ok: false, llmCalls: [] };
+  const authStartUrl = auth.loginUrl || baseUrl || page.url();
 
-  logger.info({ url: auth.loginUrl }, "Authenticating");
-  await page.goto(auth.loginUrl, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+  logger.info({ url: authStartUrl }, "Authenticating");
+  if (page.url() !== authStartUrl) {
+    await page.goto(authStartUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+  }
 
-  if (auth.selectors) {
-    const ok = await trySelectorsAuth(page, auth);
+  const selectorOverrides = normalizeSelectorOverrides(auth.selectors);
+  const shouldAutoDetectSelectors = auth.autoDetectSelectors !== false;
+  const selectors = selectorOverrides ?? (shouldAutoDetectSelectors ? await detectLoginSelectors(page) : null);
+  if (selectors) {
+    const ok = await trySelectorsAuth(page, selectors, auth, authStartUrl);
     if (ok) {
       logger.info({ url: page.url() }, "Auth complete (selectors)");
       return { ok: true, llmCalls: [] };
     }
-    logger.info({ url: auth.loginUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
+    logger.info({ url: authStartUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
   }
 
-  return await tryAgentAuthViaRunAgent(page, auth, context, baseUrl, onLLMCall);
+  return await tryAgentAuthViaRunAgent(page, auth, context, baseUrl, authStartUrl, onLLMCall);
 }
 
-async function trySelectorsAuth(page: Page, auth: AuthConfig): Promise<boolean> {
-  const { usernameField, passwordField, submitButton } = auth.selectors!;
+function normalizeSelectorOverrides(selectors: AuthConfig["selectors"] | undefined):
+  { usernameField?: string; passwordField?: string; submitButton?: string } | null {
+  if (!selectors) return null;
+  const normalized = {
+    usernameField: selectors.usernameField?.trim() || undefined,
+    passwordField: selectors.passwordField?.trim() || undefined,
+    submitButton: selectors.submitButton?.trim() || undefined,
+  };
+  return normalized.usernameField || normalized.passwordField || normalized.submitButton ? normalized : null;
+}
+
+async function detectLoginSelectors(page: Page): Promise<{ usernameField?: string; passwordField?: string; submitButton?: string } | null> {
+  try {
+    const detected = await page.evaluate(() => {
+      function isVisible(el: Element | null): el is HTMLElement {
+        if (!el || !(el instanceof HTMLElement)) return false;
+        const style = getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }
+      function cssPath(el: Element): string {
+        if ((el as HTMLElement).id) return `#${CSS.escape((el as HTMLElement).id)}`;
+        const tag = el.tagName.toLowerCase();
+        const name = el.getAttribute("name");
+        if (name) return `${tag}[name="${CSS.escape(name)}"]`;
+        return tag;
+      }
+
+      const usernameCandidate = document.querySelector(
+        'input[type="email"], input[name*="email" i], input[autocomplete="username"], input[name*="user" i], input[type="text"]'
+      );
+      const passwordCandidate = document.querySelector(
+        'input[type="password"], input[name*="password" i], input[autocomplete="current-password"]'
+      );
+      const submitCandidate = document.querySelector(
+        'button[type="submit"], input[type="submit"], button[name*="login" i], button[id*="login" i], button[aria-label*="sign in" i], button'
+      );
+
+      const usernameField = isVisible(usernameCandidate) ? cssPath(usernameCandidate) : undefined;
+      const passwordField = isVisible(passwordCandidate) ? cssPath(passwordCandidate) : undefined;
+      const submitButton = isVisible(submitCandidate) ? cssPath(submitCandidate) : undefined;
+      return { usernameField, passwordField, submitButton };
+    });
+
+    if (!detected.passwordField) return null;
+    logger.info({ detected }, "Auth: auto-detected selectors");
+    return detected;
+  } catch (err) {
+    logger.warn({ err: String(err).split("\n")[0] }, "Auth: selector auto-detection failed");
+    return null;
+  }
+}
+
+async function trySelectorsAuth(
+  page: Page,
+  selectors: { usernameField?: string; passwordField?: string; submitButton?: string },
+  auth: AuthConfig,
+  authStartUrl: string,
+): Promise<boolean> {
+  const { usernameField, passwordField, submitButton } = selectors;
   const { username, password } = auth.credentials!;
 
   if (usernameField && username) {
@@ -1421,13 +1520,20 @@ async function trySelectorsAuth(page: Page, auth: AuthConfig): Promise<boolean> 
       logger.warn({ selector: "submitButton", err: String(err).split("\n")[0] }, "Auth: submit selector failed");
       return false;
     }
+  } else if (passwordField) {
+    await page.locator(passwordField).first().press("Enter").catch(() => {});
   }
 
-  await page.waitForURL(url => url.href !== auth.loginUrl!, { timeout: 15000 }).catch(() => {});
+  await page.waitForURL(url => url.href !== authStartUrl, { timeout: 15000 }).catch(() => {});
   await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
   const finalUrl = page.url();
-  return finalUrl !== auth.loginUrl!;
+  if (finalUrl !== authStartUrl) return true;
+  if (passwordField) {
+    const passwordStillVisible = await page.locator(passwordField).first().isVisible().catch(() => false);
+    return !passwordStillVisible;
+  }
+  return false;
 }
 
 /** Full Navigator pipeline for login when CSS selectors fail or are wrong. */
@@ -1436,6 +1542,7 @@ async function tryAgentAuthViaRunAgent(
   auth: AuthConfig,
   context: string | undefined,
   baseUrl: string | undefined,
+  authStartUrl: string,
   onLLMCall?: (call: LLMCallRecord) => void,
 ): Promise<AuthHandleResult> {
   const { username, password } = auth.credentials!;
@@ -1461,7 +1568,7 @@ async function tryAgentAuthViaRunAgent(
     undefined,
   );
 
-  const success = page.url() !== auth.loginUrl!;
+  const success = page.url() !== authStartUrl;
   logger.info({ success, url: page.url(), status: result.status }, "Agent auth (full runAgent) complete");
   return { ok: success, llmCalls: result.llmCalls };
 }

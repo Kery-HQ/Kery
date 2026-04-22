@@ -87,6 +87,37 @@ export function createRunWorker(
 
       const stopPoller = startRunStopPoller(redis, data.runId);
 
+      // Buffers for incremental Postgres persistence every INCREMENTAL_FLUSH_EVERY items.
+      // Declared outside try/catch so catch block can flush remaining items on error.
+      const INCREMENTAL_FLUSH_EVERY = 10;
+      const stepBuffer: any[] = [];
+      const llmCallBuffer: any[] = [];
+      const activityBuffer: any[] = [];
+      let latestAgentPlan: Array<{ text: string; status: "pending" | "done" | "current" | "failed" }> = [];
+
+      const planCurrentIndex = (
+        items: Array<{ text: string; status: "pending" | "done" | "current" | "failed" }>,
+      ): number | null => {
+        const idx = items.findIndex((i) => i.status === "current");
+        return idx >= 0 ? idx : null;
+      };
+
+      const flushSteps = async () => {
+        if (stepBuffer.length === 0) return;
+        const batch = stepBuffer.splice(0, stepBuffer.length);
+        await storage.appendRunSteps(data.runId, batch).catch((err: unknown) => {
+          logger.warn({ err, runId: data.runId }, "Incremental step flush failed");
+        });
+      };
+
+      const flushLlmCalls = async () => {
+        if (llmCallBuffer.length === 0) return;
+        const batch = llmCallBuffer.splice(0, llmCallBuffer.length);
+        await storage.appendRunLlmCalls(data.runId, batch).catch((err: unknown) => {
+          logger.warn({ err, runId: data.runId }, "Incremental LLM call flush failed");
+        });
+      };
+
       try {
         await storage.updateTestRun(data.runId, {
           status: "running",
@@ -106,12 +137,35 @@ export function createRunWorker(
           maxSteps: data.maxSteps,
           recordVideo: data.recordVideo,
           videosDir: VIDEOS_DIR,
-          onStep: (step: any) => void live.forwardStep(step),
-          onAgentPlan: (items: Array<{ text: string; status: "pending" | "done" | "current" | "failed" }>) =>
-            void live.forwardAgentPlan(items),
-          onActivity: (activity: { kind: "observe"; text: string; at: number }) => void live.forwardActivity(activity),
+          onStep: (step: any) => {
+            void live.forwardStep(step);
+            const at = typeof step?.at === "number" ? step.at : Date.now();
+            activityBuffer.push({ type: "step", at, step });
+            void live.forwardReplayProgress(typeof step?.index === "number" ? step.index : null, planCurrentIndex(latestAgentPlan), at);
+            stepBuffer.push(step);
+            if (stepBuffer.length >= INCREMENTAL_FLUSH_EVERY) void flushSteps();
+          },
+          onAgentPlan: (items: Array<{ text: string; status: "pending" | "done" | "current" | "failed" }>) => {
+            latestAgentPlan = Array.isArray(items) ? items : [];
+            const at = Date.now();
+            activityBuffer.push({ type: "plan", at, items: latestAgentPlan });
+            void live.forwardAgentPlan(latestAgentPlan);
+            void live.forwardReplayProgress(null, planCurrentIndex(latestAgentPlan), at);
+          },
+          onActivity: (activity: { kind: "observe"; text: string; at: number }) => {
+            activityBuffer.push({
+              type: "activity",
+              at: typeof activity?.at === "number" ? activity.at : Date.now(),
+              activity,
+            });
+            void live.forwardActivity(activity);
+          },
           onScreenshot: (buf: Buffer) => void live.forwardScreenshot(buf),
-          onLLMCall: (call: any) => void live.forwardLlmCall(call),
+          onLLMCall: (call: any) => {
+            void live.forwardLlmCall(call);
+            llmCallBuffer.push(call);
+            if (llmCallBuffer.length >= INCREMENTAL_FLUSH_EVERY) void flushLlmCalls();
+          },
           shouldStop: () => stopPoller.shouldStop() || isStopRequested(data.runId),
         };
         const result = await runOrchestratedJob(storage, runJob);
@@ -128,14 +182,34 @@ export function createRunWorker(
 
         let destRegPlan: any[] | null = null;
         if (data.destinationId && result.status === "passed" && result.stepsDetail?.length > 0) {
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Generating destination replay script...",
+            at: Date.now(),
+          });
           const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
           if (plan.length > 0) destRegPlan = plan;
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Destination replay script generation complete.",
+            at: Date.now(),
+          });
         }
 
         let testRegPlan: any[] | null = null;
         if (data.testId && result.status === "passed" && result.stepsDetail?.length > 0) {
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Generating saved-test replay script...",
+            at: Date.now(),
+          });
           const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
           if (plan.length > 0) testRegPlan = plan;
+          void live.forwardActivity({
+            kind: "observe",
+            text: "Saved-test replay script generation complete.",
+            at: Date.now(),
+          });
         }
 
         const allLLMCalls = [...result.llmCalls, ...scriptLLMCalls].map((c, i) => ({ ...c, seq: i + 1 }));
@@ -149,8 +223,11 @@ export function createRunWorker(
           await tx.updateTestRun(data.runId, {
             status: result.status, summary: null,
             steps_json: result.stepsDetail, bugs_json: enrichedBugs,
+            activity_json: activityBuffer,
+            agent_plan_json: latestAgentPlan,
             llm_calls_json: allLLMCalls, completed_at: completedAt,
             video_url: result.videoUrl || null,
+            recording_started_at: result.recordingStartedAt ?? null,
             cost_usd: costUsd,
           });
 
@@ -187,6 +264,9 @@ export function createRunWorker(
         emitter.emit("done", completedRun ?? { runId: data.runId, status: result.status, summary: null });
       } catch (err) {
         logger.error({ runId: data.runId, err: String(err) }, "Run job error");
+        // Flush any buffered steps/LLM calls accumulated before the crash so data isn't lost
+        await flushSteps().catch(() => {});
+        await flushLlmCalls().catch(() => {});
         await storage.updateTestRun(data.runId, {
           status: "failed", summary: String(err), completed_at: new Date().toISOString(),
         });
@@ -200,11 +280,31 @@ export function createRunWorker(
         destroyEmitter(data.runId);
       }
     },
-    { connection, concurrency },
+    {
+      connection,
+      concurrency,
+      removeOnComplete: { count: 100 },
+      removeOnFail: { count: 500 }, // keep last 500 failed jobs for post-mortem debugging
+    },
   );
 
   worker.on("failed", (job, err) => {
-    logger.error({ jobId: job?.id, runId: job?.data?.runId, err: String(err) }, "BullMQ job failed");
+    const runId = job?.data?.runId;
+    logger.error({ jobId: job?.id, runId, err: String(err) }, "BullMQ job failed");
+    // Best-effort: mark the run as failed in Postgres if it wasn't already marked above
+    if (runId) {
+      storage.getTestRun(runId)
+        .then((run) => {
+          if (run && run.status === "running") {
+            return storage.updateTestRun(runId, {
+              status: "failed",
+              summary: `Worker crash: ${String(err).slice(0, 300)}`,
+              completed_at: new Date().toISOString(),
+            });
+          }
+        })
+        .catch((e) => logger.warn({ runId, err: String(e) }, "BullMQ failed handler: DB update failed"));
+    }
   });
 
   return worker;

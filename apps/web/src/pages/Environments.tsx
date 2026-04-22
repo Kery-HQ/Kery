@@ -17,6 +17,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -77,22 +78,7 @@ const AUTH_MODES: readonly {
     setupHelp:
       "Provide your project URL, anon (or service) key, and a test user email and password. Kery signs in via Supabase Auth and attaches the returned JWT for the session.",
   },
-  {
-    value: "apiToken",
-    label: "API token (custom)",
-    subtitle: "Bring your own JSON config for headers or bearer tokens",
-    icon: Key,
-    setupHelp:
-      "Use the JSON below to describe how Kery should obtain or send a static API token or custom headers. Shape the config to match what your backend expects for authenticated requests.",
-  },
-  {
-    value: "oauthToken",
-    label: "OAuth token (custom)",
-    subtitle: "Client credentials or other OAuth flows in JSON",
-    icon: LockKey,
-    setupHelp:
-      "Paste a JSON config that defines token URL, client credentials, scopes, and how to read the access token. Kery uses it to fetch a fresh bearer token before runs when your API requires OAuth.",
-  },
+  // "apiToken" and "oauthToken" options hidden for now
 ];
 
 function AuthModeSelect({
@@ -202,6 +188,8 @@ function AuthModeField({
 }
 
 type UiAuthForm = {
+  autoDetectLogin: boolean;
+  autoDetectSelectors: boolean;
   loginUrl: string;
   usernameField: string;
   passwordField: string;
@@ -211,10 +199,12 @@ type UiAuthForm = {
 };
 
 const DEFAULT_UI_FORM: UiAuthForm = {
+  autoDetectLogin: true,
+  autoDetectSelectors: true,
   loginUrl: "",
-  usernameField: "#email",
-  passwordField: "#password",
-  submitButton: "button[type=submit]",
+  usernameField: "",
+  passwordField: "",
+  submitButton: "",
   username: "",
   password: "",
 };
@@ -236,11 +226,14 @@ const DEFAULT_TOKEN_FORM: TokenProviderForm = {
 function uiFormFromConfig(config: Record<string, any>): UiAuthForm {
   const s = config?.selectors ?? {};
   const c = config?.credentials ?? {};
+  const hasSelectorOverride = !!(s.usernameField || s.passwordField || s.submitButton);
   return {
+    autoDetectLogin: config?.autoDetectLogin ?? !config?.loginUrl,
+    autoDetectSelectors: config?.autoDetectSelectors ?? !hasSelectorOverride,
     loginUrl: config?.loginUrl ?? "",
-    usernameField: s.usernameField ?? DEFAULT_UI_FORM.usernameField,
-    passwordField: s.passwordField ?? DEFAULT_UI_FORM.passwordField,
-    submitButton: s.submitButton ?? DEFAULT_UI_FORM.submitButton,
+    usernameField: s.usernameField ?? "",
+    passwordField: s.passwordField ?? "",
+    submitButton: s.submitButton ?? "",
     username: c.username ?? "",
     password: c.password ?? "",
   };
@@ -248,7 +241,9 @@ function uiFormFromConfig(config: Record<string, any>): UiAuthForm {
 
 function configFromUiForm(f: UiAuthForm): Record<string, any> {
   return {
-    loginUrl: f.loginUrl.trim() || undefined,
+    autoDetectLogin: f.autoDetectLogin,
+    autoDetectSelectors: f.autoDetectSelectors,
+    loginUrl: f.autoDetectLogin ? undefined : f.loginUrl.trim() || undefined,
     selectors: {
       usernameField: f.usernameField.trim() || undefined,
       passwordField: f.passwordField.trim() || undefined,
@@ -673,6 +668,36 @@ export const Environments: React.FC = () => {
 
                         {authMode === "ui" && (
                           <div className="space-y-3">
+                            <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[12px] font-medium text-foreground">Auto-detect login page</p>
+                                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                                    Start from the environment base URL and let Kery find the login route.
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={uiForm.autoDetectLogin}
+                                  onCheckedChange={(checked) => setUiForm((f) => ({ ...f, autoDetectLogin: checked }))}
+                                  aria-label="Auto-detect login page"
+                                />
+                              </div>
+                            </div>
+                            <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[12px] font-medium text-foreground">Auto-detect selectors</p>
+                                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                                    Kery tries to detect username, password, and submit controls automatically.
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={uiForm.autoDetectSelectors}
+                                  onCheckedChange={(checked) => setUiForm((f) => ({ ...f, autoDetectSelectors: checked }))}
+                                  aria-label="Auto-detect selectors"
+                                />
+                              </div>
+                            </div>
                             <div>
                               <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Login URL</label>
                               <Input
@@ -681,7 +706,13 @@ export const Environments: React.FC = () => {
                                 value={uiForm.loginUrl}
                                 onChange={(e) => setUiForm((f) => ({ ...f, loginUrl: e.target.value }))}
                                 className="font-mono text-[12px]"
+                                disabled={uiForm.autoDetectLogin}
                               />
+                              {uiForm.autoDetectLogin && (
+                                <p className="mt-1 text-[10px] text-muted-foreground/70">
+                                  Optional when auto-detect is enabled.
+                                </p>
+                              )}
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                               <div>
@@ -712,6 +743,9 @@ export const Environments: React.FC = () => {
                                 />
                               </div>
                             </div>
+                            <p className="text-[10px] text-muted-foreground/70">
+                              Selector fields are optional overrides; leave blank to rely on auto-detection.
+                            </p>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Username</label>

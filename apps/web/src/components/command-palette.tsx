@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   SquaresFour,
   Stack,
-  Flask,
+  FlowArrow,
   Pulse,
   Warning,
   Globe,
@@ -22,13 +22,13 @@ import { runListLabel } from "@/lib/formatters";
 
 const NAV_ITEMS = [
   { name: "Overview", href: "/overview", icon: SquaresFour },
-  { name: "Pages", href: "/pages", icon: Stack },
-  { name: "Flows", href: "/tests", icon: Flask },
+  { name: "Routes", href: "/pages", icon: Stack },
+  { name: "Flows", href: "/tests", icon: FlowArrow },
   { name: "Runs", href: "/runs", icon: Pulse },
   { name: "Issues", href: "/bugs", icon: Warning },
   { name: "Environments", href: "/environments", icon: Globe },
   { name: "Memory", href: "/memory", icon: Brain },
-  { name: "Settings", href: "/settings", icon: Gear },
+  { name: "Platform Settings", href: "/settings", icon: Gear },
 ];
 
 interface CommandPaletteProps {
@@ -162,7 +162,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       }}
                       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
                     >
-                      <Flask className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <FlowArrow className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="min-w-0 truncate">{t.name}</span>
                     </Command.Item>
                   ))}
@@ -195,7 +195,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             {currentProjectId && entities && entities.pages.length > 0 && (
               <>
                 <Command.Separator className="my-1.5 h-px bg-border" />
-                <Command.Group heading="Pages" className="[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
+                <Command.Group heading="Routes" className="[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
                   {entities.pages.map((p) => (
                     <Command.Item
                       key={p.id}
@@ -204,7 +204,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
                     >
                       <Stack className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">{p.title || p.route || "Page"}</span>
+                      <span className="min-w-0 flex-1 truncate">{p.title || p.route || "Route"}</span>
                       <span className="font-mono text-[11px] text-muted-foreground/60 flex-shrink-0 max-w-[40%] truncate">
                         {p.route}
                       </span>
@@ -226,12 +226,12 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 Run ad-hoc test
               </Command.Item>
               <Command.Item
-                value="Scan pages"
+                value="Scan routes"
                 onSelect={() => go("/pages")}
                 className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
               >
                 <Scan className="h-4 w-4 text-muted-foreground" />
-                Scan pages
+                Scan routes
               </Command.Item>
               <Command.Item
                 value="Create test flow"
