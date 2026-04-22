@@ -9,6 +9,7 @@ import { logger } from "./logger.js";
 import type { RunStep, LLMCallRecord } from "./agent.js";
 import { waitForPageStable } from "./agent.js";
 import { healWithMicroAgent } from "./regressionHeal.js";
+import type { AuthConfig } from "./types.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,8 @@ export type RegressionLiveHooks = {
   onStep?: (step: RunStep) => void;
   onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer, domHash: string) => void;
   onHealCall?: (call: LLMCallRecord) => void;
+  /** Auth config forwarded to the heal agent so it can re-login mid-recovery. */
+  auth?: AuthConfig | null;
 };
 
 const REPLAYABLE_ACTIONS = new Set([
@@ -442,6 +445,7 @@ export async function executeRegressionPlan(
           result.healCalls.push(call);
           hooks.onHealCall?.(call);
         },
+        hooks.auth,
       );
 
       if (healResult.resumeFromStepIndex > i) {

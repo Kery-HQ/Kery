@@ -17,6 +17,7 @@ import type { MemoryEntry } from "./agentMemory.js";
 import { formatMemoryForPrompt } from "./agentMemory.js";
 import { llmAgentChat, calcCostUsd } from "./llmClient.js";
 import { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText, type A11yElement, type A11yTextNode } from "./a11yTree.js";
+import { drawGridOnScreenshot } from "./gridScan.js";
 import { handleTokenAuth, refreshIfNeeded } from "./tokenAuth.js";
 import {
   stagehandObserve, formatObserveForLLM, hasSufficientObserve,
@@ -29,7 +30,8 @@ export type DoneResult = "completed" | "blocked";
 export type AgentAction = {
   action: "fill" | "click" | "navigate" | "assert" | "wait" | "done"
     | "hover" | "scroll" | "pressKey" | "selectOption" | "back"
-    | "dragAndDrop" | "setDate" | "observe" | "plan" | "report_bug";
+    | "dragAndDrop" | "setDate" | "observe" | "plan" | "report_bug"
+    | "login" | "gridScan";
   element?: number;
   target?: string;
   value?: string;
@@ -556,11 +558,14 @@ ACTIONS:
 - observe: request a fresh snapshot without interacting. Use this to verify state before deciding next step. Example: {"action":"observe","reasoning":"Verify cart count updated after add-to-cart clicks"}
 - plan: create/update a checklist to track progress. Example: {"action":"plan","planItems":[{"text":"Add item 1","status":"done"},{"text":"Add item 2","status":"current"},{"text":"Verify cart count","status":"pending"}],"reasoning":"Track multi-step flow"}
 - report_bug: log an in-memory bug for this run. Example: {"action":"report_bug","bugDescription":"Third Add to cart click has no effect","bugType":"functional","severity":"high","reasoning":"Button stays Add to cart and cart count does not change"}
+- login: re-authenticate using the configured credentials (e.g. after an accidental logout). Example: {"action":"login","reasoning":"Page returned to login screen after drag caused a navigation"}
+- gridScan: overlay a 0-1000 coordinate grid on the current page screenshot and return it as a new observation, so you can read exact x/y values before using dragAndDrop or other coordinate actions. Example: {"action":"gridScan","reasoning":"Need to identify precise drag source and destination coordinates"}
 
 RULES:
 - Don't fill fields that already have the correct value (check the "value" shown in the element list).
 - A disabled element cannot be interacted with \u2014 change something first.
-- Auth in conversation history = already logged in, skip re-login.
+- Auth in conversation history = already logged in, skip re-login unless you see a login page or an "unauthorized" indicator.
+- If you accidentally land on a login screen mid-run, use the login action to re-authenticate rather than trying to fill credentials manually.
 - If on wrong page, use navigate to go directly to the target URL.
 - When the observation mentions DOM stagnation or loop warnings, reason about whether the app is broken vs. a different strategy is needed; call done with result "blocked" if the app is genuinely non-responsive.
 - Keep one clear goal: satisfy the Intent exactly and do not wander to unrelated flows.
@@ -1683,6 +1688,9 @@ export async function runAgent(
     const agentBugTracker: RunStep[] = [];
     let agentPlan: AgentPlanItem[] = [];
     let consecutiveMetaActions = 0;
+    /** Guard against the agent spamming re-auth mid-run. */
+    let authAttempts = 0;
+    const MAX_AUTH_ATTEMPTS = 2;
     const messages: any[] = [
       { role: "system", content: baseSystemPrompt },
     ];
@@ -1933,6 +1941,47 @@ export async function runAgent(
         continue;
       }
 
+      if (action.action === "login") {
+        consecutiveMetaActions++;
+        logger.info({ authAttempts, MAX_AUTH_ATTEMPTS }, "Navigator: login meta-action");
+        if (authAttempts >= MAX_AUTH_ATTEMPTS) {
+          logger.warn({ authAttempts }, "Navigator: login attempt cap reached; skipping re-auth");
+          messages.push({ role: "user", content: "Re-login was already attempted the maximum number of times. Continue with current session or call done with result \"blocked\"." });
+        } else if (!auth) {
+          messages.push({ role: "user", content: "No auth configuration is available for this run; cannot re-login." });
+        } else {
+          authAttempts++;
+          const reAuthResult = await handleAuth(page, auth, context, baseUrl, handleLLMCall);
+          logger.info({ ok: reAuthResult.ok, authAttempts }, "Navigator: re-auth result");
+          const msg = reAuthResult.ok
+            ? "Re-login succeeded. Continue with the intent."
+            : "Re-login failed. Try an alternative approach or call done with result \"blocked\".";
+          messages.push({ role: "user", content: msg });
+        }
+        prevResult = undefined;
+        continue;
+      }
+
+      if (action.action === "gridScan") {
+        consecutiveMetaActions++;
+        logger.info({ consecutiveMetaActions }, "Navigator: gridScan meta-action");
+        const raw = await page.screenshot({ type: "jpeg", quality: 85 }).catch(() => Buffer.alloc(0));
+        if (raw.length > 0) {
+          const gridded = await drawGridOnScreenshot(raw).catch(() => raw);
+          messages.push({
+            role: "user",
+            content: [
+              { type: "text", text: "Coordinate grid overlay (0-1000 scale). Read x/y values directly from the grid labels, then use them in your next action." },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${gridded.toString("base64")}` } },
+            ],
+          });
+        } else {
+          messages.push({ role: "user", content: "gridScan: could not capture screenshot." });
+        }
+        prevResult = undefined;
+        continue;
+      }
+
       if (action.action === "observe" || action.action === "plan" || action.action === "report_bug") {
         consecutiveMetaActions++;
         logger.info(
@@ -1946,7 +1995,7 @@ export async function runAgent(
           );
           messages.push({
             role: "user",
-            content: "Too many consecutive meta-actions (observe/plan/report_bug). Take a concrete page action or call done.",
+            content: "Too many consecutive meta-actions (observe/plan/report_bug/login/gridScan). Take a concrete page action or call done.",
           });
           prevResult = undefined;
           continue;
@@ -2074,6 +2123,17 @@ export async function runAgent(
                   await locator.click({ timeout: 3000 });
                   await page.getByText(action.value!, { exact: false }).first().click({ timeout: 3000 });
                 });
+              } else if (action.action === "dragAndDrop" && action.toX != null && action.toY != null) {
+                const bbox = await locator.boundingBox();
+                const src = bbox
+                  ? { px: bbox.x + bbox.width / 2, py: bbox.y + bbox.height / 2 }
+                  : toPixel(action.x ?? 500, action.y ?? 500);
+                const dst = toPixel(action.toX, action.toY);
+                await page.mouse.move(src.px, src.py);
+                await page.mouse.down();
+                await page.mouse.move(dst.px, dst.py, { steps: 10 });
+                await page.mouse.up();
+                await waitForPageStable(page, 3000);
               } else {
                 await executeAction(page, action);
               }
@@ -2107,7 +2167,7 @@ export async function runAgent(
             // resolveElement returned null (element has no W3C-accessible name) but we
             // have a bbox from extraction time. Use the bbox center as coordinates so
             // click/fill still work without modifying the action object.
-            if (resolvedA11yEl.bbox && (action.action === "click" || action.action === "fill")) {
+            if (resolvedA11yEl.bbox && (action.action === "click" || action.action === "fill" || action.action === "dragAndDrop")) {
               const { x: bx, y: by, width: bw, height: bh } = resolvedA11yEl.bbox;
               const cx = ((bx + bw / 2) / VIEWPORT_W) * 1000;
               const cy = ((by + bh / 2) / VIEWPORT_H) * 1000;
@@ -2118,6 +2178,8 @@ export async function runAgent(
               stepExecutionMethod = "coordinates";
               if (action.action === "fill" && action.value !== undefined) {
                 await fillAtCoordinates(page, cx, cy, action.value);
+              } else if (action.action === "dragAndDrop" && action.toX != null && action.toY != null) {
+                await executeAction(page, { ...action, x: cx, y: cy });
               } else {
                 await clickAtCoordinates(page, cx, cy);
                 await waitForPageStable(page, 4000);

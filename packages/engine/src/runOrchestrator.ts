@@ -256,6 +256,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           onHealCall: (call) => {
             job.onLLMCall?.(call);
           },
+          auth: job.auth ?? null,
         });
 
         if (regResult.status === "passed" || regResult.status === "failed") {

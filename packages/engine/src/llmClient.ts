@@ -66,6 +66,8 @@ const ACTION_ENUM = [
   "observe",
   "plan",
   "report_bug",
+  "login",
+  "gridScan",
 ];
 
 function isOpenAIModel(model: string): boolean {

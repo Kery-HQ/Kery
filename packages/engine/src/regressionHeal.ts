@@ -20,8 +20,10 @@ import {
   injectElementMarkers, removeElementMarkers, resolveElement,
 } from "./a11yTree.js";
 import type { A11yElement } from "./a11yTree.js";
-import { waitForPageStable, executeAction, serializeWireMessagesForStorage } from "./agent.js";
+import { waitForPageStable, executeAction, serializeWireMessagesForStorage, handleAuth } from "./agent.js";
 import type { LLMCallRecord, RunStep } from "./agent.js";
+import type { AuthConfig } from "./types.js";
+import { drawGridOnScreenshot } from "./gridScan.js";
 import type { RegressionStep } from "./regressionEngine.js";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -46,7 +48,7 @@ const HEAL_SCHEMA = {
       properties: {
         action: {
           type: "string",
-          enum: ["click", "fill", "navigate", "selectOption", "pressKey", "scroll", "hover", "back", "dragAndDrop", "setDate", "wait", "done", "give_up"],
+          enum: ["click", "fill", "navigate", "selectOption", "pressKey", "scroll", "hover", "back", "dragAndDrop", "setDate", "wait", "done", "give_up", "login", "gridScan"],
         },
         element:        { anyOf: [{ type: "integer" }, { type: "null" }] },
         target:         { anyOf: [{ type: "string" }, { type: "null" }] },
@@ -103,7 +105,9 @@ If the page is broken or you cannot make progress after trying alternatives, res
 If you see a confirmation dialog or alert, accept it using the appropriate action.
 
 For actions: use element index from the list, or target (text label), or x/y coordinates (0–1000 scale).
-Available actions: click, fill, navigate, selectOption, pressKey, scroll, hover, back, dragAndDrop, setDate, wait.`;
+Available actions: click, fill, navigate, selectOption, pressKey, scroll, hover, back, dragAndDrop, setDate, wait.
+- login: re-authenticate using the configured credentials if the page shows a login screen.
+- gridScan: overlay a 0-1000 coordinate grid on the page screenshot so you can read precise x/y values before using dragAndDrop or other coordinate actions.`;
 }
 
 function buildObservation(url: string, dom: string, actionResult?: string, consecutiveErrors?: number): string {
@@ -224,10 +228,13 @@ export async function healWithMicroAgent(
   completedSteps: RunStep[],
   onScreenshot?: (screenshot: Buffer, cleanScreenshot: Buffer, domHash: string) => void,
   onHealCall?: (call: LLMCallRecord) => void,
+  auth?: AuthConfig | null,
 ): Promise<HealResult> {
   const config = getConfig();
   const model = config.agentModel;
   const llmCalls: LLMCallRecord[] = [];
+  let authAttempts = 0;
+  const MAX_AUTH_ATTEMPTS = 2;
 
   logger.info(
     { failedIndex, action: plan[failedIndex]?.action, name: plan[failedIndex]?.name },
@@ -351,6 +358,39 @@ export async function healWithMicroAgent(
           : failedIndex + 1;
         logger.info({ turn, resumeFromStepIndex: resume }, "Heal agent: done, resuming regression");
         return { resumeFromStepIndex: resume, llmCalls };
+      }
+
+      if (parsed.action === "login") {
+        logger.info({ turn, authAttempts }, "Heal agent: login meta-action");
+        if (authAttempts >= MAX_AUTH_ATTEMPTS) {
+          lastActionResult = "Re-login cap reached; continuing with current session.";
+        } else if (!auth) {
+          lastActionResult = "No auth configuration available for this run.";
+        } else {
+          authAttempts++;
+          const reAuthResult = await handleAuth(page, auth);
+          lastActionResult = reAuthResult.ok ? "Re-login succeeded." : "Re-login failed.";
+          logger.info({ ok: reAuthResult.ok, authAttempts }, "Heal agent: re-auth result");
+        }
+        continue;
+      }
+
+      if (parsed.action === "gridScan") {
+        logger.info({ turn }, "Heal agent: gridScan meta-action");
+        const raw = await page.screenshot({ type: "jpeg", quality: 85 }).catch(() => Buffer.alloc(0));
+        if (raw.length > 0) {
+          const gridded = await drawGridOnScreenshot(raw).catch(() => raw);
+          messages.push({
+            role: "user",
+            content: [
+              { type: "text", text: "Coordinate grid overlay (0-1000 scale). Read x/y values directly from the grid labels, then use them in your next action." },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${gridded.toString("base64")}` } },
+            ],
+          });
+        } else {
+          lastActionResult = "gridScan: could not capture screenshot.";
+        }
+        continue;
       }
 
       // Execute — mirror the Navigator: resolve element index → locator first,
