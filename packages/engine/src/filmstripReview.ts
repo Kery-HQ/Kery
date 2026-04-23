@@ -8,6 +8,7 @@ import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 import type { LLMCallRecord } from "./agent.js";
 import { serializeWireMessagesForStorage } from "./agent.js";
 import type { ReviewBug } from "./types.js";
+import { drawGridOnScreenshot } from "./gridScan.js";
 
 export type FilmstripFrame = { url: string; base64: string };
 
@@ -34,7 +35,8 @@ STRICT SCOPE — do NOT report these (other agents handle them):
 Return JSON: { "bugs": [ { "type": "visual"|"ux", "description": string (max 120 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
 Be selective — only report what you are confident is a cross-page inconsistency.
-If you include "region", coordinates MUST use a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.`;
+If you include "region", coordinates MUST use a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.
+Screenshots have a faint 0-1000 coordinate grid overlay — read axis labels along the top and left edges to produce precise "region" values.`;
 
 function chunkFrames(frames: FilmstripFrame[], size: number): FilmstripFrame[][] {
   const out: FilmstripFrame[][] = [];
@@ -133,12 +135,26 @@ async function analyzeChunk(
     `Batch ${chunkIndex + 1}. Images are in visit order (earlier = earlier in the test). ` +
     `Pages in order (one screenshot per distinct visual state):\n${chunk.map((f, i) => `${i}. ${f.url}`).join("\n")}`;
 
+  // Grid the images for LLM input so it can read precise coordinates.
+  // The clean originals in `chunk` are kept for bug screenshotBase64 storage.
+  const griddedBase64s = await Promise.all(
+    chunk.map(async (f) => {
+      if (!f.base64) return f.base64;
+      try {
+        const buf = await drawGridOnScreenshot(Buffer.from(f.base64, "base64"));
+        return buf.toString("base64");
+      } catch {
+        return f.base64;
+      }
+    }),
+  );
+
   const content: any[] = [{ type: "text", text: textIntro }];
-  for (const f of chunk) {
+  for (const b64 of griddedBase64s) {
     content.push({
       type: "image_url",
       image_url: {
-        url: `data:image/jpeg;base64,${f.base64}`,
+        url: `data:image/jpeg;base64,${b64}`,
         detail: "auto",
       },
     });

@@ -9,6 +9,7 @@ import type { LLMCallRecord, RunStep } from "./agent.js";
 import { serializeWireMessagesForStorage } from "./agent.js";
 import type { ReviewBug } from "./types.js";
 import type { FilmstripFrame } from "./filmstripReview.js";
+import { drawGridOnScreenshot } from "./gridScan.js";
 
 const MAX_FRAMES = 8;
 const BASE_STEP_INDEX = 60_000;
@@ -51,7 +52,8 @@ Return JSON only:
 { "bugs": [ { "type": "behavioral"|"ux"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
 Use frameIndex to tie a bug to the screenshot that best shows the issue.
-If you include "region", coordinates MUST be on a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.`;
+If you include "region", coordinates MUST be on a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.
+Screenshots have a faint 0-1000 coordinate grid overlay — read axis labels along the top and left edges to produce precise "region" values.`;
 
 function buildTrace(stepsDetail: RunStep[]): string {
   const lines: string[] = [];
@@ -173,12 +175,26 @@ export async function runHolisticFlowReview(
       ? `Screenshots below show the page after each distinct DOM state change (in order). The LAST screenshot (#${frames.length - 1}) is the final page state when the run ended.\n${frames.map((f, i) => `${i}. ${f.url}`).join("\n")}`
       : "No page screenshots available — rely on the trace only.");
 
+  // Build gridded versions for the LLM so it can read precise coordinates.
+  // The clean originals in `frames` are kept for bug screenshotBase64 storage.
+  const griddedBase64s = await Promise.all(
+    frames.map(async (f) => {
+      if (!f.base64) return f.base64;
+      try {
+        const buf = await drawGridOnScreenshot(Buffer.from(f.base64, "base64"));
+        return buf.toString("base64");
+      } catch {
+        return f.base64;
+      }
+    }),
+  );
+
   const userParts: unknown[] = [{ type: "text", text: textIntro }];
-  for (const f of frames) {
+  for (const b64 of griddedBase64s) {
     userParts.push({
       type: "image_url",
       image_url: {
-        url: `data:image/jpeg;base64,${f.base64}`,
+        url: `data:image/jpeg;base64,${b64}`,
         detail: "auto",
       },
     });
