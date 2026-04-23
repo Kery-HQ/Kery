@@ -406,407 +406,354 @@ export function Pages() {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-fade-in">
-          <div className="grid grid-cols-1 gap-4">
-            <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {coverage && coverage.total > 0 && (
-                <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
-                  <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
-                  <div className="mt-2 flex items-center gap-3">
-                    <div
-                      className="relative h-14 w-14 rounded-full"
-                      style={{
-                        background: `conic-gradient(
-                          rgb(16 185 129) 0 ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg,
-                          rgb(245 158 11) ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg,
-                          rgb(251 146 60) ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg,
-                          rgb(148 163 184 / 0.35) ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg 360deg
-                        )`,
-                      }}
-                    >
-                      <div className="absolute inset-2 rounded-full bg-card flex items-center justify-center">
-                        <span className="text-[10px] font-semibold tabular-nums text-foreground">
-                          {coverage.tested}/{coverage.total}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="space-y-0.5 text-[11px] text-muted-foreground">
-                      <p>{coverage.clean} clean</p>
-                      <p>{coverage.withIssues} issues</p>
-                      <p>{coverage.stale} stale</p>
+        <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
+          {/* ── KPI stat cards ─────────────────────────────────────── */}
+          <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {coverage && coverage.total > 0 && (
+              <div className="glass-card-flat card-stagger px-3 py-3">
+                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div
+                    className="relative h-14 w-14 rounded-full shrink-0"
+                    style={{
+                      background: `conic-gradient(
+                        rgb(16 185 129) 0 ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg,
+                        rgb(245 158 11) ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg,
+                        rgb(251 146 60) ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg,
+                        rgb(148 163 184 / 0.35) ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg 360deg
+                      )`,
+                    }}
+                  >
+                    <div className="absolute inset-2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                      <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                        {coverage.tested}/{coverage.total}
+                      </span>
                     </div>
                   </div>
+                  <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                    <p>{coverage.clean} clean</p>
+                    <p>{coverage.withIssues} issues</p>
+                    <p>{coverage.stale} stale</p>
+                  </div>
                 </div>
-              )}
-              {/* Issues Found */}
-              <div className={cn(
-                "rounded-lg border bg-card px-3 py-3",
-                totalIssuesFound > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-border/60",
+              </div>
+            )}
+
+            <div className="glass-card-flat card-stagger px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Issues Found</p>
+              <p className={cn(
+                "mt-2 text-[26px] font-semibold tabular-nums",
+                totalIssuesFound > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground",
               )}>
-                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Issues Found</p>
-                <p className={cn(
-                  "mt-2 text-[26px] font-semibold tabular-nums",
-                  totalIssuesFound > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-                )}>
-                  {pages.length === 0 ? "—" : totalIssuesFound}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {totalIssuesFound === 0
-                    ? "No bugs detected"
-                    : `Across ${issuesPageCount} route${issuesPageCount !== 1 ? "s" : ""}`}
-                </p>
-              </div>
+                {pages.length === 0 ? "—" : totalIssuesFound}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {totalIssuesFound === 0
+                  ? "No bugs detected"
+                  : `Across ${issuesPageCount} route${issuesPageCount !== 1 ? "s" : ""}`}
+              </p>
+            </div>
 
-              {/* Needs Attention */}
-              <div className={cn(
-                "rounded-lg border bg-card px-3 py-3",
-                needsAttentionCount > 0 ? "border-orange-400/30 bg-orange-400/5" : "border-border/60",
+            <div className="glass-card-flat card-stagger px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Needs Attention</p>
+              <p className={cn(
+                "mt-2 text-[26px] font-semibold tabular-nums",
+                needsAttentionCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
               )}>
-                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Needs Attention</p>
-                <p className={cn(
-                  "mt-2 text-[26px] font-semibold tabular-nums",
-                  needsAttentionCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
-                )}>
-                  {pages.length === 0 ? "—" : needsAttentionCount}
-                </p>
+                {pages.length === 0 ? "—" : needsAttentionCount}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {needsAttentionCount === 0
+                  ? "All routes are clean"
+                  : "Routes with issues or stale results"}
+              </p>
+            </div>
+
+            <div className="glass-card-flat card-stagger px-3 py-3">
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Last Scan</p>
+              <p className="mt-2 text-[26px] font-semibold tabular-nums text-foreground">
+                {lastScan?.pages_visited ?? (pages.length > 0 ? pages.length : "—")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {lastScan?.completed_at
+                  ? `Routes · ${relativeTime(lastScan.completed_at)}`
+                  : "Never scanned"}
+              </p>
+            </div>
+          </aside>
+
+          {/* ── Main content ────────────────────────────────────────── */}
+          <main className="space-y-3">
+            {scanActive && bannerRun && (
+              <ScanBanner run={bannerRun} live={scanActive} />
+            )}
+
+            {scanActive && canForceReplaceScan && (
+              <div className="liquid-glass rounded-xl px-3 py-2.5">
                 <p className="text-[11px] text-muted-foreground">
-                  {needsAttentionCount === 0
-                    ? "All routes are clean"
-                    : "Routes with issues or stale results"}
+                  No progress? Use{" "}
+                  <span className="font-medium text-foreground">Replace stuck scan</span> in the header
+                  to abort this run and start a new one.
                 </p>
               </div>
+            )}
 
-              {/* Last Scan */}
-              <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
-                <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Last Scan</p>
-                <p className="mt-2 text-[26px] font-semibold tabular-nums text-foreground">
-                  {lastScan?.pages_visited ?? (pages.length > 0 ? pages.length : "—")}
+            {rateLimited && (
+              <div className="liquid-glass rounded-xl border-amber-500/30 p-3 flex items-center justify-between">
+                <p className="text-[12px] text-muted-foreground">
+                  A scan ran in the last hour. Run again anyway?
                 </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {lastScan?.completed_at
-                    ? `Routes · ${relativeTime(lastScan.completed_at)}`
-                    : "Never scanned"}
-                </p>
+                <Button size="sm" variant="outline" onClick={() => handleScan(true)} className="h-7 text-[11px]">
+                  Scan anyway
+                </Button>
               </div>
-            </aside>
+            )}
 
-            <main className="space-y-3">
-              {/* Scan banner — only while running */}
-              {scanActive && bannerRun && (
-                <ScanBanner run={bannerRun} live={scanActive} />
-              )}
-
-              {/* Replace stuck notice */}
-              {scanActive && canForceReplaceScan && (
-                <div className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
-                  <p className="text-[11px] text-muted-foreground">
-                    No progress? Use{" "}
-                    <span className="font-medium text-foreground">Replace stuck scan</span> in the header
-                    to abort this run and start a new one.
-                  </p>
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : pages.length === 0 ? (
+              <EmptyState
+                icon={<Stack className="h-8 w-8" />}
+                title="No routes discovered yet"
+                description="Click 'Scan my app' to discover app routes, forms, and interactions."
+                action={
+                  environments.length === 0
+                    ? { label: "Add environment first", onClick: () => navigate("/environments") }
+                    : undefined
+                }
+              />
+            ) : (
+              <>
+                {/* Filter + health tabs */}
+                <div className="liquid-glass rounded-xl p-3 space-y-3">
+                  <div className="relative w-full">
+                    <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+                    <Input
+                      value={filter}
+                      onChange={e => setFilter(e.target.value)}
+                      placeholder="Filter routes..."
+                      className="pl-8"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {HEALTH_FILTERS.map(h => (
+                      <Button
+                        key={h}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setHealthFilter(h)}
+                        className={cn(
+                          "h-7 px-2.5 text-[11px] capitalize",
+                          healthFilter === h
+                            ? "bg-foreground/8 dark:bg-white/10 text-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {HEALTH_LABEL[h]}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-              {/* Rate limit notice */}
-              {rateLimited && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex items-center justify-between">
-                  <p className="text-[12px] text-muted-foreground">
-                    A scan ran in the last hour. Run again anyway?
-                  </p>
-                  <Button size="sm" variant="outline" onClick={() => handleScan(true)} className="h-7 text-[11px]">
-                    Scan anyway
-                  </Button>
-                </div>
-              )}
-
-              {loading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : pages.length === 0 ? (
-                <EmptyState
-                  icon={<Stack className="h-8 w-8" />}
-                  title="No routes discovered yet"
-                  description="Click 'Scan my app' to discover app routes, forms, and interactions."
-                  action={
-                    environments.length === 0
-                      ? { label: "Add environment first", onClick: () => navigate("/environments") }
-                      : undefined
-                  }
-                />
-              ) : (
-                <>
-                  <div className="rounded-lg border border-border/60 bg-card p-3 space-y-3">
-                    <div className="relative w-full">
-                      <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-                      <Input
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                        placeholder="Filter routes..."
-                        className="pl-8"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {HEALTH_FILTERS.map(h => (
+                {/* Enabled route tiles */}
+                {enabledFilteredPages.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                        Enabled routes ({enabledFilteredPages.length})
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {environments.length > 0 && (
+                          <Select
+                            value={defaultEnvId ?? ""}
+                            onChange={(e) => setSelectedEnvId(e.target.value)}
+                            className="w-[170px] h-8 text-[12px]"
+                          >
+                            {environments.map((env) => (
+                              <option key={env.id} value={env.id}>{env.name}</option>
+                            ))}
+                          </Select>
+                        )}
                         <Button
-                          key={h}
+                          type="button"
                           size="sm"
-                          variant="ghost"
-                          onClick={() => setHealthFilter(h)}
-                          className={cn(
-                            "h-7 px-2.5 text-[11px] capitalize",
-                            healthFilter === h
-                              ? "bg-accent text-foreground"
-                              : "text-muted-foreground"
-                          )}
+                          disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
+                          loading={testAllBusy}
+                          onClick={() => void handleTestAll()}
+                          className="gap-1.5 h-8"
                         >
-                          {HEALTH_LABEL[h]}
+                          {!testAllBusy && <Play className="h-3.5 w-3.5" />}
+                          Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
                         </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleScan()}
+                          loading={scanActive && !canForceReplaceScan}
+                          className="h-8"
+                        >
+                          {!(scanActive && !canForceReplaceScan) && <ArrowsClockwise className="h-3.5 w-3.5" />}
+                          {scanActive ? (canForceReplaceScan ? "Replace scan" : "Scanning...") : "Scan app"}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                      {enabledFilteredPages.map((page, i) => (
+                        <div
+                          key={page.id}
+                          className="glass-card-flat card-stagger p-3 flex flex-col gap-2 min-h-[8rem]"
+                          style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <Link
+                              to={`/pages/${page.id}`}
+                              className="min-w-0 flex-1 space-y-1"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <StatusDot status={page.health} />
+                                <span className="font-mono text-[13px] font-medium text-foreground truncate">
+                                  {page.route}
+                                </span>
+                              </div>
+                              {page.title && page.title !== page.route && (
+                                <p className="text-[11px] text-muted-foreground/60 truncate">
+                                  {page.title}
+                                </p>
+                              )}
+                            </Link>
+                            <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
+                              <Switch
+                                checked={page.enabled}
+                                onCheckedChange={v => { void handleToggleEnabled(page, v); }}
+                                aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
+                                className="scale-90"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
+                            <span className={cn(
+                              "font-medium tabular-nums",
+                              page.issues > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/60",
+                            )}>
+                              {page.issues} issue{page.issues !== 1 ? "s" : ""}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={e => { e.preventDefault(); navigate(`/pages/${page.id}`); }}
+                              >
+                                View
+                              </Button>
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                disabled={!defaultEnvId}
+                                loading={runBusyId === page.id}
+                                onClick={e => { e.preventDefault(); void handleRunPage(page); }}
+                                aria-label={`Run test for ${page.route}`}
+                              >
+                                {runBusyId !== page.id && <Play className="h-3.5 w-3.5" />}
+                              </Button>
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={e => { e.preventDefault(); setDeleteTarget(page); }}
+                                aria-label={`Remove ${page.route} from project`}
+                              >
+                                <Trash className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Enabled route tiles */}
-                  {enabledFilteredPages.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                          Enabled routes ({enabledFilteredPages.length})
-                        </p>
-                        <div className="flex items-center gap-2">
-                          {environments.length > 0 && (
-                            <Select
-                              value={defaultEnvId ?? ""}
-                              onChange={(e) => setSelectedEnvId(e.target.value)}
-                              className="w-[170px] h-8 text-[12px]"
+                {/* Disabled route tiles */}
+                {disabledFilteredPages.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                      Disabled routes ({disabledFilteredPages.length})
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                      {disabledFilteredPages.map((page, i) => (
+                        <div
+                          key={page.id}
+                          className="glass-card-flat card-stagger p-3 flex flex-col gap-2 min-h-[8rem] opacity-50"
+                          style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <Link
+                              to={`/pages/${page.id}`}
+                              className="min-w-0 flex-1 space-y-1"
                             >
-                              {environments.map((env) => (
-                                <option key={env.id} value={env.id}>{env.name}</option>
-                              ))}
-                            </Select>
-                          )}
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={!defaultEnvId || enabledPageCount === 0 || testAllBusy}
-                            loading={testAllBusy}
-                            onClick={() => void handleTestAll()}
-                            className="gap-1.5 h-8"
-                          >
-                            {!testAllBusy && <Play className="h-3.5 w-3.5" />}
-                            Test all{enabledPageCount > 0 ? ` (${enabledPageCount})` : ""}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleScan()}
-                            loading={scanActive && !canForceReplaceScan}
-                            className="h-8"
-                          >
-                            {!(scanActive && !canForceReplaceScan) && <ArrowsClockwise className="h-3.5 w-3.5" />}
-                            {scanActive ? (canForceReplaceScan ? "Replace scan" : "Scanning...") : "Scan app"}
-                          </Button>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <StatusDot status={page.health} />
+                                <span className="font-mono text-[13px] font-medium text-foreground truncate line-through">
+                                  {page.route}
+                                </span>
+                              </div>
+                              {page.title && page.title !== page.route && (
+                                <p className="text-[11px] text-muted-foreground/60 truncate">
+                                  {page.title}
+                                </p>
+                              )}
+                            </Link>
+                            <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
+                              <Switch
+                                checked={page.enabled}
+                                onCheckedChange={v => { void handleToggleEnabled(page, v); }}
+                                aria-label="Enable testing for this page"
+                                className="scale-90"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
+                            <span className={cn(
+                              "font-medium tabular-nums",
+                              page.issues > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/60",
+                            )}>
+                              {page.issues} issue{page.issues !== 1 ? "s" : ""}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                onClick={e => { e.preventDefault(); navigate(`/pages/${page.id}`); }}
+                              >
+                                View
+                              </Button>
+                              <Button
+                                type="button" size="sm" variant="ghost"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={e => { e.preventDefault(); setDeleteTarget(page); }}
+                                aria-label={`Remove ${page.route} from project`}
+                              >
+                                <Trash className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                        {enabledFilteredPages.map(page => (
-                          <div
-                            key={page.id}
-                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[8rem]"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <Link
-                                to={`/pages/${page.id}`}
-                                className="min-w-0 flex-1 space-y-1 group/link"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <StatusDot status={page.health} />
-                                  <span className="font-mono text-[13px] truncate">
-                                    {page.route}
-                                  </span>
-                                </div>
-                                {page.title && page.title !== page.route && (
-                                  <p className="text-[11px] text-muted-foreground/60 truncate">
-                                    {page.title}
-                                  </p>
-                                )}
-                              </Link>
-                              <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
-                                <Switch
-                                  checked={page.enabled}
-                                  onCheckedChange={v => { void handleToggleEnabled(page, v); }}
-                                  aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
-                                  className="scale-90"
-                                />
-                              </div>
-                            </div>
-                            <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
-                              <div className="min-w-0 space-y-0.5">
-                                <span className={cn(
-                                  "font-medium tabular-nums block",
-                                  page.issues > 0
-                                    ? "text-amber-600 dark:text-amber-400"
-                                    : "text-muted-foreground/60"
-                                )}>
-                                  {page.issues} issue{page.issues !== 1 ? "s" : ""}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                                  onClick={e => {
-                                    e.preventDefault();
-                                    navigate(`/pages/${page.id}`);
-                                  }}
-                                >
-                                  View
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                  disabled={!defaultEnvId}
-                                  loading={runBusyId === page.id}
-                                  onClick={e => {
-                                    e.preventDefault();
-                                    void handleRunPage(page);
-                                  }}
-                                  aria-label={`Run test for ${page.route}`}
-                                >
-                                  {runBusyId !== page.id && <Play className="h-3.5 w-3.5" />}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                                  onClick={e => {
-                                    e.preventDefault();
-                                    setDeleteTarget(page);
-                                  }}
-                                  aria-label={`Remove ${page.route} from project`}
-                                >
-                                  <Trash className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Disabled route tiles */}
-                  {disabledFilteredPages.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                        Disabled routes ({disabledFilteredPages.length})
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                        {disabledFilteredPages.map(page => (
-                          <div
-                            key={page.id}
-                            className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[8rem] opacity-60"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <Link
-                                to={`/pages/${page.id}`}
-                                className="min-w-0 flex-1 space-y-1 group/link"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <StatusDot status={page.health} />
-                                  <span className="font-mono text-[13px] truncate line-through">
-                                    {page.route}
-                                  </span>
-                                </div>
-                                {page.title && page.title !== page.route && (
-                                  <p className="text-[11px] text-muted-foreground/60 truncate">
-                                    {page.title}
-                                  </p>
-                                )}
-                              </Link>
-                              <div className="shrink-0 pt-0.5" onClick={e => e.preventDefault()}>
-                                <Switch
-                                  checked={page.enabled}
-                                  onCheckedChange={v => { void handleToggleEnabled(page, v); }}
-                                  aria-label={page.enabled ? "Disable testing for this page" : "Enable testing for this page"}
-                                  className="scale-90"
-                                />
-                              </div>
-                            </div>
-                            <div className="mt-auto flex items-end justify-between gap-2 text-[11px]">
-                              <div className="min-w-0 space-y-0.5">
-                                <span
-                                  className={cn(
-                                    "font-medium tabular-nums block",
-                                    page.issues > 0
-                                      ? "text-amber-600 dark:text-amber-400"
-                                      : "text-muted-foreground/60",
-                                  )}
-                                >
-                                  {page.issues} issue{page.issues !== 1 ? "s" : ""}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                                  onClick={e => {
-                                    e.preventDefault();
-                                    navigate(`/pages/${page.id}`);
-                                  }}
-                                >
-                                  View
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                  disabled
-                                  aria-label={`Run test for ${page.route}`}
-                                >
-                                  <Play className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                                  onClick={e => {
-                                    e.preventDefault();
-                                    setDeleteTarget(page);
-                                  }}
-                                  aria-label={`Remove ${page.route} from project`}
-                                >
-                                  <Trash className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {filteredPages.length === 0 && (filter || healthFilter !== "all") && (
-                    <div className="text-center py-8 text-[13px] text-muted-foreground">
-                      No routes matching current filters
-                    </div>
-                  )}
-                </>
-              )}
-            </main>
-          </div>
+                {filteredPages.length === 0 && (filter || healthFilter !== "all") && (
+                  <div className="text-center py-8 text-[13px] text-muted-foreground">
+                    No routes matching current filters
+                  </div>
+                )}
+              </>
+            )}
+          </main>
         </div>
       </div>
 

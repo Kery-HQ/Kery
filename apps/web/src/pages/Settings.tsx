@@ -1,5 +1,5 @@
 import React from "react";
-import { Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick } from "@phosphor-icons/react";
+import { Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick, CheckCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -27,7 +27,6 @@ export const Settings: React.FC = () => {
   const [modelPrices, setModelPrices] = React.useState<Partial<Record<ModelSlotKey, ModelPriceUsd>>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
-  const [selectedModelKey, setSelectedModelKey] = React.useState<ModelSlotKey>("agentModel");
 
   React.useEffect(() => {
     fetchModelSettings()
@@ -52,9 +51,9 @@ export const Settings: React.FC = () => {
       setModelSettings(r.models);
       setLlmKeys(r.llmKeys);
       setModelPrices(r.modelPrices ?? {});
-      setModelStatus(value ? "Model updated." : "Reset to default.");
+      setModelStatus(value ? "saved" : "reset");
     } catch {
-      setModelStatus("Failed to save model setting.");
+      setModelStatus("error");
     } finally {
       setModelSaving(null);
     }
@@ -69,107 +68,105 @@ export const Settings: React.FC = () => {
       setModelSettings(r.models);
       setLlmKeys(r.llmKeys);
       setModelPrices(r.modelPrices ?? {});
-      setModelStatus("All models reset to defaults.");
+      setModelStatus("reset");
     } catch {
-      setModelStatus("Failed to reset.");
+      setModelStatus("error");
     } finally {
       setModelSaving(null);
     }
   }
 
   const hasCustomizedModels = Object.values(modelSettings).some((m) => m.customized);
-  const activeModel = MODEL_CONFIG.find((m) => m.key === selectedModelKey) ?? MODEL_CONFIG[0];
-  const activeSetting = modelSettings[activeModel.key];
 
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
         icon={<Gear className="h-4 w-4" />}
         title="Platform Settings"
-        description="Pick a model mode per agent: preset or custom."
+        description="Configure the AI model powering each agent."
       />
 
-      <div className="px-6 py-5 animate-fade-in space-y-6 w-full">
-        <section>
-          <div className="flex items-center justify-between mb-3">
+      <div className="px-6 py-6 animate-page-enter flex-1">
+        <div className="max-w-3xl mx-auto space-y-6">
+
+          {/* Section header */}
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Global model controls</p>
+              <h2 className="text-[14px] font-semibold text-foreground">Model agents</h2>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                Choose a preset or enter a custom model id for each agent role.
+              </p>
             </div>
             {hasCustomizedModels && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleResetAllModels}
                 disabled={modelSaving !== null}
-                className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-50"
               >
-                <ArrowCounterClockwise className="h-3 w-3" />
+                <ArrowCounterClockwise className="h-3.5 w-3.5 mr-1.5" />
                 Reset all
-              </button>
+              </Button>
             )}
           </div>
-          <div>
-              <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-                <aside className="space-y-1 rounded-md border border-border/70 bg-surface-2/60 p-2">
-                  {MODEL_CONFIG.map((model) => {
-                    const setting = modelSettings[model.key];
-                    const selected = model.key === selectedModelKey;
-                    return (
-                      <button
-                        key={model.key}
-                        type="button"
-                        onClick={() => setSelectedModelKey(model.key)}
-                        className={cn(
-                          "w-full rounded-md border px-2.5 py-2 text-left transition-colors",
-                          selected
-                            ? "border-primary/40 bg-primary/10"
-                            : "border-transparent hover:border-border/70 hover:bg-accent/40",
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <model.Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                          <p className="text-[12px] font-medium text-foreground">{model.label}</p>
-                        </div>
-                        <p className="mt-1 text-[10px] text-muted-foreground/80">{model.hint}</p>
-                        {setting?.customized && (
-                          <Badge variant="warning" className="mt-1.5 h-4 text-[9px]">override</Badge>
-                        )}
-                      </button>
-                    );
-                  })}
-                </aside>
 
-                <div>
-                  {activeSetting ? (
+          {/* Model cards grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {MODEL_CONFIG.map((model, i) => {
+              const setting = modelSettings[model.key];
+              return (
+                <div
+                  key={model.key}
+                  className="glass-card-flat card-stagger"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {setting ? (
                     <ModelSlotCard
-                      modelKey={activeModel.key}
-                      label={activeModel.label}
-                      hint={activeModel.hint}
-                      Icon={activeModel.Icon}
-                      options={activeModel.options}
-                      current={activeSetting.current}
-                      defaultValue={activeSetting.default}
-                      customized={activeSetting.customized}
-                      saving={modelSaving === activeModel.key || modelSaving === "__all__"}
+                      modelKey={model.key}
+                      label={model.label}
+                      hint={model.hint}
+                      Icon={model.Icon}
+                      options={model.options}
+                      current={setting.current}
+                      defaultValue={setting.default}
+                      customized={setting.customized}
+                      saving={modelSaving === model.key || modelSaving === "__all__"}
                       onChange={handleModelChange}
                       llmKeys={llmKeys}
-                      modelPrice={modelPrices[activeModel.key]}
+                      modelPrice={modelPrices[model.key]}
                     />
                   ) : (
-                    <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-[12px] text-muted-foreground">
-                      Loading {activeModel.label}...
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-xl bg-foreground/6 animate-pulse" />
+                        <div className="space-y-1.5">
+                          <div className="h-3 w-28 rounded bg-foreground/6 animate-pulse" />
+                          <div className="h-2.5 w-20 rounded bg-foreground/4 animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="h-9 w-full rounded-lg bg-foreground/4 animate-pulse" />
                     </div>
                   )}
                 </div>
-              </div>
-              {modelStatus && (
-                <p className={cn(
-                  "text-[12px] mt-3",
-                  modelStatus.includes("Failed") ? "text-destructive" : "text-status-pass",
-                )}>
-                  {modelStatus}
-                </p>
-              )}
+              );
+            })}
+          </div>
+
+          {/* Status toast */}
+          {modelStatus && (
+            <div className={cn(
+              "flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border animate-fade-in",
+              modelStatus === "error"
+                ? "border-destructive/30 bg-destructive/8 text-destructive"
+                : "border-status-pass/30 bg-status-pass/8 text-status-pass",
+            )}>
+              <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+              {modelStatus === "saved" && "Model saved successfully."}
+              {modelStatus === "reset" && "Reset to defaults."}
+              {modelStatus === "error" && "Failed to save — please try again."}
             </div>
-        </section>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -248,7 +245,7 @@ const MODEL_CONFIG: {
   {
     key: "auxiliaryModel",
     label: "Support agent",
-    hint: "Planning and structured outputs",
+    hint: "Planning & structured outputs",
     Icon: NotePencil,
     options: CODE_OPTIONS,
   },
@@ -270,23 +267,19 @@ const MODEL_CONFIG: {
 
 function customModelPlaceholder(provider: CustomProviderId): string {
   switch (provider) {
-    case "openai":
-      return "e.g. gpt-4o-mini";
-    case "anthropic":
-      return "e.g. claude-3-5-haiku-20241022";
-    case "gemini":
-      return "e.g. gemini-2.0-flash";
-    case "openrouter":
-      return "e.g. mistralai/mistral-small-3.1-24b-instruct";
+    case "openai":     return "e.g. gpt-4o-mini";
+    case "anthropic":  return "e.g. claude-3-5-haiku-20241022";
+    case "gemini":     return "e.g. gemini-2.0-flash";
+    case "openrouter": return "e.g. mistralai/mistral-small-3.1-24b-instruct";
   }
 }
 
 function normalizeModelIdForCompare(modelId: string): string {
   const value = modelId.trim().toLowerCase();
   if (!value) return "";
-  if (value.startsWith("openai/")) return value.slice("openai/".length);
+  if (value.startsWith("openai/"))    return value.slice("openai/".length);
   if (value.startsWith("anthropic/")) return value.slice("anthropic/".length);
-  if (value.startsWith("google/")) return value.slice("google/".length);
+  if (value.startsWith("google/"))    return value.slice("google/".length);
   return value;
 }
 
@@ -332,6 +325,7 @@ function ModelSlotCard({
     [options, current],
   );
 
+  const [expanded, setExpanded] = React.useState(false);
   const [mode, setMode] = React.useState<"preset" | "custom">(!isPresetCurrent && current.length > 0 ? "custom" : "preset");
   const [customProvider, setCustomProvider] = React.useState<CustomProviderId>("openai");
   const [customRaw, setCustomRaw] = React.useState("");
@@ -376,14 +370,11 @@ function ModelSlotCard({
   function handleApplyCustom() {
     setCustomError("");
     const composed = composeCustomModel(customProvider, customRaw);
-    if (!composed) {
-      setCustomError("Enter a model id.");
-      return;
-    }
+    if (!composed) { setCustomError("Enter a model id."); return; }
     const pi = parseFloat(priceIn);
     const po = parseFloat(priceOut);
     if (!Number.isFinite(pi) || !Number.isFinite(po) || pi < 0 || po < 0) {
-      setCustomError("Enter USD per 1M input tokens and per 1M output tokens (non-negative numbers).");
+      setCustomError("Enter USD / 1M tokens for input and output (non-negative).");
       return;
     }
     if (llmKeys && !isModelSelectable(composed, llmKeys)) {
@@ -393,192 +384,163 @@ function ModelSlotCard({
     }
     onChange(modelKey, composed, { input: pi, output: po });
     setMode("custom");
+    setExpanded(false);
   }
 
   const presetSelectValue = isPresetCurrent ? presetMatchForCurrent : "";
+  const displayModelLabel = currentOption?.label ?? (current ? current : "Default");
 
   return (
-    <div className="rounded-md border border-border/80 bg-surface-2 p-3">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+    <div className="p-4 space-y-3">
+      {/* Card header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <label className="text-[13px] font-semibold text-foreground block truncate">{label}</label>
-            <p className="text-[10px] text-muted-foreground/80 truncate">{hint}</p>
+            <p className="text-[13px] font-semibold text-foreground truncate">{label}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{hint}</p>
           </div>
-          {customized && <Badge variant="warning" className="text-[9px] px-1.5 py-0">override</Badge>}
         </div>
-        {customized && (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {customized && <Badge variant="warning" className="text-[9px] px-1.5 h-4">custom</Badge>}
+          {customized && (
+            <button
+              type="button"
+              onClick={() => onChange(modelKey, "", null)}
+              disabled={saving}
+              title="Reset to default"
+              className="text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-40"
+            >
+              <ArrowCounterClockwise className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Current model display + quick-select */}
+      {!expanded ? (
+        <div className="space-y-2">
+          <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-foreground truncate">{displayModelLabel}</p>
+              {currentOption?.price && (
+                <p className="text-[10px] text-muted-foreground/70 truncate">{currentOption.price} per 1M in/out</p>
+              )}
+              {!isPresetCurrent && current && (
+                <p className="text-[10px] font-mono text-muted-foreground/60 truncate">{current}</p>
+              )}
+            </div>
+            {saving && (
+              <div className="h-3.5 w-3.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin shrink-0" />
+            )}
+          </div>
+
+          {/* Preset select — inline quick change */}
+          <Select
+            value={presetSelectValue}
+            onChange={(e) => handlePresetChange(e.target.value)}
+            disabled={saving}
+            className="text-[12px]"
+          >
+            <option value="">Choose preset model…</option>
+            {options.map((opt) => {
+              const sel = optionSelectable(opt.value);
+              const missing = llmKeys && !sel && opt.value !== current ? modelMissingKeyLabel(opt.value, llmKeys) : null;
+              return (
+                <option key={opt.value} value={opt.value} disabled={!sel}>
+                  {opt.label}{modelIdsEquivalent(opt.value, defaultValue) ? " (default)" : ""}
+                  {missing ? ` — ${missing}` : ""}
+                </option>
+              );
+            })}
+          </Select>
+
           <button
             type="button"
-            onClick={() => onChange(modelKey, "", null)}
-            disabled={saving}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors disabled:opacity-50"
+            onClick={() => setExpanded(true)}
+            className="w-full text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors py-1 rounded-md hover:bg-foreground/4"
           >
-            <ArrowCounterClockwise className="h-2.5 w-2.5" />
-            Use default
+            Use custom model →
           </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => setMode("preset")}
-          className={cn(
-            "rounded-md border px-3 py-2 text-left transition-colors",
-            mode === "preset" ? "border-primary/40 bg-primary/10" : "border-border/70 bg-surface-3/40 hover:bg-surface-3/70",
-          )}
-        >
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className={cn(
-              "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-              mode === "preset" ? "border-primary" : "border-border",
-            )}>
-              {mode === "preset" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-            </span>
-            <p className="text-[11px] font-semibold">Preset</p>
-          </div>
-          <p className="text-[10px] text-muted-foreground/80 pl-5">Choose from curated models</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("custom")}
-          className={cn(
-            "rounded-md border px-3 py-2 text-left transition-colors",
-            mode === "custom" ? "border-primary/40 bg-primary/10" : "border-border/70 bg-surface-3/40 hover:bg-surface-3/70",
-          )}
-        >
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className={cn(
-              "h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-              mode === "custom" ? "border-primary" : "border-border",
-            )}>
-              {mode === "custom" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-            </span>
-            <p className="text-[11px] font-semibold">Custom</p>
-          </div>
-          <p className="text-[10px] text-muted-foreground/80 pl-5">Use provider + model id</p>
-        </button>
-      </div>
-
-      {mode === "preset" && (
-        <div className="rounded-md border border-border/70 bg-surface-3/60 p-2">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mb-1">Model</p>
-            <Select
-              value={presetSelectValue}
-              onChange={(e) => handlePresetChange(e.target.value)}
-              disabled={saving}
-              className={cn("mono-ui text-[12px] bg-background", customized && "border-primary/40")}
-            >
-              <option value="">Choose model…</option>
-              {options.map((opt) => {
-                const sel = optionSelectable(opt.value);
-                const missing =
-                  llmKeys && !sel && opt.value !== current ? modelMissingKeyLabel(opt.value, llmKeys) : null;
-                return (
-                  <option key={opt.value} value={opt.value} disabled={!sel}>
-                    {opt.label}{modelIdsEquivalent(opt.value, defaultValue) ? " (default)" : ""}
-                    {missing ? ` — ${missing}` : ""}
-                  </option>
-                );
-              })}
-            </Select>
-          {currentOption?.price ? (
-            <p className="mt-2 text-[10px] text-muted-foreground/70">
-              {currentOption.price} in/out
-            </p>
-          ) : null}
         </div>
-      )}
+      ) : (
+        /* Expanded custom form */
+        <div className="space-y-2.5 rounded-lg border border-border/70 bg-background/30 p-3">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[11px] font-medium text-foreground">Custom model</p>
+            <button
+              type="button"
+              onClick={() => { setExpanded(false); setCustomError(""); }}
+              className="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
 
-      {mode === "custom" && (
-        <div className="rounded-md border border-border/80 bg-muted/20 p-3 space-y-2">
           <div className="flex flex-col sm:flex-row gap-2">
             <Select
               value={customProvider}
-              onChange={(e) => {
-                setCustomProvider(e.target.value as CustomProviderId);
-                setCustomError("");
-              }}
+              onChange={(e) => { setCustomProvider(e.target.value as CustomProviderId); setCustomError(""); }}
               disabled={saving}
-              className="sm:w-[180px] flex-shrink-0"
+              className="sm:w-[140px] flex-shrink-0 text-[11px]"
               aria-label="Provider"
             >
               {CUSTOM_PROVIDER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
+                <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </Select>
             <Input
               value={customRaw}
-              onChange={(e) => {
-                setCustomRaw(e.target.value);
-                setCustomError("");
-              }}
+              onChange={(e) => { setCustomRaw(e.target.value); setCustomError(""); }}
               disabled={saving}
               placeholder={customModelPlaceholder(customProvider)}
-              className="mono-ui text-[12px] flex-1"
+              className="mono-ui text-[11px] flex-1"
               spellCheck={false}
               autoCapitalize="off"
               autoCorrect="off"
             />
           </div>
+
           {customProvider === "openrouter" && (
-            <p className="text-[10px] text-muted-foreground/70 leading-snug">
-              Use full slug: vendor/model
-            </p>
+            <p className="text-[10px] text-muted-foreground/60">Use full slug: vendor/model</p>
           )}
+
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-muted-foreground">Input $ / 1M tokens</label>
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Input $ / 1M tokens</label>
               <Input
-                type="number"
-                step="any"
-                min={0}
+                type="number" step="any" min={0}
                 value={priceIn}
-                onChange={(e) => {
-                  setPriceIn(e.target.value);
-                  setCustomError("");
-                }}
+                onChange={(e) => { setPriceIn(e.target.value); setCustomError(""); }}
                 disabled={saving}
                 placeholder="0.40"
-                className="mono-ui text-[12px] mt-0.5"
+                className="mono-ui text-[11px]"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Output $ / 1M tokens</label>
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Output $ / 1M tokens</label>
               <Input
-                type="number"
-                step="any"
-                min={0}
+                type="number" step="any" min={0}
                 value={priceOut}
-                onChange={(e) => {
-                  setPriceOut(e.target.value);
-                  setCustomError("");
-                }}
+                onChange={(e) => { setPriceOut(e.target.value); setCustomError(""); }}
                 disabled={saving}
                 placeholder="1.60"
-                className="mono-ui text-[12px] mt-0.5"
+                className="mono-ui text-[11px]"
               />
             </div>
           </div>
-          {customError && (
-            <p className="text-[11px] text-destructive">{customError}</p>
-          )}
-          <div className="flex flex-wrap gap-2">
+
+          {customError && <p className="text-[11px] text-destructive">{customError}</p>}
+
+          <div className="flex gap-2 pt-0.5">
             <Button type="button" size="sm" onClick={handleApplyCustom} disabled={saving} loading={saving}>
-              Apply custom model
+              Apply
             </Button>
             <Button
-              type="button"
-              variant="ghost"
-              size="sm"
+              type="button" variant="ghost" size="sm"
               onClick={() => {
-                setMode(isPresetCurrent ? "preset" : "custom");
                 setCustomError("");
                 const p = parseStoredModelForCustomUi(current);
                 setCustomProvider(p.provider);
@@ -591,18 +553,7 @@ function ModelSlotCard({
           </div>
         </div>
       )}
-
-      {!isPresetCurrent && mode === "preset" && current && (
-        <p className="text-[11px] mono-ui text-muted-foreground/80 mt-2 break-all rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
-          Active: {current}
-          {modelPrice?.input != null && modelPrice?.output != null && (
-            <span className="block text-muted-foreground/60 mt-0.5">
-              Cost: ${modelPrice.input}/M in, ${modelPrice.output}/M out
-            </span>
-          )}
-        </p>
-      )}
-
     </div>
   );
 }
+

@@ -10,10 +10,12 @@ interface KpiCardProps {
 
 export function KpiCard({ label, value, suffix, icon, className }: KpiCardProps) {
   return (
-    <div className={cn("rounded-lg border border-border bg-card p-4 flex flex-col gap-1", className)}>
+    <div className={cn("glass-card-flat card-stagger p-4 flex flex-col gap-1", className)}>
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
-        {icon && <span className="text-muted-foreground">{icon}</span>}
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        {icon && <span className="text-muted-foreground/70">{icon}</span>}
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-2xl font-semibold tabular-nums text-foreground">{value}</span>

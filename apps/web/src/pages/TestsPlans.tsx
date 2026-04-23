@@ -313,12 +313,12 @@ export const TestsPlans: React.FC = () => {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-fade-in">
+        <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
 
           {/* ── 4 stat cards ──────────────────────────────────────────── */}
           <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Signal – script coverage donut */}
-            <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
+            <div className="glass-card-flat card-stagger px-3 py-3">
               <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
               {tests.length === 0 ? (
                 <p className="mt-3 text-[13px] text-muted-foreground/50">No flows yet</p>
@@ -334,7 +334,7 @@ export const TestsPlans: React.FC = () => {
                       )`,
                     }}
                   >
-                    <div className="absolute inset-2 rounded-full bg-card flex items-center justify-center">
+                    <div className="absolute inset-2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
                       <span className="text-[10px] font-semibold tabular-nums text-foreground">
                         {readyCount}/{tests.length}
                       </span>
@@ -350,10 +350,7 @@ export const TestsPlans: React.FC = () => {
             </div>
 
             {/* Issues Found */}
-            <div className={cn(
-              "rounded-lg border bg-card px-3 py-3",
-              totalIssuesFound > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-border/60",
-            )}>
+            <div className={cn("glass-card-flat card-stagger px-3 py-3")}>
               <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Issues Found</p>
               <p className={cn(
                 "mt-2 text-[26px] font-semibold tabular-nums",
@@ -369,10 +366,7 @@ export const TestsPlans: React.FC = () => {
             </div>
 
             {/* No Script Yet */}
-            <div className={cn(
-              "rounded-lg border bg-card px-3 py-3",
-              noScriptCount > 0 ? "border-orange-400/30 bg-orange-400/5" : "border-border/60",
-            )}>
+            <div className={cn("glass-card-flat card-stagger px-3 py-3")}>
               <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">No Script Yet</p>
               <p className={cn(
                 "mt-2 text-[26px] font-semibold tabular-nums",
@@ -386,7 +380,7 @@ export const TestsPlans: React.FC = () => {
             </div>
 
             {/* Total Runs */}
-            <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
+            <div className="glass-card-flat card-stagger px-3 py-3">
               <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Total Runs</p>
               <p className="mt-2 text-[26px] font-semibold tabular-nums text-foreground">
                 {tests.length === 0 ? "—" : totalRunCount}
@@ -411,7 +405,7 @@ export const TestsPlans: React.FC = () => {
             ) : (
               <>
                 {/* Filter + search card */}
-                <div className="rounded-lg border border-border/60 bg-card p-3 space-y-3">
+                <div className="liquid-glass rounded-xl p-3 space-y-3">
                   <div className="relative w-full">
                     <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
                     <Input
@@ -511,8 +505,8 @@ export const TestsPlans: React.FC = () => {
                         <div
                           key={test.id}
                           className={cn(
-                            "rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/30 flex flex-col gap-2 min-h-[8rem]",
-                            !test.enabled && "opacity-60",
+                            "glass-card-flat p-3 flex flex-col gap-2 min-h-[8rem]",
+                            !test.enabled && "opacity-50",
                           )}
                         >
                           {/* Top: dot + name + switch — identical to page tile */}

@@ -4,8 +4,9 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 import "./styles/globals.css";
 
 // Apply saved theme before first render to avoid flash
-import { initTheme } from "@/lib/hooks";
+import { initTheme, initWallpaper } from "@/lib/hooks";
 initTheme();
+initWallpaper();
 
 import { Nav } from "@/components/nav";
 import { CommandPalette } from "@/components/command-palette";
@@ -32,9 +33,9 @@ function AppShell() {
   useHotkey("mod+k", () => setCmdkOpen(true));
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden">
       <Nav onOpenCommandPalette={() => setCmdkOpen(true)} />
-      <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-background">
+      <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-transparent">
         <Outlet />
       </main>
       <CommandPalette open={cmdkOpen} onOpenChange={setCmdkOpen} />

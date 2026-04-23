@@ -5,28 +5,44 @@ import { cn } from "@/lib/utils";
 import { Spinner } from "@phosphor-icons/react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 rounded-md text-[13px] font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none active:opacity-80",
+  "inline-flex items-center justify-center gap-1.5 rounded-md text-[13px] font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:opacity-45 disabled:pointer-events-none select-none",
   {
     variants: {
       variant: {
+        /* Solid opaque — stays readable regardless of glass beneath */
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/85",
+          "bg-primary text-primary-foreground active:scale-[0.98] " +
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_3px_10px_rgba(0,0,0,0.18)] " +
+          "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_6px_18px_rgba(0,0,0,0.24)] " +
+          "hover:brightness-110 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.22)]",
+
+        /* Glass secondary */
         secondary:
-          "bg-secondary text-secondary-foreground border border-border hover:bg-accent",
+          "liquid-glass text-foreground active:scale-[0.98] " +
+          "hover:border-white/70 hover:bg-white/70",
+
+        /* Glass outline */
         outline:
-          "border border-border bg-transparent hover:bg-accent hover:text-accent-foreground",
+          "liquid-glass text-foreground active:scale-[0.98] " +
+          "hover:border-white/70 hover:bg-white/65",
+
         ghost:
-          "hover:bg-accent hover:text-accent-foreground",
+          "text-foreground hover:bg-white/50 dark:hover:bg-white/10 " +
+          "active:scale-[0.98] transition-colors",
+
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/85",
+          "bg-destructive text-destructive-foreground active:scale-[0.98] " +
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_3px_10px_rgba(0,0,0,0.18)] " +
+          "hover:brightness-110",
+
         link:
-          "text-primary underline-offset-4 hover:underline",
+          "text-foreground underline-offset-4 hover:underline p-0 h-auto shadow-none",
       },
       size: {
-        sm: "h-7 px-2.5 text-[12px]",
-        md: "h-8 px-3",
-        lg: "h-9 px-4 text-[14px]",
-        icon: "h-8 w-8",
+        sm:      "h-7 px-2.5 text-[12px] rounded",
+        md:      "h-8 px-3",
+        lg:      "h-9 px-4 text-[14px]",
+        icon:    "h-8 w-8",
         "icon-sm": "h-7 w-7",
       },
     },

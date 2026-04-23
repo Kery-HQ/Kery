@@ -2,6 +2,15 @@ import { useEffect, useCallback } from "react";
 
 export type Theme = "light" | "dark" | "system";
 const STORAGE_KEY = "kery_theme";
+const WALLPAPER_STORAGE_KEY = "kery_wallpaper_index";
+
+const WALLPAPERS = [
+  null,
+  "/wallpaper/kery_wallpaper_2.jpeg",
+  "/wallpaper/kery_wallpaper_3.jpeg",
+  "/wallpaper/kery_wallpaper_4.jpeg",
+  "/wallpaper/run_details_wallpaper.png",
+] as const;
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -24,6 +33,36 @@ export function setTheme(theme: Theme) {
 
 export function initTheme() {
   applyTheme(getTheme());
+}
+
+function applyWallpaper(path: (typeof WALLPAPERS)[number]) {
+  if (!path) {
+    document.documentElement.style.setProperty("--app-wallpaper-image", "none");
+    document.documentElement.style.setProperty("--app-wallpaper-blur-light", "6px");
+    document.documentElement.style.setProperty("--app-wallpaper-blur-dark", "7px");
+    return;
+  }
+  document.documentElement.style.setProperty("--app-wallpaper-image", `url("${path}")`);
+  document.documentElement.style.setProperty("--app-wallpaper-blur-light", "2px");
+  document.documentElement.style.setProperty("--app-wallpaper-blur-dark", "3px");
+}
+
+export function getWallpaperIndex(): number {
+  const raw = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+  const parsed = raw ? Number.parseInt(raw, 10) : 0;
+  if (!Number.isFinite(parsed)) return 0;
+  return ((parsed % WALLPAPERS.length) + WALLPAPERS.length) % WALLPAPERS.length;
+}
+
+export function rotateWallpaper(): number {
+  const next = (getWallpaperIndex() + 1) % WALLPAPERS.length;
+  localStorage.setItem(WALLPAPER_STORAGE_KEY, String(next));
+  applyWallpaper(WALLPAPERS[next]);
+  return next;
+}
+
+export function initWallpaper() {
+  applyWallpaper(WALLPAPERS[getWallpaperIndex()]);
 }
 
 export function useHotkey(key: string, callback: () => void, deps: any[] = []) {

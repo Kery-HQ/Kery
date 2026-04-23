@@ -506,19 +506,19 @@ type LlmAgentDisplay = {
 };
 
 const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
-  navigator:            { label: "Navigator",   color: "text-sky-400", badgeClass: "border-sky-500/35 bg-sky-500/10 text-sky-300", Icon: Compass },
-  review:               { label: "Review",      color: "text-violet-400", badgeClass: "border-violet-500/35 bg-violet-500/10 text-violet-300", Icon: Eye },
-  holistic:             { label: "Flow review", color: "text-fuchsia-400", badgeClass: "border-fuchsia-500/35 bg-fuchsia-500/10 text-fuchsia-300", Icon: GitBranch },
-  summary:              { label: "Summary",     color: "text-indigo-400", badgeClass: "border-indigo-500/35 bg-indigo-500/10 text-indigo-300", Icon: FileText },
-  filmstrip:            { label: "Filmstrip",   color: "text-emerald-400", badgeClass: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300", Icon: Stack },
-  bug_triage:           { label: "Bug triage",  color: "text-red-400", badgeClass: "border-red-500/35 bg-red-500/10 text-red-300", Icon: WarningCircle },
-  crawl_link_filter:    { label: "Crawl links", color: "text-cyan-400", badgeClass: "border-cyan-500/35 bg-cyan-500/10 text-cyan-300", Icon: Funnel },
-  crawl_route_filter:   { label: "Crawl routes", color: "text-teal-400", badgeClass: "border-teal-500/35 bg-teal-500/10 text-teal-300", Icon: Funnel },
-  crawl_suggested_flows:{ label: "Crawl flows", color: "text-green-400", badgeClass: "border-green-500/35 bg-green-500/10 text-green-300", Icon: FlowArrow },
-  memory_curator:       { label: "Memory",      color: "text-amber-400", badgeClass: "border-amber-500/35 bg-amber-500/10 text-amber-300", Icon: Brain },
-  script_generator:     { label: "Script gen",  color: "text-orange-400", badgeClass: "border-orange-500/35 bg-orange-500/10 text-orange-300", Icon: Scroll },
-  stagehand:            { label: "Stagehand",   color: "text-rose-400", badgeClass: "border-rose-500/35 bg-rose-500/10 text-rose-300", Icon: Lightning },
-  regression_heal:      { label: "Heal",        color: "text-pink-400", badgeClass: "border-pink-500/35 bg-pink-500/10 text-pink-300", Icon: Lightning },
+  navigator:            { label: "Navigator",   color: "text-sky-600 dark:text-sky-400",     badgeClass: "border-sky-500/50 bg-sky-500/12 text-sky-700 dark:text-sky-300", Icon: Compass },
+  review:               { label: "Review",      color: "text-violet-600 dark:text-violet-400", badgeClass: "border-violet-500/50 bg-violet-500/12 text-violet-700 dark:text-violet-300", Icon: Eye },
+  holistic:             { label: "Flow review", color: "text-fuchsia-600 dark:text-fuchsia-400", badgeClass: "border-fuchsia-500/50 bg-fuchsia-500/12 text-fuchsia-700 dark:text-fuchsia-300", Icon: GitBranch },
+  summary:              { label: "Summary",     color: "text-indigo-600 dark:text-indigo-400", badgeClass: "border-indigo-500/50 bg-indigo-500/12 text-indigo-700 dark:text-indigo-300", Icon: FileText },
+  filmstrip:            { label: "Filmstrip",   color: "text-emerald-600 dark:text-emerald-400", badgeClass: "border-emerald-500/50 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", Icon: Stack },
+  bug_triage:           { label: "Bug triage",  color: "text-red-600 dark:text-red-400",     badgeClass: "border-red-500/50 bg-red-500/12 text-red-700 dark:text-red-300", Icon: WarningCircle },
+  crawl_link_filter:    { label: "Crawl links", color: "text-cyan-600 dark:text-cyan-400",   badgeClass: "border-cyan-500/50 bg-cyan-500/12 text-cyan-700 dark:text-cyan-300", Icon: Funnel },
+  crawl_route_filter:   { label: "Crawl routes", color: "text-teal-600 dark:text-teal-400",  badgeClass: "border-teal-500/50 bg-teal-500/12 text-teal-700 dark:text-teal-300", Icon: Funnel },
+  crawl_suggested_flows:{ label: "Crawl flows", color: "text-green-600 dark:text-green-400", badgeClass: "border-green-500/50 bg-green-500/12 text-green-700 dark:text-green-300", Icon: FlowArrow },
+  memory_curator:       { label: "Memory",      color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Brain },
+  script_generator:     { label: "Script gen",  color: "text-orange-600 dark:text-orange-400", badgeClass: "border-orange-500/50 bg-orange-500/12 text-orange-700 dark:text-orange-300", Icon: Scroll },
+  stagehand:            { label: "Stagehand",   color: "text-rose-600 dark:text-rose-400",   badgeClass: "border-rose-500/50 bg-rose-500/12 text-rose-700 dark:text-rose-300", Icon: Lightning },
+  regression_heal:      { label: "Heal",        color: "text-pink-600 dark:text-pink-400",   badgeClass: "border-pink-500/50 bg-pink-500/12 text-pink-700 dark:text-pink-300", Icon: Lightning },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
@@ -1230,64 +1230,34 @@ function PlanChecklistRow({ item, isLast }: { item: AgentPlanItem; isLast: boole
 
 /** Clean browser preview stage — no wallpaper. */
 function BrowserPreviewStage({
-  badge,
   children,
-  tabLabel,
   empty,
-  framed,
   liveFrameOpenAnim,
   onLiveFrameOpenAnimEnd,
 }: {
-  badge: React.ReactNode;
   children: React.ReactNode;
-  tabLabel: string;
   empty?: boolean;
-  framed: boolean;
   liveFrameOpenAnim?: boolean;
   onLiveFrameOpenAnimEnd?: () => void;
 }) {
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/20 dark:bg-surface-2/50">
-
-      <div className="absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] sm:left-3 sm:top-3 sm:max-w-[calc(100%-1.5rem)]">
-        {badge}
-      </div>
-
-      <div className="relative z-10 flex min-h-[min(12rem,42svh)] flex-1 items-center justify-center p-2 pt-11 sm:min-h-0 sm:p-4 sm:pt-12 md:p-5 md:pt-14 lg:p-6 lg:pt-[3.75rem]">
-        {framed ? (
-          <div
-            className={cn(
-              "run-preview-liquid-shell flex max-h-full min-h-0 w-full max-w-full min-w-0 flex-col",
-              liveFrameOpenAnim && "run-preview-window-open-anim",
-            )}
-            onAnimationEnd={(e) => {
-              if (e.target !== e.currentTarget) return;
-              if (!e.animationName.includes("run-preview-window-open")) return;
-              onLiveFrameOpenAnimEnd?.();
-            }}
-          >
-            <div className="run-preview-browser-tab-wrap" aria-hidden>
-              <div className="run-preview-browser-tab">{tabLabel}</div>
-            </div>
-            <div className="run-preview-liquid-inner flex max-h-full min-h-0 w-full flex-1 flex-col">
-              <div
-                className={cn(
-                  "relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]",
-                  empty && "items-center justify-center bg-muted/30 dark:bg-muted/15",
-                )}
-              >
-                {!empty && (
-                  <div className="pointer-events-none absolute inset-0 bg-muted/20 dark:bg-surface-2/40" aria-hidden />
-                )}
-                <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex max-h-full min-h-0 w-full flex-1 flex-col items-center justify-center px-3">
-            {children}
-          </div>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/20 dark:bg-surface-2/50 p-3">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50",
+          empty && "items-center justify-center bg-muted/30 dark:bg-muted/15",
+          liveFrameOpenAnim && "run-preview-window-open-anim",
         )}
+        onAnimationEnd={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (!e.animationName.includes("run-preview-window-open")) return;
+          onLiveFrameOpenAnimEnd?.();
+        }}
+      >
+        {!empty && (
+          <div className="pointer-events-none absolute inset-0 rounded-xl bg-muted/20 dark:bg-surface-2/40" aria-hidden />
+        )}
+        <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">{children}</div>
       </div>
     </div>
   );
@@ -1350,24 +1320,37 @@ function OverviewTab({
   const isRunStarting = run.status === "running" && !liveScreenshot && !showLiveDisk;
   const showRecording = !showLive && !showLiveDisk && !!run.video_url;
   const previewEmpty = !isRunStarting && !showLive && !showLiveDisk && !showRecording && !snapshotSrc;
-  const previewTabLabel = React.useMemo(() => {
-    const src = (run.source_label ?? "").trim();
-    if (src) return src;
-    const latestUrl = [...steps].reverse().find((s) => !!s.url)?.url;
-    if (!latestUrl) return "App";
-    try {
-      return new URL(latestUrl).hostname.replace(/^www\./, "") || "App";
-    } catch {
-      return latestUrl;
-    }
-  }, [run.source_label, steps]);
-
   const [liveFrameOpenAnim, setLiveFrameOpenAnim] = React.useState(false);
   const seenLivePreviewRef = React.useRef(false);
   const recordingVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const [playbackMs, setPlaybackMs] = React.useState(0);
   const [videoDurationMs, setVideoDurationMs] = React.useState(0);
   const replayActiveStepRef = React.useRef<HTMLDivElement | null>(null);
+  const [panelWidth, setPanelWidth] = React.useState(288);
+  const isDragging = React.useRef(false);
+  const dragStartX = React.useRef(0);
+  const dragStartWidth = React.useRef(0);
+
+  const onDragHandleMouseDown = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = panelWidth;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = dragStartX.current - ev.clientX;
+      const next = Math.max(180, Math.min(520, dragStartWidth.current + delta));
+      setPanelWidth(next);
+    };
+    const onMouseUp = () => {
+      isDragging.current = false;
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [panelWidth]);
   const stepTimeline = React.useMemo(() => {
     const timed = steps
       .filter((s): s is RunStep & { at: number } => typeof s.at === "number")
@@ -1444,28 +1427,6 @@ function OverviewTab({
     return null;
   }, [run.status, replayProgress?.planIndex, stepTimeline, agentPlan.length, activityOldestFirst, run.recording_started_at, playbackMs, replayCursorRelativeMs, videoDurationMs]);
   const canReplay = showRecording && stepTimeline.length > 0;
-  const replayStepLabel = React.useMemo(() => {
-    if (run.status === "running") {
-      if (typeof replayProgress?.stepIndex === "number" && replayProgress.stepIndex > 0) {
-        return `Step ${replayProgress.stepIndex}`;
-      }
-      return steps.length > 0 ? `Step ${steps.length}` : "Starting";
-    }
-    if (!canReplay) return null;
-    if (replayCurrentIndex < 0) return "Step 0";
-    return `Step ${replayCurrentIndex + 1}/${stepTimeline.length}`;
-  }, [run.status, replayProgress?.stepIndex, steps.length, canReplay, replayCurrentIndex, stepTimeline.length]);
-  const replayPlanLabel = React.useMemo(() => {
-    if (agentPlan.length === 0) return null;
-    if (run.status === "running") {
-      if (typeof replayProgress?.planIndex === "number" && replayProgress.planIndex >= 0) {
-        return `Plan ${replayProgress.planIndex + 1}/${agentPlan.length}`;
-      }
-      return null;
-    }
-    if (!canReplay || replayCurrentPlanIndex == null || replayCurrentPlanIndex < 0) return null;
-    return `Plan ${replayCurrentPlanIndex + 1}/${agentPlan.length}`;
-  }, [agentPlan.length, run.status, replayProgress?.planIndex, canReplay, replayCurrentPlanIndex]);
   const displayStep = React.useMemo(() => {
     if (canReplay && replayCurrentIndex >= 0) {
       return stepTimeline[replayCurrentIndex] ?? latestStep;
@@ -1518,113 +1479,119 @@ function OverviewTab({
   }, [canReplay]);
 
   return (
-    <div className="px-6 py-5 flex flex-col flex-1 min-h-0 h-full overflow-hidden animate-fade-in">
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 min-h-0 overflow-hidden">
-        <Card className="flex h-full min-h-[min(13rem,38svh)] flex-col overflow-hidden sm:min-h-[min(15rem,36svh)] xl:col-span-3 xl:min-h-0">
-          <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-            <BrowserPreviewStage
-              tabLabel={previewTabLabel}
-              empty={previewEmpty}
-              framed={!isRunStarting}
-              liveFrameOpenAnim={liveFrameOpenAnim}
-              onLiveFrameOpenAnimEnd={() => setLiveFrameOpenAnim(false)}
-              badge={
-                (showLive || showLiveDisk || replayStepLabel || replayPlanLabel) ? (
-                  <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/70 bg-card/90 px-2 py-1 backdrop-blur-[2px]">
-                    {(showLive || showLiveDisk) && (
-                      <>
-                        <span className="relative flex h-2 w-2 shrink-0">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                        </span>
-                        <span className="text-[11px] font-medium text-foreground/90">live</span>
-                      </>
-                    )}
-                    {replayStepLabel && (
-                      <span className="rounded border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] font-mono text-foreground/85">
-                        {replayStepLabel}
-                      </span>
-                    )}
-                    {replayPlanLabel && (
-                      <span className="rounded border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] font-mono text-foreground/85">
-                        {replayPlanLabel}
-                      </span>
-                    )}
-                  </div>
-                ) : null
-              }
-            >
-              {isRunStarting ? (
-                <div className="flex max-w-[min(100%,22rem)] items-center gap-2 rounded-lg border border-border/70 bg-card/92 px-3 py-2 backdrop-blur-[2px]">
-                  <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" weight="bold" />
-                  <p className="font-display text-[11px] font-medium leading-snug tracking-tight text-foreground">
-                    Launching a browser for this run...
-                  </p>
-                </div>
-              ) : showLive ? (
-                <img src={`data:image/jpeg;base64,${liveScreenshot}`} alt="Live browser" className="h-full w-full min-h-0 flex-1 object-contain" />
-              ) : showLiveDisk ? (
-                <img src={livePreviewDiskUrl!} alt="Live browser" className="h-full w-full min-h-0 flex-1 object-contain" />
-              ) : showRecording ? (
-                <video
-                  ref={recordingVideoRef}
-                  src={apiMediaUrl(run.video_url!)}
-                  controls
-                  className="h-full w-full min-h-0 flex-1 object-contain"
-                  preload="metadata"
-                  onLoadedMetadata={(e) => {
-                    const d = e.currentTarget.duration;
-                    setVideoDurationMs(Number.isFinite(d) && d > 0 ? Math.round(d * 1000) : 0);
-                  }}
-                  onTimeUpdate={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
-                  onSeeking={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
-                  onSeeked={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
-                />
-              ) : snapshotSrc ? (
-                <img src={snapshotSrc} alt="Run browser preview" className="h-full w-full min-h-0 flex-1 object-contain" />
-              ) : (
-                <p className="px-4 text-center text-[12px] text-muted-foreground">No preview yet</p>
-              )}
-            </BrowserPreviewStage>
-          </CardContent>
-        </Card>
+    /* flex-row: video grows left, resizable panel is a fixed-width column on the right */
+    <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
 
-        <div className="xl:col-span-2 h-full min-h-0 flex flex-col gap-3 overflow-hidden">
-          <Card className="min-h-0 flex-[1.05] flex flex-col overflow-hidden border-border/60 bg-card/90">
-            <CardContent className="p-3 flex flex-col flex-1 min-h-0 gap-0">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1 rounded-md border border-border/60 bg-muted/20 p-0.5">
-                  {hasPlan && (
-                    <button
-                      type="button"
-                      onClick={() => setRightTab("plan")}
-                      className={cn("h-7 rounded px-2.5 text-[11px] transition-colors", rightTab === "plan" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
-                    >
-                      Plan
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setRightTab("progress")}
-                    className={cn("h-7 rounded px-2.5 text-[11px] transition-colors", rightTab === "progress" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}
-                  >
-                    Progress
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
-                  <span>{duration(run.started_at, run.completed_at) || "--"}</span>
-                  <span className="text-border">·</span>
-                  <span>{steps.length} steps</span>
-                  <span className="text-border">·</span>
-                  <span>{formatCost(totalCost)}</span>
-                </div>
+      {/* ── Video column — fills all remaining width ── */}
+      <div className="relative flex-1 min-w-0 min-h-0 overflow-hidden">
+        <BrowserPreviewStage
+          empty={previewEmpty}
+          liveFrameOpenAnim={liveFrameOpenAnim}
+          onLiveFrameOpenAnimEnd={() => setLiveFrameOpenAnim(false)}
+        >
+          {isRunStarting ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="flex max-w-[min(100%,22rem)] items-center gap-2 rounded-lg border border-border/70 bg-card/92 px-3 py-2 backdrop-blur-[2px]">
+                <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" weight="bold" />
+                <p className="font-display text-[11px] font-medium leading-snug tracking-tight text-foreground">
+                  Launching a browser for this run...
+                </p>
               </div>
+            </div>
+          ) : showLive ? (
+            <img src={`data:image/jpeg;base64,${liveScreenshot}`} alt="Live browser" className="h-full w-full min-h-0 flex-1 object-contain" />
+          ) : showLiveDisk ? (
+            <img src={livePreviewDiskUrl!} alt="Live browser" className="h-full w-full min-h-0 flex-1 object-contain" />
+          ) : showRecording ? (
+            <video
+              ref={recordingVideoRef}
+              src={apiMediaUrl(run.video_url!)}
+              controls
+              className="h-full w-full min-h-0 flex-1 object-contain"
+              preload="metadata"
+              onLoadedMetadata={(e) => {
+                const d = e.currentTarget.duration;
+                setVideoDurationMs(Number.isFinite(d) && d > 0 ? Math.round(d * 1000) : 0);
+              }}
+              onTimeUpdate={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
+              onSeeking={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
+              onSeeked={(e) => setPlaybackMs(Math.round(e.currentTarget.currentTime * 1000))}
+            />
+          ) : snapshotSrc ? (
+            <img src={snapshotSrc} alt="Run browser preview" className="h-full w-full min-h-0 flex-1 object-contain" />
+          ) : (
+            <p className="px-4 text-center text-[12px] text-muted-foreground">No preview yet</p>
+          )}
+        </BrowserPreviewStage>
 
+        {/* Live indicator — small pill in video corner */}
+        {(showLive || showLiveDisk) && (
+          <div className="pointer-events-none absolute left-5 top-5 z-20 flex items-center gap-1.5 rounded-full border border-border/50 bg-card/90 px-2 py-1 backdrop-blur-[4px]">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+            </span>
+            <span className="text-[10px] font-medium text-foreground/80">live</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Drag-to-resize handle ── */}
+      <div
+        onMouseDown={onDragHandleMouseDown}
+        className="w-1 flex-shrink-0 cursor-col-resize group relative z-10 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        title="Drag to resize"
+      >
+        <div className="absolute inset-y-0 -left-1 -right-1" />
+      </div>
+
+      {/* ── Plan / Progress panel — resizable column ── */}
+      <div
+        className="flex-shrink-0 flex flex-col min-h-0 overflow-hidden border-l glass-divider"
+        style={{ width: panelWidth }}
+      >
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b glass-divider flex-shrink-0">
+            <div className="flex items-center gap-1 rounded-md border border-border/40 bg-black/5 dark:bg-white/5 p-0.5">
+              {hasPlan && (
+                <button
+                  type="button"
+                  onClick={() => setRightTab("plan")}
+                  className={cn(
+                    "h-6 rounded px-2.5 text-[11px] transition-colors",
+                    rightTab === "plan" ? "bg-foreground/10 dark:bg-white/12 text-foreground font-medium" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Plan
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setRightTab("progress")}
+                className={cn(
+                  "h-6 rounded px-2.5 text-[11px] transition-colors",
+                  rightTab === "progress" ? "bg-foreground/10 dark:bg-white/12 text-foreground font-medium" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Progress
+              </button>
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground/60 truncate">
+              {steps.length}s · {formatCost(totalCost)}
+            </span>
+          </div>
+
+            {/* Body */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden p-3 gap-3">
               {rightTab === "plan" ? (
                 <>
                   {planProgress && planProgress.n > 0 && (
-                    <div className="mb-2 h-1 overflow-hidden rounded-full bg-muted/50">
-                      <div className="plan-progress-glow h-full rounded-full bg-foreground/25 transition-[width] duration-200 ease-out" style={{ width: `${planProgress.pct}%` }} />
+                    <div className="h-1 overflow-hidden rounded-full bg-foreground/10 flex-shrink-0">
+                      <div
+                        className="plan-progress-glow h-full rounded-full bg-primary/60 transition-[width] duration-200 ease-out"
+                        style={{ width: `${planProgress.pct}%` }}
+                      />
                     </div>
                   )}
                   <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pr-1 pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
@@ -1635,11 +1602,7 @@ function OverviewTab({
                         {agentPlan.map((item, idx) => {
                           const replayStatus =
                             run.status !== "running" && canReplay && replayCurrentPlanIndex != null
-                              ? (idx < replayCurrentPlanIndex
-                                  ? "done"
-                                  : idx === replayCurrentPlanIndex
-                                    ? "current"
-                                    : "pending")
+                              ? (idx < replayCurrentPlanIndex ? "done" : idx === replayCurrentPlanIndex ? "current" : "pending")
                               : item.status;
                           return (
                             <PlanChecklistRow
@@ -1655,21 +1618,20 @@ function OverviewTab({
                 </>
               ) : (
                 <>
-                  {/* Latest activity status bar */}
-                  <div className="mb-3 flex items-start gap-2.5 rounded-md border border-border/70 bg-muted/35 px-3.5 py-2.5 shadow-sm">
+                  <div className="flex items-start gap-2.5 rounded-xl border border-border/40 bg-foreground/4 px-3 py-2.5 flex-shrink-0">
                     {run.status === "running" ? (
                       <Spinner className="mt-0.5 h-3.5 w-3.5 animate-spin text-primary shrink-0" />
                     ) : (
                       <CheckCircle className="mt-0.5 h-3.5 w-3.5 text-emerald-500 shrink-0" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="min-w-0 text-[13px] font-medium leading-snug text-foreground break-words space-y-1">
+                      <div className="min-w-0 text-[12px] font-medium leading-snug text-foreground break-words space-y-1">
                         <ReactMarkdown
                           components={{
                             p: ({ children }) => <p className="whitespace-pre-wrap break-words mb-1">{children}</p>,
                             strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
                             em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
-                            code: ({ children }) => <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-[12px]">{children}</code>,
+                            code: ({ children }) => <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-[11px]">{children}</code>,
                             ul: ({ children }) => <ul className="list-disc space-y-0.5 pl-4">{children}</ul>,
                             ol: ({ children }) => <ol className="list-decimal space-y-0.5 pl-4">{children}</ol>,
                             li: ({ children }) => <li className="leading-snug">{children}</li>,
@@ -1679,14 +1641,12 @@ function OverviewTab({
                         </ReactMarkdown>
                       </div>
                       {(run.status !== "running" || latestEntry?.type !== "activity") && (
-                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                          Action: {displayActionLabel}
+                        <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                          {displayActionLabel}
                         </p>
                       )}
                     </div>
                   </div>
-
-
                   <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
                     <StepTimeline
                       activityFeed={activityOldestFirst}
@@ -1697,9 +1657,8 @@ function OverviewTab({
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </>
       </div>
     </div>
   );
