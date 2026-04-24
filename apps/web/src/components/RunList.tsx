@@ -64,13 +64,13 @@ export function RunList({
           {title}
         </p>
       )}
-      <div className="divide-y divide-border rounded-lg border border-border bg-card overflow-hidden">
+      <div className="liquid-glass rounded-xl overflow-hidden space-y-0.5 p-1">
         {runs.map((r) => (
           <button
             key={r.id}
             type="button"
             onClick={() => navigate(`/runs/${r.id}`)}
-            className="group w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-accent/40 transition-colors"
+            className="glass-row group w-full flex items-center gap-3 px-4 py-2.5 text-left"
           >
             <StatusDot status={r.status} />
             <span className="font-mono text-[11px] text-muted-foreground w-[5.5rem] flex-shrink-0 truncate">

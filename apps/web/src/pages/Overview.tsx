@@ -99,8 +99,8 @@ function SetupChecklist({
   let foundCurrent = false;
 
   return (
-    <Card className="overflow-hidden border-border/80">
-      <div className="flex items-start justify-between gap-3 p-4 pb-2 border-b border-border/60 bg-muted/20">
+    <Card className="overflow-hidden">
+      <div className="flex items-start justify-between gap-3 p-4 pb-2 border-b glass-divider bg-muted/10">
         <div className="min-w-0">
           <h2 className="text-[14px] font-semibold text-foreground">Get started</h2>
         </div>
@@ -160,7 +160,7 @@ function SetupChecklist({
               )}>
                 <div className={cn(
                   "rounded-lg transition-colors",
-                  status === "current" && "bg-card border border-border p-4 -mt-1",
+                  status === "current" && "liquid-glass border-border/60 p-4 -mt-1",
                   status === "upcoming" && "opacity-40",
                 )}>
                   <div className="flex items-center gap-2">
@@ -238,7 +238,7 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
   const untested = coverage?.untested ?? 0;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-2 min-h-[88px]">
+    <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Route coverage
@@ -316,7 +316,7 @@ function Dashboard({
 }) {
   const totalCost = overview?.totalCostUsd ?? 0;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Pulse className="h-4 w-4" />} />
@@ -329,25 +329,25 @@ function Dashboard({
         <KpiCard label="Running" value={overview?.running ?? 0} icon={<Spinner className="h-4 w-4 animate-spin" />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Runs */}
-        <Card>
-          <div className="flex items-center justify-between p-4 pb-2">
+        <Card className="min-h-[20rem]">
+          <div className="flex items-center justify-between p-4 pb-2 border-b glass-divider">
             <span className="text-[14px] font-medium">Recent Runs</span>
             <Button variant="ghost" size="sm" onClick={() => navigate("/runs")} className="h-7 text-[12px] gap-1">
               View all <CaretRight className="h-3 w-3" />
             </Button>
           </div>
-          <CardContent className="pt-0">
+          <CardContent className="pt-2">
             {runs.length === 0 ? (
               <EmptyState icon={<Pulse className="h-5 w-5" />} title="No runs yet" className="py-8" />
             ) : (
-              <div className="divide-y divide-border">
+              <div className="space-y-1">
                 {runs.map((r: any) => (
                   <button
                     key={r.id}
                     onClick={() => navigate(`/runs/${r.id}`)}
-                    className="group w-full flex items-center gap-3 px-2 py-2 text-left hover:bg-accent/40 transition-colors rounded"
+                    className="glass-row group w-full flex items-center gap-3 px-2.5 py-2 text-left"
                   >
                     <StatusDot status={r.status} />
                     <span className="flex-1 text-[13px] text-foreground truncate">
@@ -373,23 +373,23 @@ function Dashboard({
         </Card>
 
         {/* Recent Issues */}
-        <Card>
-          <div className="flex items-center justify-between p-4 pb-2">
+        <Card className="min-h-[20rem]">
+          <div className="flex items-center justify-between p-4 pb-2 border-b glass-divider">
             <span className="text-[14px] font-medium">Recent Issues</span>
             <Button variant="ghost" size="sm" onClick={() => navigate("/bugs")} className="h-7 text-[12px] gap-1">
               View all <CaretRight className="h-3 w-3" />
             </Button>
           </div>
-          <CardContent className="pt-0">
+          <CardContent className="pt-2">
             {bugs.length === 0 ? (
               <EmptyState icon={<WarningCircle className="h-5 w-5" />} title="No issues found" className="py-8" />
             ) : (
-              <div className="divide-y divide-border">
+              <div className="space-y-1">
                 {bugs.map((bug: any, i: number) => (
                   <button
                     key={bug.id ?? i}
                     onClick={() => bug.run_id && navigate(`/runs/${bug.run_id}`)}
-                    className="group w-full flex items-center gap-3 px-2 py-2 text-left hover:bg-accent/40 transition-colors rounded"
+                    className="glass-row group w-full flex items-center gap-3 px-2.5 py-2 text-left"
                   >
                     <span className={cn("h-2 w-2 rounded-full flex-shrink-0", SEVERITY_DOT[bug.severity] ?? "bg-muted-foreground/40")} />
                     <span className="flex-1 text-[13px] text-foreground truncate">{bug.name || "Issue"}</span>
@@ -507,9 +507,9 @@ export const Overview: React.FC = () => {
         )}
       </PageHeader>
 
-      <div className="p-6 animate-fade-in">
+      <div className="p-4 md:p-6 animate-page-enter">
         {loading ? (
-          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full">
+          <div className="glass-stage flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full">
             <div className="flex-1 min-w-0 space-y-6 w-full">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[1, 2, 3, 4].map((i) => (
@@ -528,7 +528,7 @@ export const Overview: React.FC = () => {
         ) : (
           <div
             className={cn(
-              "flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full",
+              "glass-stage flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full",
               !showSetupPanel && "max-w-[1600px] mx-auto",
             )}
           >

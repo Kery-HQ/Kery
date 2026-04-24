@@ -43,7 +43,7 @@ const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 const app = Fastify({ logger: true });
 
 await app.register(cors, {
-  origin: [config.appUrl, "http://localhost:19834", "http://localhost:3000"],
+  origin: [config.appUrl, "http://localhost:19834", "http://localhost:3000", "http://localhost:5173"],
   credentials: true,
 });
 

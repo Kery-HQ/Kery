@@ -103,7 +103,7 @@ export function PageDetail() {
   if (loading) {
     return (
       <div className="flex flex-col min-h-full">
-        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-4 w-48" />
           <div className="flex-1" />
@@ -123,7 +123,7 @@ export function PageDetail() {
   if (error || !data) {
     return (
       <div className="flex flex-col min-h-full">
-        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
           <button
             onClick={() => navigate("/pages")}
             className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
@@ -155,7 +155,7 @@ export function PageDetail() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+      <div className="flex items-center justify-between gap-4 px-6 h-12 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
@@ -233,7 +233,7 @@ export function PageDetail() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Main — route + regression plan */}
                 <div className="lg:col-span-2 space-y-4">
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                  <div className="rounded-lg border border-border bg-surface-2 dark:bg-surface-3 p-4 space-y-1">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Route</p>
                     <p className="font-mono text-[14px] text-foreground break-all">{page.normalized_route}</p>
                     {page.title && (
@@ -260,7 +260,7 @@ export function PageDetail() {
                 </div>
 
                 {/* Sidebar — metadata */}
-                <div className="space-y-px rounded-lg border border-border bg-card overflow-hidden">
+                <div className="space-y-px rounded-lg border border-border bg-surface-2 dark:bg-surface-3 overflow-hidden">
                   <div className="px-4 py-3 border-b border-border">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Health</p>
                     <div className="flex items-center gap-2">
@@ -312,7 +312,7 @@ export function PageDetail() {
                   className="py-16"
                 />
               ) : (
-                <div className="rounded-lg border border-border bg-card divide-y divide-border overflow-hidden">
+                <div className="rounded-lg border border-border bg-surface-2 dark:bg-surface-3 divide-y divide-border overflow-hidden">
                   {recentRuns.map((run) => (
                     <button
                       key={run.id}

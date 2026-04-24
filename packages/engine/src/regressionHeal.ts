@@ -91,7 +91,10 @@ function serializeCompletedSteps(completedSteps: RunStep[]): string {
 function buildSystemPrompt(plan: RegressionStep[], failedIndex: number, completedSteps: RunStep[]): string {
   const remainingSteps = serializeRemainingSteps(plan, failedIndex);
   const completedSection = serializeCompletedSteps(completedSteps);
+  const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
   return `You are recovering a failed regression test step. Your job is to make progress on the remaining plan steps using the current page state.
+
+Current date/time: ${now}
 ${completedSection}
 Remaining plan steps (starting from the failed one):
 ${remainingSteps}

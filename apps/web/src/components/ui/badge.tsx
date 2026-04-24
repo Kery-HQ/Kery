@@ -3,18 +3,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
+  "inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors",
   {
     variants: {
       variant: {
-        default:     "bg-primary/12 text-primary",
-        secondary:   "bg-secondary text-secondary-foreground",
-        destructive: "bg-destructive/10 text-destructive",
-        outline:     "border border-border text-foreground",
-        success:     "bg-status-pass/12 text-status-pass",
-        warning:     "bg-status-warn/12 text-status-warn",
-        neutral:     "bg-muted text-muted-foreground",
-        running:     "bg-status-running/12 text-status-running",
+        default:
+          "bg-foreground/10 text-foreground dark:bg-white/12 dark:text-white/90",
+        secondary:
+          "bg-muted text-muted-foreground",
+        destructive:
+          "bg-destructive/14 text-destructive dark:bg-destructive/20 dark:text-red-300",
+        outline:
+          "border border-border/80 text-foreground bg-transparent",
+        success:
+          "bg-status-pass/14 text-status-pass dark:bg-status-pass/18 dark:text-emerald-300",
+        warning:
+          "bg-status-warn/14 text-status-warn dark:bg-status-warn/18 dark:text-amber-300",
+        neutral:
+          "bg-black/8 text-foreground/70 dark:bg-white/10 dark:text-white/60",
+        running:
+          "bg-status-running/14 text-status-running dark:bg-status-running/20 dark:text-blue-300",
       },
     },
     defaultVariants: { variant: "default" },
@@ -22,12 +30,12 @@ const badgeVariants = cva(
 );
 
 const dotColors: Record<string, string> = {
-  default: "bg-primary",
-  success: "bg-status-pass",
+  default:     "bg-foreground dark:bg-white",
+  success:     "bg-status-pass",
   destructive: "bg-status-fail",
-  warning: "bg-status-warn",
-  running: "bg-status-running",
-  neutral: "bg-muted-foreground/40",
+  warning:     "bg-status-warn",
+  running:     "bg-status-running",
+  neutral:     "bg-muted-foreground/50",
 };
 
 export interface BadgeProps

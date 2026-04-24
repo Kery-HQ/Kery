@@ -26,6 +26,24 @@ export function initTheme() {
   applyTheme(getTheme());
 }
 
+function applyWallpaper() {
+  document.documentElement.style.setProperty("--app-wallpaper-image", "none");
+  document.documentElement.style.setProperty("--app-wallpaper-blur-light", "6px");
+  document.documentElement.style.setProperty("--app-wallpaper-blur-dark", "7px");
+}
+
+export function getWallpaperIndex(): number {
+  return 0;
+}
+
+export function rotateWallpaper(): number {
+  return 0;
+}
+
+export function initWallpaper() {
+  applyWallpaper();
+}
+
 export function useHotkey(key: string, callback: () => void, deps: any[] = []) {
   const handler = useCallback(
     (e: KeyboardEvent) => {

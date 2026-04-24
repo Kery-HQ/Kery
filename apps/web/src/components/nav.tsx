@@ -5,12 +5,12 @@ import {
   Check,
   Plus,
   SquaresFour,
-  Globe,
-  FlowArrow,
-  Stack,
-  Pulse,
+  Code,
+  Path,
+  ListChecks,
+  Play,
   Brain,
-  Warning,
+  Bug,
   Gear,
   Sun,
   Moon,
@@ -32,14 +32,14 @@ export type { Theme } from "@/lib/hooks";
 
 const CORE_ITEMS = [
   { name: "Overview",     href: "/overview",      icon: SquaresFour },
-  { name: "Routes",       href: "/pages",         icon: Stack },
-  { name: "Flows",        href: "/tests",         icon: FlowArrow },
-  { name: "Runs",         href: "/runs",          icon: Pulse },
-  { name: "Issues",       href: "/bugs",          icon: Warning },
+  { name: "Routes",       href: "/pages",         icon: Path },
+  { name: "Flows",        href: "/tests",         icon: ListChecks },
+  { name: "Runs",         href: "/runs",          icon: Play },
+  { name: "Issues",       href: "/bugs",          icon: Bug },
 ];
 
 const TOOLS_ITEMS = [
-  { name: "Environments", href: "/environments",  icon: Globe },
+  { name: "Environments", href: "/environments",  icon: Code },
   { name: "Memory",       href: "/memory",        icon: Brain },
 ];
 
@@ -150,12 +150,12 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
   return (
     <nav className={cn(
-      "flex flex-col min-h-screen border-r border-sidebar-border bg-sidebar/95 backdrop-blur-sm flex-shrink-0 transition-all duration-200",
+      "liquid-glass-strong liquid-glass-rgb flex flex-col min-h-screen flex-shrink-0 transition-all duration-200 border-r",
       collapsed ? "w-12" : "w-[220px]",
     )}>
       {/* Brand */}
-      <div className={cn("flex items-center h-12 border-b border-sidebar-border", collapsed ? "px-2 justify-center" : "px-3 justify-between")}>
-        <NavLink to="/overview" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-foreground/90 transition-colors">
+      <div className={cn("flex items-center h-12 glass-divider border-b", collapsed ? "px-2 justify-center" : "px-3 justify-between")}>
+        <NavLink to="/overview" className="flex items-center gap-2 text-foreground dark:text-white hover:opacity-80 transition-opacity">
           <Logo />
           {!collapsed && (
             <span className="font-display font-semibold tracking-tight text-[15px] leading-none">
@@ -164,7 +164,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
           )}
         </NavLink>
         {!collapsed && (
-          <button onClick={toggleCollapsed} className="text-muted-foreground/40 hover:text-muted-foreground transition-colors p-1 rounded-md hover:bg-sidebar-accent">
+          <button onClick={toggleCollapsed} className="text-foreground/35 dark:text-white/35 hover:text-foreground dark:hover:text-white transition-colors p-1 rounded-md hover:bg-black/6 dark:hover:bg-white/8">
             <CaretDoubleLeft className="h-3.5 w-3.5" />
           </button>
         )}
@@ -178,9 +178,9 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className={cn(
-                  "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors",
-                  "text-sidebar-foreground hover:bg-sidebar-accent",
-                  dropdownOpen && "bg-sidebar-accent",
+                  "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition-all",
+                  "text-foreground dark:text-white/90 hover:bg-black/6 dark:hover:bg-white/10",
+                  dropdownOpen && "bg-black/8 dark:bg-white/12",
                 )}
               >
                 {currentProject ? <ProjectIcon project={currentProject} size={5} /> : (
@@ -201,7 +201,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
             </div>
 
             {dropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-border bg-popover ring-1 ring-border/50 overflow-hidden animate-fade-in">
+              <div className="liquid-glass-strong absolute top-full left-0 right-0 mt-1 z-50 rounded-md overflow-hidden animate-fade-in">
                 {projects.length > 0 && (
                   <div className="py-1 max-h-48 overflow-y-auto">
                     {projects.map((p) => (
@@ -259,7 +259,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
           {/* Cmd+K trigger */}
           <button
             onClick={onOpenCommandPalette}
-            className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 mt-1 text-[12px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors"
+            className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 mt-1 text-[12px] text-foreground/45 dark:text-white/45 hover:text-foreground dark:hover:text-white hover:bg-black/6 dark:hover:bg-white/8 transition-colors"
           >
             <MagnifyingGlass className="h-3.5 w-3.5" />
             <span className="flex-1 text-left">Search...</span>
@@ -287,7 +287,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
           {!collapsed && (
             <div className="mt-4 mb-1">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/35 px-2 font-display">Configure</span>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-foreground/30 dark:text-white/30 px-2 font-display">Configure</span>
             </div>
           )}
           {collapsed && <div className="h-px bg-sidebar-border my-2 mx-1" />}
@@ -297,7 +297,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
       </ScrollArea>
 
       {/* Bottom settings */}
-      <div className="px-2 pt-2 pb-1 border-t border-sidebar-border">
+      <div className="px-2 pt-2 pb-1 border-t glass-divider">
         <NavItem
           item={{ name: "Platform Settings", href: "/settings", icon: Gear }}
           active={location.pathname.startsWith("/settings")}
@@ -306,7 +306,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
       </div>
 
       {/* Theme footer */}
-      <div className="border-t border-sidebar-border p-2">
+      <div className="border-t glass-divider p-2">
         {collapsed ? (
           <div className="flex justify-center">
             <button onClick={cycleTheme} className="p-1.5 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors">
@@ -314,7 +314,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
             </button>
           </div>
         ) : (
-          <div className="flex rounded-md bg-sidebar-accent/50 p-0.5 gap-0.5">
+          <div className="flex rounded-md bg-black/6 dark:bg-white/6 p-0.5 gap-0.5">
             {([
               { mode: "light" as const, Icon: Sun, label: "Light" },
               { mode: "system" as const, Icon: Monitor, label: "System" },
@@ -324,8 +324,8 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1 rounded py-1 text-[11px] font-medium transition-colors",
                   theme === mode
-                    ? "bg-sidebar-border/50 text-foreground"
-                    : "text-muted-foreground/45 hover:text-foreground",
+                    ? "bg-white/55 dark:bg-white/15 text-foreground dark:text-white shadow-sm"
+                    : "text-foreground/40 dark:text-white/40 hover:text-foreground dark:hover:text-white",
                 )}>
                 <Icon className="h-3 w-3 flex-shrink-0" />
                 <span>{label}</span>
@@ -361,17 +361,17 @@ function NavItem({ item, active, collapsed }: { item: { name: string; href: stri
         "group flex items-center rounded-md text-[13px] font-medium transition-colors relative",
         collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2 py-[6px]",
         active
-          ? "bg-primary/10 text-foreground"
-          : "text-sidebar-foreground/55 hover:text-sidebar-foreground hover:bg-sidebar-accent",
+          ? "bg-black/8 dark:bg-white/12 text-foreground dark:text-white font-semibold"
+          : "text-foreground/55 dark:text-white/55 hover:text-foreground dark:hover:text-white hover:bg-black/6 dark:hover:bg-white/8",
       )}
     >
       {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r bg-primary" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r bg-foreground dark:bg-white/80" />
       )}
       <item.icon className={cn(
         "flex-shrink-0 transition-colors",
         collapsed ? "h-4 w-4" : "h-[15px] w-[15px]",
-        active ? "text-primary" : "text-muted-foreground/50 group-hover:text-sidebar-foreground",
+        active ? "text-foreground dark:text-white" : "text-foreground/45 dark:text-white/45 group-hover:text-foreground dark:group-hover:text-white",
       )} />
       {!collapsed && <span>{item.name}</span>}
     </NavLink>
