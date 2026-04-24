@@ -5,7 +5,7 @@ import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun, generateScriptWithLLM,
   createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
-  isStopRequested, updateEngineConfig,
+  isStopRequested, updateEngineConfig, rewriteForDocker,
 } from "@kery/engine";
 import { decryptValue } from "@kery/db";
 import type { Redis } from "ioredis";
@@ -220,7 +220,7 @@ export function createRunWorker(
 
         const runJob: any = {
           runId: data.runId,
-          baseUrl: data.baseUrl,
+          baseUrl: rewriteForDocker(data.baseUrl),
           intent: data.intent,
           projectId: data.projectId,
           auth: data.auth,

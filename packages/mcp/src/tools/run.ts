@@ -1,23 +1,72 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { KeryClient } from "@kery/client";
+import { RunIntentField } from "../validation.js";
 
 export function registerRunTestTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_run_test",
-    `Run a test against a web application. Provide an intent (what to test) OR a testId (saved test) OR a pageRoute (specific page to inspect). The test runs in a real browser with an AI agent navigating and detecting bugs. Returns pass/fail status and any bugs found. Typically takes 1-5 minutes.`,
+    `Run an AI browser test against a web application. The AI agent navigates the app in a real browser, takes actions, and reports any bugs found.
+
+WHEN TO USE:
+  • User says "run a test", "test my app", "check if X works", "verify the signup flow"
+  • After making code changes and wanting to regression test
+  • Testing a specific page or user flow
+  • Running a saved test by ID
+
+PREREQUISITES:
+  • Kery must be running (call kery_start if needed)
+  • Project must exist (call kery_setup_project first)
+  • For pageRoute: must have scanned the app first (call kery_scan)
+
+HOW TO PROVIDE THE TEST:
+  • Use 'intent' for natural language: "verify the checkout flow completes successfully"
+  • Use 'pageRoute' to test a specific page: "/dashboard", "/settings", "/checkout"
+  • Use 'testId' to rerun a saved test (get IDs from kery_list_tests)
+  • Omitting all three runs a general health check of the app
+
+TIMING: Tests take 1-5 minutes. This tool waits for completion and returns results.
+
+After the test, call kery_get_bugs to review bugs, or kery_get_run with the runId for full step-by-step details.`,
     {
-      projectId: z.string().uuid().describe("The Kery project ID"),
-      intent: z.string().optional().describe("What to test, e.g. 'verify the signup flow works' or 'check that the settings page loads correctly'"),
-      testId: z.string().uuid().optional().describe("Run a saved test by its ID"),
-      pageRoute: z.string().optional().describe("Test a specific page by route, e.g. '/settings' or '/dashboard'. Resolved to a destination internally."),
-      environmentId: z.string().uuid().optional().describe("Environment to test against. Defaults to the project's default environment."),
+      projectId: z
+        .string()
+        .uuid()
+        .describe("Project ID to run the test against (get from kery_setup_project or kery_list_projects)"),
+      intent: RunIntentField,
+      testId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe("ID of a saved test to run (get from kery_list_tests)"),
+      pageRoute: z
+        .string()
+        .optional()
+        .describe(
+          "Test a specific page by its route, e.g. '/settings', '/dashboard', '/checkout'. " +
+          "The app must have been scanned first (kery_scan). " +
+          "Get available routes from kery_list_routes.",
+        ),
+      environmentId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe(
+          "Environment to test against (defaults to the project's default environment). " +
+          "Use this to test against staging or production instead of local dev.",
+        ),
     },
     async ({ projectId, intent, testId, pageRoute, environmentId }) => {
       const healthy = await client.checkHealth();
       if (!healthy) {
         return {
-          content: [{ type: "text", text: "Kery is not running. Start it first with kery_start." }],
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              error: "Kery is not running.",
+              fix: "Call kery_start first, then retry kery_run_test.",
+            }),
+          }],
           isError: true,
         };
       }
@@ -29,7 +78,13 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
           environmentId = env.id;
         } catch {
           return {
-            content: [{ type: "text", text: "No environment configured. Use kery_setup_project first." }],
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "No environment configured for this project.",
+                fix: "Call kery_setup_project first to create the project and a default environment.",
+              }),
+            }],
             isError: true,
           };
         }
@@ -39,25 +94,34 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
       let destinationId: string | undefined;
       if (pageRoute) {
         const { pages } = await client.getPages(projectId);
+        if (pages.length === 0) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: "No pages discovered yet.",
+                fix: `Call kery_scan with projectId="${projectId}" first to crawl the app and discover pages, then retry.`,
+              }),
+            }],
+            isError: true,
+          };
+        }
         const match = pages.find((p) => p.normalized_route === pageRoute);
         if (!match) {
           const available = pages.map((p) => p.normalized_route).slice(0, 20);
           return {
             content: [{
               type: "text",
-              text: `Page route "${pageRoute}" not found. Run kery_scan first. Available routes: ${JSON.stringify(available)}`,
+              text: JSON.stringify({
+                error: `Page route "${pageRoute}" not found in discovered pages.`,
+                availableRoutes: available,
+                fix: "Use one of the availableRoutes, or call kery_scan again if you added this page recently.",
+              }),
             }],
             isError: true,
           };
         }
         destinationId = match.id;
-      }
-
-      if (!intent && !testId && !destinationId) {
-        return {
-          content: [{ type: "text", text: "Provide at least one of: intent, testId, or pageRoute." }],
-          isError: true,
-        };
       }
 
       try {
@@ -70,8 +134,22 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
 
         const run = await client.waitForRun(runId);
 
-        // Strip screenshots from bugs (too large for LLM context)
         const bugs = (run.bugs_json ?? []).map(({ screenshotBase64, screenshotPath, ...rest }) => rest);
+        const highBugs = bugs.filter((b) => b.severity === "high");
+        const medBugs = bugs.filter((b) => b.severity === "medium");
+
+        const nextSteps: string[] = [];
+        if (run.status === "passed" && bugs.length === 0) {
+          nextSteps.push("Test passed with no bugs found.");
+          nextSteps.push("Run more tests with different intents, or call kery_get_coverage to see untested pages.");
+        } else if (bugs.length > 0) {
+          nextSteps.push(
+            `Found ${bugs.length} bug(s)${highBugs.length > 0 ? ` (${highBugs.length} high severity)` : ""}. Call kery_get_bugs with projectId="${projectId}" to review them in detail.`,
+          );
+          nextSteps.push(`Call kery_get_run with runId="${run.id}" to see the full step-by-step agent trace.`);
+        } else if (run.status === "failed") {
+          nextSteps.push(`Test run failed. Call kery_get_run with runId="${run.id}" to see what went wrong.`);
+        }
 
         return {
           content: [{
@@ -79,21 +157,34 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
             text: JSON.stringify({
               runId: run.id,
               status: run.status,
-              stepsCount: run.steps_json?.length ?? 0,
+              stepsCount: (run.steps_json ?? []).length,
               bugsFound: bugs.map((b) => ({
+                id: b.id,
                 name: b.name,
-                description: b.description,
                 severity: b.severity,
                 category: b.category,
+                description: b.description,
                 url: b.url,
               })),
+              summary: run.summary ?? null,
               webUrl: client.buildWebUrl(`/runs/${run.id}`),
+              nextSteps,
             }),
           }],
         };
       } catch (err) {
         return {
-          content: [{ type: "text", text: `Test run failed: ${err instanceof Error ? err.message : String(err)}` }],
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              error: `Test run failed: ${err instanceof Error ? err.message : String(err)}`,
+              nextSteps: [
+                "Make sure the app is running and accessible at the configured URL.",
+                "Check kery_list_projects to verify the environment's baseUrl is correct.",
+                "If auth is needed, verify credentials with kery_update_auth.",
+              ],
+            }),
+          }],
           isError: true,
         };
       }

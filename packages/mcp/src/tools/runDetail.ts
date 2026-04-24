@@ -5,21 +5,31 @@ import type { KeryClient } from "@kery/client";
 export function registerRunDetailTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_get_run",
-    `Get detailed results of a specific test run. Includes status, steps taken, and bugs found. Use includeScreenshots to get URLs pointing to bug screenshots — URLs are returned instead of raw image data to keep the response size manageable. Open the URLs in a browser or pass them to an image viewer.`,
+    `Get detailed results of a specific test run, including every step the AI agent took and all bugs found.
+
+WHEN TO USE:
+  • After kery_run_test returns a runId, call this to get the full trace
+  • User asks "what happened in that test run", "show me the steps"
+  • Debugging why a test failed — the steps show exactly what the agent clicked/typed and where it got stuck
+  • Getting screenshot URLs for bugs found in a run
+
+STEP STRUCTURE: Each step shows the agent's action (click, type, navigate, observe), the target element, reasoning, and status (ok/failed/skipped).
+
+Get runIds from kery_run_test results or kery_list_runs.`,
     {
-      runId: z.string().uuid().describe("The run ID to look up"),
+      runId: z.string().uuid().describe("Run ID to look up (get from kery_run_test or kery_list_runs)"),
       includeScreenshots: z
         .boolean()
         .default(false)
         .describe(
-          "When true, each bug in the response will include a screenshotUrl (a direct URL to the JPEG screenshot). Screenshots are NOT embedded — the URL must be opened separately. Defaults to false.",
+          "When true, each bug includes a screenshotUrl (direct URL to a JPEG). Open in a browser to view. Defaults to false to keep response size small.",
         ),
     },
     async ({ runId, includeScreenshots }) => {
       const healthy = await client.checkHealth();
       if (!healthy) {
         return {
-          content: [{ type: "text", text: "Kery is not running. Start it first with kery_start." }],
+          content: [{ type: "text", text: "Kery is not running. Call kery_start to launch Docker, or check your connection." }],
           isError: true,
         };
       }
@@ -40,13 +50,13 @@ export function registerRunDetailTool(server: McpServer, client: KeryClient) {
             source: rest.source,
             reportedAt: rest.reportedAt,
           };
-
           if (includeScreenshots && screenshotPath) {
             bug.screenshotUrl = `${client.apiUrl}/api/bugs/${run.id}/${screenshotPath}`;
           }
-
           return bug;
         });
+
+        const failedSteps = (run.steps_json ?? []).filter((s) => s.status === "failed");
 
         return {
           content: [{
@@ -55,8 +65,11 @@ export function registerRunDetailTool(server: McpServer, client: KeryClient) {
               runId: run.id,
               status: run.status,
               displayName: (run as any).display_name ?? null,
+              summary: run.summary ?? null,
               startedAt: run.started_at,
               completedAt: run.completed_at,
+              stepsCount: (run.steps_json ?? []).length,
+              failedStepsCount: failedSteps.length,
               steps: (run.steps_json ?? []).map((s) => ({
                 index: s.index,
                 action: s.action,
@@ -69,15 +82,29 @@ export function registerRunDetailTool(server: McpServer, client: KeryClient) {
               bugs,
               ...(includeScreenshots && {
                 screenshotNote:
-                  "screenshotUrl fields point to JPEG images served by the Kery API. They are accessible as long as Kery is running.",
+                  "screenshotUrl fields are direct JPEG URLs served by the Kery API, accessible while Kery is running.",
               }),
+              nextSteps: [
+                bugs.length > 0
+                  ? `${bugs.length} bug(s) found. Call kery_update_bug to mark them as resolved or wont_fix after reviewing.`
+                  : "No bugs found in this run.",
+                failedSteps.length > 0
+                  ? `${failedSteps.length} steps failed. Check the steps array above for details on what the agent couldn't do.`
+                  : null,
+              ].filter(Boolean),
               webUrl: client.buildWebUrl(`/runs/${run.id}`),
             }),
           }],
         };
       } catch {
         return {
-          content: [{ type: "text", text: `Run "${runId}" not found.` }],
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              error: `Run "${runId}" not found.`,
+              fix: "Call kery_list_runs to see available run IDs for your project.",
+            }),
+          }],
           isError: true,
         };
       }

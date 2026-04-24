@@ -271,6 +271,159 @@ export class KeryClient {
     return this.fetch(`/api/projects/${projectId}/overview`);
   }
 
+  // ── Project management ───────────────────────────────────────────────────
+
+  async updateProject(
+    projectId: string,
+    data: { name?: string; domain?: string | null },
+  ): Promise<Project> {
+    const result = await this.fetch<{ project: Project }>(`/api/projects/${projectId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    return result.project;
+  }
+
+  // ── Environment management ───────────────────────────────────────────────
+
+  async updateEnvironment(
+    projectId: string,
+    environmentId: string,
+    data: { name?: string; baseUrl?: string },
+  ): Promise<Environment> {
+    const result = await this.fetch<{ environment: Environment }>(
+      `/api/projects/${projectId}/environments/${environmentId}`,
+      { method: "PUT", body: JSON.stringify(data) },
+    );
+    return result.environment;
+  }
+
+  async deleteEnvironment(projectId: string, environmentId: string): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/environments/${environmentId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // ── Auth management ──────────────────────────────────────────────────────
+
+  async getAuth(
+    projectId: string,
+    environmentId: string,
+  ): Promise<{ mode: string; config?: Record<string, unknown> } | null> {
+    const result = await this.fetch<{
+      auth: { mode: string; config?: Record<string, unknown> } | null;
+    }>(`/api/projects/${projectId}/environments/${environmentId}/auth`);
+    return result.auth;
+  }
+
+  // ── Bug management ───────────────────────────────────────────────────────
+
+  async updateBug(
+    projectId: string,
+    bugId: string,
+    status: "open" | "in_progress" | "resolved" | "wont_fix",
+  ): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/bugs/${bugId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async deleteBug(projectId: string, bugId: string): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/bugs/${bugId}`, { method: "DELETE" });
+  }
+
+  // ── Pages ─────────────────────────────────────────────────────────────────
+
+  async updatePage(projectId: string, pageId: string, enabled: boolean): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/pages/${pageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  // ── Runs ──────────────────────────────────────────────────────────────────
+
+  async stopRun(runId: string): Promise<void> {
+    await this.fetch(`/api/runs/${runId}/stop`, { method: "POST" });
+  }
+
+  // ── Memory ────────────────────────────────────────────────────────────────
+
+  async listMemory(projectId: string): Promise<Record<string, unknown>[]> {
+    const result = await this.fetch<{ entries: Record<string, unknown>[] }>(
+      `/api/projects/${projectId}/memory`,
+    );
+    return result.entries;
+  }
+
+  async createMemoryEntry(
+    projectId: string,
+    data: {
+      type: string;
+      summary: string;
+      content: string;
+      confidence?: number;
+      region?: { description: string } | null;
+    },
+  ): Promise<Record<string, unknown>> {
+    const result = await this.fetch<{ entry: Record<string, unknown> }>(
+      `/api/projects/${projectId}/memory`,
+      { method: "POST", body: JSON.stringify(data) },
+    );
+    return result.entry;
+  }
+
+  async updateMemoryEntry(
+    projectId: string,
+    entryId: string,
+    data: {
+      type?: string;
+      summary?: string;
+      content?: string;
+      confidence?: number;
+      region?: { description: string } | null;
+    },
+  ): Promise<Record<string, unknown>> {
+    const result = await this.fetch<{ entry: Record<string, unknown> }>(
+      `/api/projects/${projectId}/memory/${entryId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+    );
+    return result.entry;
+  }
+
+  async deleteMemoryEntry(projectId: string, entryId: string): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/memory/${entryId}`, { method: "DELETE" });
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+
+  async getModelSettings(): Promise<{
+    models: Record<string, { current: string; default: string; customized: boolean }>;
+    modelPrices?: Record<string, { input: number; output: number }>;
+    llmKeys?: Record<string, boolean>;
+  }> {
+    return this.fetch("/api/settings/models");
+  }
+
+  async updateModelSettings(
+    models: Partial<Record<"agentModel" | "auxiliaryModel" | "reviewAgentModel" | "stagehandModel", string>>,
+  ): Promise<void> {
+    await this.fetch("/api/settings/models", { method: "PUT", body: JSON.stringify(models) });
+  }
+
+  async getApiKeys(): Promise<
+    Record<string, { hasKey: boolean; source: "env" | "db" | "none"; maskedKey?: string }>
+  > {
+    return this.fetch("/api/settings/api-keys");
+  }
+
+  async updateApiKeys(
+    keys: Partial<Record<"openai" | "anthropic" | "gemini" | "openrouter", string>>,
+  ): Promise<void> {
+    await this.fetch("/api/settings/api-keys", { method: "PUT", body: JSON.stringify(keys) });
+  }
+
   // ── Saved Tests ──────────────────────────────────────────────────────
 
   async listTests(projectId: string): Promise<SavedTest[]> {
@@ -291,6 +444,27 @@ export class KeryClient {
       { method: "POST", body: JSON.stringify({ name, intent, context }) },
     );
     return data.test;
+  }
+
+  async updateTest(
+    projectId: string,
+    testId: string,
+    data: {
+      name?: string;
+      intent?: string;
+      context?: string | null;
+      reset_script?: boolean;
+    },
+  ): Promise<SavedTest> {
+    const result = await this.fetch<{ test: SavedTest }>(
+      `/api/projects/${projectId}/tests/${testId}`,
+      { method: "PUT", body: JSON.stringify(data) },
+    );
+    return result.test;
+  }
+
+  async deleteTest(projectId: string, testId: string): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/tests/${testId}`, { method: "DELETE" });
   }
 }
 
