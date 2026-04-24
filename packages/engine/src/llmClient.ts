@@ -269,6 +269,198 @@ function getAgentSchema(model: string, routeKind: LlmRoute["kind"]): any | undef
   return GEMINI_AGENT_SCHEMA;
 }
 
+// ─── Review agent schemas ─────────────────────────────────────────────────────
+
+/**
+ * Shared region property: OpenAI/Anthropic variant (nullable anyOf).
+ * For Gemini we use a plain object (non-required field handles optionality).
+ */
+const REGION_PROP_OAI = {
+  anyOf: [
+    {
+      type: "object",
+      properties: {
+        x: { type: "number" },
+        y: { type: "number" },
+        w: { type: "number" },
+        h: { type: "number" },
+      },
+      required: ["x", "y", "w", "h"],
+      additionalProperties: false,
+    },
+    { type: "null" },
+  ],
+};
+
+const REGION_PROP_GEMINI = {
+  type: "object",
+  properties: {
+    x: { type: "number" },
+    y: { type: "number" },
+    w: { type: "number" },
+    h: { type: "number" },
+  },
+};
+
+function makeBugsResponseFormat(bugTypeEnum: string[], provider: "oai" | "gemini"): any {
+  if (provider === "gemini") {
+    return {
+      type: "json_schema" as const,
+      json_schema: {
+        name: "review_bugs",
+        schema: {
+          type: "object",
+          properties: {
+            bugs: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  type:        { type: "string", enum: bugTypeEnum },
+                  description: { type: "string" },
+                  severity:    { type: "string", enum: ["high", "medium", "low"] },
+                  frameIndex:  { type: "integer" },
+                  region:      REGION_PROP_GEMINI,
+                },
+                required: ["type", "description", "severity"],
+              },
+            },
+          },
+          required: ["bugs"],
+        },
+      },
+    };
+  }
+  // OpenAI / Anthropic strict mode
+  return {
+    type: "json_schema" as const,
+    json_schema: {
+      name: "review_bugs",
+      strict: true,
+      schema: {
+        type: "object",
+        properties: {
+          bugs: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                type:        { type: "string", enum: bugTypeEnum },
+                description: { type: "string" },
+                severity:    { type: "string", enum: ["high", "medium", "low"] },
+                frameIndex:  { anyOf: [{ type: "integer" }, { type: "null" }] },
+                region:      REGION_PROP_OAI,
+              },
+              required: ["type", "description", "severity", "frameIndex", "region"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["bugs"],
+        additionalProperties: false,
+      },
+    },
+  };
+}
+
+const TRIAGE_RESPONSE_FORMAT_OAI = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "triage_decisions",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        decisions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              bugIndex: { type: "integer" },
+              keep:     { type: "boolean" },
+              severity: { type: "string", enum: ["low", "medium", "high"] },
+              reason:   { type: "string" },
+            },
+            required: ["bugIndex", "keep", "severity", "reason"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["decisions"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const TRIAGE_RESPONSE_FORMAT_GEMINI = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "triage_decisions",
+    schema: {
+      type: "object",
+      properties: {
+        decisions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              bugIndex: { type: "integer" },
+              keep:     { type: "boolean" },
+              severity: { type: "string", enum: ["low", "medium", "high"] },
+              reason:   { type: "string" },
+            },
+            required: ["bugIndex", "keep", "severity", "reason"],
+          },
+        },
+      },
+      required: ["decisions"],
+    },
+  },
+};
+
+/**
+ * Returns the responseFormat for holistic/filmstrip review agents, applying the same routing
+ * logic as getAgentSchema:
+ * - Anthropic direct → Anthropic tool-call schema (strict)
+ * - Anthropic via OpenRouter (supported models) → OpenAI json_schema
+ * - Anthropic via OpenRouter (unsupported, e.g. haiku-4.5) → undefined (prompt+retry fallback)
+ * - OpenAI → OpenAI json_schema
+ * - Gemini → Gemini json_schema
+ */
+export function getReviewBugsResponseFormat(model: string, bugTypeEnum: string[]): any | undefined {
+  const cfg = getConfig();
+  const route = pickLlmRoute(model, cfg);
+  if (route.kind === "none") return undefined;
+  if (isAnthropicModel(model)) {
+    if (route.kind === "anthropic") return makeBugsResponseFormat(bugTypeEnum, "oai");
+    if (route.kind === "openrouter" && OPENROUTER_ANTHROPIC_STRUCTURED_MODELS.has(model)) {
+      return makeBugsResponseFormat(bugTypeEnum, "oai");
+    }
+    return undefined;
+  }
+  if (isOpenAIModel(model)) return makeBugsResponseFormat(bugTypeEnum, "oai");
+  return makeBugsResponseFormat(bugTypeEnum, "gemini");
+}
+
+/**
+ * Returns the responseFormat for the bug triage agent, using the same routing logic as
+ * getReviewBugsResponseFormat.
+ */
+export function getTriageResponseFormat(model: string): any | undefined {
+  const cfg = getConfig();
+  const route = pickLlmRoute(model, cfg);
+  if (route.kind === "none") return undefined;
+  if (isAnthropicModel(model)) {
+    if (route.kind === "anthropic") return TRIAGE_RESPONSE_FORMAT_OAI;
+    if (route.kind === "openrouter" && OPENROUTER_ANTHROPIC_STRUCTURED_MODELS.has(model)) {
+      return TRIAGE_RESPONSE_FORMAT_OAI;
+    }
+    return undefined;
+  }
+  if (isOpenAIModel(model)) return TRIAGE_RESPONSE_FORMAT_OAI;
+  return TRIAGE_RESPONSE_FORMAT_GEMINI;
+}
+
 // ─── Usage / pricing ─────────────────────────────────────────────────────────
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {

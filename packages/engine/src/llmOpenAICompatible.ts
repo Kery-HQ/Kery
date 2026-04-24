@@ -31,7 +31,7 @@ export async function openAIStyleChat(
   const body: Record<string, unknown> = {
     model: wireModel,
     messages,
-    max_tokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
+    max_completion_tokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
     temperature: opts.temperature ?? 0.1,
   };
   if (opts.responseFormat) body.response_format = opts.responseFormat;

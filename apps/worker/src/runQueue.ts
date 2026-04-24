@@ -5,11 +5,13 @@ import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun, generateScriptWithLLM,
   createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
-  isStopRequested,
+  isStopRequested, updateEngineConfig,
 } from "@kery/engine";
+import { decryptValue } from "@kery/db";
 import type { Redis } from "ioredis";
 import { clearRunStopRequest, startRunStopPoller, runStopRedisKey } from "./runStopRedis.js";
 import { createRunLiveBridge, deleteLiveRunState, runEventsChannel } from "./liveRunBridge.js";
+import { config } from "./config.js";
 import * as fs from "fs";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
@@ -52,6 +54,97 @@ function detectConcurrency(): number {
   const concurrency = Math.max(1, Math.min(10, Math.floor(freeMem / (512 * 1024 * 1024))));
   logger.info({ freeMem, concurrency }, "Auto-detected run queue concurrency");
   return concurrency;
+}
+
+/** Refresh LLM/API-key config from DB before each run (DB overrides env defaults). */
+async function refreshEngineConfigFromDb(storage: StorageAdapter): Promise<void> {
+  const baseConfig = {
+    openaiApiKey: config.openaiApiKey,
+    openrouterApiKey: config.openrouterApiKey,
+    anthropicApiKey: config.anthropicApiKey,
+    geminiApiKey: config.geminiApiKey,
+    agentModel: config.agentModel,
+    auxiliaryModel: config.auxiliaryModel,
+    reviewAgentModel: config.reviewAgentModel,
+    stagehandModel: config.stagehandModel,
+    modelPriceUsdPerMillion: {},
+  };
+  updateEngineConfig(baseConfig);
+
+  try {
+    const all = await storage.getSettings();
+
+    const keyOverrides: Record<string, string> = {};
+    const keyMap: Record<string, string> = {
+      "apiKey.openai": "openaiApiKey",
+      "apiKey.anthropic": "anthropicApiKey",
+      "apiKey.gemini": "geminiApiKey",
+      "apiKey.openrouter": "openrouterApiKey",
+    };
+    for (const [dbKey, cfgKey] of Object.entries(keyMap)) {
+      if (all[dbKey]) keyOverrides[cfgKey] = decryptValue(all[dbKey]);
+    }
+
+    const modelOverrides: Record<string, string> = {};
+    const modelMap: Record<string, string> = {
+      "model.agentModel": "agentModel",
+      "model.reviewAgentModel": "reviewAgentModel",
+      "model.stagehandModel": "stagehandModel",
+    };
+    for (const [dbKey, cfgKey] of Object.entries(modelMap)) {
+      if (all[dbKey]) modelOverrides[cfgKey] = all[dbKey];
+    }
+    const auxiliaryModel =
+      all["model.auxiliaryModel"] ??
+      all["model.crawlModel"] ??
+      all["model.scriptModel"] ??
+      all["model.summaryModel"] ??
+      all["model.reviewModel"];
+    if (auxiliaryModel) modelOverrides.auxiliaryModel = auxiliaryModel;
+
+    const modelPriceUsdPerMillion: Record<string, { input: number; output: number }> = {};
+    const priceMap: Record<string, string> = {
+      "modelPrice.agentModel": "agentModel",
+      "modelPrice.reviewAgentModel": "reviewAgentModel",
+      "modelPrice.stagehandModel": "stagehandModel",
+    };
+    for (const [dbKey, cfgKey] of Object.entries(priceMap)) {
+      const raw = all[dbKey];
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as { input?: unknown; output?: unknown };
+        if (typeof parsed.input === "number" && typeof parsed.output === "number") {
+          modelPriceUsdPerMillion[cfgKey] = { input: parsed.input, output: parsed.output };
+        }
+      } catch {
+        /* ignore bad JSON */
+      }
+    }
+    const auxiliaryPriceRaw =
+      all["modelPrice.auxiliaryModel"] ??
+      all["modelPrice.crawlModel"] ??
+      all["modelPrice.scriptModel"] ??
+      all["modelPrice.summaryModel"] ??
+      all["modelPrice.reviewModel"];
+    if (auxiliaryPriceRaw) {
+      try {
+        const parsed = JSON.parse(auxiliaryPriceRaw) as { input?: unknown; output?: unknown };
+        if (typeof parsed.input === "number" && typeof parsed.output === "number") {
+          modelPriceUsdPerMillion.auxiliaryModel = { input: parsed.input, output: parsed.output };
+        }
+      } catch {
+        /* ignore bad JSON */
+      }
+    }
+
+    updateEngineConfig({
+      ...(Object.keys(keyOverrides).length > 0 ? keyOverrides : {}),
+      ...(Object.keys(modelOverrides).length > 0 ? modelOverrides : {}),
+      modelPriceUsdPerMillion,
+    });
+  } catch {
+    // settings table may not exist yet — env defaults already applied above
+  }
 }
 
 export function createRunWorker(
@@ -119,6 +212,7 @@ export function createRunWorker(
       };
 
       try {
+        await refreshEngineConfigFromDb(storage);
         await storage.updateTestRun(data.runId, {
           status: "running",
           started_at: new Date().toISOString(),

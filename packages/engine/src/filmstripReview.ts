@@ -4,11 +4,12 @@
  */
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS, getReviewBugsResponseFormat } from "./llmClient.js";
 import type { LLMCallRecord } from "./agent.js";
 import { serializeWireMessagesForStorage } from "./agent.js";
 import type { ReviewBug } from "./types.js";
 import { drawGridOnScreenshot } from "./gridScan.js";
+import { parseFirstJsonObject } from "./jsonResponse.js";
 
 export type FilmstripFrame = { url: string; base64: string };
 
@@ -35,6 +36,7 @@ STRICT SCOPE — do NOT report these (other agents handle them):
 Return JSON: { "bugs": [ { "type": "visual"|"ux", "description": string (max 120 chars), "severity": "low"|"medium"|"high", "frameIndex"?: number (0-based index within THIS batch of images), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
 Be selective — only report what you are confident is a cross-page inconsistency.
+Output MUST be raw JSON only. Do not use markdown fences. Do not add any prose.
 If you include "region", coordinates MUST use a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.
 Screenshots have a faint 0-1000 coordinate grid overlay — read axis labels along the top and left edges to produce precise "region" values.`;
 
@@ -68,14 +70,7 @@ function parseFilmstripResponse(
   const toParse = raw?.trim() ?? "";
   if (!toParse) return bugs;
   try {
-    let body = toParse;
-    const jsonMatch = body.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) body = jsonMatch[1].trim();
-    if (!body.endsWith("}") && body.includes('"bugs"')) {
-      const lastObjEnd = body.lastIndexOf("},");
-      if (lastObjEnd > 0) body = body.slice(0, lastObjEnd + 1) + "]}";
-    }
-    const parsed = JSON.parse(body) as {
+    const parsed = parseFirstJsonObject<{
       bugs?: Array<{
         type?: string;
         description?: string;
@@ -83,7 +78,8 @@ function parseFilmstripResponse(
         frameIndex?: number;
         region?: { x: number; y: number; w: number; h: number };
       }>;
-    };
+    }>(toParse);
+    if (!parsed) return bugs;
     const list = Array.isArray(parsed?.bugs) ? parsed.bugs : [];
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
@@ -167,33 +163,64 @@ async function analyzeChunk(
     { role: "user", content },
   ];
 
+  const FILMSTRIP_BUG_TYPES = ["visual", "ux"];
+  const responseFormat = getReviewBugsResponseFormat(model, FILMSTRIP_BUG_TYPES);
+
   try {
-    const t0 = Date.now();
-    const { content: raw, usage } = await llmChat(messages, model, {
-      maxTokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.15,
-      timeoutMs: config.reviewTimeoutMs * 2,
-    });
-    const durationMs = Date.now() - t0;
-    const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(messages);
-    onLLMCall?.({
-      stepIndex: baseStepIndex,
-      model,
-      hasVision: true,
-      attempt: 1,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      totalTokens: usage.totalTokens,
-      durationMs,
-      costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel"),
-      query: `Filmstrip journey review (chunk ${chunkIndex + 1}, ${chunk.length} frames)`,
-      requestMessages,
-      imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
-      imageBase64: imageBase64s[0],
-      response: raw,
-      agent: "filmstrip",
-    });
-    return parseFilmstripResponse(raw, baseStepIndex, chunk, at);
+    const reminder = "REMINDER: Reply with one raw JSON object only. No markdown, no extra text.";
+    let totalCostUsd = 0;
+    let totalDurationMs = 0;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const callMessages = attempt === 0
+        ? messages
+        : [
+            messages[0],
+            {
+              role: "user" as const,
+              content: [
+                ...content,
+                { type: "text", text: reminder },
+              ],
+            },
+          ];
+      const t0 = Date.now();
+      const { content: raw, usage } = await llmChat(callMessages, model, {
+        maxTokens: MAX_OUTPUT_TOKENS,
+        temperature: 0.15,
+        timeoutMs: config.reviewTimeoutMs * 2,
+        responseFormat,
+      });
+      const durationMs = Date.now() - t0;
+      const attemptCost = calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel");
+      totalCostUsd += attemptCost;
+      totalDurationMs += durationMs;
+
+      const parsed = parseFilmstripResponse(raw, baseStepIndex, chunk, at);
+      const valid = parsed.length > 0 || parseFirstJsonObject<{ bugs?: unknown[] }>(raw) !== null;
+
+      if (valid || attempt === 2) {
+        const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(callMessages);
+        onLLMCall?.({
+          stepIndex: baseStepIndex,
+          model,
+          hasVision: true,
+          attempt: attempt + 1,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+          durationMs: totalDurationMs,
+          costUsd: totalCostUsd,
+          query: `Filmstrip journey review (chunk ${chunkIndex + 1}, ${chunk.length} frames)`,
+          requestMessages,
+          imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
+          imageBase64: imageBase64s[0],
+          response: raw,
+          agent: "filmstrip",
+        });
+        return valid ? parsed : [];
+      }
+    }
+    return [];
   } catch (err) {
     logger.warn({ err: String(err), chunkIndex }, "FilmstripReview: LLM call failed");
     return [];

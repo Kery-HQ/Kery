@@ -1,9 +1,10 @@
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS, getTriageResponseFormat } from "./llmClient.js";
 import type { LLMCallRecord, RunStep } from "./agent.js";
 import { serializeWireMessagesForStorage } from "./agent.js";
 import type { MemoryEntry } from "./agentMemory.js";
+import { parseFirstJsonObject } from "./jsonResponse.js";
 
 const TRIAGE_SYSTEM = `You are a senior QA triage agent.
 
@@ -99,11 +100,8 @@ function parseTriage(raw: string, bugs: RunStep[]): { next: RunStep[]; skippedCo
   const trimmed = raw?.trim() ?? "";
   if (!trimmed) return fallback;
   try {
-    let body = trimmed;
-    const jsonBlock = body.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonBlock) body = jsonBlock[1].trim();
-
-    const parsed = JSON.parse(body) as { decisions?: ParsedDecision[] };
+    const parsed = parseFirstJsonObject<{ decisions?: ParsedDecision[] }>(trimmed);
+    if (!parsed) return fallback;
     const decisions = Array.isArray(parsed.decisions) ? parsed.decisions : [];
     if (decisions.length === 0) return fallback;
 
@@ -169,34 +167,59 @@ export async function runBugTriageAgent(
     { role: "user", content: [{ type: "text", text: userPrompt }] },
   ];
 
+  const responseFormat = getTriageResponseFormat(model);
+
   try {
-    const t0 = Date.now();
-    const { content: raw, usage } = await llmChat(messages, model, {
-      maxTokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.1,
-      timeoutMs: config.reviewTimeoutMs,
-    });
-    const durationMs = Date.now() - t0;
-    const parsed = parseTriage(raw, input.bugs);
-    const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(messages);
-    const llmCall: Omit<LLMCallRecord, "seq"> = {
-      stepIndex: 70_000,
-      model,
-      hasVision: false,
-      attempt: 1,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      totalTokens: usage.totalTokens,
-      durationMs,
-      costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel"),
-      query: `Bug triage (${input.bugs.length} candidates, ${input.openProjectBugs.length} open issues)`,
-      requestMessages,
-      imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
-      response: raw,
-      agent: "bug_triage",
-    };
-    opts?.onLLMCall?.(llmCall);
-    return { bugs: parsed.next, llmCall, skippedCount: parsed.skippedCount };
+    const reminder = "REMINDER: Reply with one raw JSON object only. No markdown, no extra text.";
+    let totalCostUsd = 0;
+    let totalDurationMs = 0;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const callMessages = attempt === 0
+        ? messages
+        : [
+            messages[0],
+            { role: "user" as const, content: [{ type: "text", text: `${userPrompt}\n\n${reminder}` }] },
+          ];
+      const t0 = Date.now();
+      const { content: raw, usage } = await llmChat(callMessages, model, {
+        maxTokens: MAX_OUTPUT_TOKENS,
+        temperature: 0.1,
+        timeoutMs: config.reviewTimeoutMs,
+        responseFormat,
+      });
+      const durationMs = Date.now() - t0;
+      const attemptCost = calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel");
+      totalCostUsd += attemptCost;
+      totalDurationMs += durationMs;
+
+      const parsed = parseTriage(raw, input.bugs);
+      const valid = parseFirstJsonObject<{ decisions?: unknown[] }>(raw) !== null;
+
+      if (valid || attempt === 2) {
+        const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(callMessages);
+        const llmCall: Omit<LLMCallRecord, "seq"> = {
+          stepIndex: 70_000,
+          model,
+          hasVision: false,
+          attempt: attempt + 1,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+          durationMs: totalDurationMs,
+          costUsd: totalCostUsd,
+          query: `Bug triage (${input.bugs.length} candidates, ${input.openProjectBugs.length} open issues)`,
+          requestMessages,
+          imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
+          response: raw,
+          agent: "bug_triage",
+        };
+        opts?.onLLMCall?.(llmCall);
+        return valid
+          ? { bugs: parsed.next, llmCall, skippedCount: parsed.skippedCount }
+          : { bugs: input.bugs, llmCall, skippedCount: 0 };
+      }
+    }
+    return { bugs: input.bugs, llmCall: null, skippedCount: 0 };
   } catch (err) {
     logger.warn({ err: String(err) }, "BugTriage: LLM call failed, returning untriaged bugs");
     return { bugs: input.bugs, llmCall: null, skippedCount: 0 };

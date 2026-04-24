@@ -4,12 +4,13 @@
  */
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
+import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS, getReviewBugsResponseFormat } from "./llmClient.js";
 import type { LLMCallRecord, RunStep } from "./agent.js";
 import { serializeWireMessagesForStorage } from "./agent.js";
 import type { ReviewBug } from "./types.js";
 import type { FilmstripFrame } from "./filmstripReview.js";
 import { drawGridOnScreenshot } from "./gridScan.js";
+import { parseFirstJsonObject } from "./jsonResponse.js";
 
 const MAX_FRAMES = 8;
 const BASE_STEP_INDEX = 60_000;
@@ -51,6 +52,7 @@ Rules:
 Return JSON only:
 { "bugs": [ { "type": "behavioral"|"ux"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
 If none: { "bugs": [] }.
+Output MUST be raw JSON only. Do not use markdown fences. Do not add any prose.
 Use frameIndex to tie a bug to the screenshot that best shows the issue.
 If you include "region", coordinates MUST be on a 0–1000 scale relative to the screenshot dimensions: (0,0) is top-left, (1000,1000) is bottom-right. x and y are independently normalized to image width and height — do NOT use raw viewport pixel values. Example: an element at 90% across and 5% down with width 5% and height 8% → {"x":900,"y":50,"w":50,"h":80}.
 Screenshots have a faint 0-1000 coordinate grid overlay — read axis labels along the top and left edges to produce precise "region" values.`;
@@ -98,14 +100,7 @@ function parseHolisticResponse(
   const toParse = raw?.trim() ?? "";
   if (!toParse) return bugs;
   try {
-    let body = toParse;
-    const jsonMatch = body.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) body = jsonMatch[1].trim();
-    if (!body.endsWith("}") && body.includes('"bugs"')) {
-      const lastObjEnd = body.lastIndexOf("},");
-      if (lastObjEnd > 0) body = body.slice(0, lastObjEnd + 1) + "]}";
-    }
-    const parsed = JSON.parse(body) as {
+    const parsed = parseFirstJsonObject<{
       bugs?: Array<{
         type?: string;
         description?: string;
@@ -113,7 +108,8 @@ function parseHolisticResponse(
         frameIndex?: number;
         region?: { x: number; y: number; w: number; h: number };
       }>;
-    };
+    }>(toParse);
+    if (!parsed) return bugs;
     const list = Array.isArray(parsed?.bugs) ? parsed.bugs : [];
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
@@ -207,34 +203,66 @@ export async function runHolisticFlowReview(
     { role: "user", content: userParts },
   ];
 
+  const HOLISTIC_BUG_TYPES = ["behavioral", "ux", "a11y", "performance", "data"];
+  const responseFormat = getReviewBugsResponseFormat(model, HOLISTIC_BUG_TYPES);
+
   try {
-    const t0 = Date.now();
-    const { content: raw, usage } = await llmChat(messages, model, {
-      maxTokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.15,
-      timeoutMs: config.reviewTimeoutMs * 2,
-    });
-    const durationMs = Date.now() - t0;
-    const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(messages);
-    opts?.onLLMCall?.({
-      stepIndex: BASE_STEP_INDEX,
-      model,
-      hasVision: true,
-      attempt: 1,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      totalTokens: usage.totalTokens,
-      durationMs,
-      costUsd: calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel"),
-      query: `Holistic flow review (${frames.length} screenshots)`,
-      requestMessages,
-      imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
-      imageBase64: imageBase64s[0],
-      response: raw,
-      agent: "holistic",
-    });
-    const fallbackFrames = frames.length > 0 ? frames : [{ url: "", base64: "" }];
-    return { bugs: parseHolisticResponse(raw, BASE_STEP_INDEX, fallbackFrames, at) };
+    const reminder = "REMINDER: Reply with one raw JSON object only. No markdown, no extra text.";
+    let totalCostUsd = 0;
+    let totalDurationMs = 0;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const callMessages = attempt === 0
+        ? messages
+        : [
+            messages[0],
+            {
+              role: "user" as const,
+              content: [
+                ...userParts,
+                { type: "text", text: reminder },
+              ],
+            },
+          ];
+      const t0 = Date.now();
+      const { content: raw, usage } = await llmChat(callMessages, model, {
+        maxTokens: MAX_OUTPUT_TOKENS,
+        temperature: 0.15,
+        timeoutMs: config.reviewTimeoutMs * 2,
+        responseFormat,
+      });
+      const durationMs = Date.now() - t0;
+      const attemptCost = calcCostUsd(model, usage.inputTokens, usage.outputTokens, "reviewAgentModel");
+      totalCostUsd += attemptCost;
+      totalDurationMs += durationMs;
+
+      const fallbackFrames = frames.length > 0 ? frames : [{ url: "", base64: "" }];
+      const parsed = parseHolisticResponse(raw, BASE_STEP_INDEX, fallbackFrames, at);
+      const valid = parsed.length > 0 || parseFirstJsonObject<{ bugs?: unknown[] }>(raw) !== null;
+
+      if (valid || attempt === 2) {
+        // Emit one consolidated call record: cost covers all retries, attempt count reflects total tries.
+        const { messages: requestMessages, imageBase64s } = serializeWireMessagesForStorage(callMessages);
+        opts?.onLLMCall?.({
+          stepIndex: BASE_STEP_INDEX,
+          model,
+          hasVision: true,
+          attempt: attempt + 1,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+          durationMs: totalDurationMs,
+          costUsd: totalCostUsd,
+          query: `Holistic flow review (${frames.length} screenshots)`,
+          requestMessages,
+          imageBase64s: imageBase64s.length > 0 ? imageBase64s : undefined,
+          imageBase64: imageBase64s[0],
+          response: raw,
+          agent: "holistic",
+        });
+        return { bugs: valid ? parsed : [] };
+      }
+    }
+    return { bugs: [] };
   } catch (err) {
     logger.warn({ err: String(err) }, "HolisticReview: LLM call failed");
     return { bugs: [] };

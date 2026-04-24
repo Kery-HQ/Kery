@@ -12,18 +12,10 @@ export type LlmKeyPresence = {
 
 const OPENROUTER_ONLY_PREFIXES = ["deepseek/", "meta/", "mistral/", "cohere/", "perplexity/", "qwen/"];
 
-// Model ID prefixes that use a known direct-provider prefix (google/) but are
-// only available on OpenRouter right now. Must be checked before the provider check.
-const OPENROUTER_ONLY_MODEL_PREFIXES = ["google/gemini-3"];
-
 function inferDirectProvider(
   model: string
 ): "openai" | "anthropic" | "gemini" | "openrouter_only" {
   const m = model.trim();
-  // Check OpenRouter-only model prefixes before provider-level checks
-  for (const p of OPENROUTER_ONLY_MODEL_PREFIXES) {
-    if (m.startsWith(p)) return "openrouter_only";
-  }
   if (m.startsWith("openai/") || m.startsWith("gpt-")) return "openai";
   if (m.startsWith("anthropic/") || m.startsWith("claude")) return "anthropic";
   if (m.startsWith("google/") || m.startsWith("gemini-")) return "gemini";

@@ -525,7 +525,7 @@ const AGENT_OPTIONS: ModelOption[] = [
   // Gemini (direct API)
   { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
-  // Gemini 3 series (via OpenRouter)
+  // Gemini 3 series
   { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
   { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
 ];
@@ -536,7 +536,7 @@ const REASONING_VISION_OPTIONS: ModelOption[] = [
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$5.00 / $25.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  // Gemini 3 (OpenRouter)
+  // Gemini 3
   { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", price: "$2.00 / $12.00" },
   { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
   // Gemini 2.5 (direct API)
@@ -557,7 +557,7 @@ const CODE_OPTIONS: ModelOption[] = [
   { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  // Gemini 3 (OpenRouter)
+  // Gemini 3
   { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", price: "$2.00 / $12.00" },
   { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
   { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
@@ -576,7 +576,7 @@ const CODE_OPTIONS: ModelOption[] = [
 ];
 
 const STAGEHAND_OPTIONS: ModelOption[] = [
-  // Gemini 3 (OpenRouter) — best for visual element targeting
+  // Gemini 3 — best for visual element targeting
   { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
   { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
   // Gemini 2.5 (direct API)
