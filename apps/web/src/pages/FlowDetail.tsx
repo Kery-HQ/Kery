@@ -80,6 +80,7 @@ export function FlowDetail() {
   const [expandedBugId, setExpandedBugId] = React.useState<string | null>(null);
   const [bugActionBusy, setBugActionBusy] = React.useState<string | null>(null);
 
+  const [resetScriptConfirmOpen, setResetScriptConfirmOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [formName, setFormName] = React.useState("");
   const [formIntent, setFormIntent] = React.useState("");
@@ -163,6 +164,7 @@ export function FlowDetail() {
 
   async function handleResetScript() {
     if (!currentProjectId || !test) return;
+    setResetScriptConfirmOpen(false);
     setResettingScript(true);
     try {
       const res = await resetTestScript(currentProjectId, test.id);
@@ -175,7 +177,7 @@ export function FlowDetail() {
   if (loading) {
     return (
       <div className="flex flex-col min-h-full">
-        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-4 w-40" />
           <div className="flex-1" />
@@ -194,7 +196,7 @@ export function FlowDetail() {
   if (error || !test) {
     return (
       <div className="flex flex-col min-h-full">
-        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center gap-3 px-6 h-12 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
           <button
             onClick={() => navigate("/tests")}
             className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
@@ -217,7 +219,7 @@ export function FlowDetail() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-6 h-12 border-b border-border bg-surface-2/80 backdrop-blur-sm flex-shrink-0">
+      <div className="flex items-center justify-between gap-4 px-6 h-12 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
@@ -234,12 +236,6 @@ export function FlowDetail() {
           >
             {test.name}
           </h1>
-          {test.plan_status === "ready" && (
-            <Badge variant="success" className="text-[10px] shrink-0">Script ready</Badge>
-          )}
-          {test.plan_status === "stale" && (
-            <Badge variant="warning" className="text-[10px] shrink-0">Script stale</Badge>
-          )}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <Button
@@ -292,12 +288,12 @@ export function FlowDetail() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Main — intent + context */}
                 <div className="lg:col-span-2 space-y-3">
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                  <div className="rounded-lg border border-border bg-surface-2 dark:bg-surface-3 p-4 space-y-1">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Description</p>
                     <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{test.intent}</p>
                   </div>
                   {test.context ? (
-                    <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                    <div className="rounded-lg border border-border bg-surface-2 dark:bg-surface-3 p-4 space-y-1">
                       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Context</p>
                       <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{test.context}</p>
                     </div>
@@ -305,7 +301,7 @@ export function FlowDetail() {
                 </div>
 
                 {/* Sidebar — metadata */}
-                <div className="space-y-px rounded-lg border border-border bg-card overflow-hidden">
+                <div className="space-y-px rounded-lg border border-border bg-surface-2 dark:bg-surface-3 overflow-hidden">
                   <div className="px-4 py-3 border-b border-border last:border-0">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Max steps</p>
                     <p className="text-[13px] text-foreground tabular-nums">
@@ -365,9 +361,9 @@ export function FlowDetail() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 gap-1.5 text-[11px] shrink-0"
+                      className="h-7 gap-1.5 text-[11px] shrink-0 text-muted-foreground"
                       loading={resettingScript}
-                      onClick={handleResetScript}
+                      onClick={() => setResetScriptConfirmOpen(true)}
                     >
                       <ArrowCounterClockwise className="h-3.5 w-3.5" />
                       Reset script
@@ -409,7 +405,7 @@ export function FlowDetail() {
                     return (
                       <div
                         key={id}
-                        className={`rounded-lg border border-border bg-card overflow-hidden ${isExpanded ? "ring-1 ring-border" : ""}`}
+                        className={`rounded-lg border border-border bg-surface-2 dark:bg-surface-3 overflow-hidden ${isExpanded ? "ring-1 ring-border" : ""}`}
                       >
                         <button
                           type="button"
@@ -433,7 +429,7 @@ export function FlowDetail() {
                         </button>
 
                         {isExpanded && (
-                          <div className="border-t border-border px-4 py-4 space-y-4 bg-muted/10 animate-fade-in">
+                          <div className="border-t border-border px-4 py-4 space-y-4 bg-surface-1 dark:bg-surface-2 animate-fade-in">
                             {bug.description && (
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
@@ -594,6 +590,26 @@ export function FlowDetail() {
               loading={formSaving}
             >
               Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Reset script confirm dialog ── */}
+      <Dialog open={resetScriptConfirmOpen} onOpenChange={setResetScriptConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset regression script?</DialogTitle>
+            <DialogDescription>
+              This will delete the current script. The next successful run will generate a new one. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setResetScriptConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleResetScript} loading={resettingScript}>
+              Reset script
             </Button>
           </DialogFooter>
         </DialogContent>

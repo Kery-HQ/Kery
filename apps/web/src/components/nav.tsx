@@ -12,7 +12,6 @@ import {
   Brain,
   Bug,
   Gear,
-  ArrowClockwise,
   Sun,
   Moon,
   Monitor,
@@ -23,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import { createProject } from "@/projectApi";
-import { getTheme, setTheme as setThemeUtil, rotateWallpaper, type Theme } from "@/lib/hooks";
+import { getTheme, setTheme as setThemeUtil, type Theme } from "@/lib/hooks";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -308,16 +307,6 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
       {/* Theme footer */}
       <div className="border-t glass-divider p-2">
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={rotateWallpaper}
-            className="group mb-2 flex w-full items-center gap-2.5 rounded-md px-2 py-[6px] text-[13px] font-medium text-foreground/55 transition-colors hover:bg-black/6 hover:text-foreground dark:text-white/55 dark:hover:bg-white/8 dark:hover:text-white"
-          >
-            <ArrowClockwise className="h-[15px] w-[15px] flex-shrink-0 text-foreground/45 transition-colors group-hover:text-foreground dark:text-white/45 dark:group-hover:text-white" />
-            Rotate wallpaper
-          </button>
-        )}
         {collapsed ? (
           <div className="flex justify-center">
             <button onClick={cycleTheme} className="p-1.5 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors">

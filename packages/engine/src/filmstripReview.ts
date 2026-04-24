@@ -160,9 +160,10 @@ async function analyzeChunk(
     });
   }
 
+  const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
   const at = Date.now();
   const messages = [
-    { role: "system", content: FILMSTRIP_SYSTEM },
+    { role: "system", content: `Current date/time: ${now}\n\n${FILMSTRIP_SYSTEM}` },
     { role: "user", content },
   ];
 

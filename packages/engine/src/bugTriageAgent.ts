@@ -25,6 +25,7 @@ Rules:
 - If two new bugs are duplicates, keep the clearer one and set the duplicate to keep=false.
 - Match open issues semantically (not exact text only).
 - Keep output deterministic and concise.
+- Date/year bugs: before flagging a displayed year as "wrong" or "future", check it against the current date provided in the system prompt. A year that equals the current year is NOT a bug.
 
 Return JSON only in this exact shape:
 {
@@ -162,8 +163,9 @@ export async function runBugTriageAgent(
     `Open issues already tracked in this project:\n${compactOpenIssueLines(input.openProjectBugs)}\n\n` +
     `Memory context (ignore_region + bug_pattern):\n${compactMemoryLines(input.memoryEntries)}`;
 
+  const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
   const messages = [
-    { role: "system", content: TRIAGE_SYSTEM },
+    { role: "system", content: `Current date/time: ${now}\n\n${TRIAGE_SYSTEM}` },
     { role: "user", content: [{ type: "text", text: userPrompt }] },
   ];
 

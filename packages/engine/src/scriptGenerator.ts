@@ -184,7 +184,14 @@ function parseResponse(raw: string): RegressionStep[] | null {
     return step;
   });
 
-  return steps.filter(s => s.action);
+  const filtered = steps.filter(s => s.action);
+
+  // Remove consecutive duplicate navigate steps (same URL in a row)
+  return filtered.filter((step, i) => {
+    if (step.action !== "navigate" || i === 0) return true;
+    const prev = filtered[i - 1];
+    return !(prev.action === "navigate" && prev.value === step.value && prev.url === step.url);
+  });
 }
 
 // ─── Main export ───────────────────────────────────────────────────────────────

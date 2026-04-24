@@ -33,7 +33,7 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "liquid-glass-strong w-full max-w-md rounded-xl p-5 animate-scale-in focus-visible:outline-none",
+          "relative liquid-glass-strong w-full max-w-md rounded-xl p-5 animate-scale-in focus-visible:outline-none",
           className
         )}
         {...props}

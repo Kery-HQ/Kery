@@ -762,7 +762,7 @@ function StepSummaryLine({ step }: { step: RegressionStep }) {
 }
 
 const REGRESSION_STEP_GRID =
-  "grid w-full grid-cols-[1.25rem_1.5rem_1.75rem_minmax(0,1fr)] items-center gap-x-1.5 pl-2 pr-4 py-2 text-[12px] sm:pl-2.5 sm:pr-5";
+  "grid w-full grid-cols-[2rem_1.25rem_1.75rem_minmax(0,1fr)] items-center gap-x-1.5 pl-2 pr-4 py-2 text-[12px] sm:pl-2.5 sm:pr-5";
 
 export function RegressionPlanView({ steps }: { steps: RegressionStep[] }) {
   const [openByIndex, setOpenByIndex] = React.useState<Record<number, boolean>>({});
@@ -780,23 +780,26 @@ export function RegressionPlanView({ steps }: { steps: RegressionStep[] }) {
 
         const body = (
           <>
-            <div className="flex h-8 w-5 shrink-0 items-center justify-center text-muted-foreground/50">
+            <span className="text-[11px] font-mono font-medium text-muted-foreground/60 tabular-nums text-right select-none">
+              {i + 1}
+            </span>
+            <div className="flex h-8 w-5 shrink-0 items-center justify-center text-muted-foreground/40">
               {hasDetails ? (
                 expanded ? (
-                  <CaretDown className="h-3.5 w-3.5" weight="bold" aria-hidden />
+                  <CaretDown className="h-3 w-3" weight="bold" aria-hidden />
                 ) : (
-                  <CaretRight className="h-3.5 w-3.5" weight="bold" aria-hidden />
+                  <CaretRight className="h-3 w-3" weight="bold" aria-hidden />
                 )
               ) : null}
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground/40 tabular-nums text-right">
-              {i + 1}
-            </span>
             <div className="flex h-8 items-center">
               <StepActionIcon action={step.action} />
             </div>
             <div className="min-w-0 py-0.5">
               <StepSummaryLine step={step} />
+              {!expanded && step.purpose?.trim() && (
+                <p className="text-[10px] text-muted-foreground/50 truncate mt-0.5">{step.purpose}</p>
+              )}
               {hasDetails && expanded && (
                 <div className="mt-2 space-y-1 border-l border-border/60 pl-2.5">
                   {step.purpose?.trim() && (

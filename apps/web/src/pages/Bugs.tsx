@@ -2,22 +2,22 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Warning,
-  CaretDown,
-  CaretRight,
   ArrowSquareOut,
   ArrowsClockwise,
   Globe,
-  Image as ImageIcon,
   ComputerTower,
   Calendar,
   Trash,
   Stack,
   FlowArrow,
   FilePdf,
+  CaretRight,
+  CaretDown,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
@@ -96,12 +96,219 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destru
   wont_fix: "neutral",
 };
 
+// ─── Issue detail pane ────────────────────────────────────────────────────────
+
+function IssueDetail({
+  bug,
+  actionBusy,
+  showRaw,
+  onToggleRaw,
+  onResolve,
+  onIgnore,
+  onDelete,
+  onViewRun,
+}: {
+  bug: BugRecord;
+  actionBusy: string | null;
+  showRaw: boolean;
+  onToggleRaw: () => void;
+  onResolve: () => void;
+  onIgnore: () => void;
+  onDelete: () => void;
+  onViewRun: () => void;
+}) {
+  const detail = projectBugDetailDescription(bug);
+  const runKey = bug.run_id ?? bug.runId;
+  const fileUrl = runScreenshotFileUrl(runKey, bug.screenshot_path ?? bug.screenshotPath);
+  const legacy = screenshotRefToSrc(bug.screenshot_base64 ?? bug.screenshotBase64 ?? undefined);
+  const screenshotSrc = fileUrl ?? legacy;
+  const reportedDate = bug.reportedAt ?? bug.reported_at;
+  const isOpen = bug.status === "open" || bug.status === "in_progress";
+
+  const hasContext = !!(bug.environment || reportedDate || bug.url);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* ── Detail header ── */}
+      <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
+        <div className="flex items-center justify-between gap-3">
+          {/* Title + tags */}
+          <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+            <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} className="flex-shrink-0" />
+            <h2 className="text-[15px] font-semibold text-foreground leading-snug truncate min-w-0">{bug.name}</h2>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <BugCategoryTag category={bug.category} />
+              <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize">
+                {bug.status.replace("_", " ")}
+              </Badge>
+              {bug.test_name && (
+                <span className="text-[11px] text-muted-foreground/50">· {bug.test_name}</span>
+              )}
+            </div>
+          </div>
+          {/* Actions — uniform outline style */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Button size="sm" variant="outline" className="h-7 px-3 text-[11px] gap-1" onClick={onViewRun}>
+              View Run <ArrowSquareOut className="h-3 w-3" />
+            </Button>
+            {bug.id && isOpen && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-3 text-[11px]"
+                disabled={actionBusy === bug.id}
+                onClick={onResolve}
+              >
+                Resolve
+              </Button>
+            )}
+            {bug.id && isOpen && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-3 text-[11px]"
+                disabled={actionBusy === bug.id}
+                onClick={onIgnore}
+              >
+                Ignore
+              </Button>
+            )}
+            {bug.id && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                disabled={actionBusy === bug.id}
+                onClick={onDelete}
+              >
+                <Trash className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Scrollable body ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto bg-surface-1 dark:bg-surface-2">
+        {/* Screenshot — hero, full width */}
+        {screenshotSrc && (
+          <div className="border-b border-border bg-surface-2 dark:bg-surface-3 flex justify-center px-6 py-5">
+            <BugScreenshotZoomDialog
+              src={screenshotSrc}
+              triggerClassName="w-full max-w-2xl"
+              thumbnailClassName="w-full max-h-[400px] object-contain"
+            />
+          </div>
+        )}
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Description */}
+          {detail && (
+            <section>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
+                Description
+              </p>
+              <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
+            </section>
+          )}
+
+          {/* Additional info */}
+          {hasContext && (
+            <section className="border-t border-border pt-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
+                Additional info
+              </p>
+              <div className="space-y-2.5">
+                {bug.environment && (
+                  <div className="flex items-center gap-2">
+                    <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Environment</span>
+                    <span className="text-[12px] text-muted-foreground">{bug.environment}</span>
+                  </div>
+                )}
+                {reportedDate && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Detected</span>
+                    <span className="text-[12px] font-mono text-muted-foreground">{new Date(reportedDate).toLocaleString()}</span>
+                  </div>
+                )}
+                {bug.url && (
+                  <div className="flex items-start gap-2 min-w-0">
+                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0 mt-0.5">URL</span>
+                    <a
+                      href={bug.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <span className="truncate">{bug.url}</span>
+                      <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" aria-hidden="true" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Raw data toggle */}
+          <section className="border-t border-border pt-3">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
+              onClick={onToggleRaw}
+            >
+              {showRaw ? <CaretDown className="h-3 w-3" /> : <CaretRight className="h-3 w-3" />}
+              {showRaw ? "Hide" : "Show"} raw data
+            </button>
+            {showRaw && (
+              <pre className="mt-2 text-[11px] font-mono bg-surface-2 dark:bg-surface-3 rounded-lg border border-border px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-64">
+                {JSON.stringify(bug, null, 2)}
+              </pre>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Filter pill ──────────────────────────────────────────────────────────────
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "h-6 px-2.5 rounded text-[11px] font-medium transition-colors",
+        active
+          ? "bg-foreground/10 dark:bg-white/12 text-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export const Bugs: React.FC = () => {
   const navigate = useNavigate();
   const { currentProjectId, currentProject } = useProject();
   const [bugs, setBugs] = React.useState<BugRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = React.useState<SourceFilter>("all");
   const [severityFilter, setSeverityFilter] = React.useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("all");
@@ -132,7 +339,7 @@ export const Bugs: React.FC = () => {
       } else if (deletePrompt.bug.id) {
         await deleteProjectBug(currentProjectId, deletePrompt.bug.id);
       }
-      setExpandedId(null);
+      setSelectedId(null);
       setDeletePrompt(null);
       await load();
     } finally {
@@ -142,8 +349,7 @@ export const Bugs: React.FC = () => {
 
   async function resolveBug(bug: BugRecord) {
     if (!currentProjectId || !bug.id) return;
-    const key = bug.id;
-    setActionBusy(key);
+    setActionBusy(bug.id);
     try {
       await patchProjectBug(currentProjectId, bug.id, { status: "resolved" });
       await load();
@@ -154,8 +360,7 @@ export const Bugs: React.FC = () => {
 
   async function ignoreBug(bug: BugRecord) {
     if (!currentProjectId || !bug.id) return;
-    const key = bug.id;
-    setActionBusy(key);
+    setActionBusy(bug.id);
     try {
       await patchProjectBug(currentProjectId, bug.id, { status: "wont_fix" });
       await createMemoryEntry(currentProjectId, {
@@ -172,20 +377,26 @@ export const Bugs: React.FC = () => {
 
   const filteredBugs = React.useMemo(() => {
     let result = [...bugs];
-    if (severityFilter !== "all") {
-      result = result.filter(b => b.severity === severityFilter);
-    }
-    if (categoryFilter !== "all") {
-      result = result.filter(b => b.category === categoryFilter);
-    }
-    if (sourceFilter === "flows") {
-      result = result.filter(b => !!b.test_id);
-    } else if (sourceFilter === "routes") {
-      result = result.filter(b => !!b.destination_id && !b.test_id);
-    }
+    if (severityFilter !== "all") result = result.filter(b => b.severity === severityFilter);
+    if (categoryFilter !== "all") result = result.filter(b => b.category === categoryFilter);
+    if (sourceFilter === "flows") result = result.filter(b => !!b.test_id);
+    else if (sourceFilter === "routes") result = result.filter(b => !!b.destination_id && !b.test_id);
     result.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
     return result;
   }, [bugs, severityFilter, categoryFilter, sourceFilter]);
+
+  React.useEffect(() => {
+    if (filteredBugs.length === 0) { setSelectedId(null); return; }
+    if (!selectedId || !filteredBugs.some((b, i) => (b.id ?? `${b.run_id ?? b.runId}-${b.index ?? i}`) === selectedId)) {
+      const first = filteredBugs[0];
+      setSelectedId(first.id ?? `${first.run_id ?? first.runId}-${first.index ?? 0}`);
+    }
+  }, [filteredBugs, selectedId]);
+
+  const selectedBug = React.useMemo(() => {
+    if (!selectedId) return null;
+    return filteredBugs.find((b, i) => (b.id ?? `${b.run_id ?? b.runId}-${b.index ?? i}`) === selectedId) ?? null;
+  }, [filteredBugs, selectedId]);
 
   if (!currentProjectId) {
     return (
@@ -201,7 +412,8 @@ export const Bugs: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex flex-col flex-1 min-h-0 w-full">
+      {/* ── Top bar ── */}
       <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues">
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
@@ -220,7 +432,7 @@ export const Bugs: React.FC = () => {
             }}
           >
             <FilePdf className="h-3.5 w-3.5" />
-            {exportBusy ? "Exporting…" : "Export all as PDF"}
+            {exportBusy ? "Exporting…" : "Export PDF"}
           </Button>
         )}
         {!loading && bugs.length > 0 && (
@@ -240,297 +452,174 @@ export const Bugs: React.FC = () => {
         </Button>
       </PageHeader>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-5 max-w-4xl mx-auto w-full space-y-4 animate-fade-in">
+      {/* ── Filter bar (only when there are bugs) ── */}
+      {!loading && bugs.length > 0 && (
+        <div className="flex-shrink-0 border-b border-border bg-surface-2 dark:bg-surface-3 px-5 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mr-1.5">Source</span>
+            {SOURCE_FILTERS.map(s => (
+              <FilterPill key={s} active={sourceFilter === s} onClick={() => setSourceFilter(s)}>
+                {s === "routes" && <Stack className="inline h-3 w-3 mr-1" />}
+                {s === "flows" && <FlowArrow className="inline h-3 w-3 mr-1" />}
+                {s === "all" ? "All" : s === "routes" ? "Routes" : "Flows"}
+              </FilterPill>
+            ))}
+          </div>
+          <div className="h-3 w-px bg-border/60" />
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mr-1.5">Severity</span>
+            {SEVERITY_FILTERS.map(s => (
+              <FilterPill key={s} active={severityFilter === s} onClick={() => setSeverityFilter(s)}>
+                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+              </FilterPill>
+            ))}
+          </div>
+          <div className="h-3 w-px bg-border/60" />
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mr-1.5">Category</span>
+            {CATEGORY_FILTERS.map(c => (
+              <FilterPill key={c} active={categoryFilter === c} onClick={() => setCategoryFilter(c)}>
+                {c === "all" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
+              </FilterPill>
+            ))}
+          </div>
+        </div>
+      )}
 
-          {loading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full" />
-              ))}
+      {/* ── Main content ── */}
+      {loading ? (
+        <div className="px-6 py-5 space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+      ) : bugs.length === 0 ? (
+        <EmptyState
+          icon={<Warning className="h-8 w-8" />}
+          title="No issues yet"
+          description="Issues are reported by the agent during test runs. Run a test to start finding problems."
+          action={{ label: "Go to Flows", onClick: () => navigate("/tests") }}
+          className="flex-1"
+        />
+      ) : (
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+
+          {/* ── Left: issue list ── */}
+          <div className="w-[340px] flex-shrink-0 flex flex-col min-h-0 border-r border-border overflow-hidden">
+            {/* list header */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border flex-shrink-0 bg-surface-2 dark:bg-surface-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Issues
+              </span>
+              <span className="text-[11px] font-mono text-muted-foreground/60">
+                {filteredBugs.length < bugs.length
+                  ? `${filteredBugs.length} / ${bugs.length}`
+                  : bugs.length}
+              </span>
             </div>
-          ) : bugs.length === 0 ? (
-            <EmptyState
-              icon={<Warning className="h-8 w-8" />}
-              title="No issues yet"
-              description="Issues are reported by the agent during test runs. Run a test to start finding problems."
-              action={{ label: "Go to Flows", onClick: () => navigate("/tests") }}
-            />
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-y-2 gap-x-3 items-center">
-                <div className="flex items-center gap-1">
-                  <span className="text-[11px] text-muted-foreground/50 mr-1">Source</span>
-                  {SOURCE_FILTERS.map(s => (
-                    <Button
-                      key={s}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setSourceFilter(s)}
-                      className={cn(
-                        "h-7 px-2.5 text-[11px] gap-1",
-                        sourceFilter === s ? "bg-accent text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      {s === "routes" && <Stack className="h-3 w-3" />}
-                      {s === "flows" && <FlowArrow className="h-3 w-3" />}
-                      {s === "all" ? "All" : s === "routes" ? "Routes" : "Flows"}
-                    </Button>
-                  ))}
-                </div>
-                <div className="h-4 w-px bg-border" />
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1">
-                  <span className="text-[11px] text-muted-foreground/50 mr-1">Severity</span>
-                  {SEVERITY_FILTERS.map(s => (
-                    <Button
-                      key={s}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setSeverityFilter(s)}
-                      className={cn(
-                        "h-7 px-2.5 text-[11px] capitalize",
-                        severityFilter === s
-                          ? "bg-accent text-foreground"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {s === "all" ? "All" : s}
-                    </Button>
-                  ))}
-                </div>
-                <div className="h-4 w-px bg-border" />
-                <div className="flex items-center gap-1">
-                  <span className="text-[11px] text-muted-foreground/50 mr-1">Category</span>
-                  {CATEGORY_FILTERS.map(c => (
-                    <Button
-                      key={c}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setCategoryFilter(c)}
-                      className={cn(
-                        "h-7 px-2.5 text-[11px] capitalize",
-                        categoryFilter === c
-                          ? c === "all"
-                            ? "bg-accent text-foreground"
-                            : cn("bg-accent font-medium", bugCategoryTagClass(c))
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {c === "all" ? "All" : c}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              </div>
 
-              {/* Bug list */}
-              <div className="space-y-1.5">
-                {filteredBugs.map((bug, i) => {
+            {/* scrollable list */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
+              {filteredBugs.length === 0 ? (
+                <p className="text-center py-8 text-[12px] text-muted-foreground">
+                  No issues match current filters
+                </p>
+              ) : (
+                filteredBugs.map((bug, i) => {
                   const id = bug.id ?? `${bug.run_id ?? bug.runId}-${bug.index ?? i}`;
-                  const isExpanded = expandedId === id;
+                  const selected = id === selectedId;
                   const reportedIso = bug.reportedAt ?? bug.reported_at ?? "";
                   return (
-                    <div
+                    <button
                       key={id}
-                      className={cn(
-                        "rounded-lg border border-border bg-card overflow-hidden transition-colors",
-                        isExpanded && "ring-1 ring-border"
-                      )}
+                      type="button"
+                      onClick={() => setSelectedId(id)}
+                      className="w-full text-left block"
                     >
-                      {/* Collapsed row */}
-                      <button
-                        type="button"
-                        onClick={() => setExpandedId(isExpanded ? null : id)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors min-w-0"
+                      <Card
+                        className={cn(
+                          "w-full transition-all",
+                          selected && "ring-2 ring-primary/40 border-primary/30",
+                        )}
                       >
-                        {isExpanded
-                          ? <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          : <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        }
-                        <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
-                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
-                          {bug.name}
-                        </span>
-                        <BugCategoryTag category={bug.category} />
-                        <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize flex-shrink-0">
-                          {bug.status.replace("_", " ")}
-                        </Badge>
-                        <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
-                          {formatReportedAt(reportedIso)}
-                        </span>
-                      </button>
-
-                      {/* Expanded detail */}
-                      {isExpanded && (
-                        <div className="border-t border-border px-4 py-4 space-y-4 bg-muted/10 animate-fade-in">
-                          {(() => {
-                            const detail = projectBugDetailDescription(bug);
-                            if (!detail) return null;
-                            return (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
-                                  Description
+                        <CardContent className="py-2.5 px-3.5">
+                          <div className="flex items-start gap-2.5">
+                            <StatusDot
+                              status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"}
+                              className="mt-0.5 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[13px] font-medium text-foreground truncate">
+                                {bug.name}
+                              </p>
+                              {bug.description && (
+                                <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                                  {bug.description}
                                 </p>
-                                <p className="text-[13px] text-foreground whitespace-pre-wrap">{detail}</p>
-                              </div>
-                            );
-                          })()}
-
-                          {(() => {
-                            const runKey = bug.run_id ?? bug.runId;
-                            const fileUrl = runScreenshotFileUrl(runKey, bug.screenshot_path ?? bug.screenshotPath);
-                            const legacy = screenshotRefToSrc(
-                              bug.screenshot_base64 ?? bug.screenshotBase64 ?? undefined,
-                            );
-                            const src = fileUrl ?? legacy;
-                            if (!src) return null;
-                            return (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 flex items-center gap-1">
-                                  <ImageIcon className="h-3 w-3" />
-                                  Screenshot
-                                </p>
-                                <BugScreenshotZoomDialog src={src} />
-                              </div>
-                            );
-                          })()}
-
-                          <div className="flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
-                            {bug.environment && (
-                              <span className="flex items-center gap-1">
-                                <ComputerTower className="h-3.5 w-3.5 flex-shrink-0" />
-                                {bug.environment}
-                              </span>
-                            )}
-                            {bug.url && (
-                              <a
-                                href={bug.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 hover:text-foreground transition-colors font-mono truncate max-w-xs"
-                              >
-                                <Globe className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="truncate">{bug.url}</span>
-                                <ArrowSquareOut className="h-3 w-3 flex-shrink-0" />
-                              </a>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3.5 w-3.5" />
-                              {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
-                            </span>
-                            <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2.5 text-[11px] gap-1.5"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/runs/${bug.run_id ?? bug.runId}`);
-                                }}
-                              >
-                                View Run
-                                <ArrowSquareOut className="h-3 w-3" />
-                              </Button>
-                              {bug.id && (bug.status === "open" || bug.status === "in_progress") && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2.5 text-[11px]"
-                                    disabled={actionBusy === bug.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      resolveBug(bug);
-                                    }}
-                                  >
-                                    Resolve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2.5 text-[11px] text-muted-foreground hover:text-foreground"
-                                    disabled={actionBusy === bug.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      ignoreBug(bug);
-                                    }}
-                                  >
-                                    Ignore
-                                  </Button>
-                                </>
                               )}
-                              {bug.id && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2.5 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
-                                  disabled={actionBusy === bug.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeletePrompt({ kind: "one", bug });
-                                  }}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                <BugCategoryTag category={bug.category} />
+                                <Badge
+                                  variant={STATUS_VARIANT[bug.status] ?? "neutral"}
+                                  className="capitalize text-[10px]"
                                 >
-                                  <Trash className="h-3 w-3" />
-                                  Delete
-                                </Button>
-                              )}
+                                  {bug.status.replace("_", " ")}
+                                </Badge>
+                                <span className="ml-auto text-[10px] font-mono text-muted-foreground/50">
+                                  {formatReportedAt(reportedIso)}
+                                </span>
+                              </div>
                             </div>
                           </div>
-
-                          <div className="border-t border-border pt-3">
-                            <button
-                              type="button"
-                              className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 hover:text-foreground/70"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowRawId(showRawId === id ? null : id);
-                              }}
-                            >
-                              Show raw data {showRawId === id ? "▼" : "▶"}
-                            </button>
-                            {showRawId === id && (
-                              <pre className="mt-2 text-[11px] font-mono bg-muted/50 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
-                                {JSON.stringify(bug, null, 2)}
-                              </pre>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                        </CardContent>
+                      </Card>
+                    </button>
                   );
-                })}
-              </div>
-
-              {filteredBugs.length === 0 && (
-                <div className="text-center py-8 text-[13px] text-muted-foreground">
-                  No issues matching current filters
-                </div>
+                })
               )}
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
 
+          {/* ── Right: detail pane ── */}
+          <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
+            {!selectedBug ? (
+              <EmptyState
+                icon={<Warning className="h-6 w-6" />}
+                title="Select an issue"
+                description="Pick an issue from the list to inspect details."
+                className="flex-1"
+              />
+            ) : (
+              <IssueDetail
+                key={selectedBug.id ?? selectedId}
+                bug={selectedBug}
+                actionBusy={actionBusy}
+                showRaw={showRawId === selectedId}
+                onToggleRaw={() => setShowRawId(showRawId === selectedId ? null : selectedId)}
+                onResolve={() => resolveBug(selectedBug)}
+                onIgnore={() => ignoreBug(selectedBug)}
+                onDelete={() => setDeletePrompt({ kind: "one", bug: selectedBug })}
+                onViewRun={() => navigate(`/runs/${selectedBug.run_id ?? selectedBug.runId}`)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirm dialog ── */}
       <Dialog
         open={deletePrompt !== null}
-        onOpenChange={(o) => {
-          if (!o && !deleteBusy) setDeletePrompt(null);
-        }}
+        onOpenChange={(o) => { if (!o && !deleteBusy) setDeletePrompt(null); }}
       >
         <DialogContent className="max-w-md" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
-            <DialogTitle>Delete issues</DialogTitle>
+            <DialogTitle>Delete issue{deletePrompt?.kind === "all" ? "s" : ""}</DialogTitle>
             <DialogDescription className="text-[13px]">
               {deletePrompt?.kind === "all" && (
-                <>
-                  Permanently delete all <strong>{bugs.length}</strong> issues for this project? This cannot be undone.
-                </>
+                <>Permanently delete all <strong>{bugs.length}</strong> issues? This cannot be undone.</>
               )}
               {deletePrompt?.kind === "one" && (
-                <>
-                  Permanently delete &ldquo;{deletePrompt.bug.name}&rdquo;? This cannot be undone.
-                </>
+                <>Permanently delete &ldquo;{deletePrompt.bug.name}&rdquo;? This cannot be undone.</>
               )}
             </DialogDescription>
           </DialogHeader>

@@ -60,6 +60,10 @@ import {
   Scroll,
   ShieldCheck,
   Link,
+  ImagesSquare,
+  DotsSixVertical,
+  MagnifyingGlass,
+  X,
 } from "@phosphor-icons/react";
 
 // --- Types ---
@@ -192,7 +196,7 @@ type Run = {
   };
 };
 
-type Tab = "overview" | "issues" | "llm" | "memory";
+type Tab = "overview" | "issues" | "gallery" | "llm" | "memory";
 
 /** Derive overview tab state from `GET /api/runs/:id` (includes merged Redis live data while running). */
 function liveUiFromRun(run: Run): {
@@ -260,6 +264,72 @@ function llmCallImageSrcByIndex(call: LLMCallRecord, runId: string, imageIndex: 
   const b64 = call.imageBase64s?.[imageIndex] ?? (imageIndex === 0 ? call.imageBase64 : undefined);
   if (b64 == null || b64 === "") return undefined;
   return screenshotRefToSrc(b64) ?? (b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`);
+}
+
+type GalleryShot = {
+  src: string;
+  label: string;
+  at?: number;
+};
+
+function collectGalleryShots(
+  runId: string,
+  steps: RunStep[],
+  llmCalls: LLMCallRecord[],
+  runBugs: Array<{
+    screenshot_path?: string | null;
+    screenshotPath?: string | null;
+    screenshot_base64?: string | null;
+    screenshotBase64?: string | null;
+    source?: string;
+    name?: string;
+    step_index?: number | null;
+  }>,
+): Record<string, GalleryShot[]> {
+  const groups: Record<string, GalleryShot[]> = {};
+  const seen = new Set<string>();
+  const push = (group: string, src?: string | null, label = "Frame", at?: number) => {
+    if (!src) return;
+    const key = `${group}:${src}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ src, label, at });
+  };
+
+  for (const s of steps) {
+    const src =
+      runScreenshotFileUrl(runId, s.screenshotPath ?? s.screenshot_path) ??
+      screenshotRefToSrc(s.screenshotBase64 ?? s.screenshot_base64 ?? s.screenshot ?? undefined);
+    push("Navigator", src, s.action || "Step", s.at);
+  }
+
+  for (const b of runBugs) {
+    const src =
+      runScreenshotFileUrl(runId, b.screenshot_path ?? b.screenshotPath) ??
+      screenshotRefToSrc(b.screenshot_base64 ?? b.screenshotBase64 ?? undefined);
+    const label = b.name ?? (b.step_index != null ? `Issue @ step ${b.step_index}` : "Issue");
+    push(`Issues/${b.source ?? "review"}`, src, label);
+  }
+
+  for (const call of llmCalls) {
+    const count = Math.max(
+      call.imagePaths?.length ?? 0,
+      call.imageBase64s?.length ?? 0,
+      call.imagePath ? 1 : 0,
+      call.imageBase64 ? 1 : 0,
+    );
+    for (let i = 0; i < count; i += 1) {
+      const src = llmCallImageSrcByIndex(call, runId, i);
+      const agent = llmAgentDisplay(call.agent ?? "navigator").label;
+      push(agent, src, `Step ${call.stepIndex}${count > 1 ? ` (frame ${i + 1}/${count})` : ""}`);
+    }
+  }
+
+  for (const k of Object.keys(groups)) {
+    groups[k].sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+  }
+  return groups;
 }
 
 /** URLs from filmstrip user prompt lines like `0. https://...` */
@@ -556,6 +626,11 @@ export const RunDetail: React.FC = () => {
       step_index?: number | null;
       status?: string;
       reported_at?: string;
+      screenshot_path?: string | null;
+      screenshotPath?: string | null;
+      screenshot_base64?: string | null;
+      screenshotBase64?: string | null;
+      source?: "navigator" | "review" | "network" | "filmstrip";
     }[]
   >([]);
   const [loading, setLoading] = React.useState(true);
@@ -763,6 +838,8 @@ export const RunDetail: React.FC = () => {
   const memoryLoaded = run.memory_loaded ?? [];
   const bugsFound    = run.bugs_json ?? [];
   const totalCost    = llmCalls.reduce((sum, c) => sum + c.costUsd, 0);
+  const galleryGroups = collectGalleryShots(run.id, steps, llmCalls, runBugs);
+  const galleryCount = Object.values(galleryGroups).reduce((acc, arr) => acc + arr.length, 0);
 
   const backUrl = run.project_id && run.source_back_path
     ? `/projects/${run.project_id}/${run.source_back_path}`
@@ -799,7 +876,7 @@ export const RunDetail: React.FC = () => {
       </PageHeader>
 
       {/* Breadcrumb bar */}
-      <div className="flex items-center gap-2 px-6 h-9 border-b border-border bg-card/30 text-[11px] flex-shrink-0">
+      <div className="flex items-center gap-2 px-6 h-9 border-b border-border bg-surface-2 dark:bg-surface-3 text-[11px] flex-shrink-0">
         <button
           onClick={() => navigate(backUrl)}
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -817,7 +894,7 @@ export const RunDetail: React.FC = () => {
 
       {/* Radix Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="flex flex-col flex-1 min-h-0">
-        <div className="px-6 flex-shrink-0 bg-card/50">
+        <div className="px-6 flex-shrink-0 bg-surface-2 dark:bg-surface-3">
           <TabsList>
             <TabsTrigger value="overview">
               Overview
@@ -828,6 +905,12 @@ export const RunDetail: React.FC = () => {
                 <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
                   {bugsFound.length}
                 </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="gallery">
+              Gallery
+              {galleryCount > 0 && (
+                <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{galleryCount}</span>
               )}
             </TabsTrigger>
             <TabsTrigger value="llm">
@@ -865,6 +948,10 @@ export const RunDetail: React.FC = () => {
               runBugs={runBugs}
               projectId={run.project_id ?? undefined}
             />
+          </TabsContent>
+
+          <TabsContent value="gallery" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
+            <GalleryTab groups={galleryGroups} />
           </TabsContent>
 
           <TabsContent value="llm" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
@@ -1022,7 +1109,7 @@ function StepCard({
           ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/8"
           : isReplayCurrent
             ? "border-primary/70 bg-primary/15 dark:bg-primary/22 shadow-sm ring-1 ring-primary/35"
-            : "border-border/50 bg-card/50 hover:bg-card/80 hover:border-border/70",
+            : "border-border/60 bg-surface-2 dark:bg-surface-3 hover:border-border hover:bg-surface-2 dark:hover:bg-surface-3",
       )}
     >
       {isReplayCurrent && (
@@ -1539,21 +1626,24 @@ function OverviewTab({
       {/* ── Drag-to-resize handle ── */}
       <div
         onMouseDown={onDragHandleMouseDown}
-        className="w-1 flex-shrink-0 cursor-col-resize group relative z-10 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        className="w-4 flex-shrink-0 cursor-col-resize group relative z-10 transition-colors"
         title="Drag to resize"
       >
-        <div className="absolute inset-y-0 -left-1 -right-1" />
+        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-border group-hover:bg-primary/60 transition-colors" />
+        <div className="absolute inset-0 grid place-items-center opacity-50 group-hover:opacity-100 transition-opacity">
+          <DotsSixVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        </div>
       </div>
 
       {/* ── Plan / Progress panel — resizable column ── */}
       <div
-        className="flex-shrink-0 flex flex-col min-h-0 overflow-hidden border-l glass-divider"
+        className="flex-shrink-0 flex flex-col min-h-0 overflow-hidden border-l border-border bg-surface-1 dark:bg-surface-2"
         style={{ width: panelWidth }}
       >
         <>
           {/* Header */}
-          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b glass-divider flex-shrink-0">
-            <div className="flex items-center gap-1 rounded-md border border-border/40 bg-black/5 dark:bg-white/5 p-0.5">
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
+            <div className="flex items-center gap-1 rounded-md border border-border bg-surface-1 dark:bg-surface-2 p-0.5">
               {hasPlan && (
                 <button
                   type="button"
@@ -1618,7 +1708,7 @@ function OverviewTab({
                 </>
               ) : (
                 <>
-                  <div className="flex items-start gap-2.5 rounded-xl border border-border/40 bg-foreground/4 px-3 py-2.5 flex-shrink-0">
+                  <div className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-2 dark:bg-surface-3 px-3 py-2.5 flex-shrink-0">
                     {run.status === "running" ? (
                       <Spinner className="mt-0.5 h-3.5 w-3.5 animate-spin text-primary shrink-0" />
                     ) : (
@@ -1659,6 +1749,93 @@ function OverviewTab({
               )}
             </div>
           </>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Gallery tab
+// ============================================================
+
+function GalleryTab({ groups }: { groups: Record<string, GalleryShot[]> }) {
+  const [query, setQuery] = React.useState("");
+  const entries = Object.entries(groups).filter(([, shots]) => shots.length > 0);
+
+  if (entries.length === 0) {
+    return (
+      <EmptyState
+        icon={<ImagesSquare className="h-5 w-5" />}
+        title="No screenshots captured"
+        description="This run has no stored gallery frames yet."
+        className="py-16"
+      />
+    );
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = entries
+    .map(([group, shots]) => ({
+      group,
+      shots: q ? shots.filter(s => s.label.toLowerCase().includes(q) || group.toLowerCase().includes(q)) : shots,
+    }))
+    .filter(({ shots }) => shots.length > 0);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Search bar */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-border">
+        <div className="relative">
+          <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Filter screenshots…"
+            className="h-8 w-full rounded-md border border-border bg-surface-2 dark:bg-surface-3 pl-8 pr-8 text-[12px] outline-none focus:ring-1 focus:ring-primary/40 placeholder:text-muted-foreground/40"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {filtered.length === 0 ? (
+          <p className="text-center py-12 text-[12px] text-muted-foreground">No screenshots match &ldquo;{query}&rdquo;</p>
+        ) : (
+          filtered.map(({ group, shots }) => (
+            <div key={group}>
+              {/* Section header */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-px flex-1 bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{group}</span>
+                  <span className="text-[10px] font-mono text-muted-foreground/50 bg-surface-2 dark:bg-surface-3 border border-border rounded px-1.5 py-0.5">{shots.length}</span>
+                </div>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+                {shots.map((shot, idx) => (
+                  <div key={`${group}-${idx}`} className="glass-card-flat flex flex-col overflow-hidden">
+                    <div className="flex-1 min-h-0">
+                      <BugScreenshotZoomDialog src={shot.src} thumbnailClassName="w-full h-[140px] object-cover" triggerClassName="w-full rounded-none border-0" />
+                    </div>
+                    <div className="px-2 py-1.5 bg-surface-2 dark:bg-surface-3 border-t glass-divider flex-shrink-0">
+                      <p className="truncate text-[11px] text-muted-foreground" title={shot.label}>{shot.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

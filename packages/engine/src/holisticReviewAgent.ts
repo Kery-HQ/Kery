@@ -200,9 +200,10 @@ export async function runHolisticFlowReview(
     });
   }
 
+  const now = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
   const at = Date.now();
   const messages = [
-    { role: "system", content: HOLISTIC_SYSTEM },
+    { role: "system", content: `Current date/time: ${now}\n\n${HOLISTIC_SYSTEM}` },
     { role: "user", content: userParts },
   ];
 
