@@ -1,16 +1,24 @@
 import React from "react";
-import { Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick, CheckCircle } from "@phosphor-icons/react";
+import {
+  Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick, CheckCircle,
+  Key, Eye as EyeIcon, EyeSlash, Trash, PencilSimple, Warning,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
+import { Separator } from "@/components/ui/separator";
 import {
   fetchModelSettings, saveModelSettings, resetModelSettings,
+  fetchApiKeySettings, saveApiKeys, deleteApiKey,
   type LlmKeyPresence,
   type ModelPriceUsd,
   type ModelSlotKey,
   type SaveModelSettingsPayload,
+  type ApiKeyProvider,
+  type ApiKeyInfo,
+  type ApiKeySettingsResponse,
 } from "@/projectApi";
 import {
   isModelSelectable,
@@ -27,15 +35,23 @@ export const Settings: React.FC = () => {
   const [modelPrices, setModelPrices] = React.useState<Partial<Record<ModelSlotKey, ModelPriceUsd>>>({});
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
+  const [apiKeySettings, setApiKeySettings] = React.useState<ApiKeySettingsResponse | null>(null);
+
+  async function refreshAll() {
+    const [modelRes, keyRes] = await Promise.all([
+      fetchModelSettings().catch(() => null),
+      fetchApiKeySettings().catch(() => null),
+    ]);
+    if (modelRes) {
+      setModelSettings(modelRes.models);
+      setLlmKeys(modelRes.llmKeys);
+      setModelPrices(modelRes.modelPrices ?? {});
+    }
+    if (keyRes) setApiKeySettings(keyRes);
+  }
 
   React.useEffect(() => {
-    fetchModelSettings()
-      .then((r) => {
-        setModelSettings(r.models);
-        setLlmKeys(r.llmKeys);
-        setModelPrices(r.modelPrices ?? {});
-      })
-      .catch(() => {});
+    refreshAll();
   }, []);
 
   async function handleModelChange(key: ModelSlotKey, value: string, modelPrice?: ModelPriceUsd | null) {
@@ -76,6 +92,16 @@ export const Settings: React.FC = () => {
     }
   }
 
+  async function handleApiKeyChange(provider: ApiKeyProvider, value: string | null) {
+    if (value === null) {
+      await deleteApiKey(provider);
+    } else {
+      await saveApiKeys({ [provider]: value });
+    }
+    // Refresh both — key presence affects model availability
+    await refreshAll();
+  }
+
   const hasCustomizedModels = Object.values(modelSettings).some((m) => m.customized);
 
   return (
@@ -83,142 +109,487 @@ export const Settings: React.FC = () => {
       <PageHeader
         icon={<Gear className="h-4 w-4" />}
         title="Platform Settings"
-        description="Configure the AI model powering each agent."
+        description="Configure API keys and the AI models powering each agent."
       />
 
       <div className="px-6 py-6 animate-page-enter flex-1">
-        <div className="max-w-3xl mx-auto space-y-6">
+        <div className="max-w-3xl mx-auto space-y-8">
 
-          {/* Section header */}
-          <div className="flex items-center justify-between">
+          {/* ── API Keys section ── */}
+          <div className="space-y-4">
             <div>
-              <h2 className="text-[14px] font-semibold text-foreground">Model agents</h2>
+              <h2 className="text-[14px] font-semibold text-foreground">API Keys</h2>
               <p className="text-[12px] text-muted-foreground mt-0.5">
-                Choose a preset or enter a custom model id for each agent role.
+                Keys saved here override your <span className="font-mono text-[11px]">.env</span> values and unlock additional models. Stored encrypted in the database.
               </p>
             </div>
-            {hasCustomizedModels && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleResetAllModels}
-                disabled={modelSaving !== null}
-              >
-                <ArrowCounterClockwise className="h-3.5 w-3.5 mr-1.5" />
-                Reset all
-              </Button>
+
+            <div className="grid grid-cols-1 gap-3">
+              {API_KEY_CONFIG.map((cfg, i) => {
+                const info = apiKeySettings?.[cfg.provider];
+                return (
+                  <div
+                    key={cfg.provider}
+                    className="glass-card-flat card-stagger"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    <ApiKeyCard
+                      provider={cfg.provider}
+                      label={cfg.label}
+                      description={cfg.description}
+                      docsUrl={cfg.docsUrl}
+                      info={info ?? null}
+                      onChange={handleApiKeyChange}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ── Model agents section ── */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-[14px] font-semibold text-foreground">Model agents</h2>
+                <p className="text-[12px] text-muted-foreground mt-0.5">
+                  Choose a preset or enter a custom model id for each agent role.
+                </p>
+              </div>
+              {hasCustomizedModels && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetAllModels}
+                  disabled={modelSaving !== null}
+                >
+                  <ArrowCounterClockwise className="h-3.5 w-3.5 mr-1.5" />
+                  Reset all
+                </Button>
+              )}
+            </div>
+
+            {/* Model cards grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {MODEL_CONFIG.map((model, i) => {
+                const setting = modelSettings[model.key];
+                return (
+                  <div
+                    key={model.key}
+                    className="glass-card-flat card-stagger"
+                    style={{ animationDelay: `${i * 60}ms` }}
+                  >
+                    {setting ? (
+                      <ModelSlotCard
+                        modelKey={model.key}
+                        label={model.label}
+                        hint={model.hint}
+                        Icon={model.Icon}
+                        options={model.options}
+                        current={setting.current}
+                        defaultValue={setting.default}
+                        customized={setting.customized}
+                        saving={modelSaving === model.key || modelSaving === "__all__"}
+                        onChange={handleModelChange}
+                        llmKeys={llmKeys}
+                        modelPrice={modelPrices[model.key]}
+                      />
+                    ) : (
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-xl bg-foreground/6 animate-pulse" />
+                          <div className="space-y-1.5">
+                            <div className="h-3 w-28 rounded bg-foreground/6 animate-pulse" />
+                            <div className="h-2.5 w-20 rounded bg-foreground/4 animate-pulse" />
+                          </div>
+                        </div>
+                        <div className="h-9 w-full rounded-lg bg-foreground/4 animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Status toast */}
+            {modelStatus && (
+              <div className={cn(
+                "flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border animate-fade-in",
+                modelStatus === "error"
+                  ? "border-destructive/30 bg-destructive/8 text-destructive"
+                  : "border-status-pass/30 bg-status-pass/8 text-status-pass",
+              )}>
+                <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                {modelStatus === "saved" && "Model saved successfully."}
+                {modelStatus === "reset" && "Reset to defaults."}
+                {modelStatus === "error" && "Failed to save — please try again."}
+              </div>
             )}
           </div>
-
-          {/* Model cards grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {MODEL_CONFIG.map((model, i) => {
-              const setting = modelSettings[model.key];
-              return (
-                <div
-                  key={model.key}
-                  className="glass-card-flat card-stagger"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  {setting ? (
-                    <ModelSlotCard
-                      modelKey={model.key}
-                      label={model.label}
-                      hint={model.hint}
-                      Icon={model.Icon}
-                      options={model.options}
-                      current={setting.current}
-                      defaultValue={setting.default}
-                      customized={setting.customized}
-                      saving={modelSaving === model.key || modelSaving === "__all__"}
-                      onChange={handleModelChange}
-                      llmKeys={llmKeys}
-                      modelPrice={modelPrices[model.key]}
-                    />
-                  ) : (
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-xl bg-foreground/6 animate-pulse" />
-                        <div className="space-y-1.5">
-                          <div className="h-3 w-28 rounded bg-foreground/6 animate-pulse" />
-                          <div className="h-2.5 w-20 rounded bg-foreground/4 animate-pulse" />
-                        </div>
-                      </div>
-                      <div className="h-9 w-full rounded-lg bg-foreground/4 animate-pulse" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Status toast */}
-          {modelStatus && (
-            <div className={cn(
-              "flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border animate-fade-in",
-              modelStatus === "error"
-                ? "border-destructive/30 bg-destructive/8 text-destructive"
-                : "border-status-pass/30 bg-status-pass/8 text-status-pass",
-            )}>
-              <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-              {modelStatus === "saved" && "Model saved successfully."}
-              {modelStatus === "reset" && "Reset to defaults."}
-              {modelStatus === "error" && "Failed to save — please try again."}
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 };
 
+// ─── API Key configuration ──────────────────────────────────────────────────
+
+const API_KEY_CONFIG: {
+  provider: ApiKeyProvider;
+  label: string;
+  description: string;
+  docsUrl: string;
+  placeholder: string;
+}[] = [
+  {
+    provider: "openai",
+    label: "OpenAI",
+    description: "GPT-4.1, GPT-4o, o3 and other OpenAI models",
+    docsUrl: "https://platform.openai.com/api-keys",
+    placeholder: "sk-proj-…",
+  },
+  {
+    provider: "anthropic",
+    label: "Anthropic",
+    description: "Claude Sonnet, Haiku, and Opus models",
+    docsUrl: "https://console.anthropic.com/settings/keys",
+    placeholder: "sk-ant-…",
+  },
+  {
+    provider: "gemini",
+    label: "Google Gemini",
+    description: "Gemini 2.5 Flash, Pro and other Gemini models",
+    docsUrl: "https://aistudio.google.com/apikey",
+    placeholder: "AIza…",
+  },
+  {
+    provider: "openrouter",
+    label: "OpenRouter",
+    description: "Access any model: DeepSeek, Llama, Mistral and more",
+    docsUrl: "https://openrouter.ai/keys",
+    placeholder: "sk-or-v1-…",
+  },
+];
+
+function ApiKeyCard({
+  provider,
+  label,
+  description,
+  docsUrl,
+  info,
+  onChange,
+}: {
+  provider: ApiKeyProvider;
+  label: string;
+  description: string;
+  docsUrl: string;
+  info: ApiKeyInfo | null;
+  onChange: (provider: ApiKeyProvider, value: string | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [keyValue, setKeyValue] = React.useState("");
+  const [showKey, setShowKey] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!editing) { setKeyValue(""); setShowKey(false); setError(""); }
+  }, [editing]);
+
+  async function handleSave() {
+    if (!keyValue.trim()) { setError("Enter an API key."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      await onChange(provider, keyValue.trim());
+      setEditing(false);
+    } catch {
+      setError("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setSaving(true);
+    try {
+      await onChange(provider, null);
+      setConfirmDelete(false);
+    } catch {
+      setError("Failed to remove key.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isLoading = info === null;
+  const source = info?.source ?? "none";
+  const hasDbKey = source === "db";
+  const hasEnvKey = source === "env";
+  const hasKey = info?.hasKey ?? false;
+
+  return (
+    <div className="p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={cn(
+            "h-8 w-8 rounded-xl flex items-center justify-center shrink-0",
+            hasKey ? "bg-primary/10 text-primary" : "bg-foreground/6 text-muted-foreground",
+          )}>
+            <Key className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-foreground truncate">{label}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{description}</p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="h-5 w-16 rounded bg-foreground/6 animate-pulse shrink-0" />
+        ) : (
+          <div className="shrink-0">
+            {hasDbKey && <Badge variant="success" className="text-[10px] px-1.5 h-4 font-medium">DB override</Badge>}
+            {hasEnvKey && !hasDbKey && <Badge variant="neutral" className="text-[10px] px-1.5 h-4 font-medium">From .env</Badge>}
+            {!hasKey && <Badge variant="warning" className="text-[10px] px-1.5 h-4 font-medium">Not configured</Badge>}
+          </div>
+        )}
+      </div>
+
+      {/* Key display */}
+      {!editing && (
+        <div className="space-y-2">
+          {isLoading ? (
+            <div className="h-8 w-full rounded-lg bg-foreground/4 animate-pulse" />
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 flex items-center justify-between gap-2 min-h-[34px]">
+              <div className="min-w-0">
+                {hasDbKey && info?.maskedKey && (
+                  <p className="font-mono text-[11px] text-foreground/70 truncate">{info.maskedKey}</p>
+                )}
+                {hasEnvKey && (
+                  <p className="text-[11px] text-muted-foreground truncate">Configured via environment variable</p>
+                )}
+                {!hasKey && (
+                  <p className="text-[11px] text-muted-foreground/60 truncate italic">No key configured</p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {hasDbKey && (
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmDelete(false); handleDelete(); }}
+                    disabled={saving}
+                    title="Remove DB override"
+                    className="text-muted-foreground/50 hover:text-destructive transition-colors disabled:opacity-40 p-0.5"
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              disabled={isLoading || saving}
+              className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-foreground/4 flex items-center gap-1 disabled:opacity-40"
+            >
+              <PencilSimple className="h-3 w-3" />
+              {hasDbKey ? "Update key" : hasEnvKey ? "Override with DB key" : "Add key"}
+            </button>
+            <a
+              href={docsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-foreground/4"
+            >
+              Get key →
+            </a>
+          </div>
+
+          {confirmDelete && (
+            <div className="flex items-center gap-2 text-[11px] text-destructive animate-fade-in">
+              <Warning className="h-3.5 w-3.5 shrink-0" />
+              <span>Remove DB key? (falls back to .env)</span>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving}
+                className="underline underline-offset-2 hover:opacity-80 disabled:opacity-40"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Edit form */}
+      {editing && (
+        <div className="space-y-2.5 rounded-lg border border-border/70 bg-background/30 p-3 animate-fade-in">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[11px] font-medium text-foreground">
+              {hasDbKey ? "Update API key" : hasEnvKey ? "Override with DB key" : "Add API key"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {hasEnvKey && !hasDbKey && (
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              You already have a key set in <span className="font-mono">.env</span>. Adding one here will override it without changing your environment file.
+            </p>
+          )}
+
+          <div className="relative">
+            <Input
+              type={showKey ? "text" : "password"}
+              value={keyValue}
+              onChange={(e) => { setKeyValue(e.target.value); setError(""); }}
+              placeholder={API_KEY_CONFIG.find(c => c.provider === provider)?.placeholder ?? "sk-…"}
+              className="mono-ui text-[11px] pr-9"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((s) => !s)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+              tabIndex={-1}
+            >
+              {showKey ? <EyeSlash className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          {error && <p className="text-[11px] text-destructive">{error}</p>}
+
+          <div className="flex gap-2 pt-0.5">
+            <Button type="button" size="sm" onClick={handleSave} disabled={saving} loading={saving}>
+              Save key
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Model configuration ────────────────────────────────────────────────────
 
 type ModelOption = { value: string; label: string; price?: string };
 
 const AGENT_OPTIONS: ModelOption[] = [
+  // GPT-5.4 family (current flagship)
+  { value: "openai/gpt-5.4", label: "GPT-5.4", price: "$2.50 / $15.00" },
+  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", price: "$0.75 / $4.50" },
+  { value: "openai/gpt-5.4-nano", label: "GPT-5.4 Nano", price: "$0.20 / $1.25" },
+  // GPT-5 family
+  { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
+  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
+  // GPT-4.1 family
   { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
   { value: "openai/gpt-4.1", label: "GPT-4.1", price: "$2.00 / $8.00" },
   { value: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano", price: "$0.10 / $0.40" },
   { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
-  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
-  { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
+  // Anthropic
+  { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$15.00 / $75.00" },
+  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$5.00 / $25.00" },
+  // Gemini (direct API)
   { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
+  // Gemini 3 series (via OpenRouter)
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
+  { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
 ];
 
 const REASONING_VISION_OPTIONS: ModelOption[] = [
+  // Anthropic
+  { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
-  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$15.00 / $75.00" },
+  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$5.00 / $25.00" },
+  { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
+  // Gemini 3 (OpenRouter)
+  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", price: "$2.00 / $12.00" },
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
+  // Gemini 2.5 (direct API)
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  // OpenAI
+  { value: "openai/gpt-5.4", label: "GPT-5.4", price: "$2.50 / $15.00" },
+  { value: "openai/o4-mini", label: "o4-mini", price: "$1.10 / $4.40" },
   { value: "openai/o3", label: "o3", price: "$2.00 / $8.00" },
-  { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
+  { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
 ];
 
 const CODE_OPTIONS: ModelOption[] = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
+  // GPT-5.4 family
+  { value: "openai/gpt-5.4", label: "GPT-5.4", price: "$2.50 / $15.00" },
+  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", price: "$0.75 / $4.50" },
+  // Anthropic
+  { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
   { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
+  { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
+  // Gemini 3 (OpenRouter)
+  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", price: "$2.00 / $12.00" },
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
+  { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
+  // Gemini 2.5 (direct API)
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  // GPT-4.1 / GPT-5
   { value: "openai/gpt-4.1", label: "GPT-4.1", price: "$2.00 / $8.00" },
   { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
   { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
+  { value: "openai/o4-mini", label: "o4-mini", price: "$1.10 / $4.40" },
   { value: "openai/o3-mini", label: "o3-mini", price: "$1.10 / $4.40" },
+  // OpenRouter-only
   { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", price: "$0.26 / $0.38" },
   { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", price: "varies" },
 ];
 
 const STAGEHAND_OPTIONS: ModelOption[] = [
-  { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
+  // Gemini 3 (OpenRouter) — best for visual element targeting
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
+  { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
+  // Gemini 2.5 (direct API)
   { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (short id)", price: "$0.15 / $0.60" },
+  { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
+  // Anthropic
+  { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
+  // OpenAI
+  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", price: "$0.75 / $4.50" },
+  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
   { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
   { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
-  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
 ];
 
 const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [

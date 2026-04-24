@@ -10,12 +10,26 @@ export type ModelProviderRequirement =
 const OPENROUTER_ONLY_PREFIXES = ["deepseek/", "meta/", "mistral/", "cohere/", "perplexity/", "qwen/"];
 
 /**
+ * Model ID prefixes that map to a known direct provider (e.g. google/) but are only
+ * available via OpenRouter at this time (e.g. preview / unreleased Gemini generations).
+ * Checked before provider-level prefix matching so they always route through OpenRouter.
+ */
+const OPENROUTER_ONLY_MODEL_PREFIXES = [
+  "google/gemini-3",  // Gemini 3 series — not yet in direct Gemini API
+];
+
+/**
  * Classify which direct provider matches `model`. OpenRouter can still satisfy the call
  * when the matching direct key is missing (see `isModelRunnableWithConfig`).
  */
 export function inferModelProviderRequirement(model: string): ModelProviderRequirement {
   const m = model.trim();
   if (!m) return { kind: "openrouter_only", hint: "Empty model id" };
+
+  // Check OpenRouter-only model prefixes BEFORE provider-level checks
+  for (const p of OPENROUTER_ONLY_MODEL_PREFIXES) {
+    if (m.startsWith(p)) return { kind: "openrouter_only", hint: "Available via OpenRouter only (not yet in direct API)" };
+  }
 
   if (m.startsWith("openai/") || m.startsWith("gpt-")) {
     return { kind: "direct", provider: "openai" };

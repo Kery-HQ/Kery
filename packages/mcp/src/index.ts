@@ -7,6 +7,7 @@ import { KeryClient } from "@kery/client";
 import { registerStartTools } from "./tools/start.js";
 import { registerSetupTool } from "./tools/setup.js";
 import { registerScanTool } from "./tools/scan.js";
+import { registerRouteTools } from "./tools/routes.js";
 import { registerRunTestTool } from "./tools/run.js";
 import { registerBugsTool } from "./tools/bugs.js";
 import { registerCoverageTool } from "./tools/coverage.js";
@@ -29,6 +30,7 @@ const server = new McpServer({
 registerStartTools(server, client, isCloud);
 registerSetupTool(server, client);
 registerScanTool(server, client);
+registerRouteTools(server, client);
 registerRunTestTool(server, client);
 registerBugsTool(server, client);
 registerCoverageTool(server, client);

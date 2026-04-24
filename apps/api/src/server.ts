@@ -9,7 +9,7 @@ import { registerRunRoutes } from "./routes/runs.js";
 import { registerCrawlRoutes } from "./routes/crawl.js";
 import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
-import { registerSettingsRoutes, applyDbModelSettings } from "./routes/settings.js";
+import { registerSettingsRoutes, applyDbModelSettings, applyDbApiKeySettings } from "./routes/settings.js";
 import { Redis } from "ioredis";
 import { createRunQueue } from "./runQueue.js";
 import { withRunCorrelation } from "@kery/engine";
@@ -56,7 +56,8 @@ app.addHook("onRequest", (request, _reply, done) => {
   done();
 });
 
-// Apply any model overrides saved in the DB
+// Apply DB-persisted API key overrides (DB wins over .env), then model overrides
+await applyDbApiKeySettings(storage);
 await applyDbModelSettings(storage);
 
 // Mark zombie runs (stuck in "running" from a previous crash) as failed

@@ -12,6 +12,9 @@ import { Nav } from "@/components/nav";
 import { CommandPalette } from "@/components/command-palette";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { fetchApiKeySettings } from "@/projectApi";
+import { Warning } from "@phosphor-icons/react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Overview } from "@/pages/Overview";
 import { Environments } from "@/pages/Environments";
 import { Runs } from "@/pages/Runs";
@@ -27,15 +30,48 @@ import { FlowDetail } from "@/pages/FlowDetail";
 import { ProjectProvider } from "@/lib/projectContext";
 import { useHotkey } from "@/lib/hooks";
 
+function NoKeysBanner() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isSettingsPage = location.pathname === "/settings";
+
+  if (isSettingsPage) return null;
+
+  return (
+    <div className="shrink-0 flex items-center gap-2.5 px-4 py-2.5 bg-status-warn/10 border-b border-status-warn/25 text-[12px] text-status-warn">
+      <Warning className="h-3.5 w-3.5 shrink-0" weight="fill" />
+      <span className="flex-1">No API keys configured — tests cannot run until at least one provider key is added.</span>
+      <button
+        type="button"
+        onClick={() => navigate("/settings")}
+        className="shrink-0 font-medium underline underline-offset-2 hover:opacity-75 transition-opacity"
+      >
+        Configure keys
+      </button>
+    </div>
+  );
+}
+
 function AppShell() {
   const [cmdkOpen, setCmdkOpen] = React.useState(false);
+  const [hasAnyKey, setHasAnyKey] = React.useState<boolean | null>(null);
 
   useHotkey("mod+k", () => setCmdkOpen(true));
+
+  React.useEffect(() => {
+    fetchApiKeySettings()
+      .then((r) => {
+        const any = Object.values(r).some((info) => info.hasKey);
+        setHasAnyKey(any);
+      })
+      .catch(() => setHasAnyKey(null));
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Nav onOpenCommandPalette={() => setCmdkOpen(true)} />
       <main className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-transparent">
+        {hasAnyKey === false && <NoKeysBanner />}
         <Outlet />
       </main>
       <CommandPalette open={cmdkOpen} onOpenChange={setCmdkOpen} />

@@ -8,7 +8,49 @@ import {
   isModelRunnableWithConfig,
   type ModelConfigKey,
 } from "@kery/engine";
+import { encryptValue, decryptValue, maskedApiKey } from "@kery/db";
 import { config as envConfig } from "../config.js";
+
+// ─── API Key provider constants ────────────────────────────────────────────────
+
+const API_KEY_PROVIDERS = ["openai", "anthropic", "gemini", "openrouter"] as const;
+type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
+
+const PROVIDER_DB_KEY: Record<ApiKeyProvider, string> = {
+  openai: "apiKey.openai",
+  anthropic: "apiKey.anthropic",
+  gemini: "apiKey.gemini",
+  openrouter: "apiKey.openrouter",
+};
+
+const PROVIDER_ENV_KEY: Record<ApiKeyProvider, string> = {
+  openai: envConfig.openaiApiKey,
+  anthropic: envConfig.anthropicApiKey,
+  gemini: envConfig.geminiApiKey,
+  openrouter: envConfig.openrouterApiKey,
+};
+
+const PROVIDER_CONFIG_KEY: Record<ApiKeyProvider, "openaiApiKey" | "anthropicApiKey" | "geminiApiKey" | "openrouterApiKey"> = {
+  openai: "openaiApiKey",
+  anthropic: "anthropicApiKey",
+  gemini: "geminiApiKey",
+  openrouter: "openrouterApiKey",
+};
+
+/** Read DB API key overrides and merge into the running engine config (DB wins over .env). */
+export async function applyDbApiKeySettings(storage: StorageAdapter): Promise<void> {
+  try {
+    const all = await storage.getSettings();
+    const overrides: Partial<Record<"openaiApiKey" | "anthropicApiKey" | "geminiApiKey" | "openrouterApiKey", string>> = {};
+    for (const provider of API_KEY_PROVIDERS) {
+      const raw = all[PROVIDER_DB_KEY[provider]];
+      if (raw) overrides[PROVIDER_CONFIG_KEY[provider]] = decryptValue(raw);
+    }
+    if (Object.keys(overrides).length > 0) updateEngineConfig(overrides);
+  } catch {
+    // settings table may not exist yet — skip silently
+  }
+}
 
 /** The model keys we allow setting via the API. */
 const MODEL_KEYS = [
@@ -245,6 +287,90 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       stagehandModel: envConfig.stagehandModel,
       modelPriceUsdPerMillion: {},
     });
+
+    reply.send({ ok: true });
+  });
+
+  // ─── API Key routes ──────────────────────────────────────────────────────────
+
+  /**
+   * GET /api/settings/api-keys
+   * Returns which API keys are configured and their source (env / db / none).
+   * Never returns the actual key values — only booleans and masked hints.
+   */
+  app.get("/api/settings/api-keys", async (_req, reply) => {
+    let dbKeys: Record<string, string> = {};
+    try {
+      dbKeys = await storage.getSettings();
+    } catch {}
+
+    const result: Record<ApiKeyProvider, { hasKey: boolean; source: "env" | "db" | "none"; maskedKey?: string }> = {} as any;
+    for (const provider of API_KEY_PROVIDERS) {
+      const dbRaw = dbKeys[PROVIDER_DB_KEY[provider]];
+      if (dbRaw) {
+        const plain = decryptValue(dbRaw);
+        result[provider] = { hasKey: true, source: "db", maskedKey: maskedApiKey(plain) };
+      } else if (PROVIDER_ENV_KEY[provider]) {
+        result[provider] = { hasKey: true, source: "env" };
+      } else {
+        result[provider] = { hasKey: false, source: "none" };
+      }
+    }
+
+    reply.send(result);
+  });
+
+  const SaveApiKeysSchema = z.object({
+    openai: z.string().optional(),
+    anthropic: z.string().optional(),
+    gemini: z.string().optional(),
+    openrouter: z.string().optional(),
+  });
+
+  /**
+   * PUT /api/settings/api-keys
+   * Save one or more API keys to the DB. DB keys take precedence over .env values.
+   * Empty string clears the DB override for that provider.
+   */
+  app.put("/api/settings/api-keys", async (req, reply) => {
+    const parsed = SaveApiKeysSchema.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload" });
+      return;
+    }
+
+    for (const provider of API_KEY_PROVIDERS) {
+      const value = parsed.data[provider];
+      if (value === undefined) continue;
+      const dbKey = PROVIDER_DB_KEY[provider];
+      if (value.trim() === "") {
+        await storage.deleteSettings([dbKey]);
+      } else {
+        await storage.saveSetting(dbKey, encryptValue(value.trim()));
+      }
+    }
+
+    // Re-apply all DB API key settings so in-memory config reflects the change
+    await applyDbApiKeySettings(storage);
+
+    reply.send({ ok: true });
+  });
+
+  /**
+   * DELETE /api/settings/api-keys/:provider
+   * Remove a provider's DB key override (falls back to .env value).
+   */
+  app.delete("/api/settings/api-keys/:provider", async (req, reply) => {
+    const { provider } = req.params as { provider: string };
+    if (!API_KEY_PROVIDERS.includes(provider as ApiKeyProvider)) {
+      reply.code(400).send({ error: "unknown provider" });
+      return;
+    }
+    await storage.deleteSettings([PROVIDER_DB_KEY[provider as ApiKeyProvider]]);
+
+    // Revert in-memory config to env value for this provider
+    const envValue = PROVIDER_ENV_KEY[provider as ApiKeyProvider];
+    updateEngineConfig({ [PROVIDER_CONFIG_KEY[provider as ApiKeyProvider]]: envValue });
 
     reply.send({ ok: true });
   });

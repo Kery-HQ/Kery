@@ -336,6 +336,35 @@ export async function resetModelSettings() {
   return apiFetch(`${API_BASE}/api/settings/models`, { method: "DELETE" });
 }
 
+// --- API Key settings ---
+
+export type ApiKeyProvider = "openai" | "anthropic" | "gemini" | "openrouter";
+
+export type ApiKeyInfo = {
+  hasKey: boolean;
+  /** "db" = saved in database (takes precedence over .env), "env" = from .env only, "none" = not configured. */
+  source: "env" | "db" | "none";
+  /** Masked hint for DB-stored keys, e.g. "••••••••••••abcd". Not present for env keys. */
+  maskedKey?: string;
+};
+
+export type ApiKeySettingsResponse = Record<ApiKeyProvider, ApiKeyInfo>;
+
+export async function fetchApiKeySettings(): Promise<ApiKeySettingsResponse> {
+  return apiFetch(`${API_BASE}/api/settings/api-keys`);
+}
+
+export async function saveApiKeys(keys: Partial<Record<ApiKeyProvider, string>>) {
+  return apiFetch(`${API_BASE}/api/settings/api-keys`, {
+    method: "PUT",
+    body: JSON.stringify(keys),
+  });
+}
+
+export async function deleteApiKey(provider: ApiKeyProvider) {
+  return apiFetch(`${API_BASE}/api/settings/api-keys/${provider}`, { method: "DELETE" });
+}
+
 export async function resetCrawlData(projectId: string, deleteFlows = false) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl${deleteFlows ? "?deleteFlows=true" : ""}`, { method: "DELETE" });
 }

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/page-header";
@@ -2135,14 +2135,8 @@ function LLMTab({
     ? llmCalls
     : llmCalls.filter((c) => (c.agent ?? "navigator") === agentFilter);
   const selectedIndex = selectedCall
-    ? filteredCalls.findIndex((c) => c.seq === selectedCall.seq)
+    ? filteredCalls.findIndex((c) => String(c.seq) === String(selectedCall.seq))
     : -1;
-
-  React.useEffect(() => {
-    if (!selectedCall) return;
-    if (selectedIndex >= 0) return;
-    setSelectedCall(null);
-  }, [selectedCall, selectedIndex]);
 
   const agentCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: llmCalls.length };
@@ -2264,7 +2258,9 @@ function LLMTab({
                 key={call.seq}
                 call={call}
                 onSelect={setSelectedCall}
-                isSelected={selectedCall?.seq === call.seq}
+                isSelected={
+                  selectedCall !== null && String(selectedCall.seq) === String(call.seq)
+                }
               />
             ))}
           </div>
@@ -2404,7 +2400,7 @@ function LLMCallDetailSheet({
 
   return (
     <Sheet open={!!call} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col p-0 gap-0 w-full sm:max-w-3xl">
+      <SheetContent className="z-[120] !translate-x-0 !opacity-100 right-0 flex flex-col p-0 gap-0 w-full sm:max-w-3xl">
         {!call ? null : (
           <>
             <SheetHeader className="sticky top-0 z-10 border-b border-border bg-popover p-4 space-y-3">
@@ -2438,6 +2434,9 @@ function LLMCallDetailSheet({
                   </Button>
                 </div>
               </SheetTitle>
+              <SheetDescription className="sr-only">
+                Detailed request, response, and metadata for selected LLM call.
+              </SheetDescription>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" className="text-[10px] h-5">
                   <agentInfo.Icon className="h-3 w-3 mr-1" />

@@ -1,7 +1,6 @@
 import { config } from "./config.js";
 import { initEngineConfig, updateEngineConfig } from "@kery/engine";
-import { initPool } from "@kery/db";
-import { PostgresAdapter } from "@kery/db";
+import { initPool, PostgresAdapter, decryptValue } from "@kery/db";
 import { Redis } from "ioredis";
 import { createRunQueue, createRunWorker } from "./runQueue.js";
 
@@ -23,6 +22,43 @@ initEngineConfig({
 
 const pool = initPool(config.databaseUrl);
 const storage = new PostgresAdapter(pool);
+
+// Apply DB-persisted API key overrides (DB wins over .env) and model overrides
+try {
+  const all = await storage.getSettings();
+  const keyOverrides: Record<string, string> = {};
+  const keyMap: Record<string, string> = {
+    "apiKey.openai": "openaiApiKey",
+    "apiKey.anthropic": "anthropicApiKey",
+    "apiKey.gemini": "geminiApiKey",
+    "apiKey.openrouter": "openrouterApiKey",
+  };
+  for (const [dbKey, cfgKey] of Object.entries(keyMap)) {
+    if (all[dbKey]) keyOverrides[cfgKey] = decryptValue(all[dbKey]);
+  }
+  const modelOverrides: Record<string, string> = {};
+  const modelMap: Record<string, string> = {
+    "model.agentModel": "agentModel",
+    "model.reviewAgentModel": "reviewAgentModel",
+    "model.stagehandModel": "stagehandModel",
+  };
+  for (const [dbKey, cfgKey] of Object.entries(modelMap)) {
+    if (all[dbKey]) modelOverrides[cfgKey] = all[dbKey];
+  }
+  const auxiliaryModel =
+    all["model.auxiliaryModel"] ??
+    all["model.crawlModel"] ??
+    all["model.scriptModel"] ??
+    all["model.summaryModel"] ??
+    all["model.reviewModel"];
+  if (auxiliaryModel) modelOverrides.auxiliaryModel = auxiliaryModel;
+
+  if (Object.keys(keyOverrides).length > 0 || Object.keys(modelOverrides).length > 0) {
+    updateEngineConfig({ ...keyOverrides, ...modelOverrides });
+  }
+} catch {
+  // settings table may not exist yet — skip silently
+}
 
 const { connection: redisConnection } = createRunQueue(config.redisUrl);
 

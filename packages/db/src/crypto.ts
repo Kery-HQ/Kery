@@ -61,3 +61,25 @@ export function decryptConfigJson(config: Record<string, any>): Record<string, a
   }
   return result;
 }
+
+/** Encrypt a single plaintext string (e.g. an API key stored in the settings table). */
+export function encryptValue(plaintext: string): string {
+  const key = getEncryptionKey();
+  if (!key) return plaintext;
+  return `enc:${encrypt(plaintext, key)}`;
+}
+
+/** Decrypt a single string previously encrypted with encryptValue. Returns plaintext unchanged if no encryption key or not encrypted. */
+export function decryptValue(encoded: string): string {
+  const key = getEncryptionKey();
+  if (!key) return encoded;
+  if (!encoded.startsWith("enc:")) return encoded;
+  return decrypt(encoded.slice(4), key);
+}
+
+/** Return the last 4 characters of a decrypted API key for masked display. */
+export function maskedApiKey(plaintext: string): string {
+  if (!plaintext) return "";
+  if (plaintext.length <= 8) return "••••••••";
+  return `${"•".repeat(12)}${plaintext.slice(-4)}`;
+}
