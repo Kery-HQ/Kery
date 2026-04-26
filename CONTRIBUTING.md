@@ -7,7 +7,7 @@ Thank you for your interest in contributing to Kery!
 1. Clone the repo
 2. Copy `.env.example` to `.env` and fill in your LLM API keys
 3. Start PostgreSQL: `docker compose up postgres -d`
-4. Run migrations: `DATABASE_URL=postgresql://kery:kery@localhost:19832/kery npm run migrate`
+4. Run migrations: `DATABASE_URL=postgresql://kery:kery@localhost:11111/kery npm run migrate`
 5. Start the API: `npm run dev:api`
 
 ## Architecture

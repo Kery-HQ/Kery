@@ -606,8 +606,8 @@ const MODEL_CONFIG: {
   },
   {
     key: "auxiliaryModel",
-    label: "Support agent",
-    hint: "Planning & structured outputs",
+    label: "Support system",
+    hint: "Planning, triage, and memory curation",
     Icon: NotePencil,
     options: CODE_OPTIONS,
   },
@@ -620,8 +620,8 @@ const MODEL_CONFIG: {
   },
   {
     key: "stagehandModel",
-    label: "Element finder",
-    hint: "UI targeting reliability",
+    label: "Support system (element finder)",
+    hint: "Interactive element detection and targeting reliability",
     Icon: CursorClick,
     options: STAGEHAND_OPTIONS,
   },

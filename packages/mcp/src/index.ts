@@ -20,8 +20,8 @@ import { registerTestsTool } from "./tools/tests.js";
 import { registerMemoryTool } from "./tools/memory.js";
 import { registerSettingsTools } from "./tools/settings.js";
 
-const apiUrl = process.env.KERY_API_URL ?? "http://localhost:19833";
-const webUrl = process.env.KERY_WEB_URL ?? "http://localhost:19834";
+const apiUrl = process.env.KERY_API_URL ?? "http://localhost:11112";
+const webUrl = process.env.KERY_WEB_URL ?? "http://localhost:11113";
 const apiKey = process.env.KERY_API_KEY;
 const isCloud = Boolean(apiKey);
 

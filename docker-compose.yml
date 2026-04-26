@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: kery
       POSTGRES_DB: kery
     ports:
-      - "19832:5432"
+      - "11111:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -32,12 +32,12 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "19833:19833"
+      - "11112:11112"
     environment:
       DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
       REDIS_URL: redis://redis:6379
-      PORT: 19833
-      APP_URL: http://localhost:19834
+      PORT: 11112
+      APP_URL: http://localhost:11113
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -104,7 +104,7 @@ services:
       context: .
       dockerfile: Dockerfile.web
     ports:
-      - "19834:80"
+      - "11113:80"
     depends_on:
       - api
 

@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const config = {
-  databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:19832/kery",
+  databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:11111/kery",
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openrouterApiKey: process.env.OPENROUTER_API_KEY || "",

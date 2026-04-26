@@ -2,9 +2,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const config = {
-  port: Number(process.env.PORT || 19833),
-  appUrl: process.env.APP_URL || "http://localhost:19834",
-  databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:19832/kery",
+  port: Number(process.env.PORT || 11112),
+  appUrl: process.env.APP_URL || "http://localhost:11113",
+  databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:11111/kery",
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openrouterApiKey: process.env.OPENROUTER_API_KEY || "",

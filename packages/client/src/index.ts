@@ -18,8 +18,8 @@ export class KeryClient {
   private readonly apiKey: string | undefined;
 
   constructor(options: KeryClientOptions = {}) {
-    this.apiUrl = (options.apiUrl ?? "http://localhost:19833").replace(/\/$/, "");
-    this.webUrl = (options.webUrl ?? "http://localhost:19834").replace(/\/$/, "");
+    this.apiUrl = (options.apiUrl ?? "http://localhost:11112").replace(/\/$/, "");
+    this.webUrl = (options.webUrl ?? "http://localhost:11113").replace(/\/$/, "");
     this.apiKey = options.apiKey;
   }
 

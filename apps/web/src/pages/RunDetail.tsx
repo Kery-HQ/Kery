@@ -121,6 +121,8 @@ type LLMAgentType =
   | "memory_curator"
   | "stagehand";
 
+type UIAgentGroup = "navigator" | "review" | "support";
+
 type LLMStoredContentPart =
   | { type: "text"; text: string }
   | { type: "image"; imageIndex: number; label?: string };
@@ -573,22 +575,16 @@ type LlmAgentDisplay = {
 const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
   navigator:            { label: "Navigator",   color: "text-sky-600 dark:text-sky-400",     badgeClass: "border-sky-500/50 bg-sky-500/12 text-sky-700 dark:text-sky-300", Icon: Compass },
   review:               { label: "Review",      color: "text-violet-600 dark:text-violet-400", badgeClass: "border-violet-500/50 bg-violet-500/12 text-violet-700 dark:text-violet-300", Icon: Eye },
-  holistic:             { label: "Flow review", color: "text-fuchsia-600 dark:text-fuchsia-400", badgeClass: "border-fuchsia-500/50 bg-fuchsia-500/12 text-fuchsia-700 dark:text-fuchsia-300", Icon: GitBranch },
-  summary:              { label: "Summary",     color: "text-indigo-600 dark:text-indigo-400", badgeClass: "border-indigo-500/50 bg-indigo-500/12 text-indigo-700 dark:text-indigo-300", Icon: FileText },
-  filmstrip:            { label: "Filmstrip",   color: "text-emerald-600 dark:text-emerald-400", badgeClass: "border-emerald-500/50 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", Icon: Stack },
-  bug_triage:           { label: "Bug triage",  color: "text-red-600 dark:text-red-400",     badgeClass: "border-red-500/50 bg-red-500/12 text-red-700 dark:text-red-300", Icon: WarningCircle },
-  crawl_link_filter:    { label: "Crawl links", color: "text-cyan-600 dark:text-cyan-400",   badgeClass: "border-cyan-500/50 bg-cyan-500/12 text-cyan-700 dark:text-cyan-300", Icon: Funnel },
-  crawl_route_filter:   { label: "Crawl routes", color: "text-teal-600 dark:text-teal-400",  badgeClass: "border-teal-500/50 bg-teal-500/12 text-teal-700 dark:text-teal-300", Icon: Funnel },
-  crawl_suggested_flows:{ label: "Crawl flows", color: "text-green-600 dark:text-green-400", badgeClass: "border-green-500/50 bg-green-500/12 text-green-700 dark:text-green-300", Icon: FlowArrow },
-  memory_curator:       { label: "Memory",      color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Brain },
-  stagehand:            { label: "Stagehand",   color: "text-rose-600 dark:text-rose-400",   badgeClass: "border-rose-500/50 bg-rose-500/12 text-rose-700 dark:text-rose-300", Icon: Lightning },
+  holistic:             { label: "Review",      color: "text-violet-600 dark:text-violet-400", badgeClass: "border-violet-500/50 bg-violet-500/12 text-violet-700 dark:text-violet-300", Icon: GitBranch },
+  summary:              { label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: FileText },
+  filmstrip:            { label: "Review",      color: "text-violet-600 dark:text-violet-400", badgeClass: "border-violet-500/50 bg-violet-500/12 text-violet-700 dark:text-violet-300", Icon: Stack },
+  bug_triage:           { label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: WarningCircle },
+  crawl_link_filter:    { label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Funnel },
+  crawl_route_filter:   { label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Funnel },
+  crawl_suggested_flows:{ label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: FlowArrow },
+  memory_curator:       { label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Brain },
+  stagehand:            { label: "Support",     color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Lightning },
 };
-
-const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
-  "navigator", "holistic", "filmstrip", "summary",
-  "bug_triage", "memory_curator", "stagehand",
-  "crawl_link_filter", "crawl_route_filter", "crawl_suggested_flows",
-];
 
 /** Legacy or engine-only agents (e.g. memory_curator) still render in the LLM tab. */
 function llmAgentDisplay(agent: string): LlmAgentDisplay {
@@ -600,6 +596,15 @@ function llmAgentDisplay(agent: string): LlmAgentDisplay {
     Icon: Brain,
   };
 }
+
+function uiAgentGroup(agent: LLMAgentType | undefined): UIAgentGroup {
+  const resolved = agent ?? "navigator";
+  if (resolved === "navigator") return "navigator";
+  if (resolved === "review" || resolved === "holistic" || resolved === "filmstrip") return "review";
+  return "support";
+}
+
+const UI_AGENT_GROUP_ORDER: UIAgentGroup[] = ["navigator", "review", "support"];
 
 // --- Main component ---
 
@@ -984,12 +989,11 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
 }
 
 function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
-  const agents = ["navigator", "holistic", "filmstrip", "summary", "memory_curator", "stagehand"] as const;
-  const rows = agents
-    .map((a) => ({
-      agent: a,
-      cost: llmCalls.filter((c) => (c.agent ?? "navigator") === a).reduce((s, c) => s + c.costUsd, 0),
-      calls: llmCalls.filter((c) => (c.agent ?? "navigator") === a).length,
+  const rows = UI_AGENT_GROUP_ORDER
+    .map((group) => ({
+      agent: group,
+      cost: llmCalls.filter((c) => uiAgentGroup(c.agent) === group).reduce((s, c) => s + c.costUsd, 0),
+      calls: llmCalls.filter((c) => uiAgentGroup(c.agent) === group).length,
     }))
     .filter((r) => r.calls > 0);
   if (rows.length === 0) return null;
@@ -1000,7 +1004,7 @@ function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {rows.map((r) => (
             <div key={r.agent} className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{llmAgentDisplay(r.agent).label}</p>
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{llmAgentDisplay(r.agent as LLMAgentType).label}</p>
               <p className="text-[13px] font-mono text-foreground">{formatCost(r.cost)}</p>
               <p className="text-[10px] text-muted-foreground/70">{r.calls} call{r.calls !== 1 ? "s" : ""}</p>
             </div>
@@ -2176,7 +2180,7 @@ function LLMTab({
   runStatus: string;
   activityFeed: ActivityEntry[];
 }) {
-  const [agentFilter, setAgentFilter] = React.useState<LLMAgentType | "all">("all");
+  const [agentFilter, setAgentFilter] = React.useState<UIAgentGroup | "all">("all");
   const [selectedCall, setSelectedCall] = React.useState<LLMCallRecord | null>(null);
 
   const totalInput  = llmCalls.reduce((s, c) => s + c.inputTokens, 0);
@@ -2187,28 +2191,28 @@ function LLMTab({
 
   const filteredCalls = agentFilter === "all"
     ? llmCalls
-    : llmCalls.filter((c) => (c.agent ?? "navigator") === agentFilter);
+    : llmCalls.filter((c) => uiAgentGroup(c.agent) === agentFilter);
   const selectedIndex = selectedCall
     ? filteredCalls.findIndex((c) => String(c.seq) === String(selectedCall.seq))
     : -1;
 
   const agentCounts = React.useMemo(() => {
     const counts: Record<string, number> = { all: llmCalls.length };
-    for (const a of LLM_TAB_AGENT_ORDER) {
-      counts[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).length;
+    for (const a of UI_AGENT_GROUP_ORDER) {
+      counts[a] = llmCalls.filter((c) => uiAgentGroup(c.agent) === a).length;
     }
     return counts;
   }, [llmCalls]);
 
   const agentCosts = React.useMemo(() => {
     const cost: Record<string, number> = {};
-    for (const a of LLM_TAB_AGENT_ORDER) {
-      cost[a] = llmCalls.filter((c) => (c.agent ?? "navigator") === a).reduce((s, c) => s + c.costUsd, 0);
+    for (const a of UI_AGENT_GROUP_ORDER) {
+      cost[a] = llmCalls.filter((c) => uiAgentGroup(c.agent) === a).reduce((s, c) => s + c.costUsd, 0);
     }
     return cost;
   }, [llmCalls]);
 
-  const agentsWithCalls = LLM_TAB_AGENT_ORDER.filter((a) => (agentCounts[a] ?? 0) > 0);
+  const agentsWithCalls = UI_AGENT_GROUP_ORDER.filter((a) => (agentCounts[a] ?? 0) > 0);
   const latestActivityText = React.useMemo(() => {
     for (let i = activityFeed.length - 1; i >= 0; i -= 1) {
       const item = activityFeed[i];
@@ -2258,7 +2262,9 @@ function LLMTab({
               All ({agentCounts.all})
             </button>
             {agentsWithCalls.map((a) => {
-              const { label, Icon, color } = llmAgentDisplay(a);
+              const groupDisplayAgent: LLMAgentType =
+                a === "navigator" ? "navigator" : a === "review" ? "review" : "memory_curator";
+              const { label, Icon, color } = llmAgentDisplay(groupDisplayAgent);
               return (
                 <button
                   key={a}

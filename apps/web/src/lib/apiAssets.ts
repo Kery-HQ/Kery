@@ -3,9 +3,9 @@ import { API_BASE } from "@/api";
 /**
  * Resolve a media URL for `<img src>` and similar.
  *
- * In Vite dev, the SPA is usually on one port (e.g. 19834) and `/api` is **proxied** to the API.
- * Prefixing `API_BASE` (e.g. `http://localhost:19833`) bypasses the proxy, so images 404 or fail
- * while the same path works at `http://localhost:19834/api/...`. Use same-origin `/api/...` in dev.
+ * In Vite dev, the SPA is usually on one port (e.g. 11113) and `/api` is **proxied** to the API.
+ * Prefixing `API_BASE` (e.g. `http://localhost:11112`) bypasses the proxy, so images 404 or fail
+ * while the same path works at `http://localhost:11113/api/...`. Use same-origin `/api/...` in dev.
  *
  * When `VITE_API_BASE_URL` is set (e.g. split API host in prod), use it for `/api` media.
  */
