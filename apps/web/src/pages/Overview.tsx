@@ -15,7 +15,6 @@ import {
   Sparkle,
   ChartPie,
   CurrencyDollar,
-  ListChecks,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
@@ -286,11 +285,11 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
             )}
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            <span className="text-status-pass">{pass} pass</span>
+            <span className="text-status-pass">{pass} clean</span>
             {" · "}
-            <span className="text-status-warn">{regress} regress</span>
+            <span className="text-status-warn">{regress} stale</span>
             {" · "}
-            <span className="text-status-fail">{fail} fail</span>
+            <span className="text-status-fail">{fail} issues</span>
             {" · "}
             <span className="text-muted-foreground">{untested} untested</span>
             <span className="text-muted-foreground/70"> · {total} routes</span>
@@ -301,10 +300,12 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
   );
 }
 
-function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; scripted: number; unscripted: number } | null }) {
+function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; tested: number; clean: number; withIssues: number; untested: number } | null }) {
   const total = flowCoverage?.total ?? 0;
-  const scripted = flowCoverage?.scripted ?? 0;
-  const unscripted = flowCoverage?.unscripted ?? 0;
+  const tested = flowCoverage?.tested ?? 0;
+  const clean = flowCoverage?.clean ?? 0;
+  const withIssues = flowCoverage?.withIssues ?? 0;
+  const untested = flowCoverage?.untested ?? 0;
 
   return (
     <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
@@ -312,7 +313,7 @@ function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; scri
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Flow coverage
         </span>
-        <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
+        <FlowArrow className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
       {total === 0 ? (
         <p className="text-[12px] text-muted-foreground leading-snug">No flows yet. Create and run flows to measure coverage.</p>
@@ -320,14 +321,39 @@ function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; scri
         <>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-semibold tabular-nums text-foreground">
-              {Math.round((scripted / total) * 100)}
+              {Math.round((tested / total) * 100)}
             </span>
-            <span className="text-[12px] text-muted-foreground">% scripted</span>
+            <span className="text-[12px] text-muted-foreground">% tested</span>
+          </div>
+          <div className="flex h-2 w-full rounded-full overflow-hidden gap-px bg-border/40">
+            {clean > 0 && (
+              <div
+                className="min-w-[3px] rounded-l-sm bg-status-pass"
+                style={{ flex: clean }}
+                title={`${clean} clean`}
+              />
+            )}
+            {withIssues > 0 && (
+              <div
+                className="min-w-[3px] bg-status-fail"
+                style={{ flex: withIssues }}
+                title={`${withIssues} with issues`}
+              />
+            )}
+            {untested > 0 && (
+              <div
+                className="min-w-[3px] rounded-r-sm bg-muted-foreground/25"
+                style={{ flex: untested }}
+                title={`${untested} untested`}
+              />
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            <span className="text-status-pass">{scripted} scripted</span>
+            <span className="text-status-pass">{clean} clean</span>
             {" · "}
-            <span className="text-muted-foreground">{unscripted} unscripted</span>
+            <span className="text-status-fail">{withIssues} issues</span>
+            {" · "}
+            <span className="text-muted-foreground">{untested} untested</span>
             <span className="text-muted-foreground/70"> · {total} flows</span>
           </p>
         </>
@@ -349,7 +375,7 @@ function Dashboard({
   runs: any[];
   bugs: any[];
   coverage: PageCoverageStats | null;
-  flowCoverage: { total: number; scripted: number; unscripted: number } | null;
+  flowCoverage: { total: number; tested: number; clean: number; withIssues: number; untested: number } | null;
   hiddenActiveRuns: number;
   navigate: (path: string) => void;
 }) {
@@ -463,7 +489,7 @@ export const Overview: React.FC = () => {
   const [bugs, setBugs] = React.useState<any[]>([]);
   const [hiddenActiveRuns, setHiddenActiveRuns] = React.useState(0);
   const [pageCoverage, setPageCoverage] = React.useState<PageCoverageStats | null>(null);
-  const [flowCoverage, setFlowCoverage] = React.useState<{ total: number; scripted: number; unscripted: number } | null>(null);
+  const [flowCoverage, setFlowCoverage] = React.useState<{ total: number; tested: number; clean: number; withIssues: number; untested: number } | null>(null);
   const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
   const [setupDone, setSetupDone] = React.useState(false);
   const [setupDismissed, setSetupDismissed] = React.useState(false);
@@ -514,11 +540,15 @@ export const Overview: React.FC = () => {
       setOverview(ov);
       setPageCoverage((pagesRes as { coverage?: PageCoverageStats }).coverage ?? null);
       const totalFlows = tests.length;
-      const scriptedFlows = tests.filter((t: any) => String(t?.plan_status ?? "none") !== "none").length;
+      const testedFlows = tests.filter((t: any) => (t?.run_count ?? 0) > 0);
+      const cleanFlows = testedFlows.filter((t: any) => (t?.issues_count ?? 0) === 0).length;
+      const issueFlows = testedFlows.filter((t: any) => (t?.issues_count ?? 0) > 0).length;
       setFlowCoverage({
         total: totalFlows,
-        scripted: scriptedFlows,
-        unscripted: Math.max(0, totalFlows - scriptedFlows),
+        tested: testedFlows.length,
+        clean: cleanFlows,
+        withIssues: issueFlows,
+        untested: Math.max(0, totalFlows - testedFlows.length),
       });
       const recentRuns = allRuns.slice(0, 10);
       const isActiveRun = (r: any) => {
