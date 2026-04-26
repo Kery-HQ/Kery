@@ -1,6 +1,7 @@
 {
   "name": "@kery/client",
   "version": "0.1.0",
+  "description": "Typed HTTP client for the Kery AI testing API",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,8 +9,29 @@
     "build": "tsc",
     "dev": "tsc --watch"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "typescript": "^5.7.0",
     "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "kery",
+    "client",
+    "api",
+    "testing"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kery-HQ/Kery.git"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,6 +1,7 @@
 {
   "name": "@kery/mcp",
   "version": "0.1.0",
+  "description": "Kery MCP server — lets AI agents in your IDE run browser tests via Kery",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,6 +12,10 @@
     "build": "tsc",
     "dev": "tsc --watch"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "dependencies": {
     "@kery/client": "*",
     "@modelcontextprotocol/sdk": "^1.12.1",
@@ -19,5 +24,23 @@
   "devDependencies": {
     "typescript": "^5.7.0",
     "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "kery",
+    "mcp",
+    "ai",
+    "testing",
+    "browser"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kery-HQ/Kery.git"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
