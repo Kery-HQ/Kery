@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FlowArrow,
+  ListChecks,
   Plus,
   Play,
   Pencil,
@@ -297,20 +298,10 @@ export const TestsPlans: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        icon={<FlowArrow className="h-4 w-4" />}
+        icon={<ListChecks className="h-4 w-4" />}
         title="Flows"
         description={tests.length > 0 ? `${tests.length} flow${tests.length !== 1 ? "s" : ""}` : undefined}
-      >
-        <Button
-          size="sm"
-          onClick={openCreate}
-          disabled={!currentProjectId}
-          className="gap-1.5 h-8 text-[12px]"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New Flow
-        </Button>
-      </PageHeader>
+      />
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
@@ -395,46 +386,8 @@ export const TestsPlans: React.FC = () => {
           <main className="space-y-3">
             {!currentProjectId ? (
               <EmptyState title="Select a project" className="py-12" />
-            ) : tests.length === 0 ? (
-              <EmptyState
-                icon={<FlowArrow className="h-5 w-5" />}
-                title="No flows yet"
-                description="Create a test flow to get started."
-                className="py-12"
-              />
             ) : (
               <>
-                {/* Filter + search card */}
-                <div className="liquid-glass rounded-xl p-3 space-y-3">
-                  <div className="relative w-full">
-                    <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-                    <Input
-                      value={flowFilter}
-                      onChange={(e) => setFlowFilter(e.target.value)}
-                      placeholder="Filter flows..."
-                      className="pl-8"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {STATUS_FILTERS.map((s) => (
-                      <Button
-                        key={s}
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setStatusFilter(s)}
-                        className={cn(
-                          "h-7 px-2.5 text-[11px]",
-                          statusFilter === s
-                            ? "bg-accent text-foreground"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {STATUS_LABELS[s]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Section header: Flows title + env + run all */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
@@ -465,36 +418,50 @@ export const TestsPlans: React.FC = () => {
                       {!runAllBusy && <Play className="h-3.5 w-3.5" />}
                       Run all{enabledCount > 0 ? ` (${enabledCount})` : ""}
                     </Button>
+                    <Button
+                      size="sm"
+                      onClick={openCreate}
+                      disabled={!currentProjectId}
+                      className="gap-1.5 h-8 text-[12px]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      New Flow
+                    </Button>
                   </div>
                 </div>
 
-                {/* Quick adhoc run */}
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={adhocIntent}
-                    onChange={(e) => setAdhocIntent(e.target.value)}
-                    placeholder="Quick run: describe what the agent should do..."
-                    className="h-8 text-[13px] flex-1"
-                    onKeyDown={(e) => { if (e.key === "Enter") handleAdhocRun(); }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleAdhocRun}
-                    disabled={adhocRunning || !adhocIntent.trim() || !selectedEnvId || !currentProjectId}
-                    loading={adhocRunning}
-                    className="gap-1.5 h-8 shrink-0"
-                  >
-                    <Play className="h-3 w-3" />
-                    Run
-                  </Button>
-                </div>
+                {/* Flow tiles (Quick run always first) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <div className="glass-card-flat p-3 flex flex-col gap-2 min-h-[8rem]">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <StatusDot status={adhocRunning ? "running" : "clean"} />
+                      <span className="text-[13px] font-medium text-foreground truncate">Quick run</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/60">
+                      Run an ad-hoc prompt without creating a saved flow.
+                    </p>
+                    <div className="mt-auto flex items-center gap-2">
+                      <Input
+                        value={adhocIntent}
+                        onChange={(e) => setAdhocIntent(e.target.value)}
+                        placeholder="Describe what the agent should do..."
+                        className="h-8 text-[13px] flex-1"
+                        onKeyDown={(e) => { if (e.key === "Enter") handleAdhocRun(); }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleAdhocRun}
+                        disabled={adhocRunning || !adhocIntent.trim() || !selectedEnvId || !currentProjectId}
+                        loading={adhocRunning}
+                        className="gap-1.5 h-8 shrink-0"
+                      >
+                        {!adhocRunning && <Play className="h-3 w-3" />}
+                        Run
+                      </Button>
+                    </div>
+                  </div>
 
-                {/* Flow tiles */}
-                {filteredTests.length === 0 ? (
-                  <EmptyState title="No flows match filters" className="py-8" />
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {filteredTests.map((test) => {
+                  {filteredTests.map((test) => {
                       const scriptDot =
                         test.plan_status === "ready"
                           ? "clean"
@@ -591,9 +558,8 @@ export const TestsPlans: React.FC = () => {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
+                  })}
+                </div>
               </>
             )}
           </main>

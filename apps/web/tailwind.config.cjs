@@ -13,8 +13,9 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)'],
-        mono: ['var(--font-mono)'],
+        sans:    ['var(--font-sans)'],
+        serif:   ['var(--font-serif)'],
+        mono:    ['var(--font-mono)'],
         display: ['var(--font-display)'],
       },
       colors: {
@@ -62,6 +63,13 @@ module.exports = {
           running: 'var(--status-running)',
           warn:    'var(--status-warn)',
         },
+        chart: {
+          1: 'var(--chart-1)',
+          2: 'var(--chart-2)',
+          3: 'var(--chart-3)',
+          4: 'var(--chart-4)',
+          5: 'var(--chart-5)',
+        },
         sidebar: {
           DEFAULT:    'var(--sidebar)',
           foreground: 'var(--sidebar-foreground)',
@@ -78,9 +86,9 @@ module.exports = {
         },
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        sm: 'calc(var(--radius) - 2px)',
+        md: 'var(--radius)',
+        lg: 'calc(var(--radius) + 2px)',
         xl: 'calc(var(--radius) + 4px)',
       },
       keyframes: {

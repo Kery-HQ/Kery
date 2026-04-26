@@ -1108,12 +1108,12 @@ function StepCard({
         isFailed
           ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/8"
           : isReplayCurrent
-            ? "border-primary/70 bg-primary/15 dark:bg-primary/22 shadow-sm ring-1 ring-primary/35"
+            ? "border-border bg-accent/25 ring-2 ring-ring/20"
             : "border-border/60 bg-surface-2 dark:bg-surface-3 hover:border-border hover:bg-surface-2 dark:hover:bg-surface-3",
       )}
     >
       {isReplayCurrent && (
-        <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg bg-primary/80" aria-hidden />
+        <span className="absolute left-1.5 top-1.5 bottom-1.5 w-[2px] rounded-full bg-ring/55" aria-hidden />
       )}
       <div className="flex items-start gap-2.5">
         {/* Step number + status indicator */}
@@ -1626,12 +1626,12 @@ function OverviewTab({
       {/* ── Drag-to-resize handle ── */}
       <div
         onMouseDown={onDragHandleMouseDown}
-        className="w-4 flex-shrink-0 cursor-col-resize group relative z-10 transition-colors"
+        className="w-5 flex-shrink-0 cursor-col-resize group relative z-10 transition-colors bg-surface-2/55 hover:bg-surface-2"
         title="Drag to resize"
       >
-        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-border group-hover:bg-primary/60 transition-colors" />
-        <div className="absolute inset-0 grid place-items-center opacity-50 group-hover:opacity-100 transition-opacity">
-          <DotsSixVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        <div className="absolute inset-y-1 left-1/2 -translate-x-1/2 w-[2px] rounded-full bg-border group-hover:bg-ring/70 transition-colors" />
+        <div className="absolute inset-0 grid place-items-center opacity-70 group-hover:opacity-100 transition-opacity">
+          <DotsSixVertical className="h-4.5 w-4.5 text-muted-foreground group-hover:text-foreground transition-colors" />
         </div>
       </div>
 
@@ -1760,7 +1760,11 @@ function OverviewTab({
 
 function GalleryTab({ groups }: { groups: Record<string, GalleryShot[]> }) {
   const [query, setQuery] = React.useState("");
-  const entries = Object.entries(groups).filter(([, shots]) => shots.length > 0);
+  const entries = Object.entries(groups).filter(([group, shots]) => {
+    if (shots.length === 0) return false;
+    const g = group.toLowerCase();
+    return g === "navigator" || g.startsWith("issues/");
+  });
 
   if (entries.length === 0) {
     return (
@@ -1864,32 +1868,95 @@ function IssuesTab({
   }[];
   projectId?: string;
 }) {
+  const [selectedIndex, setSelectedIndex] = React.useState(0);
+  React.useEffect(() => {
+    if (bugsFound.length === 0) {
+      setSelectedIndex(0);
+      return;
+    }
+    if (selectedIndex >= bugsFound.length) setSelectedIndex(0);
+  }, [bugsFound.length, selectedIndex]);
+
+  const selectedBug = bugsFound[selectedIndex] ?? null;
+
   return (
-    <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in">
-      {bugsFound.length > 0 ? (
-        <div className="mb-4">
-          <SectionLabel icon={<WarningCircle className="h-3.5 w-3.5" />} text={`Issues (${bugsFound.length})`} />
-          <p className="text-[12px] text-muted-foreground mt-1">
-            Findings from the Navigator, review agents, and related signals for this run.
-          </p>
-        </div>
-      ) : null}
+    <div className="flex flex-col flex-1 min-h-0 w-full animate-fade-in">
       {bugsFound.length === 0 ? (
-        <EmptyState
-          icon={<WarningCircle className="h-5 w-5" />}
-          title="No issues"
-          description="Nothing was reported for this run. Check the Overview for live activity and LLM Calls for audit detail."
-        />
+        <div className="px-6 py-5 max-w-4xl w-full mx-auto">
+          <EmptyState
+            icon={<WarningCircle className="h-5 w-5" />}
+            title="No issues"
+            description="Nothing was reported for this run. Check the Overview for live activity and LLM Calls for audit detail."
+          />
+        </div>
       ) : (
-        <div className="space-y-1.5">
-          {bugsFound.map((bug: RunStep & { name?: string }, i: number) => (
-            <div key={i} className="animate-fade-in" style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
-              <BugCard bug={bug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} />
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="w-[340px] flex-shrink-0 flex flex-col min-h-0 border-r border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border flex-shrink-0 bg-surface-2 dark:bg-surface-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Issues</span>
+              <span className="text-[11px] font-mono text-muted-foreground/60">{bugsFound.length}</span>
             </div>
-          ))}
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
+              {bugsFound.map((bug: RunStep & { name?: string }, i: number) => {
+                const displayName = runJsonBugDisplayName(bug);
+                const category = String(bug.category ?? bug.bugType ?? "other");
+                const dbBug = resolveRunDbBug(bug, runBugs);
+                const reportedIso = dbBug?.reported_at ?? run.completed_at ?? run.started_at ?? "";
+                const selected = i === selectedIndex;
+                return (
+                  <button key={i} type="button" onClick={() => setSelectedIndex(i)} className="w-full text-left block">
+                    <div className={cn("glass-card-flat p-2.5 transition-all", selected && "ring-2 ring-ring/20 border-border bg-accent/25")}>
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
+                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{displayName}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <BugCategoryTag category={category} />
+                        {dbBug?.status && (
+                          <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
+                            {dbBug.status.replace("_", " ")}
+                          </Badge>
+                        )}
+                        <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">
+                          {reportedIso ? formatReportedAt(reportedIso) : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto px-6 py-5">
+            {selectedBug && (
+              <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded />
+            )}
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+function resolveRunDbBug(
+  bug: any,
+  runBugs: {
+    id?: string;
+    name: string;
+    description: string;
+    url?: string | null;
+    step_index?: number | null;
+    status?: string;
+    reported_at?: string;
+  }[],
+) {
+  const nameNorm = (bug.name ?? "").trim();
+  const bodyNorm = (bug.description ?? bug.reasoning ?? "").trim();
+  return runBugs.find(
+    (b) =>
+      (typeof bug.index === "number" && b.step_index != null && b.step_index === bug.index) ||
+      (b.name.trim() === nameNorm && b.description.trim() === bodyNorm) ||
+      (b.description.trim() === bodyNorm && (b.url ?? "").trim() === (bug.url ?? "").trim()),
   );
 }
 
@@ -1903,6 +1970,7 @@ function BugCard({
   runId,
   projectId,
   run,
+  forceExpanded = false,
 }: {
   bug: any;
   runBugs: {
@@ -1917,6 +1985,7 @@ function BugCard({
   runId: string;
   projectId?: string;
   run: Run;
+  forceExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [showRaw, setShowRaw] = React.useState(false);
@@ -1926,15 +1995,9 @@ function BugCard({
   const detail = runJsonBugDetailDescription(bug, displayName);
   const category = String(bug.category ?? bug.bugType ?? "other");
 
-  const nameNorm = (bug.name ?? "").trim();
-  const bodyNorm = (bug.description ?? bug.reasoning ?? "").trim();
-  const dbBug = runBugs.find(
-    (b) =>
-      (typeof bug.index === "number" && b.step_index != null && b.step_index === bug.index) ||
-      (b.name.trim() === nameNorm && b.description.trim() === bodyNorm) ||
-      (b.description.trim() === bodyNorm && (b.url ?? "").trim() === (bug.url ?? "").trim()),
-  );
+  const dbBug = resolveRunDbBug(bug, runBugs);
   const reportedIso = dbBug?.reported_at ?? run.completed_at ?? run.started_at ?? "";
+  const isExpanded = forceExpanded || expanded;
 
   async function resolveIssue() {
     if (!projectId || !dbBug?.id) return;
@@ -1951,7 +2014,7 @@ function BugCard({
     setBusy(true);
     try {
       await patchProjectBug(projectId, dbBug.id, { status: "wont_fix" });
-      const bodyForMemory = detail || bodyNorm;
+      const bodyForMemory = detail || (bug.description ?? bug.reasoning ?? "").trim();
       await createMemoryEntry(projectId, {
         type: "ignore_region",
         summary: `Ignored issue: ${displayName}`,
@@ -1967,37 +2030,57 @@ function BugCard({
     <div
       className={cn(
         "rounded-lg border border-border bg-card overflow-hidden transition-colors",
-        expanded && "ring-1 ring-border",
+        isExpanded && "ring-1 ring-border",
       )}
     >
-      <button
-        type="button"
-        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {expanded ? (
-          <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-        ) : (
-          <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-        )}
-        <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
-        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{displayName}</span>
-        <BugCategoryTag category={category} />
-        {dbBug?.status && (
-          <Badge
-            variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"}
-            className="capitalize flex-shrink-0 text-[10px]"
-          >
-            {dbBug.status.replace("_", " ")}
-          </Badge>
-        )}
-        <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0 tabular-nums">
-          {reportedIso ? formatReportedAt(reportedIso) : "—"}
-        </span>
-      </button>
+      {!forceExpanded && (
+        <button
+          type="button"
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? (
+            <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          ) : (
+            <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          )}
+          <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
+          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{displayName}</span>
+          <BugCategoryTag category={category} />
+          {dbBug?.status && (
+            <Badge
+              variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"}
+              className="capitalize flex-shrink-0 text-[10px]"
+            >
+              {dbBug.status.replace("_", " ")}
+            </Badge>
+          )}
+          <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0 tabular-nums">
+            {reportedIso ? formatReportedAt(reportedIso) : "—"}
+          </span>
+        </button>
+      )}
 
-      {expanded && (
-        <div className="border-t border-border px-4 py-4 space-y-4 bg-muted/10 animate-fade-in">
+      {isExpanded && (
+        <div className={cn("px-4 py-4 space-y-4 animate-fade-in", forceExpanded ? "" : "border-t border-border bg-muted/10")}>
+          {forceExpanded && (
+            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-semibold text-foreground truncate">{displayName}</h3>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <BugCategoryTag category={category} />
+                  {dbBug?.status && (
+                    <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
+                      {dbBug.status.replace("_", " ")}
+                    </Badge>
+                  )}
+                  <span className="text-[11px] font-mono text-muted-foreground/60">
+                    {reportedIso ? formatReportedAt(reportedIso) : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           {detail ? (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
@@ -2063,7 +2146,7 @@ function BugCard({
                       resolveIssue();
                     }}
                   >
-                    Resolve
+                    Mark as resolved
                   </Button>
                   <Button
                     size="sm"
@@ -2075,7 +2158,7 @@ function BugCard({
                       ignoreIssue();
                     }}
                   >
-                    Ignore
+                    Ignore bug
                   </Button>
                 </>
               )}

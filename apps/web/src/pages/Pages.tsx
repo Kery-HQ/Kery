@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Stack,
+  Path,
   ArrowsClockwise,
   MagnifyingGlass,
   Play,
@@ -375,7 +376,7 @@ export function Pages() {
   if (!pid) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Stack className="h-4 w-4" />} title="Routes" />
+        <PageHeader icon={<Path className="h-4 w-4" />} title="Routes" />
         <EmptyState
           icon={<Stack className="h-8 w-8" />}
           title="No project selected"
@@ -387,23 +388,7 @@ export function Pages() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Stack className="h-4 w-4" />} title="Routes">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => handleScan()}
-          loading={scanActive && !canForceReplaceScan}
-        >
-          {!(scanActive && !canForceReplaceScan) && <ArrowsClockwise className="h-3.5 w-3.5" />}
-          {scanActive
-            ? canForceReplaceScan
-              ? "Replace stuck scan"
-              : "Scanning..."
-            : pages.length === 0
-              ? "Scan my app"
-              : "Scan app"}
-        </Button>
-      </PageHeader>
+      <PageHeader icon={<Path className="h-4 w-4" />} title="Routes" />
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
@@ -528,37 +513,6 @@ export function Pages() {
               />
             ) : (
               <>
-                {/* Filter + health tabs */}
-                <div className="liquid-glass rounded-xl p-3 space-y-3">
-                  <div className="relative w-full">
-                    <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-                    <Input
-                      value={filter}
-                      onChange={e => setFilter(e.target.value)}
-                      placeholder="Filter routes..."
-                      className="pl-8"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {HEALTH_FILTERS.map(h => (
-                      <Button
-                        key={h}
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setHealthFilter(h)}
-                        className={cn(
-                          "h-7 px-2.5 text-[11px] capitalize",
-                          healthFilter === h
-                            ? "bg-foreground/8 dark:bg-white/10 text-foreground"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {HEALTH_LABEL[h]}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Enabled route tiles */}
                 {enabledFilteredPages.length > 0 && (
                   <div className="space-y-2">

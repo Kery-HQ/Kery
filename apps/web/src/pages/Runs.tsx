@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Pulse, ArrowsClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { Pulse, Play, ArrowsClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -168,7 +168,7 @@ export const Runs: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Pulse className="h-4 w-4" />} title="Runs">
+      <PageHeader icon={<Play className="h-4 w-4" />} title="Runs">
         {!loading && runs.length > 0 && (
           <span className="text-[11px] font-mono text-muted-foreground">{total} runs</span>
         )}

@@ -2,7 +2,7 @@
 
 ## Aesthetic
 
-Calm developer tool. Pale sage green surfaces in light mode, deep forest sage in dark mode. Muted terracotta/amber accent (the mango brand) pops against the sage. Dense but breathable, keyboard-first, subtle animations. Inspired by Claude.ai's restraint applied to a dev tool context.
+Flat developer tool with a warm, Claude-inspired palette. Light mode: warm cream surfaces with a barely-perceptible warm tint throughout. Dark mode: very dark warm charcoal (not pure black). Yellow-gold accent (Kery brand). No glass effects, no decorative gradients, no shadows for elevation. Dense but breathable, keyboard-first, subtle animations.
 
 ## Imports
 
@@ -10,11 +10,12 @@ Always use `@/` path aliases: `@/components/ui/button`, `@/lib/utils`, `@/pages/
 
 ## Colors
 
-OKLCH-based. Light mode: pale sage (hue ~148, very low chroma). Dark mode: deep forest sage (same hue, low lightness). Never use raw hex/rgb — use CSS variables or Tailwind tokens.
+OKLCH-based. Light mode: warm cream base (hue ~80, very low chroma). Dark mode: warm near-black (same hue family). The warm tint is subtle — every surface carries it. Never use raw hex/rgb — use CSS variables or Tailwind tokens.
 
-- **Accent**: muted terracotta (`--primary`). Used for active states, focus rings, primary buttons. Not saturated amber — deliberately quiet.
-- **Status**: all muted pastels — sage green, brick red, soft periwinkle, straw yellow. Available as `bg-status-pass`, `text-status-pass`, etc.
-- **Elevation**: `surface-1` → `surface-2` → `surface-3`, stepping in brightness. Use `bg-surface-2` on cards, `bg-surface-3` for raised panels.
+- **Accent**: Kery yellow-gold (`--primary`, hue 82). Used for active states, focus rings, primary buttons. Dark text on yellow (`--primary-foreground`).
+- **Sidebar**: noticeably sandier/darker than the main background in light mode; darker than background in dark mode (like Claude).
+- **Status**: semantic colors — `bg-status-pass`, `text-status-pass`, etc.
+- **Elevation**: `surface-1` → `surface-2` → `surface-3`, stepping in warmth/lightness. Use `bg-surface-2` on cards, `bg-surface-3` for raised panels. Prefer `bg-card border` over surface tokens for cards.
 
 ## Icons
 
@@ -34,10 +35,9 @@ OKLCH-based. Light mode: pale sage (hue ~148, very low chroma). Dark mode: deep 
 | Uppercase labels | 11px | 500 | `text-[11px] font-medium uppercase tracking-wider` |
 | Code / IDs / durations / URLs / costs | 12-13px | 400 | `font-mono text-[13px]` |
 
-- **UI font**: Ubuntu (loaded via Google Fonts) — warm, rounded, highly legible
-- **Display font**: Space Grotesk (`font-display`) — used for page titles (`PageHeader`), nav wordmark "Kery", and section headings that need character
-- **Monospace**: Fira Code → Fira Mono → Ubuntu Mono → Menlo → Consolas. Use `font-mono` for code blocks, IDs, routes, costs, timestamps. Use `mono-ui` class for compact ID/slug fields.
-- Fira Code ligatures are enabled by default (`liga`, `calt` feature settings)
+- **UI font**: Plus Jakarta Sans (`font-sans`) — humanist, warm, great at UI sizes.
+- **Serif**: Lora (`font-serif`) — available for prose/marketing contexts if needed.
+- **Monospace**: Roboto Mono (`font-mono`) — clean, readable. Use for code blocks, IDs, routes, costs, timestamps. Use `mono-ui` class for compact ID/slug fields.
 
 ## Component Library
 
@@ -90,12 +90,26 @@ All in `@/components/ui/`. Radix-backed where noted.
 ## Animation Rules
 
 - Micro-interactions: 100-150ms, `ease-out`
-- Layout shifts: 200ms, `ease-out`
-- Never exceed 300ms
+- Layout shifts: 150-200ms, `ease-out`
+- Never exceed 250ms
 - Use `animate-fade-in` on page content areas
 - Use `stagger-item` class on list items for staggered entrance
 - Use `dot-pulse` on running status dots
 - Always respect `prefers-reduced-motion`
+
+## Surface System
+
+The glass utility classes still exist in globals.css but are now flat-rendered. Use them normally — they render as simple bordered surfaces:
+
+- `.liquid-glass` — `bg-card border` — for cards, panels
+- `.liquid-glass-strong` — `bg-sidebar border` — for sidebar, header
+- `.glass-card-flat` — bordered card with hover border highlight
+- `.glass-row` — list rows with muted hover background
+- `.glass-stage` — transparent wrapper (no visual styling)
+- `.glass-divider` — uses `--border` color
+- `.liquid-glow-hover` — subtle border-color transition on hover
+
+Prefer `bg-card border rounded-lg` over `.liquid-glass` for new components — it's more explicit.
 
 ## Page Structure Pattern
 
@@ -121,9 +135,12 @@ export function MyPage() {
 - **Do** use `Dialog` for create/edit/delete confirmations (not `window.confirm`)
 - **Do** use `Skeleton` for loading states (not spinners)
 - **Do** use `EmptyState` when a list has no data
+- **Do** use `bg-card border rounded-lg` for cards and panels
 - **Don't** use raw hex/rgb colors — always CSS variables or Tailwind tokens
-- **Don't** use box-shadows for elevation — use surface tokens (`bg-surface-2`, etc.)
-- **Don't** use cold blue-gray backgrounds — always use warm surface tokens
+- **Don't** use `backdrop-filter` / blur effects anywhere
+- **Don't** use box-shadows for elevation — use border + surface tokens
+- **Don't** use warm/tinted backgrounds — always neutral surface tokens
+- **Don't** use `font-display` — it maps to Inter, same as sans. Just use `font-semibold`.
 - **Don't** use emojis in the UI
-- **Don't** add animations longer than 300ms
+- **Don't** add animations longer than 250ms
 - **Don't** import from relative paths — always use `@/` aliases

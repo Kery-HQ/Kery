@@ -49,6 +49,7 @@ export const Memory: React.FC = () => {
   const [entries, setEntries] = React.useState<MemoryEntry[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [filter, setFilter] = React.useState<FilterType>("all");
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   // Add dialog
   const [addOpen, setAddOpen] = React.useState(false);
@@ -143,6 +144,21 @@ export const Memory: React.FC = () => {
     if (filter === "all") return entries;
     return entries.filter((e) => e.type === filter);
   }, [entries, filter]);
+
+  React.useEffect(() => {
+    if (filtered.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !filtered.some((e) => e.id === selectedId)) {
+      setSelectedId(filtered[0].id);
+    }
+  }, [filtered, selectedId]);
+
+  const selectedEntry = React.useMemo(
+    () => filtered.find((e) => e.id === selectedId) ?? null,
+    [filtered, selectedId]
+  );
 
   if (!currentProjectId) {
     return (
@@ -305,102 +321,149 @@ export const Memory: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="px-6 py-5 animate-fade-in max-w-3xl w-full mx-auto">
-        {/* Type filter chips */}
-        <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-          <button
-            onClick={() => setFilter("all")}
-            className={cn(
-              "text-[11px] font-medium px-2.5 py-1 rounded-md border transition-colors",
-              filter === "all"
-                ? "bg-accent border-border text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50",
-            )}
-          >
-            All
-          </button>
-          {TYPES.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setFilter(t.value)}
-              className={cn(
-                "flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border transition-colors",
-                filter === t.value
-                  ? "bg-accent border-border text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50",
-              )}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
+      <div className="flex-1 min-h-0 overflow-hidden animate-fade-in">
         {loading ? (
-          <div className="space-y-2">
+          <div className="px-6 py-5 space-y-2">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState
-            icon={<Brain className="h-8 w-8" />}
-            title={filter === "all" ? "No memory yet" : `No ${typeInfo(filter as MemoryEntryType).label.toLowerCase()} entries`}
-            description={
-              filter === "all"
-                ? "The agent learns paths, tips, and patterns as it runs tests. You can also add entries manually."
-                : "No entries match this filter."
-            }
-            action={filter === "all" ? { label: "Add entry", onClick: () => setAddOpen(true) } : undefined}
-            className="py-20 rounded-lg border border-dashed border-border"
-          />
+          <div className="px-6 py-5">
+            <EmptyState
+              icon={<Brain className="h-8 w-8" />}
+              title={filter === "all" ? "No memory yet" : `No ${typeInfo(filter as MemoryEntryType).label.toLowerCase()} entries`}
+              description={
+                filter === "all"
+                  ? "The agent learns paths, tips, and patterns as it runs tests. You can also add entries manually."
+                  : "No entries match this filter."
+              }
+              action={filter === "all" ? { label: "Add entry", onClick: () => setAddOpen(true) } : undefined}
+              className="py-20 rounded-lg border border-dashed border-border"
+            />
+          </div>
         ) : (
-          <div className="space-y-2">
-            {filtered.map((entry) => {
-              const info = typeInfo(entry.type);
-              return (
-                <Card key={entry.id} className="group hover:border-border/80 transition-colors">
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
+          <div className="flex h-full min-h-0 overflow-hidden">
+            <div className="w-[360px] flex-shrink-0 flex flex-col min-h-0 border-r border-border overflow-hidden">
+              <div className="px-3 py-2 border-b border-border bg-surface-2 dark:bg-surface-3">
+                <Select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value as FilterType)}
+                  className="h-8 text-[12px]"
+                >
+                  <option value="all">All types</option>
+                  {TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
+                {filtered.map((entry) => {
+                  const info = typeInfo(entry.type);
+                  const selected = entry.id === selectedId;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => setSelectedId(entry.id)}
+                      className="w-full text-left block"
+                    >
+                      <Card className={cn("transition-all", selected && "ring-2 ring-ring/20 border-border bg-accent/25")}>
+                        <CardContent className="py-2.5 px-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={info.badge} className="gap-1">
+                              {info.icon}
+                              {info.label}
+                            </Badge>
+                          </div>
+                          <p className="text-[13px] font-medium text-foreground line-clamp-1">{entry.summary}</p>
+                          <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2">{entry.content}</p>
+                        </CardContent>
+                      </Card>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
+              {selectedEntry ? (
+                <>
+                  <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant={info.badge} className="gap-1">
-                            {info.icon}
-                            {info.label}
+                          <Badge variant={typeInfo(selectedEntry.type).badge} className="gap-1">
+                            {typeInfo(selectedEntry.type).icon}
+                            {typeInfo(selectedEntry.type).label}
                           </Badge>
+                          <Badge variant={selectedEntry.source === "agent" ? "outline" : "neutral"}>
+                            {selectedEntry.source}
+                          </Badge>
+                          <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">
+                            {selectedEntry.confidence}%
+                          </span>
                         </div>
-                        <p className="text-[13px] font-medium text-foreground">{entry.summary}</p>
-                        <p className="text-[12px] text-muted-foreground mt-0.5 whitespace-pre-wrap line-clamp-3">{entry.content}</p>
-                        {entry.region?.description && (
-                          <p className="text-[11px] text-muted-foreground/50 mt-1 italic">Region: {entry.region.description}</p>
-                        )}
+                        <h2 className="text-[15px] font-semibold text-foreground leading-snug truncate min-w-0">
+                          {selectedEntry.summary}
+                        </h2>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
-                        <Badge variant={entry.source === "agent" ? "outline" : "neutral"} className="opacity-50 group-hover:opacity-100 transition-opacity">
-                          {entry.source}
-                        </Badge>
-                        <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums">
-                          {entry.confidence}%
-                        </span>
-                        <button
-                          onClick={() => openEdit(entry)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent text-muted-foreground/50 hover:text-foreground"
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-3 text-[12px] gap-1.5"
+                          onClick={() => openEdit(selectedEntry)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(entry.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 text-muted-foreground/50 hover:text-destructive"
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-3 text-[12px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => handleDelete(selectedEntry.id)}
                         >
                           <Trash className="h-3.5 w-3.5" />
-                        </button>
+                          Delete
+                        </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+                    <section>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55 mb-2">
+                        Content
+                      </p>
+                      <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">
+                        {selectedEntry.content}
+                      </p>
+                    </section>
+                    {selectedEntry.region?.description && (
+                      <section className="border-t border-border pt-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55 mb-2">
+                          Region
+                        </p>
+                        <p className="text-[12px] text-muted-foreground italic">
+                          {selectedEntry.region.description}
+                        </p>
+                      </section>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="p-6">
+                  <EmptyState
+                    icon={<Brain className="h-8 w-8" />}
+                    title="Select an entry"
+                    description="Choose a memory entry from the sidebar to view details."
+                    className="py-16"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

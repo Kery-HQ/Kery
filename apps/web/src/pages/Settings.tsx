@@ -136,7 +136,6 @@ export const Settings: React.FC = () => {
                     <ApiKeyCard
                       provider={cfg.provider}
                       label={cfg.label}
-                      description={cfg.description}
                       docsUrl={cfg.docsUrl}
                       info={info ?? null}
                       onChange={handleApiKeyChange}
@@ -239,35 +238,30 @@ export const Settings: React.FC = () => {
 const API_KEY_CONFIG: {
   provider: ApiKeyProvider;
   label: string;
-  description: string;
   docsUrl: string;
   placeholder: string;
 }[] = [
   {
     provider: "openai",
     label: "OpenAI",
-    description: "GPT-4.1, GPT-4o, o3 and other OpenAI models",
     docsUrl: "https://platform.openai.com/api-keys",
     placeholder: "sk-proj-…",
   },
   {
     provider: "anthropic",
     label: "Anthropic",
-    description: "Claude Sonnet, Haiku, and Opus models",
     docsUrl: "https://console.anthropic.com/settings/keys",
     placeholder: "sk-ant-…",
   },
   {
     provider: "gemini",
     label: "Google Gemini",
-    description: "Gemini 2.5 Flash, Pro and other Gemini models",
     docsUrl: "https://aistudio.google.com/apikey",
     placeholder: "AIza…",
   },
   {
     provider: "openrouter",
     label: "OpenRouter",
-    description: "Access any model: DeepSeek, Llama, Mistral and more",
     docsUrl: "https://openrouter.ai/keys",
     placeholder: "sk-or-v1-…",
   },
@@ -276,14 +270,12 @@ const API_KEY_CONFIG: {
 function ApiKeyCard({
   provider,
   label,
-  description,
   docsUrl,
   info,
   onChange,
 }: {
   provider: ApiKeyProvider;
   label: string;
-  description: string;
   docsUrl: string;
   info: ApiKeyInfo | null;
   onChange: (provider: ApiKeyProvider, value: string | null) => Promise<void>;
@@ -345,7 +337,6 @@ function ApiKeyCard({
           </div>
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-foreground truncate">{label}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{description}</p>
           </div>
         </div>
 

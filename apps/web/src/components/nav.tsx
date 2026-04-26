@@ -150,15 +150,15 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
   return (
     <nav className={cn(
-      "liquid-glass-strong liquid-glass-rgb flex flex-col min-h-screen flex-shrink-0 transition-all duration-200 border-r",
-      collapsed ? "w-12" : "w-[220px]",
+      "liquid-glass-strong flex flex-col min-h-screen flex-shrink-0 transition-all duration-200 border-r",
+      collapsed ? "w-12" : "w-[248px]",
     )}>
       {/* Brand */}
       <div className={cn("flex items-center h-12 glass-divider border-b", collapsed ? "px-2 justify-center" : "px-3 justify-between")}>
         <NavLink to="/overview" className="flex items-center gap-2 text-foreground dark:text-white hover:opacity-80 transition-opacity">
           <Logo />
           {!collapsed && (
-            <span className="font-display font-semibold tracking-tight text-[15px] leading-none">
+            <span className="font-semibold tracking-tight text-[15px] leading-none">
               Kery
             </span>
           )}
@@ -178,7 +178,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className={cn(
-                  "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium transition-all",
+                  "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-semibold transition-all",
                   "text-foreground dark:text-white/90 hover:bg-black/6 dark:hover:bg-white/10",
                   dropdownOpen && "bg-black/8 dark:bg-white/12",
                 )}
@@ -201,7 +201,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
             </div>
 
             {dropdownOpen && (
-              <div className="liquid-glass-strong absolute top-full left-0 right-0 mt-1 z-50 rounded-md overflow-hidden animate-fade-in">
+              <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md overflow-hidden animate-fade-in bg-popover border border-border shadow-[var(--shadow-md)]">
                 {projects.length > 0 && (
                   <div className="py-1 max-h-48 overflow-y-auto">
                     {projects.map((p) => (
@@ -287,7 +287,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
           {!collapsed && (
             <div className="mt-4 mb-1">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-foreground/30 dark:text-white/30 px-2 font-display">Configure</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.10em] text-foreground/40 dark:text-white/35 px-2.5">Configure</span>
             </div>
           )}
           {collapsed && <div className="h-px bg-sidebar-border my-2 mx-1" />}
@@ -357,13 +357,13 @@ function NavItem({ item, active, collapsed }: { item: { name: string; href: stri
     <NavLink
       to={item.href}
       title={collapsed ? item.name : undefined}
-      className={cn(
-        "group flex items-center rounded-md text-[13px] font-medium transition-colors relative",
-        collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2 py-[6px]",
-        active
-          ? "bg-black/8 dark:bg-white/12 text-foreground dark:text-white font-semibold"
-          : "text-foreground/55 dark:text-white/55 hover:text-foreground dark:hover:text-white hover:bg-black/6 dark:hover:bg-white/8",
-      )}
+        className={cn(
+          "group flex items-center rounded-md text-[13px] font-semibold transition-colors relative",
+          collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2.5 py-[7px]",
+          active
+            ? "bg-black/8 dark:bg-white/12 text-foreground dark:text-white"
+            : "text-foreground/60 dark:text-white/55 hover:text-foreground dark:hover:text-white hover:bg-black/6 dark:hover:bg-white/8",
+        )}
     >
       {active && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r bg-foreground dark:bg-white/80" />

@@ -9,34 +9,23 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        /* Solid opaque — stays readable regardless of glass beneath */
         default:
-          "bg-primary text-primary-foreground active:scale-[0.98] " +
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_3px_10px_rgba(0,0,0,0.18)] " +
-          "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_6px_18px_rgba(0,0,0,0.24)] " +
-          "hover:brightness-110 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.22)]",
+          "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98]",
 
-        /* Glass secondary */
         secondary:
-          "liquid-glass text-foreground active:scale-[0.98] " +
-          "hover:border-white/70 hover:bg-white/70",
+          "bg-secondary text-secondary-foreground border border-border hover:bg-secondary/70 active:scale-[0.98]",
 
-        /* Glass outline */
         outline:
-          "liquid-glass text-foreground active:scale-[0.98] " +
-          "hover:border-white/70 hover:bg-white/65",
+          "border border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground active:scale-[0.98]",
 
         ghost:
-          "text-foreground hover:bg-white/50 dark:hover:bg-white/10 " +
-          "active:scale-[0.98] transition-colors",
+          "text-foreground hover:bg-accent hover:text-accent-foreground active:scale-[0.98]",
 
         destructive:
-          "bg-destructive text-destructive-foreground active:scale-[0.98] " +
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_3px_10px_rgba(0,0,0,0.18)] " +
-          "hover:brightness-110",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98]",
 
         link:
-          "text-foreground underline-offset-4 hover:underline p-0 h-auto shadow-none",
+          "text-foreground underline-offset-4 hover:underline p-0 h-auto",
       },
       size: {
         sm:      "h-7 px-2.5 text-[12px] rounded",

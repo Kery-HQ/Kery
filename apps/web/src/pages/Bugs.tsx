@@ -2,14 +2,13 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Warning,
+  Bug,
   ArrowSquareOut,
   ArrowsClockwise,
   Globe,
   ComputerTower,
   Calendar,
   Trash,
-  Stack,
-  FlowArrow,
   FilePdf,
   CaretRight,
   CaretDown,
@@ -19,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -125,7 +125,7 @@ function IssueDetail({
   const reportedDate = bug.reportedAt ?? bug.reported_at;
   const isOpen = bug.status === "open" || bug.status === "in_progress";
 
-  const hasContext = !!(bug.environment || reportedDate || bug.url);
+  const hasContext = !!(bug.environment || reportedDate || bug.url || bug.category || bug.status || bug.test_name);
 
   return (
     <div className="flex flex-col h-full">
@@ -134,17 +134,7 @@ function IssueDetail({
         <div className="flex items-center justify-between gap-3">
           {/* Title + tags */}
           <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-            <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} className="flex-shrink-0" />
             <h2 className="text-[15px] font-semibold text-foreground leading-snug truncate min-w-0">{bug.name}</h2>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <BugCategoryTag category={bug.category} />
-              <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize">
-                {bug.status.replace("_", " ")}
-              </Badge>
-              {bug.test_name && (
-                <span className="text-[11px] text-muted-foreground/50">· {bug.test_name}</span>
-              )}
-            </div>
           </div>
           {/* Actions — uniform outline style */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -159,7 +149,7 @@ function IssueDetail({
                 disabled={actionBusy === bug.id}
                 onClick={onResolve}
               >
-                Resolve
+                Mark as resolved
               </Button>
             )}
             {bug.id && isOpen && (
@@ -170,7 +160,7 @@ function IssueDetail({
                 disabled={actionBusy === bug.id}
                 onClick={onIgnore}
               >
-                Ignore
+                Ignore bug
               </Button>
             )}
             {bug.id && (
@@ -219,6 +209,17 @@ function IssueDetail({
                 Additional info
               </p>
               <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <BugCategoryTag category={bug.category} />
+                  <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize text-[10px]">
+                    {bug.status.replace("_", " ")}
+                  </Badge>
+                  {bug.test_name && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {bug.test_name}
+                    </Badge>
+                  )}
+                </div>
                 {bug.environment && (
                   <div className="flex items-center gap-2">
                     <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
@@ -274,33 +275,6 @@ function IssueDetail({
   );
 }
 
-// ─── Filter pill ──────────────────────────────────────────────────────────────
-
-function FilterPill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "h-6 px-2.5 rounded text-[11px] font-medium transition-colors",
-        active
-          ? "bg-foreground/10 dark:bg-white/12 text-foreground"
-          : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export const Bugs: React.FC = () => {
@@ -312,6 +286,7 @@ export const Bugs: React.FC = () => {
   const [sourceFilter, setSourceFilter] = React.useState<SourceFilter>("all");
   const [severityFilter, setSeverityFilter] = React.useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("all");
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [actionBusy, setActionBusy] = React.useState<string | null>(null);
   const [showRawId, setShowRawId] = React.useState<string | null>(null);
   const [deletePrompt, setDeletePrompt] = React.useState<
@@ -401,7 +376,7 @@ export const Bugs: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues" />
+        <PageHeader icon={<Bug className="h-4 w-4" />} title="Issues" />
         <EmptyState
           icon={<Warning className="h-8 w-8" />}
           title="No project selected"
@@ -414,9 +389,20 @@ export const Bugs: React.FC = () => {
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full">
       {/* ── Top bar ── */}
-      <PageHeader icon={<Warning className="h-4 w-4" />} title="Issues">
+      <PageHeader icon={<Bug className="h-4 w-4" />} title="Issues">
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
+        )}
+        {!loading && bugs.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="gap-1.5"
+          >
+            Filters
+            {filtersOpen ? <CaretDown className="h-3.5 w-3.5" /> : <CaretRight className="h-3.5 w-3.5" />}
+          </Button>
         )}
         {!loading && bugs.length > 0 && (
           <Button
@@ -452,36 +438,52 @@ export const Bugs: React.FC = () => {
         </Button>
       </PageHeader>
 
-      {/* ── Filter bar (only when there are bugs) ── */}
-      {!loading && bugs.length > 0 && (
-        <div className="flex-shrink-0 border-b border-border bg-surface-2 dark:bg-surface-3 px-5 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mr-1.5">Source</span>
-            {SOURCE_FILTERS.map(s => (
-              <FilterPill key={s} active={sourceFilter === s} onClick={() => setSourceFilter(s)}>
-                {s === "routes" && <Stack className="inline h-3 w-3 mr-1" />}
-                {s === "flows" && <FlowArrow className="inline h-3 w-3 mr-1" />}
-                {s === "all" ? "All" : s === "routes" ? "Routes" : "Flows"}
-              </FilterPill>
-            ))}
-          </div>
-          <div className="h-3 w-px bg-border/60" />
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mr-1.5">Severity</span>
-            {SEVERITY_FILTERS.map(s => (
-              <FilterPill key={s} active={severityFilter === s} onClick={() => setSeverityFilter(s)}>
-                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-              </FilterPill>
-            ))}
-          </div>
-          <div className="h-3 w-px bg-border/60" />
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mr-1.5">Category</span>
-            {CATEGORY_FILTERS.map(c => (
-              <FilterPill key={c} active={categoryFilter === c} onClick={() => setCategoryFilter(c)}>
-                {c === "all" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
-              </FilterPill>
-            ))}
+      {/* ── Expandable filters (only when there are bugs) ── */}
+      {!loading && bugs.length > 0 && filtersOpen && (
+        <div className="flex-shrink-0 border-b border-border bg-surface-2 dark:bg-surface-3 px-5 py-2.5">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55">Source</label>
+              <Select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+                className="w-[120px] h-8 text-[12px]"
+              >
+                {SOURCE_FILTERS.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "all" ? "All" : s === "routes" ? "Routes" : "Flows"}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55">Severity</label>
+              <Select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)}
+                className="w-[130px] h-8 text-[12px]"
+              >
+                {SEVERITY_FILTERS.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55">Category</label>
+              <Select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+                className="w-[140px] h-8 text-[12px]"
+              >
+                {CATEGORY_FILTERS.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "all" ? "All" : c.charAt(0).toUpperCase() + c.slice(1)}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
         </div>
       )}
@@ -539,7 +541,7 @@ export const Bugs: React.FC = () => {
                       <Card
                         className={cn(
                           "w-full transition-all",
-                          selected && "ring-2 ring-primary/40 border-primary/30",
+                          selected && "ring-2 ring-ring/20 border-border bg-accent/25",
                         )}
                       >
                         <CardContent className="py-2.5 px-3.5">

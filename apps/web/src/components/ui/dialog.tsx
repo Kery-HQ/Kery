@@ -33,7 +33,8 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "relative liquid-glass-strong w-full max-w-md rounded-xl p-5 animate-scale-in focus-visible:outline-none",
+          "relative w-full max-w-md rounded-xl p-5 animate-scale-in focus-visible:outline-none",
+          "bg-popover border border-border shadow-[var(--shadow-lg)]",
           className
         )}
         {...props}

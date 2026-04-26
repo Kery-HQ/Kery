@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Globe,
+  Code,
   Plus,
   Trash,
   ShieldCheck,
@@ -23,7 +24,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
@@ -318,6 +318,12 @@ export const Environments: React.FC = () => {
     loadEnvs();
   }, [currentProjectId]);
 
+  React.useEffect(() => {
+    if (!envs.length) return;
+    if (expandedEnvId && envs.some((e) => e.id === expandedEnvId)) return;
+    void expandEnv(envs[0]);
+  }, [envs, expandedEnvId]);
+
   async function loadEnvs() {
     if (!currentProjectId) return;
     setLoading(true);
@@ -328,10 +334,7 @@ export const Environments: React.FC = () => {
   }
 
   async function expandEnv(env: Env) {
-    if (expandedEnvId === env.id) {
-      setExpandedEnvId(null);
-      return;
-    }
+    if (expandedEnvId === env.id) return;
     setExpandedEnvId(env.id);
     setEditName(env.name);
     setEditUrl(env.base_url);
@@ -451,7 +454,7 @@ export const Environments: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Globe className="h-4 w-4" />} title="Environments" />
+        <PageHeader icon={<Code className="h-4 w-4" />} title="Environments" />
         <EmptyState
           icon={<Globe className="h-8 w-8" />}
           title="No project selected"
@@ -462,9 +465,11 @@ export const Environments: React.FC = () => {
     );
   }
 
+  const selectedEnv = envs.find((e) => e.id === expandedEnvId) ?? envs[0] ?? null;
+
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Globe className="h-4 w-4" />} title="Environments">
+      <PageHeader icon={<Code className="h-4 w-4" />} title="Environments">
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5">
@@ -539,71 +544,93 @@ export const Environments: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="p-6 animate-fade-in">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : envs.length === 0 ? (
+      <div className="flex-1 min-h-0 overflow-hidden animate-fade-in">
+        {loading ? (
+          <div className="p-6 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : envs.length === 0 ? (
+          <div className="p-6">
             <EmptyState
               icon={<Globe className="h-8 w-8" />}
               title="No environments"
               description="Add your first environment to start running tests."
               className="py-16"
             />
-          ) : (
-            envs.map((env) => {
-              const isExpanded = expandedEnvId === env.id;
-              return (
-                <Card key={env.id} className="overflow-hidden">
-                  {/* Card header row */}
-                  <button
-                    onClick={() => expandEnv(env)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
-                      isExpanded ? "bg-accent/50" : "hover:bg-accent/30",
-                    )}
-                  >
-                    <CaretDown
-                      className={cn(
-                        "h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 transition-transform duration-150",
-                        isExpanded ? "rotate-0" : "-rotate-90",
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
+          </div>
+        ) : (
+          <div className="flex h-full min-h-0 overflow-hidden">
+            {/* ── Left: environment list ───────────────────────────── */}
+            <div className="w-[340px] flex-shrink-0 flex flex-col min-h-0 border-r border-border overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border flex-shrink-0 bg-surface-2 dark:bg-surface-3">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Environments
+                </span>
+                <span className="text-[11px] font-mono text-muted-foreground/60">{envs.length}</span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
+                {envs.map((env) => {
+                  const isSelected = expandedEnvId === env.id;
+                  return (
+                    <button
+                      key={env.id}
+                      type="button"
+                      onClick={() => expandEnv(env)}
+                      className="w-full text-left block"
+                    >
+                      <div
+                        className={cn(
+                          "glass-card-flat p-3 transition-all",
+                          isSelected && "ring-2 ring-ring/20 border-border bg-accent/25",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[13px] font-medium text-foreground truncate">{env.name}</span>
+                              {env.is_default && (
+                                <Badge variant="default" className="text-[9px] px-1.5 py-0">default</Badge>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5">{env.base_url}</p>
+                          </div>
+                          <div className="shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteTarget(env)}
+                              className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Right: selected environment controls ─────────────── */}
+            <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
+              {selectedEnv ? (
+                  <div className="flex flex-col h-full">
+                    <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-medium text-foreground truncate">
-                          {env.name}
-                        </span>
-                        {env.is_default && (
+                        <h2 className="text-[15px] font-semibold text-foreground leading-snug truncate min-w-0">
+                          {selectedEnv.name}
+                        </h2>
+                        {selectedEnv.is_default && (
                           <Badge variant="default" className="text-[9px] px-1.5 py-0">default</Badge>
                         )}
                       </div>
-                      <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5">
-                        {env.base_url}
-                      </p>
+                      <p className="text-[12px] font-mono text-muted-foreground mt-0.5 truncate">{selectedEnv.base_url}</p>
                     </div>
-                    <div
-                      className="flex-shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteTarget(env)}
-                        className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </button>
 
-                  {/* Expanded edit form */}
-                  {isExpanded && (
-                    <div className="border-t border-border px-4 py-4 space-y-5 animate-fade-in">
+                    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
                       {/* Environment details */}
                       <section className="space-y-3">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
@@ -902,12 +929,20 @@ export const Environments: React.FC = () => {
                         </div>
                       </section>
                     </div>
-                  )}
-                </Card>
-              );
-            })
-          )}
-        </div>
+                  </div>
+                ) : (
+                  <div className="p-6">
+                    <EmptyState
+                      icon={<Globe className="h-8 w-8" />}
+                      title="Select an environment"
+                      description="Choose an environment from the list to edit details and authentication."
+                      className="py-16"
+                    />
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

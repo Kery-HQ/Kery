@@ -4,7 +4,6 @@ import {
   SquaresFour,
   Pulse,
   WarningCircle,
-  Spinner,
   CaretRight,
   Globe,
   Scan,
@@ -16,6 +15,7 @@ import {
   Sparkle,
   ChartPie,
   CurrencyDollar,
+  ListChecks,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
@@ -301,17 +301,56 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
   );
 }
 
+function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; scripted: number; unscripted: number } | null }) {
+  const total = flowCoverage?.total ?? 0;
+  const scripted = flowCoverage?.scripted ?? 0;
+  const unscripted = flowCoverage?.unscripted ?? 0;
+
+  return (
+    <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Flow coverage
+        </span>
+        <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
+      </div>
+      {total === 0 ? (
+        <p className="text-[12px] text-muted-foreground leading-snug">No flows yet. Create and run flows to measure coverage.</p>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-semibold tabular-nums text-foreground">
+              {Math.round((scripted / total) * 100)}
+            </span>
+            <span className="text-[12px] text-muted-foreground">% scripted</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            <span className="text-status-pass">{scripted} scripted</span>
+            {" · "}
+            <span className="text-muted-foreground">{unscripted} unscripted</span>
+            <span className="text-muted-foreground/70"> · {total} flows</span>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({
   overview,
   runs,
   bugs,
   coverage,
+  flowCoverage,
+  hiddenActiveRuns,
   navigate,
 }: {
   overview: any;
   runs: any[];
   bugs: any[];
   coverage: PageCoverageStats | null;
+  flowCoverage: { total: number; scripted: number; unscripted: number } | null;
+  hiddenActiveRuns: number;
   navigate: (path: string) => void;
 }) {
   const totalCost = overview?.totalCostUsd ?? 0;
@@ -321,19 +360,26 @@ function Dashboard({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Pulse className="h-4 w-4" />} />
         <PageCoverageKpi coverage={coverage} />
+        <FlowCoverageKpi flowCoverage={flowCoverage} />
         <KpiCard
           label="Project spend"
           value={formatCost(totalCost)}
           icon={<CurrencyDollar className="h-4 w-4" />}
         />
-        <KpiCard label="Running" value={overview?.running ?? 0} icon={<Spinner className="h-4 w-4 animate-spin" />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Runs */}
         <Card className="min-h-[20rem]">
           <div className="flex items-center justify-between p-4 pb-2 border-b glass-divider">
-            <span className="text-[14px] font-medium">Recent Runs</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[14px] font-medium">Recent Runs</span>
+              {hiddenActiveRuns > 0 && (
+                <Badge variant="warning" className="text-[10px]">
+                  {hiddenActiveRuns} queued/running not shown
+                </Badge>
+              )}
+            </div>
             <Button variant="ghost" size="sm" onClick={() => navigate("/runs")} className="h-7 text-[12px] gap-1">
               View all <CaretRight className="h-3 w-3" />
             </Button>
@@ -353,9 +399,6 @@ function Dashboard({
                     <span className="flex-1 text-[13px] text-foreground truncate">
                       {runListLabel(r)}
                     </span>
-                    <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
-                      {r.status}
-                    </Badge>
                     <span className="text-[11px] font-mono text-muted-foreground flex-shrink-0 tabular-nums">
                       {formatRunCost(r)}
                     </span>
@@ -418,7 +461,9 @@ export const Overview: React.FC = () => {
   const [overview, setOverview] = React.useState<any>(null);
   const [runs, setRuns] = React.useState<any[]>([]);
   const [bugs, setBugs] = React.useState<any[]>([]);
+  const [hiddenActiveRuns, setHiddenActiveRuns] = React.useState(0);
   const [pageCoverage, setPageCoverage] = React.useState<PageCoverageStats | null>(null);
+  const [flowCoverage, setFlowCoverage] = React.useState<{ total: number; scripted: number; unscripted: number } | null>(null);
   const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
   const [setupDone, setSetupDone] = React.useState(false);
   const [setupDismissed, setSetupDismissed] = React.useState(false);
@@ -468,7 +513,22 @@ export const Overview: React.FC = () => {
       setSetupDone(steps.size === 4);
       setOverview(ov);
       setPageCoverage((pagesRes as { coverage?: PageCoverageStats }).coverage ?? null);
-      setRuns(allRuns.slice(0, 10));
+      const totalFlows = tests.length;
+      const scriptedFlows = tests.filter((t: any) => String(t?.plan_status ?? "none") !== "none").length;
+      setFlowCoverage({
+        total: totalFlows,
+        scripted: scriptedFlows,
+        unscripted: Math.max(0, totalFlows - scriptedFlows),
+      });
+      const recentRuns = allRuns.slice(0, 10);
+      const isActiveRun = (r: any) => {
+        const s = String(r?.status ?? "").toLowerCase();
+        return s === "running" || s === "queued";
+      };
+      const activeAllCount = allRuns.filter(isActiveRun).length;
+      const activeShownCount = recentRuns.filter(isActiveRun).length;
+      setHiddenActiveRuns(Math.max(0, activeAllCount - activeShownCount));
+      setRuns(recentRuns);
       setBugs(allBugs.slice(0, 10));
       setLoading(false);
     });
@@ -533,7 +593,15 @@ export const Overview: React.FC = () => {
             )}
           >
             <div className="flex-1 min-w-0 w-full space-y-6">
-              <Dashboard overview={overview} runs={runs} bugs={bugs} coverage={pageCoverage} navigate={navigate} />
+              <Dashboard
+                overview={overview}
+                runs={runs}
+                bugs={bugs}
+                coverage={pageCoverage}
+                flowCoverage={flowCoverage}
+                hiddenActiveRuns={hiddenActiveRuns}
+                navigate={navigate}
+              />
             </div>
             {showSetupPanel && (
               <aside className="w-full lg:w-[min(100%,340px)] lg:max-w-[40%] lg:flex-shrink-0 lg:sticky lg:top-6 lg:self-start">
