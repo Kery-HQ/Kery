@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Play,
   Trash,
-  Repeat,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import { EmptyState } from "@/components/empty-state";
 import { relativeTime, duration, statusVariant, runListLabel } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchPageDetail, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
-import { RegressionPlanView, type RegressionStep } from "@/pages/TestsPlans";
 
 type PageData = {
   page: {
@@ -25,9 +23,6 @@ type PageData = {
     health_status: string;
     issues_count: number;
     enabled: boolean;
-    regression_plan?: any[] | null;
-    plan_status?: "none" | "ready" | "stale" | null;
-    plan_success_count?: number;
     last_inspected_at: string | null;
     last_crawled_at?: string;
   };
@@ -142,7 +137,6 @@ export function PageDetail() {
   }
 
   const { page, recentRuns } = data;
-  const hasRegressionPlan = page.regression_plan && page.regression_plan.length > 0;
   const routeRaw = (page.normalized_route ?? "/").trim() || "/";
 
   const statusHint =
@@ -241,22 +235,6 @@ export function PageDetail() {
                     )}
                   </div>
 
-                  {hasRegressionPlan && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-[13px] font-medium text-foreground">Regression script</span>
-                        {page.plan_status === "ready" && <Badge variant="success">Active</Badge>}
-                        {page.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
-                        {(page.plan_success_count ?? 0) > 0 && (
-                          <span className="text-[11px] text-muted-foreground/50 ml-auto font-mono">
-                            {page.plan_success_count} successful replay{page.plan_success_count !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                      <RegressionPlanView steps={page.regression_plan as RegressionStep[]} />
-                    </div>
-                  )}
                 </div>
 
                 {/* Sidebar — metadata */}
@@ -275,16 +253,6 @@ export function PageDetail() {
                         <span className="text-muted-foreground/50">None</span>
                       )}
                     </p>
-                  </div>
-                  <div className="px-4 py-3 border-b border-border">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Script</p>
-                    <div>
-                      {page.plan_status === "ready" && <Badge variant="success">Ready</Badge>}
-                      {page.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
-                      {(!page.plan_status || page.plan_status === "none") && (
-                        <span className="text-[13px] text-muted-foreground/50">None yet</span>
-                      )}
-                    </div>
                   </div>
                   <div className="px-4 py-3 border-b border-border">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Last inspected</p>
