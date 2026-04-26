@@ -1400,7 +1400,44 @@ export async function handleAuth(
   if (auth.mode === "tokenProvider" && auth.tokenProvider) {
     const url = baseUrl || auth.loginUrl || page.url();
     const ok = await handleTokenAuth(page, auth.tokenProvider, url);
-    return { ok, llmCalls: [] };
+    // If token auth succeeds but app still shows login, fall back to Navigator
+    // login using tokenProvider credentials so SSR/cookie-based apps can proceed.
+    const tokenCreds = auth.tokenProvider.credentials;
+    const canFallbackToNavigator = !!tokenCreds?.email;
+    const stillOnLogin = await isLikelyLoginScreen(page);
+    if (ok && !stillOnLogin) {
+      logger.info({ provider: auth.tokenProvider.type, method: "token" }, "Auth complete via token injection");
+      return { ok, llmCalls: [] };
+    }
+    if (!canFallbackToNavigator) {
+      logger.warn({ provider: auth.tokenProvider.type, ok, stillOnLogin }, "Token auth did not clear login screen; no credentials to fall back with");
+      return { ok, llmCalls: [] };
+    }
+
+    logger.info(
+      {
+        provider: auth.tokenProvider.type,
+        ok,
+        stillOnLogin,
+      },
+      "Token auth incomplete; falling back to Navigator login with configured credentials",
+    );
+
+    const fallbackAuth: AuthConfig = {
+      mode: "ui",
+      loginUrl: auth.loginUrl,
+      autoDetectSelectors: true,
+      credentials: {
+        username: tokenCreds!.email,
+        password: tokenCreds!.password,
+      },
+    };
+    const fallbackResult = await tryAgentAuthViaRunAgent(page, fallbackAuth, context, baseUrl, url, onLLMCall);
+    logger.info(
+      { provider: auth.tokenProvider.type, method: "navigator-fallback", ok: fallbackResult.ok },
+      "Auth complete via Navigator fallback",
+    );
+    return fallbackResult;
   }
 
   // API Token auth — inject header on all requests via page.route()
@@ -1490,6 +1527,23 @@ async function detectLoginSelectors(page: Page): Promise<{ usernameField?: strin
   } catch (err) {
     logger.warn({ err: String(err).split("\n")[0] }, "Auth: selector auto-detection failed");
     return null;
+  }
+}
+
+async function isLikelyLoginScreen(page: Page): Promise<boolean> {
+  try {
+    const currentUrl = page.url().toLowerCase();
+    if (/(?:^|\/)(sign-?in|login|auth)(?:\/|$|\?)/.test(currentUrl)) return true;
+    return await page.evaluate(() => {
+      const hasPassword = !!document.querySelector('input[type="password"]');
+      if (!hasPassword) return false;
+      const hasSubmit = !!document.querySelector(
+        'button[type="submit"], input[type="submit"], button[name*="login" i], button[id*="login" i], button[aria-label*="sign in" i]',
+      );
+      return hasSubmit;
+    });
+  } catch {
+    return false;
   }
 }
 
