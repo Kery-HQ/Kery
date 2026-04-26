@@ -20,9 +20,10 @@ IMPORTANT — get IDs first:
 
 AUTH MODE GUIDE:
   'none'     — public app, no login. Clears any existing auth config.
-  'form'     — standard HTML login form. Kery auto-detects fields.
-               Provide loginUrl (optional), username, password.
-               Add totpSecret if the app uses 2FA/TOTP.
+  'form'     — standard HTML login form. Auto-detection is always on: Kery finds the login
+               page and form selectors automatically. loginUrl is an optional hint — if omitted
+               or if the login attempt fails, Kery falls back to base-URL route discovery.
+               Provide username and password. Add totpSecret for 2FA/TOTP apps.
   'clerk'    — app uses Clerk. Provide frontendApiUrl, secretKey (sk_test_/sk_live_), email.
                Your app must be configured correctly or sign-in will silently redirect to accounts.dev:
                  1. clerkMiddleware() must be present in middleware.ts (or proxy.ts for Next.js 16+).

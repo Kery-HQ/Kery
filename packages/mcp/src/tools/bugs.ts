@@ -17,8 +17,16 @@ WHEN TO USE:
   • User asks "what bugs did kery find", "show me the issues", "are there any open bugs"
   • After a test run completes to review what was discovered
   • To get bug IDs for kery_update_bug (marking as resolved, wont_fix, etc.)
+  • Filtering bugs by route: use the returned destination_id to match against kery_list_routes IDs
+  • Filtering bugs by flow: use the returned test_id to match against kery_list_tests IDs
 
-Each bug includes name, description, severity (low/medium/high), category (visual/functional/ux/other), the URL where it was found, and a status. Screenshots are viewable in the web UI via the webUrl.
+Each bug includes name, description, severity (low/medium/high), category (visual/functional/ux/other),
+the URL where it was found, a status, and source attribution:
+  • destination_id — the route/page (from kery_list_routes) where the bug was found, or null
+  • test_id        — the saved test flow (from kery_list_tests) that triggered it, or null
+  Route-level bugs (no test_id) surface in the Route Detail Issues tab in the web UI.
+
+Screenshots are viewable in the web UI via the webUrl.
 
 After reviewing bugs, call kery_update_bug to mark them as resolved or wont_fix.`,
     {
@@ -77,6 +85,8 @@ After reviewing bugs, call kery_update_bug to mark them as resolved or wont_fix.
               status: b.status,
               url: b.url,
               reportedAt: b.reportedAt,
+              destination_id: (b as any).destination_id ?? null,
+              test_id: (b as any).test_id ?? null,
             })),
             webUrl: client.buildWebUrl(`/projects/${projectId}/bugs`),
             nextSteps,

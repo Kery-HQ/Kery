@@ -23,7 +23,8 @@ WHAT THIS DOES:
 
 AUTH MODES — set auth.mode to:
   'none'     — public app, no login (default if auth is omitted)
-  'form'     — standard HTML login form (provide loginUrl, username, password)
+  'form'     — standard HTML login form. Auto-detection always on: loginUrl is optional
+               (Kery falls back to base-URL discovery if omitted or login fails). Provide username, password.
   'clerk'    — Clerk-protected app (provide frontendApiUrl, secretKey, email)
   'supabase' — Supabase Auth (provide projectUrl, anonKey, email, password)
 

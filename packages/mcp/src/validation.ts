@@ -67,14 +67,18 @@ export const AuthInput = z.discriminatedUnion("mode", [
   // Form login
   z.object({
     mode: z.literal("form").describe(
-      "Standard HTML login form. Kery auto-detects form fields by default. " +
-      "Provide loginUrl, username, and password for reliable sign-in.",
+      "Standard HTML login form. Kery always auto-detects login page and form selectors — " +
+      "loginUrl and selector hints are optional overrides. If omitted or if a login attempt fails, " +
+      "Kery falls back to base-URL route discovery automatically.",
     ),
     loginUrl: z
       .string()
       .url("Must be a valid URL, e.g. 'http://localhost:3000/login'")
       .optional()
-      .describe("Login page URL. Omit to let Kery auto-detect the login page."),
+      .describe(
+        "Login page URL — optional hint. Leave blank and Kery will discover the login route " +
+        "from the environment base URL. Also used as a fallback starting point if a provided URL fails.",
+      ),
     username: z
       .string()
       .optional()
@@ -168,8 +172,9 @@ export function authInputToApiPayload(auth: AuthInput): { apiMode: string; apiCo
     return {
       apiMode: "ui",
       apiConfig: {
-        loginUrl: auth.loginUrl,
+        autoDetectLogin: true,
         autoDetectSelectors: true,
+        loginUrl: auth.loginUrl,
         credentials: {
           username: auth.username,
           password: auth.password,

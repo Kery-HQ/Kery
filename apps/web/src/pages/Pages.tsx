@@ -370,7 +370,6 @@ export function Pages() {
     : lastScan;
 
   const totalIssuesFound = pages.reduce((sum, p) => sum + Math.max(0, Number(p.issues || 0)), 0);
-  const needsAttentionCount = pages.filter((p) => p.health === "issues" || p.health === "stale").length;
   const issuesPageCount = pages.filter((p) => p.issues > 0).length;
 
   if (!pid) {
@@ -393,7 +392,7 @@ export function Pages() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
           {/* ── KPI stat cards ─────────────────────────────────────── */}
-          <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <aside className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {coverage && coverage.total > 0 && (
               <div className="glass-card-flat card-stagger px-3 py-3">
                 <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
@@ -436,21 +435,6 @@ export function Pages() {
                 {totalIssuesFound === 0
                   ? "No bugs detected"
                   : `Across ${issuesPageCount} route${issuesPageCount !== 1 ? "s" : ""}`}
-              </p>
-            </div>
-
-            <div className="glass-card-flat card-stagger px-3 py-3">
-              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Needs Attention</p>
-              <p className={cn(
-                "mt-2 text-[26px] font-semibold tabular-nums",
-                needsAttentionCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
-              )}>
-                {pages.length === 0 ? "—" : needsAttentionCount}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {needsAttentionCount === 0
-                  ? "All routes are clean"
-                  : "Routes with issues or stale results"}
               </p>
             </div>
 

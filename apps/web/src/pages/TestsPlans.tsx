@@ -4,6 +4,7 @@ import {
   ListChecks,
   Plus,
   Play,
+  FastForward,
   Pencil,
   Trash,
   MagnifyingGlass,
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { StatusDot } from "@/components/status-dot";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/formatters";
@@ -210,7 +210,10 @@ export const TestsPlans: React.FC = () => {
   const enabledCount = tests.filter((t) => t.enabled).length;
   const totalRunCount = tests.reduce((sum, t) => sum + (t.run_count ?? 0), 0);
   const totalIssuesFound = tests.reduce((sum, t) => sum + (t.issues_count ?? 0), 0);
+  const testedFlows = tests.filter((t) => (t.run_count ?? 0) > 0).length;
   const flowsWithIssues = tests.filter((t) => (t.issues_count ?? 0) > 0).length;
+  const cleanFlows = tests.filter((t) => (t.run_count ?? 0) > 0 && (t.issues_count ?? 0) === 0).length;
+  const untestedFlows = Math.max(0, tests.length - testedFlows);
 
   const [flowFilter, setFlowFilter] = React.useState("");
 
@@ -236,18 +239,33 @@ export const TestsPlans: React.FC = () => {
         <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
 
           {/* ── Stat cards ────────────────────────────────────────────── */}
-          <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Enabled Flows */}
+          <aside className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Signal */}
             <div className="glass-card-flat card-stagger px-3 py-3">
-              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Flows</p>
-              <p className="mt-2 text-[26px] font-semibold tabular-nums text-foreground">
-                {tests.length === 0 ? "—" : enabledCount}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {tests.length === 0
-                  ? "No flows yet"
-                  : `${tests.length - enabledCount} disabled`}
-              </p>
+              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
+              <div className="mt-2 flex items-center gap-3">
+                <div
+                  className="relative h-14 w-14 rounded-full shrink-0"
+                  style={{
+                    background: `conic-gradient(
+                      rgb(16 185 129) 0 ${(cleanFlows / Math.max(tests.length, 1)) * 360}deg,
+                      rgb(245 158 11) ${(cleanFlows / Math.max(tests.length, 1)) * 360}deg ${((cleanFlows + flowsWithIssues) / Math.max(tests.length, 1)) * 360}deg,
+                      rgb(148 163 184 / 0.35) ${((cleanFlows + flowsWithIssues) / Math.max(tests.length, 1)) * 360}deg 360deg
+                    )`,
+                  }}
+                >
+                  <div className="absolute inset-2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                    <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                      {testedFlows}/{tests.length}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                  <p>{cleanFlows} clean</p>
+                  <p>{flowsWithIssues} issues</p>
+                  <p>{untestedFlows} untested</p>
+                </div>
+              </div>
             </div>
 
             {/* Issues Found */}
@@ -263,20 +281,6 @@ export const TestsPlans: React.FC = () => {
                 {totalIssuesFound === 0
                   ? "No bugs detected"
                   : `Across ${flowsWithIssues} flow${flowsWithIssues !== 1 ? "s" : ""}`}
-              </p>
-            </div>
-
-            {/* Flows with Issues */}
-            <div className="glass-card-flat card-stagger px-3 py-3">
-              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Flows with Issues</p>
-              <p className={cn(
-                "mt-2 text-[26px] font-semibold tabular-nums",
-                flowsWithIssues > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
-              )}>
-                {tests.length === 0 ? "—" : flowsWithIssues}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {flowsWithIssues === 0 ? "All flows clean" : `of ${tests.length} total`}
               </p>
             </div>
 
@@ -344,7 +348,7 @@ export const TestsPlans: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   <div className="glass-card-flat p-3 flex flex-col gap-2 min-h-[8rem]">
                     <div className="flex items-center gap-2 min-w-0">
-                      <StatusDot status={adhocRunning ? "running" : "clean"} />
+                      <FastForward className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="text-[13px] font-medium text-foreground truncate">Quick run</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground/60">
