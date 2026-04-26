@@ -4,7 +4,11 @@ import {
   ArrowLeft,
   Play,
   Trash,
-  Repeat,
+  WarningCircle,
+  CaretDown,
+  CaretRight,
+  ArrowSquareOut,
+  Globe,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,10 +16,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
-import { relativeTime, duration, statusVariant, runListLabel } from "@/lib/formatters";
+import { RunList } from "@/components/RunList";
+import { relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
-import { fetchPageDetail, fetchEnvironments, runDestination, resetPageData } from "@/projectApi";
-import { RegressionPlanView, type RegressionStep } from "@/pages/TestsPlans";
+import { fetchPageDetail, fetchEnvironments, fetchProjectBugs, runDestination, resetPageData } from "@/projectApi";
 
 type PageData = {
   page: {
@@ -25,9 +29,6 @@ type PageData = {
     health_status: string;
     issues_count: number;
     enabled: boolean;
-    regression_plan?: any[] | null;
-    plan_status?: "none" | "ready" | "stale" | null;
-    plan_success_count?: number;
     last_inspected_at: string | null;
     last_crawled_at?: string;
   };
@@ -43,6 +44,20 @@ type PageData = {
   }>;
 };
 
+type PageIssue = {
+  id?: string;
+  name: string;
+  severity: "low" | "medium" | "high";
+  status: "open" | "in_progress" | "resolved" | "wont_fix";
+  description?: string;
+  run_id?: string;
+  runId?: string;
+  reported_at?: string;
+  reportedAt?: string;
+  destination_id?: string | null;
+  test_id?: string | null;
+};
+
 export function PageDetail() {
   const { destinationId } = useParams<{ destinationId: string }>();
   const navigate = useNavigate();
@@ -50,6 +65,8 @@ export function PageDetail() {
   const [data, setData] = React.useState<PageData | null>(null);
   const [environments, setEnvironments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [routeIssues, setRouteIssues] = React.useState<PageIssue[]>([]);
+  const [expandedIssueId, setExpandedIssueId] = React.useState<string | null>(null);
   const [running, setRunning] = React.useState(false);
   const [resetting, setResetting] = React.useState(false);
   const [confirmReset, setConfirmReset] = React.useState(false);
@@ -60,16 +77,22 @@ export function PageDetail() {
     setLoading(true);
     setError(null);
     try {
-      const [detailRes, envsRes] = await Promise.all([
+      const [detailRes, envsRes, bugsRes] = await Promise.all([
         fetchPageDetail(currentProjectId, destinationId),
         fetchEnvironments(currentProjectId),
+        fetchProjectBugs(currentProjectId).catch(() => ({ bugs: [] })),
       ]);
       setData(detailRes as PageData);
       setEnvironments((envsRes as { environments: any[] }).environments || []);
+      const allBugs = ((bugsRes as { bugs?: PageIssue[] })?.bugs ?? []).filter(Boolean);
+      setRouteIssues(
+        allBugs.filter((bug) => bug.destination_id === destinationId && !bug.test_id),
+      );
     } catch (e: any) {
       setError(e?.message || "Failed to load route");
       setData(null);
       setEnvironments([]);
+      setRouteIssues([]);
     }
     setLoading(false);
   }, [currentProjectId, destinationId]);
@@ -142,7 +165,6 @@ export function PageDetail() {
   }
 
   const { page, recentRuns } = data;
-  const hasRegressionPlan = page.regression_plan && page.regression_plan.length > 0;
   const routeRaw = (page.normalized_route ?? "/").trim() || "/";
 
   const statusHint =
@@ -218,6 +240,14 @@ export function PageDetail() {
           <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="issues">
+                Issues
+                {routeIssues.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-muted-foreground">
+                    {routeIssues.length}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="runs">
                 Runs
                 {recentRuns.length > 0 && (
@@ -241,22 +271,6 @@ export function PageDetail() {
                     )}
                   </div>
 
-                  {hasRegressionPlan && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-[13px] font-medium text-foreground">Regression script</span>
-                        {page.plan_status === "ready" && <Badge variant="success">Active</Badge>}
-                        {page.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
-                        {(page.plan_success_count ?? 0) > 0 && (
-                          <span className="text-[11px] text-muted-foreground/50 ml-auto font-mono">
-                            {page.plan_success_count} successful replay{page.plan_success_count !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                      <RegressionPlanView steps={page.regression_plan as RegressionStep[]} />
-                    </div>
-                  )}
                 </div>
 
                 {/* Sidebar — metadata */}
@@ -277,16 +291,6 @@ export function PageDetail() {
                     </p>
                   </div>
                   <div className="px-4 py-3 border-b border-border">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Script</p>
-                    <div>
-                      {page.plan_status === "ready" && <Badge variant="success">Ready</Badge>}
-                      {page.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
-                      {(!page.plan_status || page.plan_status === "none") && (
-                        <span className="text-[13px] text-muted-foreground/50">None yet</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="px-4 py-3 border-b border-border">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Last inspected</p>
                     <p className="text-[13px] font-mono text-muted-foreground">
                       {page.last_inspected_at ? relativeTime(page.last_inspected_at) : (
@@ -304,40 +308,88 @@ export function PageDetail() {
 
             {/* Runs */}
             <TabsContent value="runs">
-              {recentRuns.length === 0 ? (
+              <RunList
+                runs={recentRuns}
+                emptyMessage="No runs yet. Hit Run to execute this route."
+              />
+            </TabsContent>
+
+            {/* Issues */}
+            <TabsContent value="issues">
+              {routeIssues.length === 0 ? (
                 <EmptyState
-                  icon={<Play className="h-5 w-5" />}
-                  title="No runs yet"
-                  description="Hit Run to execute this route and see results here."
+                  icon={<WarningCircle className="h-5 w-5" />}
+                  title="No route issues yet"
+                  description="Issues found for this route during runs will appear here."
                   className="py-16"
                 />
               ) : (
-                <div className="rounded-lg border border-border bg-surface-2 dark:bg-surface-3 divide-y divide-border overflow-hidden">
-                  {recentRuns.map((run) => (
-                    <button
-                      key={run.id}
-                      onClick={() => navigate(`/runs/${run.id}`)}
-                      className="flex items-center gap-3 px-4 py-2.5 w-full text-left hover:bg-accent/40 transition-colors"
-                    >
-                      <StatusDot status={run.status} />
-                      <Badge variant={statusVariant(run.status)} className="capitalize text-[11px]">
-                        {run.status}
-                      </Badge>
-                      <span className="text-[13px] text-muted-foreground truncate flex-1">
-                        {runListLabel(run)}
-                      </span>
-                      {run.started_at && (
-                        <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
-                          {relativeTime(run.started_at)}
-                        </span>
-                      )}
-                      {run.started_at && (
-                        <span className="text-[11px] font-mono text-muted-foreground/40 flex-shrink-0">
-                          {duration(run.started_at, run.completed_at ?? undefined)}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                <div className="space-y-1.5">
+                  {routeIssues.map((issue, idx) => {
+                    const runId = issue.run_id ?? issue.runId;
+                    const reportedAt = issue.reported_at ?? issue.reportedAt;
+                    const issueKey = issue.id ?? `${runId ?? "run"}-${idx}`;
+                    const isExpanded = expandedIssueId === issueKey;
+                    return (
+                      <div
+                        key={issueKey}
+                        className={`rounded-lg border border-border bg-surface-2 dark:bg-surface-3 overflow-hidden ${isExpanded ? "ring-1 ring-border" : ""}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setExpandedIssueId(isExpanded ? null : issueKey)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors min-w-0"
+                        >
+                          {isExpanded
+                            ? <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            : <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                          <StatusDot status={issue.severity === "high" ? "issues" : issue.severity === "medium" ? "stale" : "clean"} />
+                          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+                            {issue.name}
+                          </span>
+                          <Badge variant={issue.status === "resolved" ? "success" : issue.status === "wont_fix" ? "neutral" : "warning"} className="capitalize text-[11px]">
+                            {issue.status.replace("_", " ")}
+                          </Badge>
+                          {reportedAt && (
+                            <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
+                              {relativeTime(reportedAt)}
+                            </span>
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-border px-4 py-4 space-y-4 bg-surface-1 dark:bg-surface-2 animate-fade-in">
+                            {issue.description && (
+                              <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
+                                  Description
+                                </p>
+                                <p className="text-[13px] text-foreground whitespace-pre-wrap">{issue.description}</p>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
+                              {runId && (
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-1 hover:text-foreground transition-colors font-mono"
+                                  onClick={() => navigate(`/runs/${runId}`)}
+                                >
+                                  <ArrowSquareOut className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <span>View related run</span>
+                                </button>
+                              )}
+                              {runId && (
+                                <span className="text-[11px] text-muted-foreground/60 flex items-center gap-1">
+                                  <Globe className="h-3.5 w-3.5" />
+                                  Run: {runId.slice(0, 8)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>

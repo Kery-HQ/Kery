@@ -119,9 +119,7 @@ type LLMAgentType =
   | "crawl_route_filter"
   | "crawl_suggested_flows"
   | "memory_curator"
-  | "script_generator"
-  | "stagehand"
-  | "regression_heal";
+  | "stagehand";
 
 type LLMStoredContentPart =
   | { type: "text"; text: string }
@@ -189,7 +187,6 @@ type Run = {
   /** Present while `status === "running"` when Redis live snapshot exists (see `@kery/engine` `LiveRunSnapshot`). */
   live_snapshot?: {
     agentPlan: { items: AgentPlanItem[]; at: number } | null;
-    replayProgress?: { stepIndex: number | null; planIndex: number | null; at: number } | null;
     activity: ActivityEntry[];
     livePreview: { filename: string; updatedAt: number } | null;
     observability?: Record<string, unknown>;
@@ -204,7 +201,6 @@ function liveUiFromRun(run: Run): {
   llmCalls: LLMCallRecord[];
   agentPlan: AgentPlanItem[];
   activityFeed: ActivityEntry[];
-  replayProgress: { stepIndex: number | null; planIndex: number | null; at: number } | null;
   livePreviewDisk: { filename: string; updatedAt: number } | null;
 } {
   const steps = (run.steps_json ?? []) as RunStep[];
@@ -219,12 +215,11 @@ function liveUiFromRun(run: Run): {
     activityFeed = steps.map((step) => ({ type: "step" as const, step, at: step.at ?? Date.now() }));
   }
   const agentPlan = ls?.agentPlan?.items ?? (run.agent_plan_json ?? []);
-  const replayProgress = ls?.replayProgress ?? null;
   const livePreviewDisk =
     run.status === "running" && ls?.livePreview?.filename
       ? ls.livePreview
       : null;
-  return { steps, llmCalls, agentPlan, activityFeed, replayProgress, livePreviewDisk };
+  return { steps, llmCalls, agentPlan, activityFeed, livePreviewDisk };
 }
 
 // --- Helpers ---
@@ -586,15 +581,12 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
   crawl_route_filter:   { label: "Crawl routes", color: "text-teal-600 dark:text-teal-400",  badgeClass: "border-teal-500/50 bg-teal-500/12 text-teal-700 dark:text-teal-300", Icon: Funnel },
   crawl_suggested_flows:{ label: "Crawl flows", color: "text-green-600 dark:text-green-400", badgeClass: "border-green-500/50 bg-green-500/12 text-green-700 dark:text-green-300", Icon: FlowArrow },
   memory_curator:       { label: "Memory",      color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Brain },
-  script_generator:     { label: "Script gen",  color: "text-orange-600 dark:text-orange-400", badgeClass: "border-orange-500/50 bg-orange-500/12 text-orange-700 dark:text-orange-300", Icon: Scroll },
   stagehand:            { label: "Stagehand",   color: "text-rose-600 dark:text-rose-400",   badgeClass: "border-rose-500/50 bg-rose-500/12 text-rose-700 dark:text-rose-300", Icon: Lightning },
-  regression_heal:      { label: "Heal",        color: "text-pink-600 dark:text-pink-400",   badgeClass: "border-pink-500/50 bg-pink-500/12 text-pink-700 dark:text-pink-300", Icon: Lightning },
 };
 
 const LLM_TAB_AGENT_ORDER: LLMAgentType[] = [
   "navigator", "holistic", "filmstrip", "summary",
-  "bug_triage",
-  "regression_heal", "memory_curator", "script_generator", "stagehand",
+  "bug_triage", "memory_curator", "stagehand",
   "crawl_link_filter", "crawl_route_filter", "crawl_suggested_flows",
 ];
 
@@ -639,11 +631,6 @@ export const RunDetail: React.FC = () => {
     filename: string;
     updatedAt: number;
   } | null>(null);
-  const [replayProgress, setReplayProgress] = React.useState<{
-    stepIndex: number | null;
-    planIndex: number | null;
-    at: number;
-  } | null>(null);
   const [agentPlan, setAgentPlan] = React.useState<AgentPlanItem[]>([]);
   const [activityFeed, setActivityFeed] = React.useState<ActivityEntry[]>([]);
   const [tab, setTab] = React.useState<Tab>("overview");
@@ -669,7 +656,6 @@ export const RunDetail: React.FC = () => {
           setLlmCalls(ui.llmCalls);
           setAgentPlan(ui.agentPlan);
           setActivityFeed(ui.activityFeed);
-          setReplayProgress(ui.replayProgress);
           setLivePreviewDisk(ui.livePreviewDisk);
           if (res.run.status !== "running") {
             fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
@@ -690,7 +676,6 @@ export const RunDetail: React.FC = () => {
           setLlmCalls(ui.llmCalls);
           setAgentPlan(ui.agentPlan);
           setActivityFeed(ui.activityFeed);
-          setReplayProgress(ui.replayProgress);
           setLivePreviewDisk(ui.livePreviewDisk);
           if (res.run.status !== "queued" && res.run.status !== "running") {
             fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
@@ -724,13 +709,6 @@ export const RunDetail: React.FC = () => {
           if (msg.type === "screenshot") {
             setLiveScreenshot(msg.data);
           }
-          if (msg.type === "replay_progress") {
-            setReplayProgress({
-              stepIndex: typeof msg.stepIndex === "number" ? msg.stepIndex : null,
-              planIndex: typeof msg.planIndex === "number" ? msg.planIndex : null,
-              at: Number(msg.at) || Date.now(),
-            });
-          }
           if (msg.type === "llm_call") {
             setLlmCalls((prev) => [...prev, msg.call]);
           }
@@ -742,7 +720,6 @@ export const RunDetail: React.FC = () => {
               setLlmCalls(ui.llmCalls);
               setAgentPlan(ui.agentPlan);
               setActivityFeed(ui.activityFeed);
-              setReplayProgress(ui.replayProgress);
             }
             setLivePreviewDisk(null);
             setLiveScreenshot(null);
@@ -764,7 +741,6 @@ export const RunDetail: React.FC = () => {
             setLlmCalls(ui.llmCalls);
             setAgentPlan(ui.agentPlan);
             setActivityFeed(ui.activityFeed);
-            setReplayProgress(ui.replayProgress);
             setLivePreviewDisk(ui.livePreviewDisk);
             if (res.run.status !== "running") {
               fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
@@ -937,7 +913,6 @@ export const RunDetail: React.FC = () => {
               totalCost={totalCost}
               agentPlan={agentPlan}
               activityFeed={activityFeed}
-              replayProgress={replayProgress}
             />
           </TabsContent>
 
@@ -1009,7 +984,7 @@ function AgentPipelineCard({ llmCalls, stepsCount }: { llmCalls: LLMCallRecord[]
 }
 
 function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
-  const agents = ["navigator", "holistic", "filmstrip", "summary", "regression_heal", "memory_curator", "script_generator", "stagehand"] as const;
+  const agents = ["navigator", "holistic", "filmstrip", "summary", "memory_curator", "stagehand"] as const;
   const rows = agents
     .map((a) => ({
       agent: a,
@@ -1102,7 +1077,7 @@ function StepCard({
 
   return (
     <div
-      ref={isReplayCurrent ? replayActiveStepRef : undefined}
+      ref={isReplayCurrent ? (replayActiveStepRef as React.RefObject<HTMLDivElement>) : undefined}
       className={cn(
         "group relative rounded-lg border px-3 py-2.5 transition-colors duration-150 animate-slide-up",
         isFailed
@@ -1351,7 +1326,7 @@ function BrowserPreviewStage({
 }
 
 function OverviewTab({
-  run, steps, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed, replayProgress,
+  run, steps, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed,
 }: {
   run: Run;
   steps: RunStep[];
@@ -1362,7 +1337,6 @@ function OverviewTab({
   totalCost: number;
   agentPlan: AgentPlanItem[];
   activityFeed: ActivityEntry[];
-  replayProgress: { stepIndex: number | null; planIndex: number | null; at: number } | null;
 }) {
   const okCount = steps.filter((s) => s.status === "ok" && s.action !== "bug").length;
   const failCount = steps.filter((s) => s.status === "failed").length;
@@ -1483,9 +1457,6 @@ function OverviewTab({
     return idx;
   }, [stepTimeline, playbackMs, replayCursorRelativeMs, videoDurationMs]);
   const replayCurrentPlanIndex = React.useMemo(() => {
-    if (run.status === "running") {
-      return replayProgress?.planIndex ?? null;
-    }
     if (stepTimeline.length === 0 || agentPlan.length === 0) return null;
     const planEvents = activityOldestFirst
       .filter((e): e is { type: "plan"; at: number; items: AgentPlanItem[] } => e.type === "plan")
@@ -1512,7 +1483,7 @@ function OverviewTab({
       return Math.max(0, Math.min(agentPlan.length - 1, Math.floor(ratio * agentPlan.length)));
     }
     return null;
-  }, [run.status, replayProgress?.planIndex, stepTimeline, agentPlan.length, activityOldestFirst, run.recording_started_at, playbackMs, replayCursorRelativeMs, videoDurationMs]);
+  }, [stepTimeline, agentPlan.length, activityOldestFirst, run.recording_started_at, playbackMs, replayCursorRelativeMs, videoDurationMs]);
   const canReplay = showRecording && stepTimeline.length > 0;
   const displayStep = React.useMemo(() => {
     if (canReplay && replayCurrentIndex >= 0) {
@@ -1907,7 +1878,7 @@ function IssuesTab({
                   <button key={i} type="button" onClick={() => setSelectedIndex(i)} className="w-full text-left block">
                     <div className={cn("glass-card-flat p-2.5 transition-all", selected && "ring-2 ring-ring/20 border-border bg-accent/25")}>
                       <div className="flex items-center gap-2">
-                        <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
+                        <StatusDot status={(bug.severity ? BUG_SEVERITY_STATUS_DOT[bug.severity] : undefined) ?? "stale"} />
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{displayName}</span>
                       </div>
                       <div className="mt-1 flex items-center gap-1.5">

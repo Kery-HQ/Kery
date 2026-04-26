@@ -1,23 +1,15 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  FlowArrow,
   ListChecks,
   Plus,
   Play,
+  FastForward,
   Pencil,
   Trash,
-  Keyboard,
-  CursorClick,
-  NavigationArrow,
-  Globe,
-  CheckCircle,
-  CaretDown,
-  CaretRight,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
@@ -27,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { StatusDot } from "@/components/status-dot";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/formatters";
@@ -39,16 +30,6 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type RegressionStep = {
-  action: string;
-  role?: string;
-  name?: string;
-  value?: string;
-  url?: string;
-  purpose?: string;
-  doneWhen?: { type: string; value?: string; role?: string; name?: string; text?: string };
-};
-
 type SavedTest = {
   id: string;
   project_id: string;
@@ -59,9 +40,6 @@ type SavedTest = {
   created_at: string;
   run_count?: number;
   issues_count?: number;
-  regression_plan?: RegressionStep[] | null;
-  plan_status?: "none" | "ready" | "stale" | null;
-  plan_success_count?: number;
   enabled: boolean;
 };
 
@@ -182,12 +160,12 @@ export const TestsPlans: React.FC = () => {
   // ─── Run ────────────────────────────────────────────────────────────────
 
   async function handleToggleEnabled(test: SavedTest, enabled: boolean) {
-    const prev = test.enabled;
-    setTests((prev) => prev.map((t) => (t.id === test.id ? { ...t, enabled } : t)));
+    const prevEnabled = test.enabled;
+    setTests((cur) => cur.map((t) => (t.id === test.id ? { ...t, enabled } : t)));
     try {
       await toggleTest(test.project_id, test.id, enabled);
     } catch {
-      setTests((prev) => prev.map((t) => (t.id === test.id ? { ...t, enabled: prev } : t)));
+      setTests((cur) => cur.map((t) => (t.id === test.id ? { ...t, enabled: prevEnabled } : t)));
     }
   }
 
@@ -228,70 +206,24 @@ export const TestsPlans: React.FC = () => {
     }
   }
 
-  // ─── Plan status badge helper ────────────────────────────────────────────
-
-  function planBadge(test: SavedTest) {
-    if (test.plan_status === "ready") {
-      return (
-        <Badge
-          variant="outline"
-          className="shrink-0 rounded-md border-status-pass/35 bg-status-pass/12 px-2 py-0.5 text-[10px] font-medium text-status-pass"
-        >
-          Script generated
-        </Badge>
-      );
-    }
-    if (test.plan_status === "stale") {
-      return (
-        <Badge
-          variant="outline"
-          className="shrink-0 rounded-md border-status-warn/35 bg-status-warn/10 px-2 py-0.5 text-[10px] font-medium text-status-warn"
-        >
-          Script stale
-        </Badge>
-      );
-    }
-    return null;
-  }
-
   const canSave = formName.trim().length > 0 && formIntent.trim().length > 0;
   const enabledCount = tests.filter((t) => t.enabled).length;
-  const readyCount = tests.filter((t) => t.plan_status === "ready").length;
-  const staleCount = tests.filter((t) => t.plan_status === "stale").length;
-  const noScriptCount = tests.filter((t) => !t.plan_status || t.plan_status === "none").length;
   const totalRunCount = tests.reduce((sum, t) => sum + (t.run_count ?? 0), 0);
   const totalIssuesFound = tests.reduce((sum, t) => sum + (t.issues_count ?? 0), 0);
+  const testedFlows = tests.filter((t) => (t.run_count ?? 0) > 0).length;
   const flowsWithIssues = tests.filter((t) => (t.issues_count ?? 0) > 0).length;
+  const cleanFlows = tests.filter((t) => (t.run_count ?? 0) > 0 && (t.issues_count ?? 0) === 0).length;
+  const untestedFlows = Math.max(0, tests.length - testedFlows);
 
   const [flowFilter, setFlowFilter] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<"all" | "ready" | "stale" | "none">("all");
 
   const filteredTests = React.useMemo(() => {
-    let result = tests;
-    if (statusFilter !== "all") {
-      result = result.filter((t) =>
-        statusFilter === "none"
-          ? !t.plan_status || t.plan_status === "none"
-          : t.plan_status === statusFilter,
-      );
-    }
-    if (flowFilter.trim()) {
-      const q = flowFilter.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) || t.intent.toLowerCase().includes(q),
-      );
-    }
-    return result;
-  }, [tests, statusFilter, flowFilter]);
-
-  const STATUS_FILTERS = ["all", "ready", "stale", "none"] as const;
-  const STATUS_LABELS: Record<string, string> = {
-    all: "All",
-    ready: "Script ready",
-    stale: "Stale",
-    none: "No script",
-  };
+    if (!flowFilter.trim()) return tests;
+    const q = flowFilter.toLowerCase();
+    return tests.filter(
+      (t) => t.name.toLowerCase().includes(q) || t.intent.toLowerCase().includes(q),
+    );
+  }, [tests, flowFilter]);
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
@@ -306,42 +238,38 @@ export const TestsPlans: React.FC = () => {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 sm:px-6 lg:px-8 py-5 w-full space-y-4 animate-page-enter">
 
-          {/* ── 4 stat cards ──────────────────────────────────────────── */}
-          <aside className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Signal – script coverage donut */}
+          {/* ── Stat cards ────────────────────────────────────────────── */}
+          <aside className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Signal */}
             <div className="glass-card-flat card-stagger px-3 py-3">
               <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Signal</p>
-              {tests.length === 0 ? (
-                <p className="mt-3 text-[13px] text-muted-foreground/50">No flows yet</p>
-              ) : (
-                <div className="mt-2 flex items-center gap-3">
-                  <div
-                    className="relative h-14 w-14 shrink-0 rounded-full"
-                    style={{
-                      background: `conic-gradient(
-                        rgb(16 185 129) 0 ${(readyCount / Math.max(tests.length, 1)) * 360}deg,
-                        rgb(245 158 11) ${(readyCount / Math.max(tests.length, 1)) * 360}deg ${((readyCount + staleCount) / Math.max(tests.length, 1)) * 360}deg,
-                        rgb(148 163 184 / 0.35) ${((readyCount + staleCount) / Math.max(tests.length, 1)) * 360}deg 360deg
-                      )`,
-                    }}
-                  >
-                    <div className="absolute inset-2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                      <span className="text-[10px] font-semibold tabular-nums text-foreground">
-                        {readyCount}/{tests.length}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-0.5 text-[11px] text-muted-foreground">
-                    <p>{readyCount} ready</p>
-                    <p>{staleCount} stale</p>
-                    <p>{noScriptCount} unscripted</p>
+              <div className="mt-2 flex items-center gap-3">
+                <div
+                  className="relative h-14 w-14 rounded-full shrink-0"
+                  style={{
+                    background: `conic-gradient(
+                      rgb(16 185 129) 0 ${(cleanFlows / Math.max(tests.length, 1)) * 360}deg,
+                      rgb(245 158 11) ${(cleanFlows / Math.max(tests.length, 1)) * 360}deg ${((cleanFlows + flowsWithIssues) / Math.max(tests.length, 1)) * 360}deg,
+                      rgb(148 163 184 / 0.35) ${((cleanFlows + flowsWithIssues) / Math.max(tests.length, 1)) * 360}deg 360deg
+                    )`,
+                  }}
+                >
+                  <div className="absolute inset-2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                    <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                      {testedFlows}/{tests.length}
+                    </span>
                   </div>
                 </div>
-              )}
+                <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                  <p>{cleanFlows} clean</p>
+                  <p>{flowsWithIssues} issues</p>
+                  <p>{untestedFlows} untested</p>
+                </div>
+              </div>
             </div>
 
             {/* Issues Found */}
-            <div className={cn("glass-card-flat card-stagger px-3 py-3")}>
+            <div className="glass-card-flat card-stagger px-3 py-3">
               <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">Issues Found</p>
               <p className={cn(
                 "mt-2 text-[26px] font-semibold tabular-nums",
@@ -353,20 +281,6 @@ export const TestsPlans: React.FC = () => {
                 {totalIssuesFound === 0
                   ? "No bugs detected"
                   : `Across ${flowsWithIssues} flow${flowsWithIssues !== 1 ? "s" : ""}`}
-              </p>
-            </div>
-
-            {/* No Script Yet */}
-            <div className={cn("glass-card-flat card-stagger px-3 py-3")}>
-              <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">No Script Yet</p>
-              <p className={cn(
-                "mt-2 text-[26px] font-semibold tabular-nums",
-                noScriptCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-foreground",
-              )}>
-                {tests.length === 0 ? "—" : noScriptCount}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {noScriptCount === 0 ? "All flows have scripts" : "Run these flows to generate scripts"}
               </p>
             </div>
 
@@ -434,7 +348,7 @@ export const TestsPlans: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   <div className="glass-card-flat p-3 flex flex-col gap-2 min-h-[8rem]">
                     <div className="flex items-center gap-2 min-w-0">
-                      <StatusDot status={adhocRunning ? "running" : "clean"} />
+                      <FastForward className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="text-[13px] font-medium text-foreground truncate">Quick run</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground/60">
@@ -462,12 +376,6 @@ export const TestsPlans: React.FC = () => {
                   </div>
 
                   {filteredTests.map((test) => {
-                      const scriptDot =
-                        test.plan_status === "ready"
-                          ? "clean"
-                          : test.plan_status === "stale"
-                            ? "issues"
-                            : "untested";
                       return (
                         <div
                           key={test.id}
@@ -476,7 +384,7 @@ export const TestsPlans: React.FC = () => {
                             !test.enabled && "opacity-50",
                           )}
                         >
-                          {/* Top: dot + name + switch — identical to page tile */}
+                          {/* Top: name + switch */}
                           <div className="flex items-start justify-between gap-2">
                             <button
                               type="button"
@@ -484,7 +392,6 @@ export const TestsPlans: React.FC = () => {
                               className="min-w-0 flex-1 text-left space-y-1 group/link"
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <StatusDot status={scriptDot} />
                                 <span className={cn("text-[13px] font-medium text-foreground truncate", !test.enabled && "line-through")}>
                                   {test.name}
                                 </span>
@@ -598,11 +505,6 @@ export const TestsPlans: React.FC = () => {
                 placeholder="Describe what the agent should do..."
                 className="text-[13px] resize-y"
               />
-              {editing && (
-                <p className="mt-1.5 text-[11px] text-muted-foreground/60">
-                  Changing this clears the saved script; the next successful run records a new one.
-                </p>
-              )}
             </div>
             <div>
               <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">
@@ -672,144 +574,4 @@ export const TestsPlans: React.FC = () => {
   );
 };
 
-// ─── Shared Regression Plan Step Viewer ──────────────────────────────────────
 
-const STEP_ACTION_COLORS: Record<string, string> = {
-  click:         "text-foreground/90",
-  fill:          "text-foreground/90",
-  navigate:      "text-foreground/90",
-  assert:        "text-foreground/90",
-  pressKey:      "text-foreground/90",
-  selectOption:  "text-foreground/90",
-  scroll:        "text-muted-foreground",
-  back:          "text-muted-foreground",
-  wait:          "text-muted-foreground/70",
-};
-
-function StepActionIcon({ action }: { action: string }) {
-  const cls = "h-4 w-4 shrink-0";
-  if (action === "fill") return <Keyboard className={cn(cls, "text-muted-foreground/75")} />;
-  if (action === "click") return <CursorClick className={cn(cls, "text-muted-foreground/75")} />;
-  if (action === "navigate") return <NavigationArrow className={cn(cls, "text-muted-foreground/75")} />;
-  if (action === "assert") return <CheckCircle className={cn(cls, "text-muted-foreground/75")} />;
-  return <Globe className={cn(cls, "text-muted-foreground/55")} />;
-}
-
-function regressionStepHasExpandableDetails(step: RegressionStep): boolean {
-  return Boolean(
-    (step.purpose && step.purpose.trim()) ||
-      (step.url && step.action !== "navigate") ||
-      step.doneWhen,
-  );
-}
-
-function StepSummaryLine({ step }: { step: RegressionStep }) {
-  return (
-    <div className="flex min-w-0 items-center gap-1.5 truncate">
-      <span className={cn("shrink-0 font-mono font-medium", STEP_ACTION_COLORS[step.action] ?? "text-foreground")}>
-        {step.action}
-      </span>
-      {step.role && step.name && (
-        <span className="shrink-0 font-mono text-foreground/80">
-          {step.role}:<span className="text-foreground">&quot;{step.name}&quot;</span>
-        </span>
-      )}
-      {!step.role && step.name && (
-        <span className="shrink-0 font-mono text-foreground/80">&quot;{step.name}&quot;</span>
-      )}
-      {step.value && step.action !== "navigate" && (
-        <span className="truncate text-muted-foreground">= &quot;{step.value}&quot;</span>
-      )}
-      {step.action === "navigate" && step.value && (
-        <span className="truncate font-mono text-foreground/80">{step.value}</span>
-      )}
-    </div>
-  );
-}
-
-const REGRESSION_STEP_GRID =
-  "grid w-full grid-cols-[2rem_1.25rem_1.75rem_minmax(0,1fr)] items-center gap-x-1.5 pl-2 pr-4 py-2 text-[12px] sm:pl-2.5 sm:pr-5";
-
-export function RegressionPlanView({ steps }: { steps: RegressionStep[] }) {
-  const [openByIndex, setOpenByIndex] = React.useState<Record<number, boolean>>({});
-
-  function toggleRow(i: number) {
-    setOpenByIndex((prev) => ({ ...prev, [i]: !prev[i] }));
-  }
-
-  return (
-    <div className="w-full rounded-lg border border-border bg-card overflow-hidden">
-      {steps.map((step, i) => {
-        const hasDetails = regressionStepHasExpandableDetails(step);
-        const expanded = Boolean(openByIndex[i]);
-        const rowBase = cn(REGRESSION_STEP_GRID, i > 0 && "border-t border-border");
-
-        const body = (
-          <>
-            <span className="text-[11px] font-mono font-medium text-muted-foreground/60 tabular-nums text-right select-none">
-              {i + 1}
-            </span>
-            <div className="flex h-8 w-5 shrink-0 items-center justify-center text-muted-foreground/40">
-              {hasDetails ? (
-                expanded ? (
-                  <CaretDown className="h-3 w-3" weight="bold" aria-hidden />
-                ) : (
-                  <CaretRight className="h-3 w-3" weight="bold" aria-hidden />
-                )
-              ) : null}
-            </div>
-            <div className="flex h-8 items-center">
-              <StepActionIcon action={step.action} />
-            </div>
-            <div className="min-w-0 py-0.5">
-              <StepSummaryLine step={step} />
-              {!expanded && step.purpose?.trim() && (
-                <p className="text-[10px] text-muted-foreground/50 truncate mt-0.5">{step.purpose}</p>
-              )}
-              {hasDetails && expanded && (
-                <div className="mt-2 space-y-1 border-l border-border/60 pl-2.5">
-                  {step.purpose?.trim() && (
-                    <p className="text-[11px] leading-snug text-muted-foreground/80">{step.purpose}</p>
-                  )}
-                  {step.url && step.action !== "navigate" && (
-                    <p className="truncate font-mono text-[10px] text-muted-foreground/50" title={step.url}>
-                      {step.url}
-                    </p>
-                  )}
-                  {step.doneWhen && (
-                    <p className="text-[10px] text-muted-foreground/55">
-                      done when: {step.doneWhen.type}
-                      {step.doneWhen.value && ` "${step.doneWhen.value}"`}
-                      {step.doneWhen.text && ` "${step.doneWhen.text}"`}
-                      {step.doneWhen.name && ` ${step.doneWhen.role}:"${step.doneWhen.name}"`}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        );
-
-        if (hasDetails) {
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => toggleRow(i)}
-              className={cn(rowBase, "w-full cursor-pointer text-left transition-colors hover:bg-accent/25")}
-              aria-expanded={expanded}
-            >
-              {body}
-            </button>
-          );
-        }
-
-        return (
-          <div key={i} className={rowBase}>
-            {body}
-          </div>
-        );
-      })}
-    </div>
-  );
-}

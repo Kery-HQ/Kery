@@ -1454,6 +1454,7 @@ export async function handleAuth(
 
   if (!auth.credentials) return { ok: false, llmCalls: [] };
   const authStartUrl = auth.loginUrl || baseUrl || page.url();
+  const baseAuthUrl = baseUrl || page.url();
 
   logger.info({ url: authStartUrl }, "Authenticating");
   if (page.url() !== authStartUrl) {
@@ -1473,7 +1474,17 @@ export async function handleAuth(
     logger.info({ url: authStartUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
   }
 
-  return await tryAgentAuthViaRunAgent(page, auth, context, baseUrl, authStartUrl, onLLMCall);
+  // Robust fallback: if a provided login URL is stale/wrong, retry Navigator auth from base URL.
+  const preferredNavigatorStartUrl = auth.loginUrl ? baseAuthUrl : authStartUrl;
+  return await tryAgentAuthViaRunAgent(
+    page,
+    auth,
+    context,
+    baseUrl,
+    authStartUrl,
+    onLLMCall,
+    preferredNavigatorStartUrl,
+  );
 }
 
 function normalizeSelectorOverrides(selectors: AuthConfig["selectors"] | undefined):
@@ -1603,11 +1614,12 @@ async function tryAgentAuthViaRunAgent(
   baseUrl: string | undefined,
   authStartUrl: string,
   onLLMCall?: (call: LLMCallRecord) => void,
+  preferredStartUrl?: string,
 ): Promise<AuthHandleResult> {
   const { username, password } = auth.credentials!;
   const loginIntent =
     `Log in with username "${username}" and password "${password}", then submit the login form.`;
-  const authBase = auth.loginUrl || baseUrl || page.url();
+  const authBase = preferredStartUrl || auth.loginUrl || baseUrl || page.url();
 
   const result = await runAgent(
     page,

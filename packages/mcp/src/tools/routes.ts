@@ -74,6 +74,9 @@ Health statuses:
   • 'issues'    — bugs found on last test
   • 'stale'     — tested long ago, may be outdated
 
+To see the actual bugs for a specific route, call kery_get_bugs and filter results by destination_id
+matching the route's 'id' field and where test_id is null (route-level issues, not flow-triggered ones).
+
 If no routes are shown, call kery_scan first to crawl the app.`,
     {
       projectId: z.string().uuid().describe("Project ID (get from kery_list_projects)"),

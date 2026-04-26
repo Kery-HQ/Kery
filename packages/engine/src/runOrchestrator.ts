@@ -1,6 +1,10 @@
 /**
  * Run Orchestrator — multi-agent orchestration for test runs.
  * Accepts StorageAdapter for all database operations.
+ *
+ * experiment/pure-llm-runs: regression scripts completely removed.
+ * Every run is a fresh LLM Navigator run — no script lookup, no replay,
+ * no healing, no script generation. Pure LLM every time.
  */
 import { chromium, type Page, type BrowserContext } from "playwright";
 import * as fs from "fs";
@@ -8,15 +12,12 @@ import * as path from "path";
 import * as os from "os";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { runAgent, handleAuth, type RunStep, type LLMCallRecord, type LLMAgentType, type AgentPlanItem } from "./agent.js";
-import { waitForPageStable } from "./agent.js";
+import { runAgent, type RunStep, type LLMCallRecord, type LLMAgentType, type AgentPlanItem } from "./agent.js";
 import type { AuthConfig } from "./types.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { runHolisticFlowReview } from "./holisticReviewAgent.js";
 import { isStopRequested } from "./runEvents.js";
 import type { ReviewBug } from "./types.js";
-import { executeRegressionPlan, updatePlanConfidence, type RegressionStep } from "./regressionEngine.js";
-import { generateScriptWithLLM } from "./scriptGenerator.js";
 import {
   loadProjectMemoryWithDecay,
   boostConfidence,
@@ -103,30 +104,6 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     } catch (err) {
       logger.warn({ err: String(err), destinationId: job.destinationId }, "Failed to resolve target URL");
     }
-  }
-
-  // Check for regression plan
-  let regressionPlan: RegressionStep[] | null = null;
-  let regressionSource: { table: string; id: string } | null = null;
-
-  if (job.testId) {
-    try {
-      const test = await storage.getRegressionPlan("saved_tests", job.testId);
-      if (test?.regression_plan && test.plan_success_count > 0 && test.plan_status === "ready") {
-        regressionPlan = test.regression_plan;
-        regressionSource = { table: "saved_tests", id: test.id };
-      }
-    } catch {}
-  }
-
-  if (!regressionPlan && job.destinationId) {
-    try {
-      const dest = await storage.getRegressionPlan("app_tree_destinations", job.destinationId);
-      if (dest?.regression_plan && (dest.plan_success_count ?? 0) > 0 && dest.plan_status === "ready") {
-        regressionPlan = dest.regression_plan;
-        regressionSource = { table: "app_tree_destinations", id: dest.id };
-      }
-    } catch {}
   }
 
   // Load memory (with in-memory decay for prompt; DB rows unchanged until curator/boost)
@@ -221,133 +198,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
     const netMonitor = attachNetworkMonitor(page);
 
-    // Try regression replay
-    if (regressionPlan && regressionPlan.length > 0) {
-      try {
-        if (job.auth) {
-          let authed = (await handleAuth(page, job.auth, context, job.baseUrl)).ok;
-          // Retry auth once before giving up
-          if (!authed) {
-            logger.warn("Regression replay: first auth attempt failed, retrying once");
-            authed = (await handleAuth(page, job.auth, context, job.baseUrl)).ok;
-          }
-          if (!authed) {
-            logger.warn("Regression replay: auth failed after retry, falling back to Navigator");
-            regressionPlan = null;
-          }
-        }
-      } catch (authErr) {
-        logger.warn({ err: String(authErr).slice(0, 200) }, "Regression replay: auth threw, falling back to Navigator");
-        regressionPlan = null;
-      }
-    }
-
-    if (regressionPlan && regressionPlan.length > 0) {
-      try {
-        const regLiveSteps: RunStep[] = [];
-        const regResult = await executeRegressionPlan(page, regressionPlan, {
-          onStep: (step) => {
-            regLiveSteps.push(step);
-            job.onStep?.(step);
-          },
-          onScreenshot: (screenshot, cleanScreenshot, domHash) => {
-            job.onScreenshot?.(screenshot, cleanScreenshot, domHash);
-          },
-          onHealCall: (call) => {
-            job.onLLMCall?.(call);
-          },
-          auth: job.auth ?? null,
-        });
-
-        if (regResult.status === "passed" || regResult.status === "failed") {
-          if (regressionSource) {
-            const current = await storage.getRegressionPlan(regressionSource.table, regressionSource.id);
-            const newCount = updatePlanConfidence(current?.plan_success_count ?? 0, regResult);
-            await storage.updateRegressionPlan(regressionSource.table, regressionSource.id, {
-              plan_success_count: newCount, plan_status: "ready",
-            });
-          }
-
-          const stepsDetail: RunStep[] = regLiveSteps.length > 0
-            ? regLiveSteps
-            : regressionPlan.map((step, i) => ({
-                index: i + 1, action: step.action, target: step.name, value: step.value,
-                reasoning: step.purpose, url: step.url ?? page.url(),
-                status: i < regResult.stepsCompleted ? "ok" as const : "skipped" as const,
-                fromMemory: false, at: Date.now(),
-                elementRef: step.role && step.name ? { role: step.role, name: step.name } : undefined,
-              }));
-
-          const bugsFound: RunStep[] = regResult.bugs.map((bug) => ({
-            index: bug.step, action: "bug", reasoning: bug.description,
-            status: "ok" as const, fromMemory: false, bugType: "functional" as const,
-            severity: "medium" as const, source: "navigator" as const,
-          }));
-
-          if (shSession) {
-            await finalizeStagehandRecording(shSession, videoTmpDir, job.runId);
-          } else {
-            await browserContext?.close();
-            await browser?.close();
-          }
-
-          const videoUrl = await finalizeVideo(videoTmpDir, job.videosDir, job.runId);
-
-          return {
-            status: regResult.status === "passed" ? "passed" : "failed",
-            steps: stepsDetail.map(s => `[${s.index}] ${s.action} \u2192 ${s.target ?? ""}`),
-            stepsDetail, bugsFound, llmCalls: regResult.healCalls,
-            memoryLoaded: allMemory, memoryProposed: 0, videoUrl,
-            recordingStartedAt,
-          };
-        }
-
-        // handoff — script got as far as it could, Navigator takes over from here
-        const completedCount = regResult.failedAtStep ?? 0;
-        const completedSummary = (regResult.completedSteps ?? [])
-          .map((s, i) => `  ${i + 1}. ${s.action} ${s.role ? `${s.role}:` : ""}${s.name ? `"${s.name}"` : ""}${s.value ? ` = "${s.value}"` : ""}`)
-          .join("\n");
-
-        const handoffContext = [
-          context,
-          `\n--- Regression script partial execution ---`,
-          `${completedCount} of ${regressionPlan.length} scripted steps completed successfully before a step failed.`,
-          completedCount > 0
-            ? `Completed steps:\n${completedSummary}`
-            : `No steps completed before the failure.`,
-          `The browser is currently at: ${page.url()}`,
-          `Continue from the current page state and complete the original intent. Do NOT redo the already-completed steps above.`,
-        ].join("\n");
-
-        logger.info(
-          { failedAtStep: regResult.failedAtStep, currentUrl: page.url() },
-          "Regression handoff: Navigator taking over mid-flow",
-        );
-
-        if (regressionSource) {
-          await storage.updateRegressionPlan(regressionSource.table, regressionSource.id, {
-            plan_status: "stale", plan_success_count: 0,
-          });
-        }
-
-        const completedRunSteps: RunStep[] = regLiveSteps.length > 0
-          ? regLiveSteps.filter((s) => s.status === "ok")
-          : (regResult.completedSteps ?? []).map((step, i) => ({
-              index: i + 1, action: step.action, target: step.name, value: step.value,
-              reasoning: step.purpose, url: step.url ?? page.url(),
-              status: "ok" as const, fromMemory: false, at: Date.now(),
-              elementRef: step.role && step.name ? { role: step.role, name: step.name } : undefined,
-            }));
-
-        context = handoffContext;
-        (job as any).__handoffCompletedSteps = completedRunSteps;
-        (job as any).__handoffHealCalls = regResult.healCalls;
-      } catch {
-        // Fall through to LLM exploration
-      }
-    }
-
-    // Full LLM exploration
+    // Pure LLM exploration — no regression replay, no scripted steps
     const holisticCalls: LLMCallRecord[] = [];
     let lastFrameDomHash: string | null = null;
     const filmstripFrames: FilmstripFrame[] = [];
@@ -504,44 +355,15 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     });
     emitActivity("Memory curation complete.");
 
-    const handoffHealCalls: LLMCallRecord[] = (job as any).__handoffHealCalls ?? [];
     const mergedCalls = mergeLLMCalls(
       agentResult.llmCalls,
       holisticCalls,
       filmstripCalls,
       triageCalls,
       memoryCuratorCalls,
-      handoffHealCalls,
     );
 
-    // If this was a handoff run, prepend the completed regression steps so the
-    // combined trace represents the full flow. Re-index all steps sequentially.
-    const handoffCompleted: RunStep[] = (job as any).__handoffCompletedSteps ?? [];
-    const combinedStepsDetail: RunStep[] = handoffCompleted.length > 0
-      ? [
-          ...handoffCompleted,
-          ...agentResult.stepsDetail.map(s => ({ ...s, index: (s.index ?? 0) + handoffCompleted.length })),
-        ]
-      : agentResult.stepsDetail;
-
-    // If the Navigator completed the flow successfully after a handoff, save a
-    // fresh regression plan from the combined trace so the script is repaired.
-    if (handoffCompleted.length > 0 && agentResult.status === "passed" && regressionSource) {
-      emitActivity("Regenerating replay script from repaired flow...");
-      const { plan: freshPlan } = await generateScriptWithLLM(job.intent, combinedStepsDetail, job.onLLMCall);
-      if (freshPlan.length > 0) {
-        await storage.updateRegressionPlan(regressionSource.table, regressionSource.id, {
-          regression_plan: freshPlan,
-          plan_status: "ready",
-          plan_success_count: 1,
-        });
-        logger.info(
-          { steps: freshPlan.length, source: regressionSource },
-          "Regression: script regenerated from handoff+navigator combined trace",
-        );
-      }
-      emitActivity("Replay script regeneration complete.");
-    }
+    const combinedStepsDetail = agentResult.stepsDetail;
 
     if (shSession) {
       await finalizeStagehandRecording(shSession, videoTmpDir, job.runId);
@@ -595,10 +417,8 @@ function mergeLLMCalls(
   filmstrip: LLMCallRecord[] = [],
   triage: LLMCallRecord[] = [],
   memoryCurator: LLMCallRecord[] = [],
-  healCalls: LLMCallRecord[] = [],
 ): LLMCallRecord[] {
   const merged: LLMCallRecord[] = [
-    ...healCalls.map((c) => ({ ...c, agent: "regression_heal" as LLMAgentType })),
     ...navigator.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
     ...holistic.map((c) => ({ ...c, agent: (c.agent ?? "holistic") as LLMAgentType })),
     ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),

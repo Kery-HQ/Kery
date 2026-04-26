@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   Play,
   Pencil,
-  Repeat,
-  ArrowCounterClockwise,
   Warning,
   CaretDown,
   CaretRight,
@@ -40,10 +38,8 @@ import {
   fetchProjectBugs,
   runProjectTest,
   updateTest,
-  resetTestScript,
   patchProjectBug,
 } from "@/projectApi";
-import { RegressionPlanView, type RegressionStep } from "@/pages/TestsPlans";
 import { BUG_SEVERITY_STATUS_DOT } from "@/lib/bug-issue-display";
 import { runScreenshotFileUrl } from "@/lib/apiAssets";
 import { BugScreenshotZoomDialog } from "@/components/bug-screenshot-zoom-dialog";
@@ -57,9 +53,6 @@ type SavedTest = {
   context?: string | null;
   max_steps?: number | null;
   created_at: string;
-  regression_plan?: RegressionStep[] | null;
-  plan_status?: "none" | "ready" | "stale" | null;
-  plan_success_count?: number;
 };
 
 const DEFAULT_FLOW_MAX_STEPS = 50;
@@ -75,12 +68,9 @@ export function FlowDetail() {
   const [environments, setEnvironments] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [running, setRunning] = React.useState(false);
-  const [resettingScript, setResettingScript] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [expandedBugId, setExpandedBugId] = React.useState<string | null>(null);
   const [bugActionBusy, setBugActionBusy] = React.useState<string | null>(null);
-
-  const [resetScriptConfirmOpen, setResetScriptConfirmOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [formName, setFormName] = React.useState("");
   const [formIntent, setFormIntent] = React.useState("");
@@ -162,18 +152,6 @@ export function FlowDetail() {
     setRunning(false);
   }
 
-  async function handleResetScript() {
-    if (!currentProjectId || !test) return;
-    setResetScriptConfirmOpen(false);
-    setResettingScript(true);
-    try {
-      const res = await resetTestScript(currentProjectId, test.id);
-      setTest(res.test as SavedTest);
-    } finally {
-      setResettingScript(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex flex-col min-h-full">
@@ -213,8 +191,6 @@ export function FlowDetail() {
       </div>
     );
   }
-
-  const hasRegressionPlan = (test.regression_plan?.length ?? 0) > 0;
 
   return (
     <div className="flex flex-col min-h-full">
@@ -266,12 +242,6 @@ export function FlowDetail() {
           <Tabs defaultValue="overview">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="script">
-                Script
-                {test.plan_status === "ready" && (
-                  <span className="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-status-pass" />
-                )}
-              </TabsTrigger>
               <TabsTrigger value="issues">
                 Issues
                 {bugs.filter(b => b.status === "open" || b.status === "in_progress").length > 0 && (
@@ -312,21 +282,6 @@ export function FlowDetail() {
                     </p>
                   </div>
                   <div className="px-4 py-3 border-b border-border last:border-0">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Script</p>
-                    <div>
-                      {test.plan_status === "ready" && <Badge variant="success">Ready</Badge>}
-                      {test.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
-                      {(!test.plan_status || test.plan_status === "none") && (
-                        <span className="text-[13px] text-muted-foreground/50">None yet</span>
-                      )}
-                      {(test.plan_success_count ?? 0) > 0 && (
-                        <p className="text-[11px] font-mono text-muted-foreground/50 mt-1">
-                          {test.plan_success_count} successful replay{test.plan_success_count !== 1 ? "s" : ""}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="px-4 py-3 border-b border-border last:border-0">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Open issues</p>
                     <p className="text-[13px] text-foreground">
                       {bugs.filter(b => b.status === "open" || b.status === "in_progress").length || (
@@ -339,47 +294,6 @@ export function FlowDetail() {
                     <p className="text-[13px] font-mono text-muted-foreground">{relativeTime(test.created_at)}</p>
                   </div>
                 </div>
-              </div>
-            </TabsContent>
-
-            {/* Script */}
-            <TabsContent value="script">
-              <div className="space-y-3">
-                {(hasRegressionPlan || test.plan_status === "ready" || test.plan_status === "stale") && (
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-[13px] font-medium text-foreground">Regression script</span>
-                      {test.plan_status === "ready" && <Badge variant="success">Active</Badge>}
-                      {test.plan_status === "stale" && <Badge variant="warning">Stale</Badge>}
-                      {(test.plan_success_count ?? 0) > 0 && (
-                        <span className="ml-2 text-[11px] font-mono text-muted-foreground/50">
-                          {test.plan_success_count} successful replay{test.plan_success_count !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1.5 text-[11px] shrink-0 text-muted-foreground"
-                      loading={resettingScript}
-                      onClick={() => setResetScriptConfirmOpen(true)}
-                    >
-                      <ArrowCounterClockwise className="h-3.5 w-3.5" />
-                      Reset script
-                    </Button>
-                  </div>
-                )}
-                {hasRegressionPlan ? (
-                  <RegressionPlanView steps={test.regression_plan as RegressionStep[]} />
-                ) : (
-                  <EmptyState
-                    icon={<Repeat className="h-5 w-5" />}
-                    title="No script yet"
-                    description="Run this flow successfully once. The step sequence will be saved and reused on the next run."
-                    className="py-16"
-                  />
-                )}
               </div>
             </TabsContent>
 
@@ -547,9 +461,6 @@ export function FlowDetail() {
                 rows={3}
                 className="text-[13px] resize-y"
               />
-              <p className="mt-1.5 text-[11px] text-muted-foreground/60">
-                Changing this clears the saved script; the next successful run records a new one.
-              </p>
             </div>
             <div>
               <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">
@@ -595,25 +506,6 @@ export function FlowDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Reset script confirm dialog ── */}
-      <Dialog open={resetScriptConfirmOpen} onOpenChange={setResetScriptConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Reset regression script?</DialogTitle>
-            <DialogDescription>
-              This will delete the current script. The next successful run will generate a new one. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setResetScriptConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" size="sm" onClick={handleResetScript} loading={resettingScript}>
-              Reset script
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
