@@ -533,7 +533,7 @@ export function Pages() {
                           className="h-8"
                         >
                           {!(scanActive && !canForceReplaceScan) && <ArrowsClockwise className="h-3.5 w-3.5" />}
-                          {scanActive ? (canForceReplaceScan ? "Replace scan" : "Scanning...") : "Scan app"}
+                          {scanActive ? (canForceReplaceScan ? "Replace scan" : "Scanning...") : "Scan routes"}
                         </Button>
                       </div>
                     </div>
