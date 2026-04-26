@@ -72,7 +72,6 @@ Health statuses:
   • 'untested'  — never been tested
   • 'clean'     — last test passed with no bugs
   • 'issues'    — bugs found on last test
-  • 'stale'     — tested long ago, may be outdated
 
 To see the actual bugs for a specific route, call kery_get_bugs and filter results by destination_id
 matching the route's 'id' field and where test_id is null (route-level issues, not flow-triggered ones).

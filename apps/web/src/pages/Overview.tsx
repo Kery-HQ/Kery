@@ -225,14 +225,12 @@ type PageCoverageStats = {
   tested: number;
   clean: number;
   withIssues: number;
-  stale: number;
   untested: number;
 };
 
 function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
   const total = coverage?.total ?? 0;
   const pass = coverage?.clean ?? 0;
-  const regress = coverage?.stale ?? 0;
   const fail = coverage?.withIssues ?? 0;
   const untested = coverage?.untested ?? 0;
 
@@ -250,7 +248,7 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
         <>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-semibold tabular-nums text-foreground">
-              {Math.round(((pass + regress + fail) / total) * 100)}
+              {Math.round(((pass + fail) / total) * 100)}
             </span>
             <span className="text-[12px] text-muted-foreground">% tested</span>
           </div>
@@ -259,21 +257,14 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
               <div
                 className="min-w-[3px] rounded-l-sm bg-status-pass"
                 style={{ flex: pass }}
-                title={`${pass} passing`}
-              />
-            )}
-            {regress > 0 && (
-              <div
-                className="min-w-[3px] bg-status-warn"
-                style={{ flex: regress }}
-                title={`${regress} regressing`}
+                title={`${pass} clean`}
               />
             )}
             {fail > 0 && (
               <div
                 className="min-w-[3px] bg-status-fail"
                 style={{ flex: fail }}
-                title={`${fail} failed`}
+                title={`${fail} with issues`}
               />
             )}
             {untested > 0 && (
@@ -286,8 +277,6 @@ function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug">
             <span className="text-status-pass">{pass} clean</span>
-            {" · "}
-            <span className="text-status-warn">{regress} stale</span>
             {" · "}
             <span className="text-status-fail">{fail} issues</span>
             {" · "}

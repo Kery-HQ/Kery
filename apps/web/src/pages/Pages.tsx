@@ -44,7 +44,7 @@ type Page = {
   id: string;
   route: string;
   title: string;
-  health: "clean" | "issues" | "stale" | "untested";
+  health: "clean" | "issues" | "untested";
   issues: number;
   enabled: boolean;
   plan_status?: "none" | "ready" | "stale" | null;
@@ -56,7 +56,6 @@ type Coverage = {
   tested: number;
   clean: number;
   withIssues: number;
-  stale: number;
   untested: number;
 };
 
@@ -96,14 +95,13 @@ type LastScanMeta = {
 
 type LastScan = CrawlRunRow;
 
-const HEALTH_FILTERS = ["all", "clean", "issues", "stale", "untested"] as const;
+const HEALTH_FILTERS = ["all", "clean", "issues", "untested"] as const;
 type HealthFilter = (typeof HEALTH_FILTERS)[number];
 
 const HEALTH_LABEL: Record<string, string> = {
   all: "All",
   clean: "Clean",
   issues: "Issues",
-  stale: "Stale",
   untested: "Untested",
 };
 
@@ -403,8 +401,7 @@ export function Pages() {
                       background: `conic-gradient(
                         rgb(16 185 129) 0 ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg,
                         rgb(245 158 11) ${(coverage.clean / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg,
-                        rgb(251 146 60) ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg,
-                        rgb(148 163 184 / 0.35) ${((coverage.clean + coverage.withIssues + coverage.stale) / Math.max(coverage.total, 1)) * 360}deg 360deg
+                        rgb(148 163 184 / 0.35) ${((coverage.clean + coverage.withIssues) / Math.max(coverage.total, 1)) * 360}deg 360deg
                       )`,
                     }}
                   >
@@ -417,7 +414,7 @@ export function Pages() {
                   <div className="space-y-0.5 text-[11px] text-muted-foreground">
                     <p>{coverage.clean} clean</p>
                     <p>{coverage.withIssues} issues</p>
-                    <p>{coverage.stale} stale</p>
+                    <p>{coverage.untested} untested</p>
                   </div>
                 </div>
               </div>
