@@ -2,7 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { KeryClient } from "@kery/client";
+import { KeryClient } from "@keryai/client";
 
 import { registerStartTools } from "./tools/start.js";
 import { registerStatusTool } from "./tools/status.js";

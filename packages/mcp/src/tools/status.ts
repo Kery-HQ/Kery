@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { KeryClient } from "@kery/client";
+import type { KeryClient } from "@keryai/client";
 
 const KERY_OVERVIEW = `Kery is an AI-powered browser testing platform. It uses LLM agents to:
   • Crawl your web app and discover all pages/routes (kery_scan)

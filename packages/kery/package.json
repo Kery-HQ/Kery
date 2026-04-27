@@ -1,10 +1,10 @@
 {
-  "name": "kery",
+  "name": "keryai",
   "version": "0.1.0",
   "description": "Set up Kery — AI browser testing — in under 2 minutes",
   "type": "module",
   "bin": {
-    "kery": "./dist/index.js"
+    "keryai": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -34,6 +34,9 @@
     "create"
   ],
   "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Kery-HQ/Kery.git"

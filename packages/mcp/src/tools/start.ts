@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { KeryClient } from "@kery/client";
+import type { KeryClient } from "@keryai/client";
 import { startDocker, stopDocker, waitForHealthy } from "../docker.js";
 
 export function registerStartTools(server: McpServer, client: KeryClient, isCloud: boolean) {

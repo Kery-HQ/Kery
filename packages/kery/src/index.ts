@@ -251,7 +251,7 @@ type IDE = "cursor" | "claude-code" | "codex" | "other";
 function mcpServerEntry(apiPort: number, webPort: number) {
   return {
     command: "npx",
-    args: ["-y", "@kery/mcp"],
+    args: ["-y", "@keryai/mcp"],
     env: {
       KERY_API_URL: `http://localhost:${apiPort}`,
       KERY_WEB_URL: `http://localhost:${webPort}`,
@@ -330,7 +330,7 @@ async function main() {
     prereqSpin.stop("Docker not found");
     p.log.error("Docker Desktop is required to run Kery.");
     p.log.message(`  Install it at: ${pc.cyan("https://docs.docker.com/desktop/")}`);
-    p.log.message("  Once installed and running, re-run: " + pc.dim("npx create-kery"));
+    p.log.message("  Once installed and running, re-run: " + pc.dim("npx keryai"));
     p.outro("Setup cancelled.");
     process.exit(1);
   }
@@ -338,7 +338,7 @@ async function main() {
   if (!docker.running) {
     prereqSpin.stop("Docker found but not running");
     p.log.error("Docker Desktop is installed but not running.");
-    p.log.message("  Start Docker Desktop, then re-run: " + pc.dim("npx create-kery"));
+    p.log.message("  Start Docker Desktop, then re-run: " + pc.dim("npx keryai"));
     p.outro("Setup cancelled.");
     process.exit(1);
   }

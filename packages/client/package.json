@@ -1,5 +1,5 @@
 {
-  "name": "@kery/client",
+  "name": "@keryai/client",
   "version": "0.1.0",
   "description": "Typed HTTP client for the Kery AI testing API",
   "type": "module",

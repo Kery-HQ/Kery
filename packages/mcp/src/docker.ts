@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { KeryClient } from "@kery/client";
+import { KeryClient } from "@keryai/client";
 
 const exec = promisify(execFile);
 

@@ -1,5 +1,5 @@
 {
-  "name": "@kery/mcp",
+  "name": "@keryai/mcp",
   "version": "0.1.0",
   "description": "Kery MCP server — lets AI agents in your IDE run browser tests via Kery",
   "type": "module",
@@ -17,7 +17,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@kery/client": "*",
+    "@keryai/client": "*",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^3.24.0"
   },

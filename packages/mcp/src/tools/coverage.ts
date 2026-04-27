@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { KeryClient } from "@kery/client";
+import type { KeryClient } from "@keryai/client";
 
 export function registerCoverageTool(server: McpServer, client: KeryClient) {
   server.tool(
