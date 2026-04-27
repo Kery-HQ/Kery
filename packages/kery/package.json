@@ -1,10 +1,10 @@
 {
-  "name": "create-kery",
+  "name": "kery",
   "version": "0.1.0",
   "description": "Set up Kery — AI browser testing — in under 2 minutes",
   "type": "module",
   "bin": {
-    "create-kery": "./dist/index.js"
+    "kery": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
