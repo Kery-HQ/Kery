@@ -1,85 +1,226 @@
-# Kery
+<p align="center">
+  <img src="apps/web/public/logo/kery.png" width="80" alt="Kery" />
+</p>
 
-Open-source AI-powered browser testing platform. Kery uses LLM agents to crawl your web app, generate test plans, execute them in a real browser, and find visual, functional, and UX bugs automatically.
+<h1 align="center">Kery</h1>
 
-## Features
+<p align="center">
+  <strong>AI agents that test your web app and find bugs — no test scripts required.</strong>
+</p>
 
-- **AI Browser Agent** — LLM-driven Playwright automation that understands your app via accessibility tree + screenshots
-- **Multi-Agent Architecture** — Navigator (executes), Review Agent (screenshots), Path Generator (plans), Network Monitor (API errors)
-- **App Discovery** — BFS crawl discovers all pages, forms, modals, and interactions
-- **Regression Engine** — Compiles successful runs into deterministic Playwright scripts, replays with zero LLM calls
-- **Self-Healing** — When selectors break, Stagehand finds elements by intent
-- **Agent Memory** — Learns from past runs to improve future testing
+<p align="center">
+  <a href="https://github.com/keryai/kery/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
+  <a href="https://www.npmjs.com/package/keryai"><img src="https://img.shields.io/npm/v/keryai.svg" alt="npm version" /></a>
+  <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/MCP-compatible-8A2BE2" alt="MCP" />
+</p>
+
+<br />
+
+Point Kery at your web app, pick an LLM provider, and let it loose. It crawls every route, runs intent-driven tests, and hands you a report of visual, functional, and UX bugs — with screenshots and bounding boxes. No selectors to write. No scripts to maintain.
+
+<!-- Add a demo GIF here once available -->
+
+---
 
 ## Quick Start
 
-### Docker (recommended)
+The fastest path: one command sets up everything.
 
 ```bash
-# Clone and configure
+npx keryai
+```
+
+The CLI wizard asks for your LLM provider and API key, generates a `docker-compose.yml`, and starts all services. Dashboard opens at `http://localhost:11113`.
+
+**Manual Docker setup:**
+
+```bash
 cp .env.example .env
-# Edit .env — add at least one LLM key (OPENROUTER_API_KEY or OPENAI_API_KEY)
-
-# Start everything
+# Add at least one LLM key — see Configuration below
 docker compose up -d
-
-# API is now at http://localhost:11112
 ```
 
-### Local Development
+**Local development (no Docker):**
 
 ```bash
-# Prerequisites: Node 20+, PostgreSQL 16+
-
-# Install dependencies
+# Requires Node 20+, PostgreSQL 16+, Redis
 npm install
-
-# Start Postgres (or use docker compose up postgres -d)
-# Run migrations
 DATABASE_URL=postgresql://kery:kery@localhost:11111/kery npm run migrate
-
-# Start the API
-npm run dev:api
+npm run dev:api   # API → http://localhost:11112
+npm run dev:web   # Dashboard → http://localhost:11113
 ```
+
+---
+
+## How It Works
+
+**1. Scan** — Kery BFS-crawls your app and builds a map of every route, form, modal, and interaction.
+
+**2. Plan** — For each route or saved test intent, a path-planning agent generates a sequence of steps to exercise that flow.
+
+**3. Run** — A Navigator agent drives a real Playwright browser, observing the page via accessibility tree and screenshots. A Review Agent and Filmstrip Reviewer run in parallel, watching for visual and UX regressions.
+
+**4. Report** — A Triage Agent deduplicates findings, filters false positives using memory from past runs, and outputs bugs categorized by type (visual / functional / UX) and severity — each with a screenshot and bounding box.
+
+---
+
+## Features
+
+**App Discovery**
+- BFS crawler maps all routes, links, forms, and modals
+- Route health dashboard — clean / issues / stale / untested
+- Depth and scope controls per project
+
+**Autonomous Testing**
+- Intent-driven tests: describe what to test in plain English
+- Supports authenticated flows — form login, Clerk, Supabase, OAuth, API tokens
+- Navigator agent uses accessibility tree + screenshots, not brittle CSS selectors
+- Stagehand self-healing: when the DOM shifts, elements are found by intent
+
+**Bug Detection**
+- Visual bugs — layout breaks, rendering glitches, pixel regressions
+- Functional bugs — broken flows, unexpected errors, failed assertions
+- UX bugs — confusing copy, missing feedback, accessibility gaps
+- Screenshot per bug with highlighted bounding box; URL, severity, and source agent
+
+**Agent Memory**
+- Learns successful navigation paths across runs
+- Records known false positives, ignore regions, and bug patterns
+- Confidence scoring with decay — memory stays fresh, not compounding
+
+**Integrations**
+- MCP server: run tests and triage bugs from Claude Code, Cursor, or any MCP-compatible IDE
+- TypeScript client SDK for CI/CD and custom orchestration
+- REST API + SSE streaming for real-time run progress
+
+**LLM Flexibility**
+- OpenRouter (recommended), OpenAI, Anthropic, Google Gemini
+- Each agent role (Navigator, Review, Auxiliary, Stagehand) configurable independently
+- Per-run token and cost tracking
+
+---
+
+## MCP — Run Kery from Your IDE
+
+Install the MCP server and run tests without leaving your editor.
+
+```bash
+npx keryai   # select "Install MCP" during setup
+```
+
+Or add it manually to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "kery": {
+      "command": "npx",
+      "args": ["-y", "@keryai/mcp"],
+      "env": { "KERY_BASE_URL": "http://localhost:11112" }
+    }
+  }
+}
+```
+
+Once connected, your AI assistant can scan your app, run tests, and triage bugs inline — no context switching.
+
+**Available tools:** `kery_scan`, `kery_run_test`, `kery_get_bugs`, `kery_update_bug`, `kery_list_routes`, `kery_memory`, `kery_get_coverage`, and [20+ more](packages/mcp/README.md).
+
+---
+
+## Client SDK
+
+```typescript
+import { KeryClient } from "@keryai/client";
+
+const kery = new KeryClient({ baseUrl: "http://localhost:11112" });
+
+// Scan your app
+await kery.startScan(projectId, environmentId);
+await kery.waitForScan(projectId);
+
+// Run a test
+const run = await kery.startRun(projectId, {
+  intent: "Complete the checkout flow as a guest user",
+});
+const result = await kery.waitForRun(run.id);
+
+// Get bugs
+const bugs = await kery.getBugs(projectId, { status: "open" });
+console.log(`Found ${bugs.length} bugs`);
+```
+
+```bash
+npm install @keryai/client
+```
+
+---
 
 ## Configuration
 
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://kery:kery@localhost:11111/kery` | PostgreSQL connection string |
-| `OPENROUTER_API_KEY` | | OpenRouter API key (recommended — routes to all models) |
-| `OPENAI_API_KEY` | | Direct OpenAI API key (fallback) |
-| `AGENT_MODEL` | `openai/gpt-4.1-mini` | Model for browser automation decisions |
-| `AUXILIARY_MODEL` | `gemini-2.5-flash` | Text/JSON auxiliary work: crawl, path & test plans, memory curation, intents, summarization. `CRAWL_MODEL` is a deprecated alias; `SCRIPT_MODEL` / `SUMMARY_MODEL` / `REVIEW_MODEL` still work as further fallbacks |
-| `REVIEW_AGENT_MODEL` | `gemini-2.5-flash` | Post-run holistic & filmstrip screenshot analysis |
-| `STAGEHAND_ENABLED` | `true` | Enable Stagehand for smart element finding |
+| `OPENROUTER_API_KEY` | — | OpenRouter key (routes to all models — recommended) |
+| `OPENAI_API_KEY` | — | Direct OpenAI key |
+| `ANTHROPIC_API_KEY` | — | Direct Anthropic key |
+| `GEMINI_API_KEY` | — | Direct Google Gemini key |
+| `AGENT_MODEL` | `openai/gpt-4.1-mini` | Model for browser navigation decisions |
+| `AUXILIARY_MODEL` | `gemini-2.5-flash` | Crawl, path planning, memory curation, summarization |
+| `REVIEW_AGENT_MODEL` | `gemini-2.5-flash` | Post-run holistic and filmstrip screenshot analysis |
+| `STAGEHAND_ENABLED` | `true` | Enable Stagehand for semantic element finding |
 | `RUN_TIMEOUT_MINUTES` | `15` | Max wall-clock time per test run |
+
+All model settings are also configurable via the dashboard under **Settings**.
+
+---
 
 ## Architecture
 
 ```
-packages/engine/   — Core testing engine (agent, LLM, crawl, regression)
-packages/db/       — PostgreSQL storage adapter
-apps/api/          — Fastify HTTP server
-apps/web/          — Web dashboard (coming soon)
+packages/
+  engine/     — Core agent loop, LLM client, crawler, memory, bug triage
+  db/         — PostgreSQL storage adapter (StorageAdapter interface)
+  kery/       — CLI setup wizard (npx keryai)
+  mcp/        — Model Context Protocol server (@keryai/mcp)
+  client/     — TypeScript HTTP client SDK (@keryai/client)
+
+apps/
+  api/        — Fastify HTTP server
+  web/        — React dashboard
+  worker/     — Test run executor (BullMQ)
 ```
 
-The engine is decoupled from the database via the `StorageAdapter` interface. This makes it possible to swap PostgreSQL for any other backend.
+The engine is storage-agnostic via the `StorageAdapter` interface — PostgreSQL is the default, but other backends can be plugged in.
 
-## API
+---
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/projects` | List projects |
-| `POST` | `/api/projects` | Create project |
-| `POST` | `/api/projects/:id/environments` | Add environment |
-| `POST` | `/api/projects/:id/run` | Trigger test run |
-| `GET` | `/api/runs/:id/stream` | SSE stream of run progress |
-| `GET` | `/api/runs/:id` | Get run result |
-| `POST` | `/api/projects/:id/scan` | Crawl & discover pages |
-| `GET` | `/api/projects/:id/pages` | List discovered pages |
-| `GET` | `/api/projects/:id/bugs` | List bugs |
-| `POST` | `/api/projects/:id/tests` | Create saved test |
+## Roadmap
+
+- [ ] GitHub / GitLab integration — trigger runs on PR, post bug comments
+- [ ] Cloud-hosted option — no Docker required
+- [ ] Team collaboration — shared projects, bug assignments, notifications
+- [ ] Custom test rules — define what counts as a bug for your app
+- [ ] Scheduled runs — nightly regression sweeps
+- [ ] Community Discord
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Please open an issue to discuss large changes before starting work.
+
+```bash
+git clone https://github.com/keryai/kery
+cd kery
+npm install
+cp .env.example .env
+docker compose up postgres redis -d
+npm run dev
+```
+
+---
 
 ## License
 
