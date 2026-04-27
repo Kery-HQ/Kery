@@ -378,9 +378,10 @@ export const Bugs: React.FC = () => {
       <div className="flex flex-col min-h-full">
         <PageHeader icon={<Bug className="h-4 w-4" />} title="Issues" />
         <EmptyState
-          icon={<Warning className="h-8 w-8" />}
+          icon={<Bug className="h-8 w-8" />}
           title="No project selected"
-          description="Create or select a project to view issues."
+          description="Select a project to view issues."
+          className="flex-1"
         />
       </div>
     );

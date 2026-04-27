@@ -227,6 +227,20 @@ export const TestsPlans: React.FC = () => {
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
+  if (!currentProjectId) {
+    return (
+      <div className="flex flex-col min-h-full">
+        <PageHeader icon={<ListChecks className="h-4 w-4" />} title="Flows" />
+        <EmptyState
+          icon={<ListChecks className="h-8 w-8" />}
+          title="No project selected"
+          description="Select a project to view flows."
+          className="flex-1"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader

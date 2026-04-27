@@ -558,9 +558,10 @@ export const Overview: React.FC = () => {
       <div className="flex flex-col min-h-full">
         <PageHeader icon={<SquaresFour className="h-4 w-4" />} title="Overview" />
         <EmptyState
-          icon={<SquaresFour className="h-6 w-6" />}
+          icon={<SquaresFour className="h-8 w-8" />}
           title="No project selected"
           description="Create or select a project to get started."
+          className="flex-1"
         />
       </div>
     );

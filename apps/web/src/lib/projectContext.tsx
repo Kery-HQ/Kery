@@ -7,6 +7,7 @@ type ProjectContextType = {
   projects: Project[];
   currentProjectId: string | null;
   currentProject: Project | null;
+  projectsLoaded: boolean;
   setCurrentProjectId: (id: string) => void;
   refreshProjects: () => Promise<void>;
 };
@@ -15,6 +16,7 @@ const ProjectContext = React.createContext<ProjectContextType>({
   projects: [],
   currentProjectId: null,
   currentProject: null,
+  projectsLoaded: false,
   setCurrentProjectId: () => {},
   refreshProjects: async () => {},
 });
@@ -25,6 +27,7 @@ export function useProject() {
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = React.useState<Project[]>([]);
+  const [projectsLoaded, setProjectsLoaded] = React.useState(false);
   const [currentProjectId, setCurrentProjectIdState] = React.useState<string | null>(
     () => localStorage.getItem("kery_project_id")
   );
@@ -41,6 +44,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         return first;
       });
     } catch {}
+    setProjectsLoaded(true);
   }
 
   function setCurrentProjectId(id: string) {
@@ -55,7 +59,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
 
   return (
-    <ProjectContext.Provider value={{ projects, currentProjectId, currentProject, setCurrentProjectId, refreshProjects }}>
+    <ProjectContext.Provider value={{ projects, currentProjectId, currentProject, projectsLoaded, setCurrentProjectId, refreshProjects }}>
       {children}
     </ProjectContext.Provider>
   );

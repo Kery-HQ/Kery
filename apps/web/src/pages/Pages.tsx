@@ -375,9 +375,10 @@ export function Pages() {
       <div className="flex flex-col min-h-full">
         <PageHeader icon={<Path className="h-4 w-4" />} title="Routes" />
         <EmptyState
-          icon={<Stack className="h-8 w-8" />}
+          icon={<Path className="h-8 w-8" />}
           title="No project selected"
           description="Select a project to view routes."
+          className="flex-1"
         />
       </div>
     );

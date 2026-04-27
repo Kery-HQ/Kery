@@ -166,6 +166,20 @@ export const Runs: React.FC = () => {
     return () => clearInterval(interval);
   }, [runs, load]);
 
+  if (!currentProjectId) {
+    return (
+      <div className="flex flex-col min-h-full">
+        <PageHeader icon={<Play className="h-4 w-4" />} title="Runs" />
+        <EmptyState
+          icon={<Play className="h-8 w-8" />}
+          title="No project selected"
+          description="Select a project to view runs."
+          className="flex-1"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader icon={<Play className="h-4 w-4" />} title="Runs">
@@ -179,13 +193,7 @@ export const Runs: React.FC = () => {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto px-6 py-6 animate-fade-in">
-        {!currentProjectId ? (
-          <EmptyState
-            icon={<Pulse className="h-6 w-6" />}
-            title="No project selected"
-            description="Select a project to view runs."
-          />
-        ) : loading ? (
+        {loading ? (
           <Card>
             <CardContent className="p-0">
               <div className="divide-y divide-border">

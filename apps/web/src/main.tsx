@@ -28,6 +28,7 @@ import { Pages } from "@/pages/Pages";
 import { PageDetail } from "@/pages/PageDetail";
 import { FlowDetail } from "@/pages/FlowDetail";
 import { ProjectProvider } from "@/lib/projectContext";
+import { WelcomeModal } from "@/components/welcome-modal";
 import { useHotkey } from "@/lib/hooks";
 
 function NoKeysBanner() {
@@ -75,6 +76,7 @@ function AppShell() {
         <Outlet />
       </main>
       <CommandPalette open={cmdkOpen} onOpenChange={setCmdkOpen} />
+      <WelcomeModal />
     </div>
   );
 }
