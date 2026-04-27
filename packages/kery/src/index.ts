@@ -335,9 +335,13 @@ function spawnProcess(
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd,
-      stdio: opts.verbose ? "inherit" : ["ignore", "pipe", "pipe"],
+      stdio: opts.verbose ? "inherit" : "pipe",
       env: { ...process.env },
     });
+
+    if (!opts.verbose && child.stdin) {
+      child.stdin.end();
+    }
 
     if (!opts.verbose && child.stdout && child.stderr) {
       const onLine = (line: string) => {
@@ -609,9 +613,7 @@ async function main() {
         title: "Pull & start Kery  (first run: image pull may take 1–2 min)",
         task: async (taskCtx, task) => {
           const state: DockerPullState = { services: new Map() };
-          const dockerArgs = verbose
-            ? ["compose", "up", "-d"]
-            : ["compose", "up", "-d", "--progress=plain"];
+          const dockerArgs = ["compose", "up", "-d"];
 
           await spawnProcess("docker", dockerArgs, taskCtx.installDir, {
             verbose,

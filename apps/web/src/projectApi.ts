@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:11112";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function apiFetch<T = any>(url: string, init: RequestInit = {}): Promise<T> {
   const h = new Headers(init.headers as HeadersInit);

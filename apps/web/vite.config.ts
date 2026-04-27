@@ -9,7 +9,7 @@ export default defineConfig({
     port: 11113,
     proxy: {
       // Match production nginx: SPA and API may differ by host/port; relative `/api/*` must reach the backend.
-      "/api": { target: "http://localhost:11112", changeOrigin: true },
+      "/api": { target: "http://localhost:11111", changeOrigin: true },
     },
   },
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
