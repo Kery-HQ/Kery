@@ -1,6 +1,6 @@
 {
   "name": "keryai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Set up Kery — AI browser testing — in under 2 minutes",
   "type": "module",
   "bin": {

@@ -234,6 +234,8 @@ function generateDockerCompose(
     image: ghcr.io/kery-hq/kery-web:latest
     ports:
       - "${webPort}:80"
+    environment:
+      DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
     depends_on:
       - api
 
@@ -410,7 +412,10 @@ async function main() {
   if (!web11113) webPort = await resolvePort("Web UI",   11113);
 
   // ── 6. Write files ──────────────────────────────────────────────────────────
-  const installDir = path.join(process.cwd(), "kery");
+  const installDir = path.resolve(
+    process.cwd() === "/" ? os.homedir() : process.cwd(),
+    "kery",
+  );
   fs.mkdirSync(installDir, { recursive: true });
 
   const writeSpin = p.spinner();
@@ -505,7 +510,7 @@ async function main() {
   p.log.success(`Web dashboard  ${pc.cyan(`http://localhost:${webPort}`)}`);
   p.log.info(`API            ${pc.dim(`http://localhost:${apiPort}`)}`);
   p.log.info(`Folder         ${pc.dim(installDir)}`);
-  p.log.info(`Stop           ${pc.dim(`cd kery && docker compose down`)}`);
+  p.log.info(`Stop           ${pc.dim(`cd ${installDir} && docker compose down`)}`);
   console.log();
 
   p.outro(pc.green("Opening Kery in your browser..."));
