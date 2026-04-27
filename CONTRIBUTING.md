@@ -7,16 +7,21 @@ Thank you for your interest in contributing to Kery!
 1. Clone the repo
 2. Copy `.env.example` to `.env` and fill in your LLM API keys
 3. Start PostgreSQL: `docker compose up postgres -d`
-4. Run migrations: `DATABASE_URL=postgresql://kery:kery@localhost:11111/kery npm run migrate`
+4. Run migrations: `DATABASE_URL=postgresql://kery:kery@localhost:11112/kery npm run migrate`
 5. Start the API: `npm run dev:api`
 
 ## Architecture
 
-Kery is a monorepo with three packages:
+Kery is a monorepo:
 
-- **packages/engine** — Core testing engine (agent, LLM, crawl, regression). Pure TypeScript, no database imports.
+- **packages/engine** — Core agent loop, LLM client, crawler, memory, bug triage. Pure TypeScript, no database imports.
 - **packages/db** — PostgreSQL adapter implementing the `StorageAdapter` interface from the engine.
-- **apps/api** — Fastify HTTP server wiring everything together.
+- **packages/mcp** — Model Context Protocol server (`@keryai/mcp`).
+- **packages/client** — TypeScript HTTP client SDK (`@keryai/client`).
+- **packages/kery** — CLI setup wizard (`npx keryai`).
+- **apps/api** — Fastify HTTP server.
+- **apps/web** — React dashboard.
+- **apps/worker** — Test run executor (BullMQ).
 
 ### Key Pattern: StorageAdapter
 

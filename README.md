@@ -31,7 +31,7 @@ The fastest path: one command sets up everything.
 npx keryai
 ```
 
-The CLI wizard asks for your LLM provider and API key, generates a `docker-compose.yml`, and starts all services. Dashboard opens at `http://localhost:11113`.
+The CLI wizard asks for your LLM provider and API key, generates a `docker-compose.yml`, and starts all services. Dashboard opens at `http://localhost:11111`.
 
 **Manual Docker setup:**
 
@@ -46,9 +46,8 @@ docker compose up -d
 ```bash
 # Requires Node 20+, PostgreSQL 16+, Redis
 npm install
-DATABASE_URL=postgresql://kery:kery@localhost:11111/kery npm run migrate
-npm run dev:api   # API → http://localhost:11112
-npm run dev:web   # Dashboard → http://localhost:11113
+DATABASE_URL=postgresql://kery:kery@localhost:11112/kery npm run migrate
+npm run dev:api   # API + Dashboard → http://localhost:11111
 ```
 
 ---
@@ -117,7 +116,7 @@ Or add it manually to your MCP config:
     "kery": {
       "command": "npx",
       "args": ["-y", "@keryai/mcp"],
-      "env": { "KERY_BASE_URL": "http://localhost:11112" }
+      "env": { "KERY_BASE_URL": "http://localhost:11111" }
     }
   }
 }
@@ -129,46 +128,18 @@ Once connected, your AI assistant can scan your app, run tests, and triage bugs 
 
 ---
 
-## Client SDK
-
-```typescript
-import { KeryClient } from "@keryai/client";
-
-const kery = new KeryClient({ baseUrl: "http://localhost:11112" });
-
-// Scan your app
-await kery.startScan(projectId, environmentId);
-await kery.waitForScan(projectId);
-
-// Run a test
-const run = await kery.startRun(projectId, {
-  intent: "Complete the checkout flow as a guest user",
-});
-const result = await kery.waitForRun(run.id);
-
-// Get bugs
-const bugs = await kery.getBugs(projectId, { status: "open" });
-console.log(`Found ${bugs.length} bugs`);
-```
-
-```bash
-npm install @keryai/client
-```
-
----
-
 ## Configuration
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://kery:kery@localhost:11111/kery` | PostgreSQL connection string |
+| `DATABASE_URL` | `postgresql://kery:kery@localhost:11112/kery` | PostgreSQL connection string |
 | `OPENROUTER_API_KEY` | — | OpenRouter key (routes to all models — recommended) |
 | `OPENAI_API_KEY` | — | Direct OpenAI key |
 | `ANTHROPIC_API_KEY` | — | Direct Anthropic key |
 | `GEMINI_API_KEY` | — | Direct Google Gemini key |
-| `AGENT_MODEL` | `openai/gpt-4.1-mini` | Model for browser navigation decisions |
-| `AUXILIARY_MODEL` | `gemini-2.5-flash` | Crawl, path planning, memory curation, summarization |
-| `REVIEW_AGENT_MODEL` | `gemini-2.5-flash` | Post-run holistic and filmstrip screenshot analysis |
+| `AGENT_MODEL` | `claude-haiku-4-5` | Model for browser navigation decisions |
+| `AUXILIARY_MODEL` | `gemini-2.5-pro` | Crawl, path planning, memory curation, summarization |
+| `REVIEW_AGENT_MODEL` | `claude-sonnet-4-6` | Post-run holistic and filmstrip screenshot analysis |
 | `STAGEHAND_ENABLED` | `true` | Enable Stagehand for semantic element finding |
 | `RUN_TIMEOUT_MINUTES` | `15` | Max wall-clock time per test run |
 
@@ -193,17 +164,6 @@ apps/
 ```
 
 The engine is storage-agnostic via the `StorageAdapter` interface — PostgreSQL is the default, but other backends can be plugged in.
-
----
-
-## Roadmap
-
-- [ ] GitHub / GitLab integration — trigger runs on PR, post bug comments
-- [ ] Cloud-hosted option — no Docker required
-- [ ] Team collaboration — shared projects, bug assignments, notifications
-- [ ] Custom test rules — define what counts as a bug for your app
-- [ ] Scheduled runs — nightly regression sweeps
-- [ ] Community Discord
 
 ---
 
