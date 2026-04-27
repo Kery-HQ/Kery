@@ -41,6 +41,7 @@ RUN npm run build --workspace=packages/engine
 RUN npm run build --workspace=packages/db
 RUN npm run build --workspace=apps/api
 RUN npm run build --workspace=apps/worker
+RUN npm run build --workspace=@kery/web
 
 # Default: run migrations then start API (overridden by worker service in docker-compose)
 COPY packages/db/migrations packages/db/migrations

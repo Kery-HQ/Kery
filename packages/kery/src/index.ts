@@ -1,11 +1,27 @@
 #!/usr/bin/env node
-import * as p from "@clack/prompts";
+import enquirer from "enquirer";
 import pc from "picocolors";
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
+import * as readline from "readline";
 import * as net from "net";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { Listr } from "listr2";
+import gradient from "gradient-string";
+import boxen from "boxen";
+
+// ─── ASCII banner ─────────────────────────────────────────────────────────────
+
+const BANNER_ART = [
+  "+------------------------+",
+  "|    _                   |",
+  "|   | |_____ _ _ _  _    |",
+  "|   | / / -_| '_| || |   |",
+  "|   |_\\_\\___|_|  \\_, |   |",
+  "|                |__/    |",
+  "+------------------------+",
+];
 
 // ─── Provider defaults ────────────────────────────────────────────────────────
 
@@ -88,16 +104,18 @@ function isPortFree(port: number): Promise<boolean> {
 }
 
 async function resolvePort(label: string, defaultPort: number): Promise<number> {
-  const answer = await p.text({
+  const { portStr } = await enquirer.prompt<{ portStr: string }>({
+    type: "input",
+    name: "portStr",
     message: `${pc.yellow(`Port ${defaultPort} is in use`)} — enter a free port for ${label}:`,
-    defaultValue: String(defaultPort + 10),
-    validate: (v) => {
+    initial: String(defaultPort + 10),
+    validate: (v: string) => {
       const n = Number(v);
       if (!Number.isInteger(n) || n < 1024 || n > 65535) return "Enter a valid port (1024–65535)";
+      return true;
     },
-  });
-  if (p.isCancel(answer)) { p.outro("Cancelled."); process.exit(0); }
-  return Number(answer);
+  } as never);
+  return Number(portStr);
 }
 
 // ─── File generation ──────────────────────────────────────────────────────────
@@ -107,7 +125,6 @@ function generateEnv(
   apiKey: string,
   dbPort: number,
   apiPort: number,
-  webPort: number,
 ): string {
   const cfg = PROVIDER_CONFIG[provider];
   return [
@@ -131,7 +148,7 @@ function generateEnv(
     "",
     "# ─── Server ──────────────────────────────────────────────────────────────────",
     `PORT=${apiPort}`,
-    `APP_URL=http://localhost:${webPort}`,
+    `APP_URL=http://localhost:${apiPort}`,
     "RUN_TIMEOUT_MINUTES=15",
     "RECORD_VIDEO=true",
   ].join("\n");
@@ -141,11 +158,8 @@ function generateDockerCompose(
   provider: Provider,
   dbPort: number,
   apiPort: number,
-  webPort: number,
 ): string {
   const cfg = PROVIDER_CONFIG[provider];
-  // API key and models are read from .env by Docker Compose automatically.
-  // docker-compose.yml is safe to commit; secrets stay in .env.
   return `services:
   postgres:
     image: postgres:16-alpine
@@ -165,8 +179,6 @@ function generateDockerCompose(
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -183,7 +195,7 @@ function generateDockerCompose(
       DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
       REDIS_URL: redis://redis:6379
       PORT: ${apiPort}
-      APP_URL: http://localhost:${webPort}
+      APP_URL: http://localhost:${apiPort}
       ${cfg.envKey}: \${${cfg.envKey}}
       AGENT_MODEL: ${cfg.agentModel}
       REVIEW_AGENT_MODEL: ${cfg.reviewAgentModel}
@@ -230,15 +242,6 @@ function generateDockerCompose(
       redis:
         condition: service_healthy
 
-  web:
-    image: ghcr.io/kery-hq/kery-web:latest
-    ports:
-      - "${webPort}:80"
-    environment:
-      DATABASE_URL: postgresql://kery:kery@postgres:5432/kery
-    depends_on:
-      - api
-
 volumes:
   pgdata:
   appdata:
@@ -250,18 +253,18 @@ volumes:
 
 type IDE = "cursor" | "claude-code" | "codex" | "other";
 
-function mcpServerEntry(apiPort: number, webPort: number) {
+function mcpServerEntry(apiPort: number) {
   return {
     command: "npx",
     args: ["-y", "@keryai/mcp"],
     env: {
       KERY_API_URL: `http://localhost:${apiPort}`,
-      KERY_WEB_URL: `http://localhost:${webPort}`,
+      KERY_WEB_URL: `http://localhost:${apiPort}`,
     },
   };
 }
 
-function installCursorMcp(apiPort: number, webPort: number): boolean {
+function installCursorMcp(apiPort: number): boolean {
   try {
     const mcpPath = path.join(os.homedir(), ".cursor", "mcp.json");
     fs.mkdirSync(path.dirname(mcpPath), { recursive: true });
@@ -269,8 +272,8 @@ function installCursorMcp(apiPort: number, webPort: number): boolean {
     if (fs.existsSync(mcpPath)) {
       try { config = JSON.parse(fs.readFileSync(mcpPath, "utf8")); } catch { /* keep empty */ }
     }
-    (config as any).mcpServers ??= {};
-    (config as any).mcpServers.kery = mcpServerEntry(apiPort, webPort);
+    (config as Record<string, Record<string, unknown>>).mcpServers ??= {};
+    (config as Record<string, Record<string, unknown>>).mcpServers["kery"] = mcpServerEntry(apiPort);
     fs.writeFileSync(mcpPath, JSON.stringify(config, null, 2) + "\n");
     return true;
   } catch {
@@ -278,16 +281,15 @@ function installCursorMcp(apiPort: number, webPort: number): boolean {
   }
 }
 
-function installClaudeCodeMcp(apiPort: number, webPort: number): boolean {
+function installClaudeCodeMcp(apiPort: number): boolean {
   try {
-    // Claude Code global MCP config lives in ~/.claude.json
     const configPath = path.join(os.homedir(), ".claude.json");
     let config: Record<string, unknown> = {};
     if (fs.existsSync(configPath)) {
       try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { /* keep empty */ }
     }
-    (config as any).mcpServers ??= {};
-    (config as any).mcpServers.kery = mcpServerEntry(apiPort, webPort);
+    (config as Record<string, Record<string, unknown>>).mcpServers ??= {};
+    (config as Record<string, Record<string, unknown>>).mcpServers["kery"] = mcpServerEntry(apiPort);
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
     return true;
   } catch {
@@ -295,8 +297,8 @@ function installClaudeCodeMcp(apiPort: number, webPort: number): boolean {
   }
 }
 
-function manualMcpSnippet(apiPort: number, webPort: number): string {
-  return JSON.stringify({ mcpServers: { kery: mcpServerEntry(apiPort, webPort) } }, null, 2);
+function manualMcpSnippet(apiPort: number): string {
+  return JSON.stringify({ mcpServers: { kery: mcpServerEntry(apiPort) } }, null, 2);
 }
 
 // ─── Wait for API ─────────────────────────────────────────────────────────────
@@ -317,210 +319,363 @@ async function waitForPort(port: number, timeoutMs = 120_000): Promise<boolean> 
   return false;
 }
 
+// ─── Spawn helper ─────────────────────────────────────────────────────────────
+
+interface SpawnOpts {
+  onLine?: (line: string) => void;
+  verbose?: boolean;
+}
+
+function spawnProcess(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  opts: SpawnOpts = {},
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, {
+      cwd,
+      stdio: opts.verbose ? "inherit" : ["ignore", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+
+    if (!opts.verbose && child.stdout && child.stderr) {
+      const onLine = (line: string) => {
+        if (opts.onLine && line.trim()) opts.onLine(line.trim());
+      };
+      readline.createInterface({ input: child.stdout, crlfDelay: Infinity }).on("line", onLine);
+      readline.createInterface({ input: child.stderr, crlfDelay: Infinity }).on("line", onLine);
+    }
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`docker exited with code ${code}`));
+    });
+  });
+}
+
+// ─── Docker output parser ─────────────────────────────────────────────────────
+
+interface DockerPullState {
+  services: Map<string, "pulling" | "done">;
+}
+
+function parseDockerLine(line: string, state: DockerPullState): string | null {
+  if (/Pulling|pulling from/i.test(line)) {
+    const m = line.match(/(\w[\w-]*)\s+(?:Pulling|pulling from)/i);
+    if (m) {
+      state.services.set(m[1], "pulling");
+      return formatDockerStatus(state);
+    }
+  }
+  if (/Pulled|DONE/i.test(line)) {
+    const m = line.match(/(\w[\w-]*)\s+(?:Pulled|DONE)/i);
+    if (m && state.services.has(m[1])) {
+      state.services.set(m[1], "done");
+      return formatDockerStatus(state);
+    }
+  }
+  const rm = line.match(/\[\+\] Running (\d+)\/(\d+)/);
+  if (rm) return `Starting services (${rm[1]}/${rm[2]} ready)`;
+  return null;
+}
+
+function formatDockerStatus(state: DockerPullState): string {
+  const pulling = [...state.services.entries()].filter(([, v]) => v === "pulling").map(([k]) => k);
+  const done = [...state.services.entries()].filter(([, v]) => v === "done").map(([k]) => k);
+  const parts: string[] = [];
+  if (pulling.length) parts.push(`Pulling: ${pulling.join(", ")}`);
+  if (done.length) parts.push(`Done: ${done.join(", ")}`);
+  return parts.join("  ·  ") || "Preparing containers…";
+}
+
+// ─── Banner + success box ─────────────────────────────────────────────────────
+
+function printBanner(): void {
+  const logo = gradient(["#F5A623", "#E8520A"]);
+
+  console.log();
+  for (const line of BANNER_ART) {
+    console.log("  " + logo(line));
+  }
+  console.log();
+  console.log("  " + pc.bold(logo("Ship Fast, Break Nothing.")));
+  console.log();
+}
+
+function buildSuccessBox(
+  apiPort: number,
+  installDir: string,
+  mcpResults: { label: string; ok: boolean; manual: boolean }[],
+): string {
+  const lines = [
+    pc.bold("Kery is ready!"),
+    "",
+    `  Dashboard  ${pc.cyan(`http://localhost:${apiPort}`)}`,
+    `  Folder     ${pc.dim(installDir)}`,
+    `  Stop       ${pc.dim(`cd ${installDir} && docker compose down`)}`,
+  ];
+
+  const needsManual = mcpResults.some((r) => r.manual || !r.ok);
+  if (needsManual) {
+    lines.push("");
+    lines.push(pc.yellow("  MCP config — add manually to your IDE:"));
+    lines.push(pc.dim(manualMcpSnippet(apiPort)));
+  }
+
+  return boxen(lines.join("\n"), {
+    padding: 1,
+    borderStyle: "round",
+    borderColor: "yellow",
+  });
+}
+
+// ─── Task context ─────────────────────────────────────────────────────────────
+
+interface TaskCtx {
+  installDir: string;
+  dbPort: number;
+  apiPort: number;
+  provider: Provider;
+  apiKey: string;
+  selectedIdes: IDE[];
+  mcpResults: { label: string; ok: boolean; manual: boolean }[];
+}
+
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log();
-  p.intro(pc.bgYellow(pc.black("  Kery — AI browser testing  ")));
+  const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
-  // ── 1. Docker check ─────────────────────────────────────────────────────────
-  const prereqSpin = p.spinner();
-  prereqSpin.start("Checking prerequisites");
-  const docker = checkDocker();
+  process.on("SIGINT", () => { console.log("\n" + pc.dim("  Cancelled.")); process.exit(0); });
 
-  if (!docker.installed) {
-    prereqSpin.stop("Docker not found");
-    p.log.error("Docker Desktop is required to run Kery.");
-    p.log.message(`  Install it at: ${pc.cyan("https://docs.docker.com/desktop/")}`);
-    p.log.message("  Once installed and running, re-run: " + pc.dim("npx keryai"));
-    p.outro("Setup cancelled.");
-    process.exit(1);
-  }
-
-  if (!docker.running) {
-    prereqSpin.stop("Docker found but not running");
-    p.log.error("Docker Desktop is installed but not running.");
-    p.log.message("  Start Docker Desktop, then re-run: " + pc.dim("npx keryai"));
-    p.outro("Setup cancelled.");
-    process.exit(1);
-  }
-
-  prereqSpin.stop("Docker is ready");
-
-  // ── 2. Provider ─────────────────────────────────────────────────────────────
-  const provider = await p.select({
-    message: "Which LLM provider?",
-    options: (Object.entries(PROVIDER_CONFIG) as [Provider, ProviderConfig][]).map(
-      ([value, cfg]) => ({ value, label: cfg.label, hint: cfg.hint }),
-    ),
-  }) as Provider;
-  if (p.isCancel(provider)) { p.outro("Cancelled."); process.exit(0); }
-
-  const providerCfg = PROVIDER_CONFIG[provider];
-
-  // ── 3. API key ──────────────────────────────────────────────────────────────
-  const apiKey = await p.password({
-    message: `${providerCfg.label} API key`,
-    validate: (v) => {
-      if (!v.trim()) return "API key is required";
-    },
-  }) as string;
-  if (p.isCancel(apiKey)) { p.outro("Cancelled."); process.exit(0); }
-
-  // ── 4. MCP install ──────────────────────────────────────────────────────────
-  const installMcp = await p.confirm({
-    message: "Install Kery MCP so your AI agents can run tests directly from your IDE?",
-    initialValue: true,
-  });
-  if (p.isCancel(installMcp)) { p.outro("Cancelled."); process.exit(0); }
-
-  let selectedIdes: IDE[] = [];
-  if (installMcp) {
-    const ides = await p.multiselect({
-      message: "Which IDEs?",
-      options: [
-        { value: "cursor",      label: "Cursor" },
-        { value: "claude-code", label: "Claude Code" },
-        { value: "codex",       label: "Codex CLI" },
-        { value: "other",       label: "Other — show me the config snippet" },
-      ],
-      required: true,
-    }) as IDE[];
-    if (p.isCancel(ides)) { p.outro("Cancelled."); process.exit(0); }
-    selectedIdes = ides;
-  }
-
-  // ── 5. Port check ───────────────────────────────────────────────────────────
-  const portSpin = p.spinner();
-  portSpin.start("Checking default ports (11111 · 11112 · 11113)");
-
-  const [db11111, api11112, web11113] = await Promise.all([
-    isPortFree(11111),
-    isPortFree(11112),
-    isPortFree(11113),
-  ]);
-
-  const allFree = db11111 && api11112 && web11113;
-  portSpin.stop(allFree ? "All ports free" : "Some ports are in use — let's pick alternatives");
-
-  let dbPort = 11111;
-  let apiPort = 11112;
-  let webPort = 11113;
-
-  if (!db11111)  dbPort  = await resolvePort("Database", 11111);
-  if (!api11112) apiPort = await resolvePort("API",      11112);
-  if (!web11113) webPort = await resolvePort("Web UI",   11113);
-
-  // ── 6. Write files ──────────────────────────────────────────────────────────
-  const installDir = path.resolve(
-    process.cwd() === "/" ? os.homedir() : process.cwd(),
-    "kery",
-  );
-  fs.mkdirSync(installDir, { recursive: true });
-
-  const writeSpin = p.spinner();
-  writeSpin.start("Writing .env and docker-compose.yml");
-
-  fs.writeFileSync(
-    path.join(installDir, ".env"),
-    generateEnv(provider, apiKey, dbPort, apiPort, webPort),
-  );
-  fs.writeFileSync(
-    path.join(installDir, "docker-compose.yml"),
-    generateDockerCompose(provider, dbPort, apiPort, webPort),
-  );
-  // .gitignore to protect the API key
-  fs.writeFileSync(
-    path.join(installDir, ".gitignore"),
-    ".env\n",
-  );
-
-  writeSpin.stop(`Created ${pc.dim(installDir)}`);
-
-  // ── 7. MCP installation ─────────────────────────────────────────────────────
-  if (selectedIdes.length > 0) {
-    const mcpSpin = p.spinner();
-    mcpSpin.start("Installing MCP");
-
-    const results: { label: string; ok: boolean; manual: boolean }[] = [];
-
-    for (const ide of selectedIdes) {
-      switch (ide) {
-        case "cursor":
-          results.push({ label: "Cursor (~/.cursor/mcp.json)", ok: installCursorMcp(apiPort, webPort), manual: false });
-          break;
-        case "claude-code":
-          results.push({ label: "Claude Code (~/.claude.json)", ok: installClaudeCodeMcp(apiPort, webPort), manual: false });
-          break;
-        case "codex":
-          results.push({ label: "Codex CLI", ok: false, manual: true });
-          break;
-        case "other":
-          results.push({ label: "Other IDE", ok: false, manual: true });
-          break;
-      }
-    }
-
-    mcpSpin.stop("MCP step complete");
-
-    for (const r of results) {
-      if (r.manual) {
-        p.log.warn(`${r.label} — add manually (snippet below)`);
-      } else if (r.ok) {
-        p.log.success(`${r.label}`);
-      } else {
-        p.log.error(`${r.label} — failed, add manually (snippet below)`);
-      }
-    }
-
-    const needsManual = results.some((r) => r.manual || !r.ok);
-    if (needsManual) {
-      p.log.message(pc.dim("Add this block to your IDE's MCP config:"));
-      p.log.message(pc.dim(manualMcpSnippet(apiPort, webPort)));
-    }
-  }
-
-  // ── 8. Start Kery ───────────────────────────────────────────────────────────
-  const startSpin = p.spinner();
-  startSpin.start("Starting Kery with Docker (first pull may take ~1 min)");
+  printBanner();
 
   try {
-    execSync("docker compose up -d", { cwd: installDir, stdio: "pipe" });
-  } catch (err) {
-    startSpin.stop("docker compose up failed");
-    p.log.error("Could not start Kery. Check Docker logs:");
-    p.log.message(`  cd ${pc.dim(installDir)} && docker compose logs`);
-    p.outro("Setup incomplete.");
-    process.exit(1);
+    // ── 1. Provider ───────────────────────────────────────────────────────────
+    const { provider } = await enquirer.prompt<{ provider: Provider }>({
+      type: "select",
+      name: "provider",
+      message: "Which LLM provider?",
+      choices: (Object.entries(PROVIDER_CONFIG) as [Provider, ProviderConfig][]).map(
+        ([name, cfg]) => ({
+          name,
+          message: name === "openrouter" ? cfg.label + "  (recommended)" : cfg.label,
+        }),
+      ),
+    } as never);
+
+    const providerCfg = PROVIDER_CONFIG[provider];
+
+    // ── 2. API key ────────────────────────────────────────────────────────────
+    const { apiKey } = await enquirer.prompt<{ apiKey: string }>({
+      type: "password",
+      name: "apiKey",
+      message: `${providerCfg.label} API key`,
+      validate: (v: string) => v.trim() ? true : "API key is required",
+    } as never);
+
+    // ── 3. MCP install ────────────────────────────────────────────────────────
+    const { installMcp } = await enquirer.prompt<{ installMcp: boolean }>({
+      type: "confirm",
+      name: "installMcp",
+      message: "Install Kery MCP so your AI agents can run tests directly from your IDE?",
+      initial: true,
+    } as never);
+
+    let selectedIdes: IDE[] = [];
+    if (installMcp) {
+      const { ides } = await enquirer.prompt<{ ides: string[] }>({
+        type: "multiselect",
+        name: "ides",
+        message: "Which IDEs?  (space to select · enter to submit)",
+        choices: [
+          { name: "cursor",      message: "Cursor" },
+          { name: "claude-code", message: "Claude Code" },
+          { name: "codex",       message: "Codex CLI" },
+          { name: "other",       message: "Other — show me the config snippet" },
+        ],
+      } as never);
+      selectedIdes = ides as IDE[];
+    }
+
+    // ── 4. Port check ─────────────────────────────────────────────────────────
+    const [dash11111, db11112] = await Promise.all([
+      isPortFree(11111),
+      isPortFree(11112),
+    ]);
+
+    if (!dash11111 || !db11112) {
+      console.log(pc.yellow("  ⚠ Some default ports are in use — let's pick alternatives"));
+    }
+
+    let apiPort = 11111;
+    let dbPort  = 11112;
+
+    if (!dash11111) apiPort = await resolvePort("Dashboard", 11111);
+    if (!db11112)   dbPort  = await resolvePort("Database",  11112);
+
+    // ── 5. Build context ──────────────────────────────────────────────────────
+    const installDir = path.resolve(
+      process.cwd() === "/" ? os.homedir() : process.cwd(),
+      "kery",
+    );
+
+    const ctx: TaskCtx = {
+      installDir,
+      dbPort,
+      apiPort,
+      provider,
+      apiKey,
+      selectedIdes,
+      mcpResults: [],
+    };
+
+    console.log(); // spacer before task list
+
+    // ── 6. Task list ──────────────────────────────────────────────────────────
+    const tasks = new Listr<TaskCtx, "default", "verbose">([
+      {
+        title: "Check Docker",
+        task: (_, task) => {
+          const docker = checkDocker();
+          if (!docker.installed) {
+            throw new Error("Docker Desktop not found. Install at https://docs.docker.com/desktop/");
+          }
+          if (!docker.running) {
+            throw new Error("Docker is not running — start Docker Desktop first");
+          }
+          task.title = pc.yellow("Docker is ready");
+        },
+      },
+      {
+        title: "Check ports",
+        task: (taskCtx, task) => {
+          task.title = pc.yellow(`Ports assigned  db:${taskCtx.dbPort}  dashboard:${taskCtx.apiPort}`);
+        },
+      },
+      {
+        title: "Write config files",
+        task: (taskCtx, task) => {
+          fs.mkdirSync(taskCtx.installDir, { recursive: true });
+          fs.writeFileSync(
+            path.join(taskCtx.installDir, ".env"),
+            generateEnv(taskCtx.provider, taskCtx.apiKey, taskCtx.dbPort, taskCtx.apiPort),
+          );
+          fs.writeFileSync(
+            path.join(taskCtx.installDir, "docker-compose.yml"),
+            generateDockerCompose(taskCtx.provider, taskCtx.dbPort, taskCtx.apiPort),
+          );
+          fs.writeFileSync(path.join(taskCtx.installDir, ".gitignore"), ".env\n");
+          task.title = pc.yellow(verbose
+            ? `Config written → ${taskCtx.installDir}`
+            : "Config files written");
+        },
+      },
+      {
+        title: "Install MCP",
+        enabled: (taskCtx) => taskCtx.selectedIdes.length > 0,
+        task: (taskCtx, task) => {
+          for (const ide of taskCtx.selectedIdes) {
+            switch (ide) {
+              case "cursor":
+                taskCtx.mcpResults.push({
+                  label: "Cursor (~/.cursor/mcp.json)",
+                  ok: installCursorMcp(taskCtx.apiPort),
+                  manual: false,
+                });
+                break;
+              case "claude-code":
+                taskCtx.mcpResults.push({
+                  label: "Claude Code (~/.claude.json)",
+                  ok: installClaudeCodeMcp(taskCtx.apiPort),
+                  manual: false,
+                });
+                break;
+              case "codex":
+                taskCtx.mcpResults.push({ label: "Codex CLI", ok: false, manual: true });
+                break;
+              case "other":
+                taskCtx.mcpResults.push({ label: "Other IDE", ok: false, manual: true });
+                break;
+            }
+          }
+          const ok = taskCtx.mcpResults.filter((r) => r.ok).map((r) => r.label).join(", ");
+          task.title = pc.yellow(ok ? `MCP installed → ${ok}` : "MCP install (manual config needed)");
+        },
+      },
+      {
+        title: "Pull & start Kery  (first run: image pull may take 1–2 min)",
+        task: async (taskCtx, task) => {
+          const state: DockerPullState = { services: new Map() };
+          const dockerArgs = verbose
+            ? ["compose", "up", "-d"]
+            : ["compose", "up", "-d", "--progress=plain"];
+
+          await spawnProcess("docker", dockerArgs, taskCtx.installDir, {
+            verbose,
+            onLine: verbose
+              ? undefined
+              : (line) => {
+                  const status = parseDockerLine(line, state);
+                  if (status) task.output = status;
+                },
+          });
+          task.title = pc.yellow("Containers started");
+        },
+      },
+      {
+        title: "Wait for API to be healthy",
+        task: async (taskCtx, task) => {
+          const start = Date.now();
+          const tick = setInterval(() => {
+            const elapsed = Math.round((Date.now() - start) / 1000);
+            task.output = `${elapsed}s — waiting for API on :${taskCtx.apiPort}`;
+          }, 1000);
+
+          const healthy = await waitForPort(taskCtx.apiPort, 120_000);
+          clearInterval(tick);
+
+          if (healthy) {
+            task.title = pc.yellow("API is healthy");
+          } else {
+            task.title = pc.yellow("API health check timed out — services may still be starting");
+          }
+        },
+      },
+    ],
+    {
+      renderer: "default",
+      fallbackRenderer: "verbose",
+      fallbackRendererCondition: () => verbose,
+      rendererOptions: { collapseSubtasks: false },
+    },
+    );
+
+    try {
+      await tasks.run(ctx);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("\n" + pc.red("Setup failed: ") + msg);
+      if (!verbose) {
+        console.error(pc.dim("Run with --verbose for full docker output"));
+      }
+      process.exit(1);
+    }
+
+    // ── 7. Done ───────────────────────────────────────────────────────────────
+    console.log("\n" + buildSuccessBox(ctx.apiPort, ctx.installDir, ctx.mcpResults));
+
+    const { default: open } = await import("open");
+    await open(`http://localhost:${ctx.apiPort}`).catch(() => {
+      console.log(pc.dim(`  Could not open browser — visit http://localhost:${ctx.apiPort}`));
+    });
+
+  } catch {
+    console.log("\n" + pc.dim("  Cancelled."));
+    process.exit(0);
   }
-
-  startSpin.message("Waiting for services to be healthy...");
-  const healthy = await waitForPort(apiPort, 120_000);
-
-  if (!healthy) {
-    startSpin.stop("Services are taking longer than expected");
-    p.log.warn("Kery may still be starting up. Check progress with:");
-    p.log.message(`  cd ${pc.dim(installDir)} && docker compose logs -f`);
-  } else {
-    startSpin.stop("All services healthy");
-  }
-
-  // ── 9. Done ─────────────────────────────────────────────────────────────────
-  console.log();
-  p.log.success(`Web dashboard  ${pc.cyan(`http://localhost:${webPort}`)}`);
-  p.log.info(`API            ${pc.dim(`http://localhost:${apiPort}`)}`);
-  p.log.info(`Folder         ${pc.dim(installDir)}`);
-  p.log.info(`Stop           ${pc.dim(`cd ${installDir} && docker compose down`)}`);
-  console.log();
-
-  p.outro(pc.green("Opening Kery in your browser..."));
-
-  // Dynamic import keeps 'open' from slowing startup on older Node versions
-  const { default: open } = await import("open");
-  await open(`http://localhost:${webPort}`).catch(() => {
-    // Non-fatal — browser may not be available in CI-like environments
-    p.log.warn(`Could not open browser automatically. Visit: http://localhost:${webPort}`);
-  });
 }
 
 main().catch((err: unknown) => {

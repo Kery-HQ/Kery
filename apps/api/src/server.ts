@@ -1,5 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import staticPlugin from "@fastify/static";
+import { fileURLToPath } from "url";
+import path from "path";
+import fs from "fs";
 import { config } from "./config.js";
 import { initEngineConfig, updateEngineConfig } from "@kery/engine";
 import { initPool } from "@kery/db";
@@ -77,6 +81,20 @@ registerCrawlRoutes(app, storage);
 registerTestRoutes(app, storage);
 registerBugRoutes(app, storage);
 registerSettingsRoutes(app, storage);
+
+// Serve built frontend (production / Docker). In dev, the Vite dev server handles this.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const webDist = path.resolve(__dirname, "../../web/dist");
+if (fs.existsSync(webDist)) {
+  await app.register(staticPlugin, { root: webDist });
+  app.setNotFoundHandler((req, reply) => {
+    if (req.url.startsWith("/api/")) {
+      reply.code(404).send({ message: "Not found" });
+      return;
+    }
+    reply.sendFile("index.html");
+  });
+}
 
 // Start server
 try {
