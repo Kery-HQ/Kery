@@ -236,10 +236,31 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       netMonitor,
     );
 
-    // Skip all post-agent review work if the run was stopped by the user, or if this is
-    // an auth-test run (which only needs the navigator result, not bug-finding review).
     const wasStopped = agentResult.failReason === "Stopped by user";
     const isAuthTest = job.triggerRef === "auth_test";
+
+    // Hard stop — close browser immediately and return without any post-run work.
+    // No review agents, no bug triage, no memory curator, no saved bugs.
+    if (wasStopped) {
+      netMonitor.stop();
+      if (shSession) {
+        await finalizeStagehandRecording(shSession, videoTmpDir, job.runId).catch(() => {});
+      } else {
+        await browserContext?.close().catch(() => {});
+        await browser?.close().catch(() => {});
+      }
+      cleanupVideoTmpDir(videoTmpDir);
+      const stoppedCalls = collectedLLMCalls.map((c, i) => ({ ...c, seq: i + 1 }));
+      return {
+        status: "failed",
+        steps: agentResult.steps,
+        stepsDetail: agentResult.stepsDetail,
+        memoryLoaded: allMemory,
+        memoryProposed: 0,
+        bugsFound: [],
+        llmCalls: stoppedCalls,
+      };
+    }
 
     // Capture the final page state for holistic review (uses clean screenshot from agent
     // if available; raw fallback only goes to holistic, not filmstrip, since filmstrip
@@ -258,14 +279,14 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     } catch { /* page may be closed */ }
 
     netMonitor.stop();
-    const netSummary = wasStopped ? undefined : (netMonitor.formatForAgent() || undefined);
-    const netBugs = wasStopped ? [] : netMonitor.getBugs();
+    const netSummary = netMonitor.formatForAgent() || undefined;
+    const netBugs = netMonitor.getBugs();
 
     const filmstripCalls: LLMCallRecord[] = [];
     const navigatorStatus = agentResult.status === "passed" ? "passed" : "failed";
 
     emitActivity("Running post-run review agents...");
-    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = wasStopped || isAuthTest
+    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = isAuthTest
       ? [{ bugs: [] }, { bugs: [] }]
       : await Promise.all([
           runHolisticFlowReview(
@@ -312,7 +333,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
     const triageCalls: LLMCallRecord[] = [];
     let triageResult: Awaited<ReturnType<typeof runBugTriageAgent>>;
-    if (wasStopped) {
+    if (isAuthTest) {
       triageResult = { bugs: bugsFound, skippedCount: 0, llmCall: null };
     } else {
       const openProjectBugs = job.projectId
@@ -338,25 +359,29 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       );
     }
     const memoryCuratorCalls: LLMCallRecord[] = [];
+    let memoryProposed = 0;
 
-    if (agentResult.status === "passed" && allMemory.length > 0) {
-      await boostConfidence(storage, allMemory.map((e) => e.id), 3);
+    if (!isAuthTest) {
+      if (agentResult.status === "passed" && allMemory.length > 0) {
+        await boostConfidence(storage, allMemory.map((e) => e.id), 3);
+      }
+
+      emitActivity("Running memory curator...");
+      const curatorResult = await curateMemoryAfterRun(storage, {
+        intent: job.intent,
+        runStatus: agentResult.status === "passed" ? "passed" : "failed",
+        stepsDetail: agentResult.stepsDetail,
+        projectId: job.projectId,
+        destinationRoute,
+        projectMemory,
+        onLLMCall: (call) => {
+          memoryCuratorCalls.push(call);
+          job.onLLMCall?.(call);
+        },
+      });
+      memoryProposed = curatorResult.proposed;
+      emitActivity("Memory curation complete.");
     }
-
-    emitActivity("Running memory curator...");
-    const { proposed: memoryProposed } = await curateMemoryAfterRun(storage, {
-      intent: job.intent,
-      runStatus: agentResult.status === "passed" ? "passed" : "failed",
-      stepsDetail: agentResult.stepsDetail,
-      projectId: job.projectId,
-      destinationRoute,
-      projectMemory,
-      onLLMCall: (call) => {
-        memoryCuratorCalls.push(call);
-        job.onLLMCall?.(call);
-      },
-    });
-    emitActivity("Memory curation complete.");
 
     const mergedCalls = mergeLLMCalls(
       agentResult.llmCalls,
