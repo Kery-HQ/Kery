@@ -452,7 +452,7 @@ function executionUsesCoordinates(action: AgentAction): boolean {
 
 // ─── Stable snapshot (a11y + stagehand + DOM fallback) ───────────────────────
 
-async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
+async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSignal): Promise<{
   screenshot: Buffer;
   cleanScreenshot: Buffer;
   dom: string;
@@ -476,7 +476,7 @@ async function takeStableSnapshot(page: Page, stagehand?: any): Promise<{
   if (stagehand && isObserveCircuitOpen()) {
     logger.info({ url }, "Snapshot: Stagehand observe skipped (circuit open), will use a11y or DOM fallback");
   }
-  if (stagehand && !isObserveCircuitOpen()) {
+  if (stagehand && !isObserveCircuitOpen() && !signal?.aborted) {
     observedElements = await stagehandObserve(stagehand);
     if (hasSufficientObserve(observedElements)) {
       const dom = formatObserveForLLM(observedElements);
@@ -1803,7 +1803,7 @@ export async function runAgent(
         return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: "Stopped by user" };
       }
 
-      const snapshot = await takeStableSnapshot(page, stagehandPage);
+      const snapshot = await takeStableSnapshot(page, stagehandPage, stopController.signal);
       const { screenshot, cleanScreenshot, dom, url, title, pageText } = snapshot;
       currentElements = snapshot.a11yElements;
       currentObserved = snapshot.observedElements;
@@ -2139,7 +2139,7 @@ export async function runAgent(
         const shInstruction = (stagehandPage && currentObserved)
           ? actionToInstruction(action, currentObserved) : null;
 
-        if (shInstruction && stagehandPage) {
+        if (shInstruction && stagehandPage && !stopController.signal.aborted) {
           stepExecutionMethod = "stagehand";
           await stagehandAct(stagehandPage, shInstruction);
           await waitForPageStable(page, 4000);

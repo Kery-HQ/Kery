@@ -27,7 +27,7 @@ export function startRunStopPoller(redis: Redis, runId: string): { shouldStop: (
   };
 
   void tick();
-  const id = setInterval(() => void tick(), 350);
+  const id = setInterval(() => void tick(), 100);
 
   return {
     shouldStop: () => flag,
