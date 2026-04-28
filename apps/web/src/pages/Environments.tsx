@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Globe,
   Code,
@@ -13,6 +14,7 @@ import {
   Key,
   LockKey,
   Info,
+  Play,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -35,7 +37,7 @@ import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, createEnvironment, deleteEnvironment,
-  fetchAuth, saveAuth, updateEnvironment,
+  fetchAuth, saveAuth, updateEnvironment, runProjectTest,
 } from "@/projectApi";
 
 const AUTH_MODES: readonly {
@@ -277,6 +279,7 @@ type Env = { id: string; name: string; base_url: string; is_default: boolean };
 
 export const Environments: React.FC = () => {
   const { currentProjectId } = useProject();
+  const navigate = useNavigate();
 
   const [envs, setEnvs] = React.useState<Env[]>([]);
   const [expandedEnvId, setExpandedEnvId] = React.useState<string | null>(null);
@@ -298,6 +301,7 @@ export const Environments: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = React.useState<Env | null>(null);
 
   // Auth state
+  const [testingAuth, setTestingAuth] = React.useState(false);
   const [authMode, setAuthMode] = React.useState<string>("none");
   const [authJson, setAuthJson] = React.useState("{}");
   const [uiForm, setUiForm] = React.useState<UiAuthForm>(DEFAULT_UI_FORM);
@@ -440,6 +444,17 @@ export const Environments: React.FC = () => {
       setAuthStatus(e?.message?.includes("Save failed") ? "Save failed." : "Invalid JSON.");
     } finally {
       setAuthSaving(false);
+    }
+  }
+
+  async function handleTestAuth() {
+    if (!currentProjectId || !expandedEnvId) return;
+    setTestingAuth(true);
+    try {
+      const res = await runProjectTest(currentProjectId, expandedEnvId, "Test auth");
+      navigate(`/runs/${res.runId}`);
+    } finally {
+      setTestingAuth(false);
     }
   }
 
@@ -884,6 +899,18 @@ export const Environments: React.FC = () => {
                           >
                             {authMode === "none" ? "Save (no auth)" : "Save auth config"}
                           </Button>
+                          {authMode !== "none" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleTestAuth}
+                              loading={testingAuth}
+                              disabled={authSaving}
+                            >
+                              <Play className="h-3.5 w-3.5" />
+                              Test auth
+                            </Button>
+                          )}
                           {authStatus && (
                             <span className={cn(
                               "text-[12px]",
