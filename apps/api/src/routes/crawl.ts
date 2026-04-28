@@ -1,7 +1,9 @@
 import { FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import type { StorageAdapter } from "@kery/engine";
-import { executeCrawlRun, logger } from "@kery/engine";
+import { logger } from "@kery/engine";
+import type { Queue } from "bullmq";
+import type { CrawlJobData } from "../runQueue.js";
 import { ProjectIdParams, ProjectCrawlRunParams } from "./params.js";
 
 /** Runs left as `running` after crash / killed process are auto-failed so the UI can scan again. */
@@ -32,7 +34,7 @@ async function hasRunningCrawl(pool: Pool, projectId: string): Promise<boolean> 
   return !!rows[0];
 }
 
-export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapter) {
+export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapter, crawlQueue: Queue<CrawlJobData>) {
   const pool = storage.getPool() as Pool;
 
   app.post("/api/projects/:projectId/crawl", async (req, reply) => {
@@ -58,16 +60,10 @@ export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapte
     const environmentId = envs[0]?.id;
     if (!environmentId) { reply.code(400).send({ error: "No crawlable environment configured." }); return; }
 
-    reply.send({ status: "started", message: "Crawl started" });
+    await crawlQueue.add("crawl", { projectId, environmentId, triggerType: "manual" } satisfies CrawlJobData);
+    logger.info({ projectId, environmentId }, "Crawl job enqueued");
 
-    (async () => {
-      try {
-        const { result } = await executeCrawlRun(storage, projectId, environmentId, "manual");
-        logger.info({ projectId, destinations: result.destinationsBuilt }, "Crawl complete");
-      } catch (err) {
-        logger.error({ err: String(err), projectId }, "Background crawl failed");
-      }
-    })();
+    reply.send({ status: "started", message: "Crawl started" });
   });
 
   app.post("/api/projects/:projectId/scan", async (req, reply) => {
@@ -95,16 +91,10 @@ export function registerCrawlRoutes(app: FastifyInstance, storage: StorageAdapte
     const environmentId = envs[0]?.id;
     if (!environmentId) { reply.code(400).send({ error: "Add an environment first." }); return; }
 
-    reply.send({ status: "scanning", message: "Scanning your app..." });
+    await crawlQueue.add("crawl", { projectId, environmentId, triggerType: "manual" } satisfies CrawlJobData);
+    logger.info({ projectId, environmentId }, "Scan job enqueued");
 
-    (async () => {
-      try {
-        const { result } = await executeCrawlRun(storage, projectId, environmentId, "manual");
-        logger.info({ projectId, pages: result.destinationsBuilt }, "Scan complete");
-      } catch (err) {
-        logger.error({ err: String(err), projectId }, "Scan failed");
-      }
-    })();
+    reply.send({ status: "scanning", message: "Scanning your app..." });
   });
 
   app.get("/api/projects/:projectId/scan/status", async (req, reply) => {
