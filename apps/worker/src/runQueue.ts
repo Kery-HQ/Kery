@@ -3,7 +3,7 @@ import * as os from "os";
 import * as path from "path";
 import type { StorageAdapter } from "@kery/engine";
 import {
-  runOrchestratedJob, enrichBugsForRun, generateScriptWithLLM,
+  runOrchestratedJob, enrichBugsForRun,
   createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
   isStopRequested, updateEngineConfig, rewriteForDocker,
 } from "@kery/engine";
@@ -269,45 +269,7 @@ export function createRunWorker(
         await materializeRunScreenshotFiles(data.runId, result.llmCalls, result.bugsFound);
         const enrichedBugs = enrichBugsForRun(data.runId, completedAt, data.triggerRef, result.bugsFound);
 
-        const scriptLLMCalls: any[] = [];
-        const onScriptLLMCall = (call: any) => {
-          scriptLLMCalls.push(call);
-          void live.forwardLlmCall(call);
-        };
-
-        let destRegPlan: any[] | null = null;
-        if (data.destinationId && result.status === "passed" && result.stepsDetail?.length > 0) {
-          void live.forwardActivity({
-            kind: "observe",
-            text: "Generating destination replay script...",
-            at: Date.now(),
-          });
-          const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
-          if (plan.length > 0) destRegPlan = plan;
-          void live.forwardActivity({
-            kind: "observe",
-            text: "Destination replay script generation complete.",
-            at: Date.now(),
-          });
-        }
-
-        let testRegPlan: any[] | null = null;
-        if (data.testId && result.status === "passed" && result.stepsDetail?.length > 0) {
-          void live.forwardActivity({
-            kind: "observe",
-            text: "Generating saved-test replay script...",
-            at: Date.now(),
-          });
-          const { plan } = await generateScriptWithLLM(data.intent, result.stepsDetail, onScriptLLMCall);
-          if (plan.length > 0) testRegPlan = plan;
-          void live.forwardActivity({
-            kind: "observe",
-            text: "Saved-test replay script generation complete.",
-            at: Date.now(),
-          });
-        }
-
-        const allLLMCalls = [...result.llmCalls, ...scriptLLMCalls].map((c, i) => ({ ...c, seq: i + 1 }));
+        const allLLMCalls = result.llmCalls.map((c, i) => ({ ...c, seq: i + 1 }));
 
         const costUsd = allLLMCalls.reduce(
           (s: number, c: { costUsd?: number }) => s + (typeof c?.costUsd === "number" ? c.costUsd : 0),
@@ -340,17 +302,6 @@ export function createRunWorker(
             }
             await tx.updateDestinationHealth(data.destinationId, healthData);
 
-            if (destRegPlan) {
-              await tx.updateRegressionPlan("app_tree_destinations", data.destinationId, {
-                regression_plan: destRegPlan, plan_status: "ready", plan_success_count: 1,
-              });
-            }
-          }
-
-          if (data.testId && testRegPlan) {
-            await tx.updateSavedTest(data.testId, {
-              regression_plan: testRegPlan, plan_status: "ready", plan_success_count: 1,
-            });
           }
         });
 
