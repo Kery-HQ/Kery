@@ -43,6 +43,7 @@ export type RunJob = {
   maxSteps?: number;
   recordVideo?: boolean;
   videosDir?: string;
+  triggerRef?: string;
   onStep?: (step: RunStep) => void;
   onAgentPlan?: (items: AgentPlanItem[]) => void;
   onActivity?: (activity: { kind: "observe"; text: string; at: number }) => void;
@@ -235,8 +236,10 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       netMonitor,
     );
 
-    // Skip all post-agent review work if the run was stopped by the user — return immediately.
+    // Skip all post-agent review work if the run was stopped by the user, or if this is
+    // an auth-test run (which only needs the navigator result, not bug-finding review).
     const wasStopped = agentResult.failReason === "Stopped by user";
+    const isAuthTest = job.triggerRef === "auth_test";
 
     // Capture the final page state for holistic review (uses clean screenshot from agent
     // if available; raw fallback only goes to holistic, not filmstrip, since filmstrip
@@ -262,7 +265,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const navigatorStatus = agentResult.status === "passed" ? "passed" : "failed";
 
     emitActivity("Running post-run review agents...");
-    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = wasStopped
+    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = wasStopped || isAuthTest
       ? [{ bugs: [] }, { bugs: [] }]
       : await Promise.all([
           runHolisticFlowReview(

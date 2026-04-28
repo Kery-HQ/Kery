@@ -1992,18 +1992,22 @@ function BugCard({
   const reportedIso = dbBug?.reported_at ?? run.completed_at ?? run.started_at ?? "";
   const isExpanded = forceExpanded || expanded;
 
+  const [bugStatus, setBugStatus] = React.useState<string | undefined>(dbBug?.status);
+  const isOpen = !bugStatus || bugStatus === "open" || bugStatus === "in_progress";
+
   async function resolveIssue() {
-    if (!projectId || !dbBug?.id) return;
+    if (!projectId || !dbBug?.id || !isOpen) return;
     setBusy(true);
     try {
       await patchProjectBug(projectId, dbBug.id, { status: "resolved" });
+      setBugStatus("resolved");
     } finally {
       setBusy(false);
     }
   }
 
   async function ignoreIssue() {
-    if (!projectId || !dbBug?.id) return;
+    if (!projectId || !dbBug?.id || !isOpen) return;
     setBusy(true);
     try {
       await patchProjectBug(projectId, dbBug.id, { status: "wont_fix" });
@@ -2014,6 +2018,7 @@ function BugCard({
         content: `${bodyForMemory}\n\n${bug.url ? `URL: ${bug.url}` : ""}`.trim(),
         confidence: 100,
       });
+      setBugStatus("wont_fix");
     } finally {
       setBusy(false);
     }
@@ -2040,12 +2045,12 @@ function BugCard({
           <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
           <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{displayName}</span>
           <BugCategoryTag category={category} />
-          {dbBug?.status && (
+          {bugStatus && (
             <Badge
-              variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"}
+              variant={RUN_BUG_STATUS_BADGE[bugStatus] ?? "neutral"}
               className="capitalize flex-shrink-0 text-[10px]"
             >
-              {dbBug.status.replace("_", " ")}
+              {bugStatus.replace("_", " ")}
             </Badge>
           )}
           <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0 tabular-nums">
@@ -2127,7 +2132,7 @@ function BugCard({
               {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
             </span>
             <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {projectId && dbBug?.id && (
+              {projectId && dbBug?.id && isOpen && (
                 <>
                   <Button
                     size="sm"

@@ -137,6 +137,17 @@ export async function runProjectTest(projectId: string, environmentId: string, i
   });
 }
 
+export async function runAuthTest(projectId: string, environmentId: string) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/run`, {
+    method: "POST",
+    body: JSON.stringify({
+      environmentId,
+      authTest: true,
+      intent: "Log in using the configured credentials. Once you have successfully authenticated and can see the main app (not the login page), take a screenshot and stop immediately. Do not navigate to any other pages or perform any other actions. Your only goal is to confirm whether authentication succeeds.",
+    }),
+  });
+}
+
 export async function fetchRun(runId: string) {
   return apiFetch(`${API_BASE}/api/runs/${runId}`);
 }

@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Globe,
   Code,
@@ -13,6 +14,7 @@ import {
   Key,
   LockKey,
   Info,
+  Play,
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -28,14 +30,13 @@ import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, createEnvironment, deleteEnvironment,
-  fetchAuth, saveAuth, updateEnvironment,
+  fetchAuth, saveAuth, updateEnvironment, runAuthTest,
 } from "@/projectApi";
 
 const AUTH_MODES: readonly {
@@ -277,6 +278,7 @@ type Env = { id: string; name: string; base_url: string; is_default: boolean };
 
 export const Environments: React.FC = () => {
   const { currentProjectId } = useProject();
+  const navigate = useNavigate();
 
   const [envs, setEnvs] = React.useState<Env[]>([]);
   const [expandedEnvId, setExpandedEnvId] = React.useState<string | null>(null);
@@ -285,8 +287,6 @@ export const Environments: React.FC = () => {
   // Env edit state
   const [editName, setEditName] = React.useState("");
   const [editUrl, setEditUrl] = React.useState("");
-  const [savingEnv, setSavingEnv] = React.useState(false);
-  const [envStatus, setEnvStatus] = React.useState("");
 
   // Create form
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -302,8 +302,11 @@ export const Environments: React.FC = () => {
   const [authJson, setAuthJson] = React.useState("{}");
   const [uiForm, setUiForm] = React.useState<UiAuthForm>(DEFAULT_UI_FORM);
   const [tokenForm, setTokenForm] = React.useState<TokenProviderForm>(DEFAULT_TOKEN_FORM);
-  const [authSaving, setAuthSaving] = React.useState(false);
-  const [authStatus, setAuthStatus] = React.useState("");
+
+  // Unified footer state
+  const [saving, setSaving] = React.useState(false);
+  const [saveStatus, setSaveStatus] = React.useState("");
+  const [testingAuth, setTestingAuth] = React.useState(false);
 
   React.useEffect(() => {
     if (!currentProjectId) return;
@@ -330,16 +333,14 @@ export const Environments: React.FC = () => {
     setExpandedEnvId(env.id);
     setEditName(env.name);
     setEditUrl(env.base_url);
-    setEnvStatus("");
-    setAuthStatus("");
+    setSaveStatus("");
     if (!currentProjectId) return;
     try {
       const { auth } = await fetchAuth(currentProjectId, env.id);
       if (auth) {
         const cfg = auth.config_json || {};
-        // Map tokenProvider mode to clerk/supabase UI mode
         if (auth.mode === "tokenProvider" && cfg.tokenProvider?.type) {
-          setAuthMode(cfg.tokenProvider.type); // "clerk" or "supabase"
+          setAuthMode(cfg.tokenProvider.type);
         } else {
           setAuthMode(auth.mode || "none");
         }
@@ -373,12 +374,11 @@ export const Environments: React.FC = () => {
       setExpandedEnvId(res.environment.id);
       setEditName(res.environment.name);
       setEditUrl(res.environment.base_url);
-      setEnvStatus("");
+      setSaveStatus("");
       setAuthMode("none");
       setAuthJson("{}");
       setUiForm(DEFAULT_UI_FORM);
       setTokenForm(DEFAULT_TOKEN_FORM);
-      setAuthStatus("");
       setCreateOpen(false);
       setNewName("");
       setNewUrl("");
@@ -395,33 +395,18 @@ export const Environments: React.FC = () => {
     setDeleteTarget(null);
   }
 
-  async function handleSaveEnv() {
+  async function handleSave() {
     if (!currentProjectId || !expandedEnvId) return;
     const name = editName.trim();
     const url = editUrl.trim();
     if (!name || !url) return;
-    setSavingEnv(true);
-    setEnvStatus("");
+    setSaving(true);
+    setSaveStatus("");
     try {
-      const res = await updateEnvironment(currentProjectId, expandedEnvId, {
-        name,
-        baseUrl: url,
-      });
+      const res = await updateEnvironment(currentProjectId, expandedEnvId, { name, baseUrl: url });
       const updated: Env = res.environment;
       setEnvs((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-      setEnvStatus("Saved.");
-    } catch {
-      setEnvStatus("Save failed.");
-    } finally {
-      setSavingEnv(false);
-    }
-  }
 
-  async function handleSaveAuth() {
-    if (!currentProjectId || !expandedEnvId) return;
-    setAuthSaving(true);
-    setAuthStatus("");
-    try {
       let config: Record<string, any>;
       let mode = authMode;
       if (authMode === "none") {
@@ -435,11 +420,22 @@ export const Environments: React.FC = () => {
         config = JSON.parse(authJson);
       }
       await saveAuth(currentProjectId, expandedEnvId, mode, config);
-      setAuthStatus("Saved.");
+      setSaveStatus("Saved.");
     } catch (e: any) {
-      setAuthStatus(e?.message?.includes("Save failed") ? "Save failed." : "Invalid JSON.");
+      setSaveStatus(e?.message?.includes("Save failed") ? "Save failed." : "Save failed.");
     } finally {
-      setAuthSaving(false);
+      setSaving(false);
+    }
+  }
+
+  async function handleTestAuth() {
+    if (!currentProjectId || !expandedEnvId) return;
+    setTestingAuth(true);
+    try {
+      const res = await runAuthTest(currentProjectId, expandedEnvId);
+      navigate(`/runs/${res.runId}`);
+    } finally {
+      setTestingAuth(false);
     }
   }
 
@@ -643,27 +639,7 @@ export const Environments: React.FC = () => {
                             className="font-mono"
                           />
                         </div>
-                        <div className="flex items-center gap-3 pt-1">
-                          <Button
-                            size="sm"
-                            onClick={handleSaveEnv}
-                            loading={savingEnv}
-                            disabled={!editName.trim() || !editUrl.trim()}
-                          >
-                            Save environment
-                          </Button>
-                          {envStatus && (
-                            <span className={cn(
-                              "text-[12px]",
-                              envStatus === "Saved." ? "text-status-pass" : "text-destructive",
-                            )}>
-                              {envStatus}
-                            </span>
-                          )}
-                        </div>
                       </section>
-
-                      <Separator />
 
                       {/* Auth configuration */}
                       <section className="space-y-4">
@@ -876,24 +852,39 @@ export const Environments: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-3 pt-1">
-                          <Button
-                            size="sm"
-                            onClick={handleSaveAuth}
-                            loading={authSaving}
-                          >
-                            {authMode === "none" ? "Save (no auth)" : "Save auth config"}
-                          </Button>
-                          {authStatus && (
-                            <span className={cn(
-                              "text-[12px]",
-                              authStatus === "Saved." ? "text-status-pass" : "text-destructive",
-                            )}>
-                              {authStatus}
-                            </span>
-                          )}
-                        </div>
                       </section>
+                    </div>
+
+                    {/* Sticky footer */}
+                    <div className="flex-shrink-0 border-t border-border px-6 py-3 flex items-center gap-3 bg-surface-2 dark:bg-surface-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSave}
+                        loading={saving}
+                        disabled={!editName.trim() || !editUrl.trim()}
+                      >
+                        Save config
+                      </Button>
+                      {authMode !== "none" && (
+                        <Button
+                          size="sm"
+                          onClick={handleTestAuth}
+                          loading={testingAuth}
+                          disabled={saving}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          Test auth
+                        </Button>
+                      )}
+                      {saveStatus && (
+                        <span className={cn(
+                          "text-[12px]",
+                          saveStatus === "Saved." ? "text-status-pass" : "text-destructive",
+                        )}>
+                          {saveStatus}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ) : (
