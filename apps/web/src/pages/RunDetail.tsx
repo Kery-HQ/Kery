@@ -1400,7 +1400,9 @@ function OverviewTab({
 
   const showLive = run.status === "running" && !!liveScreenshot;
   const showLiveDisk = run.status === "running" && !liveScreenshot && !!livePreviewDiskUrl;
-  const isRunStarting = run.status === "running" && !liveScreenshot && !showLiveDisk;
+  // Don't show the "launching" spinner if we already have an LLM screenshot to display —
+  // snapshotSrc falls back to the latest navigator vision call (same source as the gallery).
+  const isRunStarting = run.status === "running" && !liveScreenshot && !showLiveDisk && !snapshotSrc;
   const showRecording = !showLive && !showLiveDisk && !!run.video_url;
   const previewEmpty = !isRunStarting && !showLive && !showLiveDisk && !showRecording && !snapshotSrc;
   const [liveFrameOpenAnim, setLiveFrameOpenAnim] = React.useState(false);
@@ -1605,7 +1607,7 @@ function OverviewTab({
         </BrowserPreviewStage>
 
         {/* Live indicator — small pill in video corner */}
-        {(showLive || showLiveDisk) && (
+        {(showLive || showLiveDisk || (run.status === "running" && !!snapshotSrc)) && (
           <div className="pointer-events-none absolute left-5 top-5 z-20 flex items-center gap-1.5 rounded-full border border-border/50 bg-card/90 px-2 py-1 backdrop-blur-[4px]">
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
