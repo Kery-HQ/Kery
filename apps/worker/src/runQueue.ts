@@ -231,6 +231,7 @@ export function createRunWorker(
           maxSteps: data.maxSteps,
           recordVideo: data.recordVideo,
           videosDir: VIDEOS_DIR,
+          triggerRef: data.triggerRef,
           onStep: (step: any) => {
             void live.forwardStep(step);
             const at = typeof step?.at === "number" ? step.at : Date.now();
