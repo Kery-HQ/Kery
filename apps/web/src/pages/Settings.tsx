@@ -618,13 +618,6 @@ const MODEL_CONFIG: {
     Icon: Eye,
     options: REASONING_VISION_OPTIONS,
   },
-  {
-    key: "stagehandModel",
-    label: "Support system (element finder)",
-    hint: "Interactive element detection and targeting reliability",
-    Icon: CursorClick,
-    options: STAGEHAND_OPTIONS,
-  },
 ];
 
 function customModelPlaceholder(provider: CustomProviderId): string {
