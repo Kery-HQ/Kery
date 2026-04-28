@@ -912,6 +912,7 @@ export const RunDetail: React.FC = () => {
             <OverviewTab
               run={run}
               steps={steps}
+              llmCalls={llmCalls}
               bugsFound={bugsFound}
               liveScreenshot={liveScreenshot}
               livePreviewDiskUrl={livePreviewDiskUrl}
@@ -1330,10 +1331,11 @@ function BrowserPreviewStage({
 }
 
 function OverviewTab({
-  run, steps, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed,
+  run, steps, llmCalls, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed,
 }: {
   run: Run;
   steps: RunStep[];
+  llmCalls: LLMCallRecord[];
   bugsFound: RunStep[];
   liveScreenshot: string | null;
   /** Throttled on-disk live frame from Redis rehydrate (`/api/bugs/:runId/live-preview.jpg?t=…`). */
@@ -1368,17 +1370,33 @@ function OverviewTab({
   }, [agentPlan]);
 
   const snapshotSrc = React.useMemo(() => {
+    // Try the last step that has a screenshot reference first.
     const lastWithScreenshot = [...steps]
       .reverse()
       .find((s) =>
         s.screenshotPath || s.screenshot_path || s.screenshotBase64 || s.screenshot_base64 || s.screenshot,
       );
-    if (!lastWithScreenshot) return null;
-    const fileUrl = runScreenshotFileUrl(run.id, lastWithScreenshot.screenshotPath ?? lastWithScreenshot.screenshot_path);
-    const legacyRef =
-      lastWithScreenshot.screenshotBase64 ?? lastWithScreenshot.screenshot_base64 ?? lastWithScreenshot.screenshot;
-    return fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined) ?? null;
-  }, [steps, run.id]);
+    if (lastWithScreenshot) {
+      const fileUrl = runScreenshotFileUrl(run.id, lastWithScreenshot.screenshotPath ?? lastWithScreenshot.screenshot_path);
+      const legacyRef =
+        lastWithScreenshot.screenshotBase64 ?? lastWithScreenshot.screenshot_base64 ?? lastWithScreenshot.screenshot;
+      const src = fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined) ?? null;
+      if (src) return src;
+    }
+    // Fall back to the last navigator LLM call that has a vision screenshot — this matches
+    // what the Gallery tab shows and ensures the overview is in parity with it.
+    const navCallsWithImages = llmCalls.filter(
+      (c) =>
+        (c.agent === "navigator" || c.agent == null) &&
+        c.hasVision &&
+        (c.imagePaths?.length || c.imageBase64s?.length || c.imagePath || c.imageBase64),
+    );
+    if (navCallsWithImages.length > 0) {
+      const last = navCallsWithImages[navCallsWithImages.length - 1];
+      return llmCallImageSrcByIndex(last, run.id, 0) ?? null;
+    }
+    return null;
+  }, [steps, llmCalls, run.id]);
 
   const showLive = run.status === "running" && !!liveScreenshot;
   const showLiveDisk = run.status === "running" && !liveScreenshot && !!livePreviewDiskUrl;
