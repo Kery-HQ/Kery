@@ -328,7 +328,11 @@ export function registerRunRoutes(
   app.get("/api/bugs/:runId/:filename", async (req, reply) => {
     const { runId, filename } = RunFilenameParams.parse(req.params);
     const safe = path.basename(filename);
-    const filePath = path.join(SCREENSHOTS_DIR, runId, safe);
+    // New location: screenshots/bugs/{filename} (independent of run)
+    // Old location: screenshots/{runId}/{filename} (pre-migration bugs)
+    const newPath = path.join(SCREENSHOTS_DIR, "bugs", safe);
+    const oldPath = path.join(SCREENSHOTS_DIR, runId, safe);
+    const filePath = fs.existsSync(newPath) ? newPath : oldPath;
     if (!fs.existsSync(filePath)) {
       reply.code(404).send({ error: "screenshot not found" });
       return;
