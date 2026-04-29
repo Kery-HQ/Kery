@@ -15,12 +15,11 @@ const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), 
 
 function unlinkBugScreenshotFile(runId: string, screenshotPath: string | null) {
   if (!screenshotPath) return;
-  const fp = path.join(SCREENSHOTS_DIR, runId, path.basename(screenshotPath));
-  try {
-    fs.unlinkSync(fp);
-  } catch {
-    /* missing file is fine */
-  }
+  const basename = path.basename(screenshotPath);
+  // New location (independent of run)
+  try { fs.unlinkSync(path.join(SCREENSHOTS_DIR, "bugs", basename)); } catch { /* missing is fine */ }
+  // Old location (backward compat — screenshots not yet migrated)
+  try { fs.unlinkSync(path.join(SCREENSHOTS_DIR, runId, basename)); } catch { /* missing is fine */ }
 }
 
 export function registerBugRoutes(app: FastifyInstance, storage: StorageAdapter) {

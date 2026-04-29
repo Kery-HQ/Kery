@@ -109,6 +109,7 @@ export class PostgresAdapter implements StorageAdapter {
   async persistBugsFromRun(projectId: string, runId: string, runLabel: string | null, reportedAt: string, environmentId: string | null, environmentName: string | null, enrichedBugs: any[]) {
     let inserted = 0;
     let skipped = 0;
+    const insertedBugs: Array<{ id: string; screenshotPath: string | null }> = [];
     for (const bug of enrichedBugs) {
       // Simple dedup: same name + url + category within project
       const { rows: existing } = await this.db.query(
@@ -117,13 +118,18 @@ export class PostgresAdapter implements StorageAdapter {
       );
       if (existing.length > 0) { skipped++; continue; }
 
-      await this.db.query(
-        `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, url, run_label, reported_at, environment, step_index, screenshot_path, region) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      const { rows: [newBug] } = await this.db.query(
+        `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, url, run_label, reported_at, environment, step_index, screenshot_path, region) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
         [projectId, runId, environmentId, bug.name, bug.description, bug.category, bug.severity, bug.status ?? "open", bug.url, runLabel, reportedAt, environmentName, bug.index ?? null, bug.screenshotPath ?? null, bug.region ?? null],
       );
+      insertedBugs.push({ id: newBug.id, screenshotPath: bug.screenshotPath ?? null });
       inserted++;
     }
-    return { inserted, skipped };
+    return { inserted, skipped, insertedBugs };
+  }
+
+  async updateBugScreenshotPath(bugId: string, newPath: string): Promise<void> {
+    await this.db.query(`UPDATE bugs SET screenshot_path = $1 WHERE id = $2`, [newPath, bugId]);
   }
 
   async listBugs(projectId: string) {
@@ -149,7 +155,12 @@ export class PostgresAdapter implements StorageAdapter {
     );
     const r = rows[0];
     if (!r?.screenshot_path) return null;
-    const fp = path.join(SCREENSHOTS_DIR, r.run_id, path.basename(r.screenshot_path));
+    const basename = path.basename(r.screenshot_path);
+    // New location: independent of run
+    const newFp = path.join(SCREENSHOTS_DIR, "bugs", basename);
+    // Old location: inside run directory (backward compat)
+    const oldFp = path.join(SCREENSHOTS_DIR, r.run_id, basename);
+    const fp = fs.existsSync(newFp) ? newFp : oldFp;
     try {
       if (!fs.existsSync(fp)) return null;
       return fs.readFileSync(fp).toString("base64");

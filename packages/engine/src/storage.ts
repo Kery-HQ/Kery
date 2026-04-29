@@ -21,7 +21,8 @@ export interface StorageAdapter {
     environmentId: string | null,
     environmentName: string | null,
     enrichedBugs: Bug[],
-  ): Promise<{ inserted: number; skipped: number }>;
+  ): Promise<{ inserted: number; skipped: number; insertedBugs: Array<{ id: string; screenshotPath: string | null }> }>;
+  updateBugScreenshotPath(bugId: string, newPath: string): Promise<void>;
   listBugs(projectId: string): Promise<Bug[]>;
   getBugScreenshot(bugId: string): Promise<string | null>;
 

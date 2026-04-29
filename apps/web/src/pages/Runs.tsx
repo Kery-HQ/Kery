@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Pulse, Play, ArrowsClockwise, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { Pulse, Play, ArrowsClockwise, CaretDown, CaretRight, Trash } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -10,11 +10,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { statusVariant, duration, relativeTime, formatRunCost, runListLabel } from "@/lib/formatters";
 import { runScreenshotFileUrl } from "@/lib/apiAssets";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
-import { fetchProjectRuns, fetchRun, stopRun } from "@/projectApi";
+import { fetchProjectRuns, fetchRun, stopRun, deleteAllRuns } from "@/projectApi";
 
 const STATUS_FILTERS = ["all", "running", "queued", "passed", "failed", "stopped"] as const;
 const PAGE_SIZE = 25;
@@ -47,6 +48,8 @@ export const Runs: React.FC = () => {
   const activeLoadedRef = React.useRef(false);
   const [liveExpanded, setLiveExpanded] = React.useState(false);
   const [stoppingRunId, setStoppingRunId] = React.useState<string | null>(null);
+  const [deleteAllOpen, setDeleteAllOpen] = React.useState(false);
+  const [deletingAll, setDeletingAll] = React.useState(false);
 
   React.useEffect(() => {
     activeRunsRef.current = activeRuns;
@@ -54,6 +57,21 @@ export const Runs: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = search.length > 0 || status !== "all";
+
+  const handleDeleteAll = async () => {
+    if (!currentProjectId) return;
+    setDeletingAll(true);
+    try {
+      await deleteAllRuns(currentProjectId);
+      setDeleteAllOpen(false);
+      setPage(1);
+      await load();
+    } catch {
+      // no-op
+    } finally {
+      setDeletingAll(false);
+    }
+  };
 
   const load = React.useCallback(async () => {
     if (!currentProjectId) return;
@@ -190,7 +208,38 @@ export const Runs: React.FC = () => {
           <ArrowsClockwise className="h-3 w-3" />
           Refresh
         </Button>
+        {!loading && total > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-[12px] text-destructive hover:text-destructive"
+            onClick={() => setDeleteAllOpen(true)}
+          >
+            <Trash className="h-3 w-3" />
+            Delete all
+          </Button>
+        )}
       </PageHeader>
+
+      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete all runs?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all {total} runs for this project, including their
+              recordings and screenshots. Issues found by these runs will not be affected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" size="sm" disabled={deletingAll}>Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" size="sm" loading={deletingAll} onClick={handleDeleteAll}>
+              Delete all runs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex-1 overflow-y-auto px-6 py-6 animate-fade-in">
         {loading ? (

@@ -15,6 +15,17 @@ import { RunIdParams, RunFilenameParams } from "./params.js";
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
 
+function deleteRunFiles(runId: string) {
+  const videoPath = path.join(VIDEOS_DIR, `${runId}.webm`);
+  try { if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch (err) {
+    logger.warn({ err: String(err), runId }, "Failed to delete video file");
+  }
+  const screenshotDir = path.join(SCREENSHOTS_DIR, runId);
+  try { if (fs.existsSync(screenshotDir)) fs.rmSync(screenshotDir, { recursive: true, force: true }); } catch (err) {
+    logger.warn({ err: String(err), runId }, "Failed to delete screenshot directory");
+  }
+}
+
 // Idempotency dedup: key -> { runId, expiresAt }
 const idempotencyCache = new Map<string, { runId: string; expiresAt: number }>();
 const IDEMPOTENCY_TTL_MS = 30_000; // 30 seconds
@@ -289,28 +300,28 @@ export function registerRunRoutes(
     return reply.send(fs.createReadStream(videoPath));
   });
 
-  // Delete a run and its associated video/screenshot files
+  // Delete a run and its associated video/screenshot files (bugs/issues are preserved)
   app.delete("/api/runs/:runId", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
     const run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
-
-    // Delete video file
-    const videoPath = path.join(VIDEOS_DIR, `${runId}.webm`);
-    try { if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath); } catch (err) {
-      logger.warn({ err: String(err), runId }, "Failed to delete video file");
-    }
-
-    // Delete screenshot directory
-    const screenshotDir = path.join(SCREENSHOTS_DIR, runId);
-    try { if (fs.existsSync(screenshotDir)) fs.rmSync(screenshotDir, { recursive: true, force: true }); } catch (err) {
-      logger.warn({ err: String(err), runId }, "Failed to delete screenshot directory");
-    }
-
-    // Delete run from DB
-    await pool.query("DELETE FROM bugs WHERE run_id = $1", [runId]);
+    await deleteRunFiles(runId);
     await pool.query("DELETE FROM test_runs WHERE id = $1", [runId]);
     reply.send({ ok: true });
+  });
+
+  // Delete all runs for a project (bugs/issues are preserved)
+  app.delete("/api/projects/:projectId/runs", async (req, reply) => {
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
+    const { rows } = await pool.query<{ id: string }>(
+      "SELECT id FROM test_runs WHERE project_id = $1",
+      [projectId],
+    );
+    for (const { id } of rows) {
+      await deleteRunFiles(id);
+    }
+    await pool.query("DELETE FROM test_runs WHERE project_id = $1", [projectId]);
+    reply.send({ ok: true, deleted: rows.length });
   });
 
   // Serve bug screenshot (buffer, not stream + Content-Length — Fastify can emit an empty body otherwise)

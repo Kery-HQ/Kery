@@ -161,6 +161,10 @@ export async function stopRun(runId: string) {
   return apiFetch(`${API_BASE}/api/runs/${runId}/stop`, { method: "POST", body: JSON.stringify({}) });
 }
 
+export async function deleteAllRuns(projectId: string) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/runs`, { method: "DELETE" });
+}
+
 export async function fetchRunBugs(runId: string) {
   return apiFetch(`${API_BASE}/api/runs/${runId}/bugs`);
 }

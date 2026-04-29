@@ -16,6 +16,7 @@ import * as fs from "fs";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
+const BUGS_SCREENSHOTS_DIR = path.join(SCREENSHOTS_DIR, "bugs");
 
 export const RUN_QUEUE_NAME = "kery-runs";
 
@@ -288,7 +289,8 @@ export function createRunWorker(
             cost_usd: costUsd,
           });
 
-          await tx.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);
+          const persistResult = await tx.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);
+          await moveBugScreenshotsToOwnDir(data.runId, persistResult.insertedBugs, storage);
 
           if (data.destinationId) {
             await tx.upsertRunCoverage(data.runId, data.destinationId, enrichedBugs.length);
@@ -354,6 +356,28 @@ export function createRunWorker(
   });
 
   return worker;
+}
+
+/** Move bug screenshot files out of the run directory into their own bug-scoped location. */
+async function moveBugScreenshotsToOwnDir(
+  runId: string,
+  insertedBugs: Array<{ id: string; screenshotPath: string | null }>,
+  storage: StorageAdapter,
+): Promise<void> {
+  if (insertedBugs.length === 0) return;
+  try { fs.mkdirSync(BUGS_SCREENSHOTS_DIR, { recursive: true }); } catch { /* exists */ }
+  for (const { id, screenshotPath } of insertedBugs) {
+    if (!screenshotPath) continue;
+    const oldPath = path.join(SCREENSHOTS_DIR, runId, path.basename(screenshotPath));
+    const newFilename = `${id}.jpg`;
+    const newPath = path.join(BUGS_SCREENSHOTS_DIR, newFilename);
+    try {
+      fs.renameSync(oldPath, newPath);
+      await storage.updateBugScreenshotPath(id, newFilename);
+    } catch (err) {
+      logger.warn({ runId, bugId: id, err: String(err) }, "Failed to move bug screenshot");
+    }
+  }
 }
 
 /** Write vision/bug JPEGs to SCREENSHOTS_DIR; replace inline base64 with filename-only refs. */
