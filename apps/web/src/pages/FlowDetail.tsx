@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/empty-state";
 import { RunList } from "@/components/RunList";
 import { useProject } from "@/lib/projectContext";
 import { relativeTime } from "@/lib/formatters";
+import { toast } from "sonner";
 import {
   fetchTests,
   fetchEnvironments,
@@ -146,8 +147,8 @@ export function FlowDetail() {
     if (!test || !defaultEnvId) return;
     setRunning(true);
     try {
-      const res = await runProjectTest(test.project_id, defaultEnvId, "", test.id);
-      navigate(`/runs/${res.runId}`);
+      await runProjectTest(test.project_id, defaultEnvId, "", test.id);
+      toast.success("Run queued");
     } catch {}
     setRunning(false);
   }

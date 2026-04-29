@@ -1943,6 +1943,7 @@ function resolveRunDbBug(
     step_index?: number | null;
     status?: string;
     reported_at?: string;
+    screenshot_path?: string | null;
   }[],
 ) {
   const nameNorm = (bug.name ?? "").trim();
@@ -1976,6 +1977,7 @@ function BugCard({
     step_index?: number | null;
     status?: string;
     reported_at?: string;
+    screenshot_path?: string | null;
   }[];
   runId: string;
   projectId?: string;
@@ -2091,7 +2093,9 @@ function BugCard({
           ) : null}
 
           {(() => {
-            const fileUrl = runScreenshotFileUrl(runId, bug.screenshotPath ?? bug.screenshot_path);
+            // Prefer dbBug.screenshot_path (UUID-named, from bugs table) over bugs_json path (stale bug-N.jpg)
+            const screenshotPath = dbBug?.screenshot_path ?? bug.screenshotPath ?? bug.screenshot_path;
+            const fileUrl = runScreenshotFileUrl(runId, screenshotPath);
             const legacyRef =
               bug.screenshotBase64 ?? bug.screenshot_base64 ?? bug.screenshot;
             const src = fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined);

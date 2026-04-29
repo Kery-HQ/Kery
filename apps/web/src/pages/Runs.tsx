@@ -16,7 +16,6 @@ import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import { fetchProjectRuns, fetchRun, stopRun, deleteAllRuns } from "@/projectApi";
-import { DEMO_MODE } from "@/lib/demo";
 
 const STATUS_FILTERS = ["all", "running", "queued", "passed", "failed", "stopped"] as const;
 
@@ -352,10 +351,7 @@ export const Runs: React.FC = () => {
                               key={run.id}
                               type="button"
                               onClick={() => navigate(`/runs/${run.id}`)}
-                              className={cn(
-                                "rounded-lg border border-border bg-card hover:bg-accent/20 transition-colors overflow-hidden text-left",
-                                DEMO_MODE && "demo-running-tile glow-pulse",
-                              )}
+                              className="rounded-lg border border-border bg-card hover:bg-accent/20 transition-colors overflow-hidden text-left"
                             >
                               <div className="aspect-[16/9] bg-black relative">
                                 {run.livePreviewUrl ? (

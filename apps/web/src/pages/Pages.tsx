@@ -297,12 +297,12 @@ export function Pages() {
     setRunBusyId(page.id);
     try {
       await runDestination(pid, defaultEnvId, page.id);
-      navigate("/runs");
+      toast.success("Run queued");
     } catch {
       toast.error("Could not start test run");
     }
     setRunBusyId(null);
-  }, [pid, defaultEnvId, navigate]);
+  }, [pid, defaultEnvId]);
 
   const handleTestAll = React.useCallback(async () => {
     if (!pid || !defaultEnvId) return;
@@ -313,12 +313,12 @@ export function Pages() {
       for (const p of targets) {
         await runDestination(pid, defaultEnvId, p.id);
       }
-      navigate("/runs");
+      toast.success(`${targets.length} run${targets.length === 1 ? "" : "s"} queued`);
     } catch {
       toast.error("Could not queue all tests");
     }
     setTestAllBusy(false);
-  }, [pid, defaultEnvId, pages, navigate]);
+  }, [pid, defaultEnvId, pages]);
 
   const confirmDeletePage = React.useCallback(async () => {
     if (!pid || !deleteTarget) return;
@@ -451,10 +451,9 @@ export function Pages() {
 
           {/* ── Main content ────────────────────────────────────────── */}
           <main className="space-y-3">
-            {scanActive && bannerRun && (
+            {(scanActive && bannerRun) && (
               <ScanBanner run={bannerRun} live={scanActive} />
             )}
-
             {scanActive && canForceReplaceScan && (
               <div className="liquid-glass rounded-xl px-3 py-2.5">
                 <p className="text-[11px] text-muted-foreground">

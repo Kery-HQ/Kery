@@ -1,5 +1,4 @@
 import { Queue, Worker, Job } from "bullmq";
-import * as os from "os";
 import * as path from "path";
 import type { StorageAdapter } from "@kery/engine";
 import {
@@ -49,12 +48,20 @@ export function createRunQueue(redisUrl: string) {
   return { queue, connection };
 }
 
-/** Auto-detect concurrency: ~1 browser per 512MB available memory, min 1, max 10 */
-function detectConcurrency(): number {
-  const freeMem = os.freemem();
-  const concurrency = Math.max(1, Math.min(10, Math.floor(freeMem / (512 * 1024 * 1024))));
-  logger.info({ freeMem, concurrency }, "Auto-detected run queue concurrency");
-  return concurrency;
+const DEFAULT_CONCURRENCY = 3;
+const MAX_CONCURRENCY_LIMIT = 10;
+
+/** Read concurrency from DB settings, falling back to 3 if not set. */
+async function readConcurrencyFromDb(storage: StorageAdapter): Promise<number> {
+  try {
+    const all = await storage.getSettings();
+    const raw = all["platform.maxConcurrency"];
+    if (raw) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= MAX_CONCURRENCY_LIMIT) return n;
+    }
+  } catch {}
+  return DEFAULT_CONCURRENCY;
 }
 
 /** Refresh LLM/API-key config from DB before each run (DB overrides env defaults). */
@@ -148,13 +155,14 @@ async function refreshEngineConfigFromDb(storage: StorageAdapter): Promise<void>
   }
 }
 
-export function createRunWorker(
+export async function createRunWorker(
   connection: { host: string; port: number; password?: string },
   storage: StorageAdapter,
   redis: Redis,
   redisPub: Redis,
 ) {
-  const concurrency = detectConcurrency();
+  const concurrency = await readConcurrencyFromDb(storage);
+  logger.info({ concurrency }, "Run queue concurrency");
 
   const worker = new Worker<RunJobData>(
     RUN_QUEUE_NAME,
@@ -277,6 +285,7 @@ export function createRunWorker(
           0,
         );
 
+        let insertedBugs: Array<{ id: string; screenshotPath: string | null }> = [];
         await storage.withTransaction(async (tx) => {
           await tx.updateTestRun(data.runId, {
             status: result.status, summary: null,
@@ -290,7 +299,7 @@ export function createRunWorker(
           });
 
           const persistResult = await tx.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);
-          await moveBugScreenshotsToOwnDir(data.runId, persistResult.insertedBugs, storage);
+          insertedBugs = persistResult.insertedBugs;
 
           if (data.destinationId) {
             await tx.upsertRunCoverage(data.runId, data.destinationId, enrichedBugs.length);
@@ -306,6 +315,9 @@ export function createRunWorker(
 
           }
         });
+
+        // Move bug screenshots after transaction commits so updateBugScreenshotPath can see the inserted rows
+        await moveBugScreenshotsToOwnDir(data.runId, insertedBugs, storage);
 
         const completedRun = await storage.getTestRun(data.runId);
         await live.publishDone(completedRun ?? { runId: data.runId, status: result.status, summary: null });

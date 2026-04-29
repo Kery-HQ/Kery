@@ -27,6 +27,7 @@ import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
   toggleTest, runProjectTest,
 } from "@/projectApi";
+import { toast } from "sonner";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -173,8 +174,8 @@ export const TestsPlans: React.FC = () => {
     if (!selectedEnvId) return;
     setRunning(test.id);
     try {
-      const res = await runProjectTest(test.project_id, selectedEnvId, "", test.id);
-      navigate(`/runs/${res.runId}`);
+      await runProjectTest(test.project_id, selectedEnvId, "", test.id);
+      toast.success("Run queued");
     } finally {
       setRunning(null);
     }
@@ -189,7 +190,7 @@ export const TestsPlans: React.FC = () => {
       for (const t of targets) {
         await runProjectTest(t.project_id, selectedEnvId, "", t.id);
       }
-      navigate("/runs");
+      toast.success(`${targets.length} run${targets.length === 1 ? "" : "s"} queued`);
     } finally {
       setRunAllBusy(false);
     }
@@ -199,8 +200,8 @@ export const TestsPlans: React.FC = () => {
     if (!currentProjectId || !selectedEnvId || !adhocIntent.trim()) return;
     setAdhocRunning(true);
     try {
-      const res = await runProjectTest(currentProjectId, selectedEnvId, adhocIntent.trim());
-      navigate(`/runs/${res.runId}`);
+      await runProjectTest(currentProjectId, selectedEnvId, adhocIntent.trim());
+      toast.success("Run queued");
     } finally {
       setAdhocRunning(false);
     }
@@ -394,7 +395,7 @@ export const TestsPlans: React.FC = () => {
                         <div
                           key={test.id}
                           className={cn(
-                            "glass-card-flat p-3 flex flex-col gap-2 min-h-[8rem]",
+                            "glass-card-flat card-stagger p-3 flex flex-col gap-2 min-h-[8rem]",
                             !test.enabled && "opacity-50",
                           )}
                         >

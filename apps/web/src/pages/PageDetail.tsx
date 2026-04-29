@@ -20,6 +20,7 @@ import { RunList } from "@/components/RunList";
 import { relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import { fetchPageDetail, fetchEnvironments, fetchProjectBugs, runDestination, resetPageData } from "@/projectApi";
+import { toast } from "sonner";
 
 type PageData = {
   page: {
@@ -107,7 +108,7 @@ export function PageDetail() {
     setRunning(true);
     try {
       await runDestination(currentProjectId, defaultEnvId, destinationId);
-      navigate("/runs");
+      toast.success("Run queued");
     } catch {}
     setRunning(false);
   }

@@ -1,7 +1,7 @@
 import React from "react";
 import {
   Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick, CheckCircle,
-  Key, Eye as EyeIcon, EyeSlash, Trash, PencilSimple, Warning,
+  Key, Eye as EyeIcon, EyeSlash, Trash, PencilSimple, Warning, Queue,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   fetchModelSettings, saveModelSettings, resetModelSettings,
   fetchApiKeySettings, saveApiKeys, deleteApiKey,
+  fetchPlatformSettings, savePlatformSettings,
   type LlmKeyPresence,
   type ModelPriceUsd,
   type ModelSlotKey,
@@ -19,6 +20,7 @@ import {
   type ApiKeyProvider,
   type ApiKeyInfo,
   type ApiKeySettingsResponse,
+  type PlatformSettingsResponse,
 } from "@/projectApi";
 import {
   isModelSelectable,
@@ -36,11 +38,16 @@ export const Settings: React.FC = () => {
   const [modelSaving, setModelSaving] = React.useState<string | null>(null);
   const [modelStatus, setModelStatus] = React.useState("");
   const [apiKeySettings, setApiKeySettings] = React.useState<ApiKeySettingsResponse | null>(null);
+  const [platformSettings, setPlatformSettings] = React.useState<PlatformSettingsResponse | null>(null);
+  const [concurrencyValue, setConcurrencyValue] = React.useState<number>(3);
+  const [concurrencySaving, setConcurrencySaving] = React.useState(false);
+  const [concurrencyStatus, setConcurrencyStatus] = React.useState("");
 
   async function refreshAll() {
-    const [modelRes, keyRes] = await Promise.all([
+    const [modelRes, keyRes, platformRes] = await Promise.all([
       fetchModelSettings().catch(() => null),
       fetchApiKeySettings().catch(() => null),
+      fetchPlatformSettings().catch(() => null),
     ]);
     if (modelRes) {
       setModelSettings(modelRes.models);
@@ -48,6 +55,10 @@ export const Settings: React.FC = () => {
       setModelPrices(modelRes.modelPrices ?? {});
     }
     if (keyRes) setApiKeySettings(keyRes);
+    if (platformRes) {
+      setPlatformSettings(platformRes);
+      setConcurrencyValue(platformRes.maxConcurrency);
+    }
   }
 
   React.useEffect(() => {
@@ -102,6 +113,19 @@ export const Settings: React.FC = () => {
     await refreshAll();
   }
 
+  async function handleConcurrencySave() {
+    setConcurrencySaving(true);
+    setConcurrencyStatus("");
+    try {
+      await savePlatformSettings({ maxConcurrency: concurrencyValue });
+      setConcurrencyStatus("saved");
+    } catch {
+      setConcurrencyStatus("error");
+    } finally {
+      setConcurrencySaving(false);
+    }
+  }
+
   const hasCustomizedModels = Object.values(modelSettings).some((m) => m.customized);
 
   return (
@@ -143,6 +167,71 @@ export const Settings: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ── Platform section ── */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-[14px] font-semibold text-foreground">Run execution</h2>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                Control how many test runs execute in parallel. Takes effect on the next worker restart.
+              </p>
+            </div>
+
+            <div className="glass-card-flat">
+              <div className="p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Queue className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-foreground">Max concurrency</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Maximum number of runs executing simultaneously. Default 3, max 10.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={platformSettings?.maxConcurrencyLimit ?? 10}
+                    step={1}
+                    value={concurrencyValue}
+                    onChange={(e) => { setConcurrencyValue(Number(e.target.value)); setConcurrencyStatus(""); }}
+                    disabled={concurrencySaving || !platformSettings}
+                    className="flex-1 accent-primary disabled:opacity-40"
+                  />
+                  <span className="font-mono text-[14px] font-semibold text-foreground w-6 text-center shrink-0">
+                    {concurrencyValue}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={handleConcurrencySave}
+                    disabled={concurrencySaving || !platformSettings || concurrencyValue === platformSettings?.maxConcurrency}
+                    loading={concurrencySaving}
+                  >
+                    Save
+                  </Button>
+                </div>
+
+                {concurrencyStatus && (
+                  <div className={cn(
+                    "flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border animate-fade-in",
+                    concurrencyStatus === "error"
+                      ? "border-destructive/30 bg-destructive/8 text-destructive"
+                      : "border-status-pass/30 bg-status-pass/8 text-status-pass",
+                  )}>
+                    <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                    {concurrencyStatus === "saved" && "Concurrency saved. Restart the worker to apply."}
+                    {concurrencyStatus === "error" && "Failed to save — please try again."}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -911,6 +1000,7 @@ function ModelSlotCard({
     </div>
   );
 }
+
 
 
 

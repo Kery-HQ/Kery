@@ -134,7 +134,44 @@ export async function applyDbModelSettings(storage: StorageAdapter): Promise<voi
   }
 }
 
+const MAX_CONCURRENCY_DB_KEY = "platform.maxConcurrency";
+const DEFAULT_CONCURRENCY = 3;
+const MAX_CONCURRENCY_LIMIT = 10;
+
+export async function applyDbPlatformSettings(storage: StorageAdapter): Promise<void> {
+  // Currently a no-op for worker — concurrency is read directly from DB at startup
+  // This hook exists so the API can notify other services of setting changes in future.
+  void storage;
+}
+
 export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAdapter) {
+  /** GET /api/settings/platform — return platform-level settings */
+  app.get("/api/settings/platform", async (_req, reply) => {
+    let maxConcurrency = DEFAULT_CONCURRENCY;
+    try {
+      const all = await storage.getSettings();
+      const raw = all[MAX_CONCURRENCY_DB_KEY];
+      if (raw) {
+        const n = parseInt(raw, 10);
+        if (Number.isFinite(n) && n >= 1 && n <= MAX_CONCURRENCY_LIMIT) maxConcurrency = n;
+      }
+    } catch {}
+    reply.send({ maxConcurrency, defaultConcurrency: DEFAULT_CONCURRENCY, maxConcurrencyLimit: MAX_CONCURRENCY_LIMIT });
+  });
+
+  /** PUT /api/settings/platform — save platform-level settings */
+  app.put("/api/settings/platform", async (req, reply) => {
+    const body = req.body as { maxConcurrency?: unknown };
+    const n = typeof body?.maxConcurrency === "number" ? body.maxConcurrency : parseInt(String(body?.maxConcurrency), 10);
+    if (!Number.isFinite(n) || n < 1 || n > MAX_CONCURRENCY_LIMIT) {
+      reply.code(400).send({ error: "maxConcurrency must be between 1 and 10" });
+      return;
+    }
+    await storage.saveSetting(MAX_CONCURRENCY_DB_KEY, String(Math.round(n)));
+    reply.send({ ok: true });
+  });
+
+
   /** GET /api/settings/models — return current model config + env defaults */
   app.get("/api/settings/models", async (_req, reply) => {
     const current = getConfig();

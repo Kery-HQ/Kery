@@ -64,23 +64,10 @@ function normalizeDomain(input: string): string {
   }
 }
 
-function faviconUrl(domain: string): string {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
-}
-
 function ProjectIcon({ project, size = 6 }: { project: { name: string; domain?: string | null }; size?: 5 | 6 }) {
-  const [imgError, setImgError] = React.useState(false);
-  const domain = project.domain ? normalizeDomain(project.domain) : "";
-  const showFavicon = domain && !imgError;
   const sizeCls = size === 5 ? "h-5 w-5" : "h-6 w-6";
-  if (showFavicon) {
-    return (
-      <img src={faviconUrl(domain)} alt="" onError={() => setImgError(true)}
-        className={cn(sizeCls, "flex-shrink-0 rounded-md object-contain")} />
-    );
-  }
   return (
-    <div className={cn(sizeCls, "flex items-center justify-center rounded-md bg-primary/10 text-primary font-semibold text-[10px]")}>
+    <div className={cn(sizeCls, "flex items-center justify-center rounded-md bg-primary/10 text-primary font-semibold text-[10px] flex-shrink-0")}>
       {project.name.charAt(0).toUpperCase() || "?"}
     </div>
   );

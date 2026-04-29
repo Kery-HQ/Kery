@@ -350,6 +350,25 @@ export async function resetModelSettings() {
   return apiFetch(`${API_BASE}/api/settings/models`, { method: "DELETE" });
 }
 
+// --- Platform settings ---
+
+export type PlatformSettingsResponse = {
+  maxConcurrency: number;
+  defaultConcurrency: number;
+  maxConcurrencyLimit: number;
+};
+
+export async function fetchPlatformSettings(): Promise<PlatformSettingsResponse> {
+  return apiFetch(`${API_BASE}/api/settings/platform`);
+}
+
+export async function savePlatformSettings(settings: { maxConcurrency: number }) {
+  return apiFetch(`${API_BASE}/api/settings/platform`, {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+}
+
 // --- API Key settings ---
 
 export type ApiKeyProvider = "openai" | "anthropic" | "gemini" | "openrouter";
