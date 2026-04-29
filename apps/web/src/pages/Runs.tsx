@@ -12,12 +12,33 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { statusVariant, duration, relativeTime, formatRunCost, runListLabel } from "@/lib/formatters";
-import { runScreenshotFileUrl } from "@/lib/apiAssets";
+import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import { fetchProjectRuns, fetchRun, stopRun, deleteAllRuns } from "@/projectApi";
+import { DEMO_MODE } from "@/lib/demo";
 
 const STATUS_FILTERS = ["all", "running", "queued", "passed", "failed", "stopped"] as const;
+
+function llmFallbackImageUrl(run: any, runId: string): string | null {
+  const calls: any[] = run?.llm_calls_json ?? [];
+  const navCalls = calls.filter(
+    (c) =>
+      (c.agent === "navigator" || c.agent == null) &&
+      c.hasVision &&
+      (c.imagePaths?.length || c.imageBase64s?.length || c.imagePath || c.imageBase64),
+  );
+  const last = navCalls[navCalls.length - 1];
+  if (!last) return null;
+  const path = last.imagePaths?.[0] ?? last.imagePath;
+  if (path) {
+    const raw = runScreenshotFileUrl(runId, path);
+    if (raw) return screenshotRefToSrc(raw) ?? raw;
+  }
+  const b64 = last.imageBase64s?.[0] ?? last.imageBase64;
+  if (!b64) return null;
+  return screenshotRefToSrc(b64) ?? (b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`);
+}
 const PAGE_SIZE = 25;
 
 type ActiveRunTile = {
@@ -137,10 +158,13 @@ export const Runs: React.FC = () => {
               const filename = live?.filename;
               const updatedAt = live?.updatedAt;
               const base = filename ? runScreenshotFileUrl(run.id, filename) : null;
+              const livePreviewUrl = base
+                ? (updatedAt ? `${base}?t=${updatedAt}` : base)
+                : llmFallbackImageUrl(detail?.run, run.id);
               return {
                 ...run,
                 status: "running" as const,
-                livePreviewUrl: base && updatedAt ? `${base}?t=${updatedAt}` : base,
+                livePreviewUrl,
                 liveSteps,
                 livePlanItems,
               };
@@ -328,7 +352,10 @@ export const Runs: React.FC = () => {
                               key={run.id}
                               type="button"
                               onClick={() => navigate(`/runs/${run.id}`)}
-                              className="rounded-lg border border-border bg-card hover:bg-accent/20 transition-colors overflow-hidden text-left"
+                              className={cn(
+                                "rounded-lg border border-border bg-card hover:bg-accent/20 transition-colors overflow-hidden text-left",
+                                DEMO_MODE && "demo-running-tile glow-pulse",
+                              )}
                             >
                               <div className="aspect-[16/9] bg-black relative">
                                 {run.livePreviewUrl ? (
