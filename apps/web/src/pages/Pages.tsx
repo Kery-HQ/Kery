@@ -484,13 +484,13 @@ export function Pages() {
               </div>
             ) : pages.length === 0 ? (
               <EmptyState
-                icon={<Stack className="h-8 w-8" />}
+                icon={<Path className="h-8 w-8" />}
                 title="No routes discovered yet"
-                description="Click 'Scan my app' to discover app routes, forms, and interactions."
+                description="Scan your app to discover routes, forms, and interactions."
                 action={
                   environments.length === 0
                     ? { label: "Add environment first", onClick: () => navigate("/environments") }
-                    : undefined
+                    : { label: "Scan routes", onClick: () => handleScan() }
                 }
               />
             ) : (

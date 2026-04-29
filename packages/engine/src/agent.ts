@@ -1393,6 +1393,7 @@ export async function handleAuth(
   context?: string,
   baseUrl?: string,
   onLLMCall?: (call: LLMCallRecord) => void,
+  shouldStop?: () => boolean,
 ): Promise<AuthHandleResult> {
   if (!auth) return { ok: false, llmCalls: [] };
 
@@ -1432,7 +1433,7 @@ export async function handleAuth(
         password: tokenCreds!.password,
       },
     };
-    const fallbackResult = await tryAgentAuthViaRunAgent(page, fallbackAuth, context, baseUrl, url, onLLMCall);
+    const fallbackResult = await tryAgentAuthViaRunAgent(page, fallbackAuth, context, baseUrl, url, onLLMCall, undefined, shouldStop);
     logger.info(
       { provider: auth.tokenProvider.type, method: "navigator-fallback", ok: fallbackResult.ok },
       "Auth complete via Navigator fallback",
@@ -1484,6 +1485,7 @@ export async function handleAuth(
     authStartUrl,
     onLLMCall,
     preferredNavigatorStartUrl,
+    shouldStop,
   );
 }
 
@@ -1615,6 +1617,7 @@ async function tryAgentAuthViaRunAgent(
   authStartUrl: string,
   onLLMCall?: (call: LLMCallRecord) => void,
   preferredStartUrl?: string,
+  shouldStop?: () => boolean,
 ): Promise<AuthHandleResult> {
   const { username, password } = auth.credentials!;
   const loginIntent =
@@ -1636,7 +1639,7 @@ async function tryAgentAuthViaRunAgent(
     10,
     undefined,
     undefined,
-    undefined,
+    shouldStop,
   );
 
   const success = page.url() !== authStartUrl;
@@ -1710,7 +1713,7 @@ export async function runAgent(
   page.on("dialog", onDialog);
 
   try {
-    const authOutcome = await handleAuth(page, auth, context, baseUrl, handleLLMCall);
+    const authOutcome = await handleAuth(page, auth, context, baseUrl, handleLLMCall, shouldStop);
     if (authOutcome.ok) {
       stepCounter++;
       const authStep: RunStep = {
@@ -1970,6 +1973,13 @@ export async function runAgent(
         continue;
       }
 
+      // LLM responded — check stop before executing anything (catches race where
+      // response arrived after the abort was scheduled but before it fired).
+      if (stopController.signal.aborted || shouldStop?.()) {
+        steps.push(`[STOPPED] Run stopped by user`);
+        return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: "Stopped by user" };
+      }
+
       const actionError = validateAction(action);
       if (actionError) {
         let fixed = false;
@@ -2002,7 +2012,15 @@ export async function runAgent(
       if (action.action === "wait") {
         consecutiveMetaActions = 0;
         const ms = Math.min(Number(action.value) || 1000, 5000);
-        await new Promise((r) => setTimeout(r, ms));
+        // Interruptible wait — resolves early if stop is signalled.
+        await new Promise<void>((r) => {
+          const t = setTimeout(r, ms);
+          stopController.signal.addEventListener("abort", () => { clearTimeout(t); r(); }, { once: true });
+        });
+        if (shouldStop?.() || stopController.signal.aborted) {
+          steps.push(`[STOPPED] Run stopped by user`);
+          return { status: "failed", steps, stepsDetail, bugsFound, llmCalls, failReason: "Stopped by user" };
+        }
         prevResult = undefined;
         continue;
       }
@@ -2017,7 +2035,7 @@ export async function runAgent(
           messages.push({ role: "user", content: "No auth configuration is available for this run; cannot re-login." });
         } else {
           authAttempts++;
-          const reAuthResult = await handleAuth(page, auth, context, baseUrl, handleLLMCall);
+          const reAuthResult = await handleAuth(page, auth, context, baseUrl, handleLLMCall, shouldStop);
           logger.info({ ok: reAuthResult.ok, authAttempts }, "Navigator: re-auth result");
           const msg = reAuthResult.ok
             ? "Re-login succeeded. Continue with the intent."
