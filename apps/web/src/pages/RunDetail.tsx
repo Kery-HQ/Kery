@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { humanizeRunStep } from "@/lib/agentActivity";
+import { SHOW_RUN_DEBUG } from "@/lib/debugFlag";
 import { cn } from "@/lib/utils";
 import {
   statusVariant,
@@ -888,22 +889,26 @@ export const RunDetail: React.FC = () => {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="gallery">
-              Gallery
-              {galleryCount > 0 && (
-                <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{galleryCount}</span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="llm">
-              LLM Calls
-              <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{llmCalls.length}</span>
-            </TabsTrigger>
-            <TabsTrigger value="memory">
-              Memory
-              {memoryLoaded.length > 0 && (
-                <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{memoryLoaded.length}</span>
-              )}
-            </TabsTrigger>
+            {SHOW_RUN_DEBUG && (
+              <>
+                <TabsTrigger value="gallery">
+                  Gallery
+                  {galleryCount > 0 && (
+                    <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{galleryCount}</span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="llm">
+                  LLM Calls
+                  <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{llmCalls.length}</span>
+                </TabsTrigger>
+                <TabsTrigger value="memory">
+                  Memory
+                  {memoryLoaded.length > 0 && (
+                    <span className="normal-case text-[11px] font-mono text-muted-foreground/50">{memoryLoaded.length}</span>
+                  )}
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
         </div>
 
@@ -2169,23 +2174,25 @@ function BugCard({
             </div>
           </div>
 
-          <div className="border-t border-border pt-3">
-            <button
-              type="button"
-              className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 hover:text-foreground/70"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowRaw(!showRaw);
-              }}
-            >
-              Show raw data {showRaw ? "▼" : "▶"}
-            </button>
-            {showRaw && (
-              <pre className="mt-2 text-[11px] font-mono bg-muted/50 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
-                {JSON.stringify(bug, null, 2)}
-              </pre>
-            )}
-          </div>
+          {SHOW_RUN_DEBUG && (
+            <div className="border-t border-border pt-3">
+              <button
+                type="button"
+                className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 hover:text-foreground/70"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRaw(!showRaw);
+                }}
+              >
+                Show raw data {showRaw ? "▼" : "▶"}
+              </button>
+              {showRaw && (
+                <pre className="mt-2 text-[11px] font-mono bg-muted/50 rounded px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-48">
+                  {JSON.stringify(bug, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

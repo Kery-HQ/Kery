@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
+import { SHOW_RUN_DEBUG } from "@/lib/debugFlag";
 import { formatReportedAt } from "@/lib/formatters";
 import { BUG_SEVERITY_STATUS_DOT, bugCategoryTagClass, projectBugDetailDescription } from "@/lib/bug-issue-display";
 import { BugCategoryTag } from "@/components/bug-category-tag";
@@ -254,21 +255,23 @@ function IssueDetail({
           )}
 
           {/* Raw data toggle */}
-          <section className="border-t border-border pt-3">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
-              onClick={onToggleRaw}
-            >
-              {showRaw ? <CaretDown className="h-3 w-3" /> : <CaretRight className="h-3 w-3" />}
-              {showRaw ? "Hide" : "Show"} raw data
-            </button>
-            {showRaw && (
-              <pre className="mt-2 text-[11px] font-mono bg-surface-2 dark:bg-surface-3 rounded-lg border border-border px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-64">
-                {JSON.stringify(bug, null, 2)}
-              </pre>
-            )}
-          </section>
+          {SHOW_RUN_DEBUG && (
+            <section className="border-t border-border pt-3">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
+                onClick={onToggleRaw}
+              >
+                {showRaw ? <CaretDown className="h-3 w-3" /> : <CaretRight className="h-3 w-3" />}
+                {showRaw ? "Hide" : "Show"} raw data
+              </button>
+              {showRaw && (
+                <pre className="mt-2 text-[11px] font-mono bg-surface-2 dark:bg-surface-3 rounded-lg border border-border px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground/70 max-h-64">
+                  {JSON.stringify(bug, null, 2)}
+                </pre>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>
