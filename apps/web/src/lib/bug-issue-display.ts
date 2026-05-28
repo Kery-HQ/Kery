@@ -6,6 +6,30 @@ export const BUG_SEVERITY_STATUS_DOT: Record<string, string> = {
 };
 
 /**
+ * User-facing bug status labels.
+ * The DB stores 4 states (open/in_progress/resolved/wont_fix) which we
+ * surface as triage states: Needs review, To fix, Fixed, Ignored.
+ */
+export const BUG_STATUS_LABEL: Record<string, string> = {
+  open: "Needs review",
+  in_progress: "To fix",
+  resolved: "Fixed",
+  wont_fix: "Ignored",
+};
+
+export function bugStatusLabel(status: string | null | undefined): string {
+  if (!status) return BUG_STATUS_LABEL.open;
+  return BUG_STATUS_LABEL[status] ?? status.replace(/_/g, " ");
+}
+
+export const BUG_STATUS_BADGE: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
+  open: "warning",
+  in_progress: "warning",
+  resolved: "success",
+  wont_fix: "neutral",
+};
+
+/**
  * Category label colors — text only (no border); Issues + Run detail.
  * Overview bug rows stay plain outline per Overview.tsx.
  */

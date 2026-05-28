@@ -26,6 +26,8 @@ import {
 } from "@/lib/formatters";
 import {
   BUG_SEVERITY_STATUS_DOT,
+  BUG_STATUS_BADGE,
+  bugStatusLabel,
   runJsonBugDisplayName,
   runJsonBugDetailDescription,
 } from "@/lib/bug-issue-display";
@@ -228,13 +230,6 @@ function liveUiFromRun(run: Run): {
 }
 
 // --- Helpers ---
-
-const RUN_BUG_STATUS_BADGE: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-  open: "warning",
-  in_progress: "warning",
-  resolved: "success",
-  wont_fix: "neutral",
-};
 
 /** Vision frame for this step: file ref or legacy inline base64. */
 function visionImageRefForStep(llmCalls: LLMCallRecord[], stepIndex: number, runId: string): string | undefined {
@@ -935,6 +930,7 @@ export const RunDetail: React.FC = () => {
               bugsFound={bugsFound}
               runBugs={runBugs}
               projectId={run.project_id ?? undefined}
+              onRefreshBugs={() => fetchRunBugs(run.id).then((r: any) => setRunBugs(r.bugs ?? []))}
             />
           </TabsContent>
 
@@ -1848,6 +1844,49 @@ function GalleryTab({ groups }: { groups: Record<string, GalleryShot[]> }) {
 }
 
 // ============================================================
+// Run triage banner — appears above issue list when bugs need review
+// ============================================================
+
+function RunTriageBanner({
+  runBugs,
+  projectId,
+  onRefreshBugs,
+}: {
+  runBugs: { id?: string; status?: string }[];
+  projectId?: string;
+  onRefreshBugs?: () => Promise<void> | void;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const untriaged = runBugs.filter((b) => b.status === "open" && b.id);
+  if (untriaged.length === 0 || !projectId) return null;
+  return (
+    <div className="flex items-center gap-2 border-b border-border bg-primary/10 px-3 py-2 flex-shrink-0">
+      <span className="text-[11px] text-foreground flex-1 min-w-0">
+        <span className="font-medium">{untriaged.length}</span> bug{untriaged.length === 1 ? "" : "s"} need review
+      </span>
+      <button
+        type="button"
+        className="text-[11px] font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await Promise.all(
+              untriaged.map((b) => patchProjectBug(projectId, b.id!, { status: "in_progress" })),
+            );
+            await onRefreshBugs?.();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Mark all for fix
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
 // Issues tab
 // ============================================================
 
@@ -1856,6 +1895,7 @@ function IssuesTab({
   bugsFound,
   runBugs,
   projectId,
+  onRefreshBugs,
 }: {
   run: Run;
   bugsFound: RunStep[];
@@ -1869,6 +1909,7 @@ function IssuesTab({
     reported_at?: string;
   }[];
   projectId?: string;
+  onRefreshBugs?: () => Promise<void> | void;
 }) {
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   React.useEffect(() => {
@@ -1898,6 +1939,7 @@ function IssuesTab({
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Issues</span>
               <span className="text-[11px] font-mono text-muted-foreground/60">{bugsFound.length}</span>
             </div>
+            <RunTriageBanner runBugs={runBugs} projectId={projectId} onRefreshBugs={onRefreshBugs} />
             <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
               {bugsFound.map((bug: RunStep & { name?: string }, i: number) => {
                 const displayName = runJsonBugDisplayName(bug);
@@ -1915,7 +1957,7 @@ function IssuesTab({
                       <div className="mt-1 flex items-center gap-1.5">
                         <BugCategoryTag category={category} />
                         {dbBug?.status && (
-                          <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
+                          <Badge variant={BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
                             {dbBug.status.replace("_", " ")}
                           </Badge>
                         )}
@@ -2006,12 +2048,12 @@ function BugCard({
   const [bugStatus, setBugStatus] = React.useState<string | undefined>(dbBug?.status);
   const isOpen = !bugStatus || bugStatus === "open" || bugStatus === "in_progress";
 
-  async function resolveIssue() {
+  async function markForFix() {
     if (!projectId || !dbBug?.id || !isOpen) return;
     setBusy(true);
     try {
-      await patchProjectBug(projectId, dbBug.id, { status: "resolved" });
-      setBugStatus("resolved");
+      await patchProjectBug(projectId, dbBug.id, { status: "in_progress" });
+      setBugStatus("in_progress");
     } finally {
       setBusy(false);
     }
@@ -2060,10 +2102,10 @@ function BugCard({
           <BugCategoryTag category={category} />
           {bugStatus && (
             <Badge
-              variant={RUN_BUG_STATUS_BADGE[bugStatus] ?? "neutral"}
-              className="capitalize flex-shrink-0 text-[10px]"
+              variant={BUG_STATUS_BADGE[bugStatus] ?? "neutral"}
+              className="flex-shrink-0 text-[10px]"
             >
-              {bugStatus.replace("_", " ")}
+              {bugStatusLabel(bugStatus)}
             </Badge>
           )}
           <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0 tabular-nums">
@@ -2096,12 +2138,12 @@ function BugCard({
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="default"
                       className="h-7 px-3 text-[11px]"
                       disabled={busy}
-                      onClick={(e) => { e.stopPropagation(); resolveIssue(); }}
+                      onClick={(e) => { e.stopPropagation(); markForFix(); }}
                     >
-                      Mark as resolved
+                      Mark for fix
                     </Button>
                     <Button
                       size="sm"
@@ -2110,7 +2152,7 @@ function BugCard({
                       disabled={busy}
                       onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
                     >
-                      Ignore bug
+                      Ignore
                     </Button>
                   </div>
                 )}
@@ -2166,8 +2208,8 @@ function BugCard({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <BugCategoryTag category={category} />
                     {dbBug?.status && (
-                      <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
-                        {dbBug.status.replace("_", " ")}
+                      <Badge variant={BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="text-[10px]">
+                        {bugStatusLabel(dbBug.status)}
                       </Badge>
                     )}
                   </div>
@@ -2291,15 +2333,15 @@ function BugCard({
                 <>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     className="h-7 text-[11px]"
                     disabled={busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      resolveIssue();
+                      markForFix();
                     }}
                   >
-                    Mark as resolved
+                    Mark for fix
                   </Button>
                   <Button
                     size="sm"
@@ -2311,7 +2353,7 @@ function BugCard({
                       ignoreIssue();
                     }}
                   >
-                    Ignore bug
+                    Ignore
                   </Button>
                 </>
               )}

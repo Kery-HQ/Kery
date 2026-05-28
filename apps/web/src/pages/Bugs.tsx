@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 import { SHOW_RUN_DEBUG } from "@/lib/debugFlag";
 import { formatReportedAt } from "@/lib/formatters";
-import { BUG_SEVERITY_STATUS_DOT, bugCategoryTagClass, projectBugDetailDescription } from "@/lib/bug-issue-display";
+import { BUG_SEVERITY_STATUS_DOT, BUG_STATUS_BADGE, bugCategoryTagClass, bugStatusLabel, projectBugDetailDescription } from "@/lib/bug-issue-display";
 import { BugCategoryTag } from "@/components/bug-category-tag";
 import { BugScreenshotZoomDialog } from "@/components/bug-screenshot-zoom-dialog";
 import { useProject } from "@/lib/projectContext";
@@ -93,12 +93,6 @@ const SEVERITY_VARIANT: Record<string, "destructive" | "warning" | "neutral"> = 
   low: "neutral",
 };
 
-const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-  open: "warning",
-  in_progress: "warning",
-  resolved: "success",
-  wont_fix: "neutral",
-};
 
 // ─── Issue detail pane ────────────────────────────────────────────────────────
 
@@ -176,12 +170,12 @@ function IssueDetail({
             {bug.id && isOpen && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="default"
                 className="h-7 px-3 text-[11px]"
                 disabled={actionBusy === bug.id}
                 onClick={onResolve}
               >
-                Mark as resolved
+                Mark for fix
               </Button>
             )}
             {bug.id && isOpen && (
@@ -192,7 +186,7 @@ function IssueDetail({
                 disabled={actionBusy === bug.id}
                 onClick={onIgnore}
               >
-                Ignore bug
+                Ignore
               </Button>
             )}
             {bug.id && (
@@ -259,8 +253,8 @@ function IssueDetail({
               <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <BugCategoryTag category={bug.category} />
-                  <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize text-[10px]">
-                    {bug.status.replace("_", " ")}
+                  <Badge variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"} className="text-[10px]">
+                    {bugStatusLabel(bug.status)}
                   </Badge>
                   {bug.test_name && (
                     <Badge variant="outline" className="text-[10px]">
@@ -372,14 +366,30 @@ export const Bugs: React.FC = () => {
     }
   }
 
-  async function resolveBug(bug: BugRecord) {
+  async function markBugForFix(bug: BugRecord) {
     if (!currentProjectId || !bug.id) return;
     setActionBusy(bug.id);
     try {
-      await patchProjectBug(currentProjectId, bug.id, { status: "resolved" });
+      await patchProjectBug(currentProjectId, bug.id, { status: "in_progress" });
       await load();
     } finally {
       setActionBusy(null);
+    }
+  }
+
+  const [bulkBusy, setBulkBusy] = React.useState(false);
+  async function markAllForFix(bugsToMark: BugRecord[]) {
+    if (!currentProjectId || bugsToMark.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        bugsToMark
+          .filter((b) => b.id && b.status === "open")
+          .map((b) => patchProjectBug(currentProjectId, b.id!, { status: "in_progress" })),
+      );
+      await load();
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -571,6 +581,27 @@ export const Bugs: React.FC = () => {
               </span>
             </div>
 
+            {/* Triage banner — only when there are untriaged bugs in current filter */}
+            {(() => {
+              const untriaged = filteredBugs.filter((b) => b.status === "open");
+              if (untriaged.length === 0) return null;
+              return (
+                <div className="flex items-center gap-2 border-b border-border bg-primary/10 px-3 py-2 flex-shrink-0">
+                  <span className="text-[11px] text-foreground flex-1 min-w-0">
+                    <span className="font-medium">{untriaged.length}</span> bug{untriaged.length === 1 ? "" : "s"} need review
+                  </span>
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+                    disabled={bulkBusy}
+                    onClick={() => markAllForFix(untriaged)}
+                  >
+                    Mark all for fix
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* scrollable list */}
             <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
               {filteredBugs.length === 0 ? (
@@ -613,10 +644,10 @@ export const Bugs: React.FC = () => {
                               <div className="mt-1.5 flex flex-wrap items-center gap-1">
                                 <BugCategoryTag category={bug.category} />
                                 <Badge
-                                  variant={STATUS_VARIANT[bug.status] ?? "neutral"}
-                                  className="capitalize text-[10px]"
+                                  variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"}
+                                  className="text-[10px]"
                                 >
-                                  {bug.status.replace("_", " ")}
+                                  {bugStatusLabel(bug.status)}
                                 </Badge>
                                 <span className="ml-auto text-[10px] font-mono text-muted-foreground/50">
                                   {formatReportedAt(reportedIso)}
@@ -649,7 +680,7 @@ export const Bugs: React.FC = () => {
                 actionBusy={actionBusy}
                 showRaw={showRawId === selectedId}
                 onToggleRaw={() => setShowRawId(showRawId === selectedId ? null : selectedId)}
-                onResolve={() => resolveBug(selectedBug)}
+                onResolve={() => markBugForFix(selectedBug)}
                 onIgnore={() => ignoreBug(selectedBug)}
                 onDelete={() => setDeletePrompt({ kind: "one", bug: selectedBug })}
                 onViewRun={() => navigate(`/runs/${selectedBug.run_id ?? selectedBug.runId}`)}

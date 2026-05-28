@@ -348,8 +348,8 @@ export function PageDetail() {
                           <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
                             {issue.name}
                           </span>
-                          <Badge variant={issue.status === "resolved" ? "success" : issue.status === "wont_fix" ? "neutral" : "warning"} className="capitalize text-[11px]">
-                            {issue.status.replace("_", " ")}
+                          <Badge variant={issue.status === "resolved" ? "success" : issue.status === "wont_fix" ? "neutral" : "warning"} className="text-[11px]">
+                            {issue.status === "open" ? "Needs review" : issue.status === "in_progress" ? "To fix" : issue.status === "resolved" ? "Fixed" : "Ignored"}
                           </Badge>
                           {reportedAt && (
                             <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
