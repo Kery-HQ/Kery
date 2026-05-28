@@ -44,8 +44,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
+import { apiMediaUrl, runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 import { downloadIssuesPdf } from "@/lib/export-issues-pdf";
+import { BugRecordingClip, deriveBugClipRange } from "@/components/bug-recording-clip";
+import { fetchRun } from "@/projectApi";
 
 export type BugRecord = {
   id?: string;
@@ -71,6 +73,7 @@ export type BugRecord = {
   test_name?: string | null;
   environment?: string | null;
   index?: number;
+  step_index?: number | null;
 };
 
 const SEVERITY_FILTERS = ["all", "high", "medium", "low"] as const;
@@ -128,6 +131,34 @@ function IssueDetail({
 
   const hasContext = !!(bug.environment || reportedDate || bug.url || bug.category || bug.status || bug.test_name);
 
+  // Lazy-fetch the run to derive recording clip range
+  const [runMeta, setRunMeta] = React.useState<{
+    video_url?: string | null;
+    recording_started_at?: number | null;
+    steps_json?: { index?: number; at?: number }[];
+  } | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    setRunMeta(null);
+    if (!runKey) return;
+    fetchRun(runKey)
+      .then((res: any) => {
+        if (cancelled || !res?.run) return;
+        setRunMeta({
+          video_url: res.run.video_url ?? null,
+          recording_started_at: res.run.recording_started_at ?? null,
+          steps_json: res.run.steps_json ?? [],
+        });
+      })
+      .catch(() => { /* clip just won't render */ });
+    return () => { cancelled = true; };
+  }, [runKey]);
+
+  const clipRange = runMeta?.video_url
+    ? deriveBugClipRange(runMeta.steps_json ?? [], runMeta.recording_started_at ?? null, bug.step_index ?? null)
+    : null;
+  const videoUrl = runMeta?.video_url ? apiMediaUrl(runMeta.video_url) : null;
+
   return (
     <div className="flex flex-col h-full">
       {/* ── Detail header ── */}
@@ -181,14 +212,30 @@ function IssueDetail({
 
       {/* ── Scrollable body ── */}
       <div className="flex-1 min-h-0 overflow-y-auto bg-surface-1 dark:bg-surface-2">
-        {/* Screenshot — hero, full width */}
-        {screenshotSrc && (
-          <div className="border-b border-border bg-surface-2 dark:bg-surface-3 flex justify-center px-6 py-5">
-            <BugScreenshotZoomDialog
-              src={screenshotSrc}
-              triggerClassName="w-full max-w-2xl"
-              thumbnailClassName="w-full max-h-[400px] object-contain"
-            />
+        {/* Screenshot + Recording — hero, full width */}
+        {(screenshotSrc || (clipRange && videoUrl)) && (
+          <div className="border-b border-border bg-surface-2 dark:bg-surface-3 px-6 py-5">
+            <div className={cn(
+              "mx-auto grid w-full max-w-4xl gap-4",
+              screenshotSrc && clipRange && videoUrl ? "md:grid-cols-2" : "grid-cols-1",
+            )}>
+              {screenshotSrc && (
+                <BugScreenshotZoomDialog
+                  src={screenshotSrc}
+                  triggerClassName="w-full"
+                  thumbnailClassName="w-full max-h-[400px] object-contain"
+                />
+              )}
+              {clipRange && videoUrl && (
+                <BugRecordingClip
+                  videoUrl={videoUrl}
+                  startSec={clipRange.startSec}
+                  endSec={clipRange.endSec}
+                  posterSrc={screenshotSrc ?? undefined}
+                  bugName={bug.name}
+                />
+              )}
+            </div>
           </div>
         )}
 

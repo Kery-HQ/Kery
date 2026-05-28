@@ -67,6 +67,7 @@ import {
   Play,
   X,
 } from "@phosphor-icons/react";
+import { BugRecordingClip, deriveBugClipRange } from "@/components/bug-recording-clip";
 
 // --- Types ---
 
@@ -1963,107 +1964,6 @@ function resolveRunDbBug(
 }
 
 // ============================================================
-// Bug recording clip — inline video that plays a ~5s slice
-// around the step where the bug was reported.
-// ============================================================
-
-function deriveBugClipRange(
-  run: Run,
-  stepIndex: number | null | undefined,
-): { startSec: number; endSec: number } | null {
-  if (stepIndex == null) return null;
-  const steps = (run.steps_json ?? []) as RunStep[];
-  if (steps.length === 0) return null;
-
-  const stepAtIdx = steps.find((s) => s.index === stepIndex && typeof s.at === "number");
-  const fallbackStep = steps[Math.min(stepIndex, steps.length - 1)];
-  const step = stepAtIdx ?? (typeof fallbackStep?.at === "number" ? fallbackStep : null);
-  if (!step || typeof step.at !== "number") return null;
-
-  const timed = steps.filter((s): s is RunStep & { at: number } => typeof s.at === "number");
-  if (timed.length === 0) return null;
-  const origin = run.recording_started_at ?? timed[0].at;
-
-  const stepRelMs = Math.max(0, step.at - origin);
-  const preRollMs = 1500;
-  const postRollMs = 3500;
-  const startSec = Math.max(0, (stepRelMs - preRollMs) / 1000);
-  const endSec = (stepRelMs + postRollMs) / 1000;
-  return { startSec, endSec };
-}
-
-function BugRecordingClip({
-  videoUrl,
-  startSec,
-  endSec,
-  posterSrc,
-}: {
-  videoUrl: string;
-  startSec: number;
-  endSec: number;
-  posterSrc?: string;
-}) {
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const [playing, setPlaying] = React.useState(false);
-  const [ready, setReady] = React.useState(false);
-
-  const play = React.useCallback(() => {
-    const node = videoRef.current;
-    if (!node) return;
-    try {
-      node.currentTime = startSec;
-    } catch {
-      /* video not yet ready — onLoadedMetadata will retry */
-    }
-    void node.play().catch(() => {});
-  }, [startSec]);
-
-  return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="relative aspect-video w-full max-w-md overflow-hidden rounded-md border border-border bg-black"
-    >
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        poster={posterSrc}
-        preload="metadata"
-        playsInline
-        muted
-        className="h-full w-full object-contain"
-        onLoadedMetadata={() => {
-          setReady(true);
-          const node = videoRef.current;
-          if (node) {
-            try { node.currentTime = startSec; } catch { /* noop */ }
-          }
-        }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onTimeUpdate={(e) => {
-          if (e.currentTarget.currentTime >= endSec) {
-            e.currentTarget.pause();
-          }
-        }}
-        onEnded={() => setPlaying(false)}
-      />
-      {!playing && (
-        <button
-          type="button"
-          onClick={play}
-          disabled={!ready}
-          className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors hover:bg-black/40 disabled:cursor-not-allowed"
-        >
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-foreground shadow-sm">
-            <Play className="h-5 w-5" weight="fill" />
-          </span>
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
 // Bug card (matches Issues page list + expanded layout)
 // ============================================================
 
@@ -2208,7 +2108,9 @@ function BugCard({
             const screenshotSrc = fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined);
 
             const stepIndex = dbBug?.step_index ?? (typeof bug.index === "number" ? bug.index : null);
-            const clipRange = run.video_url ? deriveBugClipRange(run, stepIndex) : null;
+            const clipRange = run.video_url
+              ? deriveBugClipRange(run.steps_json ?? [], run.recording_started_at ?? null, stepIndex)
+              : null;
             const videoUrl = run.video_url ? apiMediaUrl(run.video_url) : null;
 
             if (!screenshotSrc && !clipRange) return null;
@@ -2236,6 +2138,7 @@ function BugCard({
                       startSec={clipRange.startSec}
                       endSec={clipRange.endSec}
                       posterSrc={screenshotSrc ?? undefined}
+                      bugName={displayName}
                     />
                   </div>
                 )}
