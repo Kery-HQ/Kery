@@ -1,6 +1,6 @@
 {
   "name": "@keryai/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kery MCP server — lets AI agents in your IDE run browser tests via Kery",
   "type": "module",
   "main": "dist/index.js",
