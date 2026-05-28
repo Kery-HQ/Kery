@@ -301,6 +301,117 @@ function manualMcpSnippet(apiPort: number): string {
   return JSON.stringify({ mcpServers: { kery: mcpServerEntry(apiPort) } }, null, 2);
 }
 
+// ─── Slash command (/kery) ──────────────────────────────────────────────────
+
+function slashCommandBody(opts: { withFrontmatter: boolean }): string {
+  const body = `You are helping the user interact with Kery — an AI browser testing platform that drives a real browser to test web apps and report bugs.
+
+The user invoked \`/kery\` with this intent:
+
+> $ARGUMENTS
+
+Figure out what they want and call the right Kery MCP tool. The Kery MCP tools are all prefixed \`mcp__kery__kery_*\`. Common ones:
+
+- \`kery_start\` / \`kery_stop\` / \`kery_status\` — manage the local Kery platform
+- \`kery_list_projects\` / \`kery_setup_project\` / \`kery_update_project\` — projects
+- \`kery_list_routes\` / \`kery_scan\` — discover pages in the app
+- \`kery_list_tests\` / \`kery_run_test\` / \`kery_update_test\` / \`kery_delete_test\` — tests
+- \`kery_list_runs\` / \`kery_get_run\` / \`kery_stop_run\` — run history & results
+- \`kery_get_bugs\` / \`kery_update_bug\` — bug triage
+- \`kery_get_coverage\` — coverage report
+- \`kery_get_settings\` / \`kery_update_settings\` / \`kery_update_auth\` / \`kery_add_environment\` / \`kery_update_environment\` / \`kery_update_page\` — configuration
+
+Rules:
+1. If a Kery tool returns "Kery is not running", call \`kery_start\` first and retry.
+2. If no project exists yet, call \`kery_list_projects\` to check, then \`kery_setup_project\` if needed.
+3. For "test the X flow" / "run a test" / "check if Y works": call \`kery_run_test\` with the user's intent. **By default it returns immediately with a \`webUrl\` — share that URL with the user right away so they can watch the run live. Do not wait for the run to finish unless the user explicitly asks for inline results (then pass \`wait: true\`).**
+4. Be terse. Show the user the relevant URL or result and stop — don't narrate the tool sequence.
+`;
+  if (!opts.withFrontmatter) return body;
+  return `---
+description: Interact with Kery — run AI browser tests, check status, view bugs
+argument-hint: <what you want Kery to do>
+allowed-tools: mcp__kery__*, Bash
+---
+
+${body}`;
+}
+
+function installClaudeCodeSlashCommand(): boolean {
+  try {
+    const cmdPath = path.join(os.homedir(), ".claude", "commands", "kery.md");
+    fs.mkdirSync(path.dirname(cmdPath), { recursive: true });
+    fs.writeFileSync(cmdPath, slashCommandBody({ withFrontmatter: true }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function installCodexSlashCommand(): boolean {
+  try {
+    const cmdPath = path.join(os.homedir(), ".codex", "prompts", "kery.md");
+    fs.mkdirSync(path.dirname(cmdPath), { recursive: true });
+    fs.writeFileSync(cmdPath, slashCommandBody({ withFrontmatter: false }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Codex MCP (TOML) ───────────────────────────────────────────────────────
+
+function codexMcpTomlBlock(apiPort: number): string {
+  return [
+    "[mcp_servers.kery]",
+    'command = "npx"',
+    'args = ["-y", "@keryai/mcp"]',
+    "",
+    "[mcp_servers.kery.env]",
+    `KERY_API_URL = "http://localhost:${apiPort}"`,
+    `KERY_WEB_URL = "http://localhost:${apiPort}"`,
+    "",
+  ].join("\n");
+}
+
+function installCodexMcp(apiPort: number): boolean {
+  try {
+    const cfgPath = path.join(os.homedir(), ".codex", "config.toml");
+    fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+    const block = codexMcpTomlBlock(apiPort);
+    let existing = "";
+    if (fs.existsSync(cfgPath)) {
+      existing = fs.readFileSync(cfgPath, "utf8");
+    }
+    // Strip any existing [mcp_servers.kery] or [mcp_servers.kery.*] tables
+    // (everything from such a header until the next top-level [section] or EOF).
+    const stripped = existing
+      .split(/\r?\n/)
+      .reduce<{ out: string[]; skipping: boolean }>(
+        (acc, line) => {
+          const headerMatch = line.match(/^\s*\[([^\]]+)\]\s*$/);
+          if (headerMatch) {
+            const name = headerMatch[1].trim();
+            if (name === "mcp_servers.kery" || name.startsWith("mcp_servers.kery.")) {
+              acc.skipping = true;
+              return acc;
+            }
+            acc.skipping = false;
+          }
+          if (!acc.skipping) acc.out.push(line);
+          return acc;
+        },
+        { out: [], skipping: false },
+      )
+      .out.join("\n");
+    const sep = stripped.length === 0 || stripped.endsWith("\n\n") ? "" : stripped.endsWith("\n") ? "\n" : "\n\n";
+    fs.writeFileSync(cfgPath, stripped + sep + block);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Wait for API ─────────────────────────────────────────────────────────────
 
 async function waitForPort(port: number, timeoutMs = 120_000): Promise<boolean> {
@@ -590,16 +701,26 @@ async function main() {
                   manual: false,
                 });
                 break;
-              case "claude-code":
+              case "claude-code": {
+                const mcpOk = installClaudeCodeMcp(taskCtx.apiPort);
+                const cmdOk = installClaudeCodeSlashCommand();
                 taskCtx.mcpResults.push({
-                  label: "Claude Code (~/.claude.json)",
-                  ok: installClaudeCodeMcp(taskCtx.apiPort),
+                  label: `Claude Code (~/.claude.json${cmdOk ? " + /kery slash command" : ""})`,
+                  ok: mcpOk,
                   manual: false,
                 });
                 break;
-              case "codex":
-                taskCtx.mcpResults.push({ label: "Codex CLI", ok: false, manual: true });
+              }
+              case "codex": {
+                const mcpOk = installCodexMcp(taskCtx.apiPort);
+                const cmdOk = installCodexSlashCommand();
+                taskCtx.mcpResults.push({
+                  label: `Codex CLI (~/.codex/config.toml${cmdOk ? " + /kery prompt" : ""})`,
+                  ok: mcpOk,
+                  manual: !mcpOk,
+                });
                 break;
+              }
               case "other":
                 taskCtx.mcpResults.push({ label: "Other IDE", ok: false, manual: true });
                 break;

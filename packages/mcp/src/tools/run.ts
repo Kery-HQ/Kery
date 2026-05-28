@@ -25,7 +25,11 @@ HOW TO PROVIDE THE TEST:
   • Use 'testId' to rerun a saved test (get IDs from kery_list_tests)
   • Omitting all three runs a general health check of the app
 
-TIMING: Tests take 1-5 minutes. This tool waits for completion and returns results.
+TIMING & WAIT BEHAVIOR:
+  • Tests take 1-5 minutes to complete.
+  • By default (wait=false), this tool returns immediately with the runId and webUrl so you can hand the user a link to watch live. This is the recommended path for interactive use — share the webUrl with the user right away.
+  • Set wait=true only when you need the full results inline (e.g. automated/CI flows). Then the tool blocks until the run finishes and returns bugs + summary.
+  • Either way, results can be fetched later with kery_get_run using the runId.
 
 After the test, call kery_get_bugs to review bugs, or kery_get_run with the runId for full step-by-step details.`,
     {
@@ -55,8 +59,17 @@ After the test, call kery_get_bugs to review bugs, or kery_get_run with the runI
           "Environment to test against (defaults to the project's default environment). " +
           "Use this to test against staging or production instead of local dev.",
         ),
+      wait: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "If true, block until the run completes and return full results (bugs, summary, steps). " +
+          "If false (default), return immediately with the runId and webUrl — share the URL with the user so they can watch the run live. " +
+          "Use kery_get_run later to fetch results.",
+        ),
     },
-    async ({ projectId, intent, testId, pageRoute, environmentId }) => {
+    async ({ projectId, intent, testId, pageRoute, environmentId, wait }) => {
       const healthy = await client.checkHealth();
       if (!healthy) {
         return {
@@ -131,6 +144,25 @@ After the test, call kery_get_bugs to review bugs, or kery_get_run with the runI
           testId,
           destinationId,
         });
+
+        if (!wait) {
+          const webUrl = client.buildWebUrl(`/runs/${runId}`);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                runId,
+                status: "queued",
+                webUrl,
+                message: `Run started. Share this URL with the user so they can watch it live: ${webUrl}`,
+                nextSteps: [
+                  `Share the webUrl with the user immediately — it is valid during and after the run.`,
+                  `Call kery_get_run with runId="${runId}" later to fetch results, or re-run kery_run_test with wait=true to block until completion.`,
+                ],
+              }),
+            }],
+          };
+        }
 
         const run = await client.waitForRun(runId);
 
