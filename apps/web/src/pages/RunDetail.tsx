@@ -2222,64 +2222,14 @@ function BugCard({
               </div>
             )}
 
-            <div className="px-6 py-5 space-y-4">
-              {/* Description */}
-              {detail && (
-                <section>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
-                    Description
-                  </p>
-                  <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
-                </section>
-              )}
-
-              {/* Additional info */}
-              <section className="border-t border-border pt-4">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
-                  Additional info
+            {detail && (
+              <div className="px-6 py-5">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
+                  Description
                 </p>
-                <div className="space-y-2.5">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <BugCategoryTag category={category} />
-                    {dbBug?.status && (
-                      <Badge variant={BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="text-[10px]">
-                        {bugStatusLabel(dbBug.status)}
-                      </Badge>
-                    )}
-                  </div>
-                  {run.environment && (
-                    <div className="flex items-center gap-2">
-                      <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Environment</span>
-                      <span className="text-[12px] text-muted-foreground">{run.environment}</span>
-                    </div>
-                  )}
-                  {reportedIso && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Detected</span>
-                      <span className="text-[12px] font-mono text-muted-foreground">{new Date(reportedIso).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {bug.url && (
-                    <div className="flex items-start gap-2 min-w-0">
-                      <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0 mt-0.5">URL</span>
-                      <a
-                        href={bug.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span className="truncate">{bug.url}</span>
-                        <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </section>
-            </div>
+                <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
+              </div>
+            )}
           </div>
         );
       })()}

@@ -257,53 +257,19 @@ function IssueDetail({
             </section>
           )}
 
-          {/* Additional info */}
-          {hasContext && (
+          {bug.url && (
             <section className="border-t border-border pt-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
-                Additional info
-              </p>
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <BugCategoryTag category={bug.category} />
-                  <Badge variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"} className="text-[10px]">
-                    {bugStatusLabel(bug.status)}
-                  </Badge>
-                  {bug.test_name && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {bug.test_name}
-                    </Badge>
-                  )}
-                </div>
-                {bug.environment && (
-                  <div className="flex items-center gap-2">
-                    <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Environment</span>
-                    <span className="text-[12px] text-muted-foreground">{bug.environment}</span>
-                  </div>
-                )}
-                {reportedDate && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Detected</span>
-                    <span className="text-[12px] font-mono text-muted-foreground">{new Date(reportedDate).toLocaleString()}</span>
-                  </div>
-                )}
-                {bug.url && (
-                  <div className="flex items-start gap-2 min-w-0">
-                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0 mt-0.5">URL</span>
-                    <a
-                      href={bug.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <span className="truncate">{bug.url}</span>
-                      <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" aria-hidden="true" />
-                    </a>
-                  </div>
-                )}
+              <div className="flex items-start gap-2 min-w-0">
+                <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
+                <a
+                  href={bug.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span className="truncate">{bug.url}</span>
+                  <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" aria-hidden="true" />
+                </a>
               </div>
             </section>
           )}
