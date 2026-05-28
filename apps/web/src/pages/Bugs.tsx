@@ -103,6 +103,7 @@ function IssueDetail({
   onToggleRaw,
   onResolve,
   onIgnore,
+  onUndo,
   onDelete,
   onViewRun,
 }: {
@@ -112,6 +113,7 @@ function IssueDetail({
   onToggleRaw: () => void;
   onResolve: () => void;
   onIgnore: () => void;
+  onUndo: () => void;
   onDelete: () => void;
   onViewRun: () => void;
 }) {
@@ -121,7 +123,7 @@ function IssueDetail({
   const legacy = screenshotRefToSrc(bug.screenshot_base64 ?? bug.screenshotBase64 ?? undefined);
   const screenshotSrc = fileUrl ?? legacy;
   const reportedDate = bug.reportedAt ?? bug.reported_at;
-  const isOpen = bug.status === "open" || bug.status === "in_progress";
+  const isOpen = bug.status === "open";
 
   const hasContext = !!(bug.environment || reportedDate || bug.url || bug.category || bug.status || bug.test_name);
 
@@ -168,25 +170,36 @@ function IssueDetail({
               View Run <ArrowSquareOut className="h-3 w-3" />
             </Button>
             {bug.id && isOpen && (
-              <Button
-                size="sm"
-                variant="default"
-                className="h-7 px-3 text-[11px]"
-                disabled={actionBusy === bug.id}
-                onClick={onResolve}
-              >
-                Mark for fix
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 px-3 text-[11px]"
+                  disabled={actionBusy === bug.id}
+                  onClick={onResolve}
+                >
+                  Mark for fix
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 text-[11px]"
+                  disabled={actionBusy === bug.id}
+                  onClick={onIgnore}
+                >
+                  Ignore
+                </Button>
+              </>
             )}
-            {bug.id && isOpen && (
+            {bug.id && !isOpen && (
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 px-3 text-[11px]"
                 disabled={actionBusy === bug.id}
-                onClick={onIgnore}
+                onClick={onUndo}
               >
-                Ignore
+                Undo
               </Button>
             )}
             {bug.id && (
@@ -371,6 +384,17 @@ export const Bugs: React.FC = () => {
     setActionBusy(bug.id);
     try {
       await patchProjectBug(currentProjectId, bug.id, { status: "in_progress" });
+      await load();
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function undoBugTriage(bug: BugRecord) {
+    if (!currentProjectId || !bug.id) return;
+    setActionBusy(bug.id);
+    try {
+      await patchProjectBug(currentProjectId, bug.id, { status: "open" });
       await load();
     } finally {
       setActionBusy(null);
@@ -682,6 +706,7 @@ export const Bugs: React.FC = () => {
                 onToggleRaw={() => setShowRawId(showRawId === selectedId ? null : selectedId)}
                 onResolve={() => markBugForFix(selectedBug)}
                 onIgnore={() => ignoreBug(selectedBug)}
+                onUndo={() => undoBugTriage(selectedBug)}
                 onDelete={() => setDeletePrompt({ kind: "one", bug: selectedBug })}
                 onViewRun={() => navigate(`/runs/${selectedBug.run_id ?? selectedBug.runId}`)}
               />

@@ -2085,6 +2085,18 @@ function BugCard({
     }
   }
 
+  async function undoTriage() {
+    if (!projectId || !dbBug?.id) return;
+    setBusy(true);
+    try {
+      await patchProjectBug(projectId, dbBug.id, { status: "open" });
+      setBugStatus("open");
+      await onRefreshBugs?.();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div
       className={cn(
@@ -2142,26 +2154,40 @@ function BugCard({
                 <h2 className="min-w-0 flex-1 text-[15px] font-semibold text-foreground leading-snug truncate">
                   {displayName}
                 </h2>
-                {projectId && dbBug?.id && isOpen && (
+                {projectId && dbBug?.id && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="h-7 px-3 text-[11px]"
-                      disabled={busy}
-                      onClick={(e) => { e.stopPropagation(); markForFix(); }}
-                    >
-                      Mark for fix
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-[11px]"
-                      disabled={busy}
-                      onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
-                    >
-                      Ignore
-                    </Button>
+                    {bugStatus === "open" || bugStatus == null ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 px-3 text-[11px]"
+                          disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); markForFix(); }}
+                        >
+                          Mark for fix
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-3 text-[11px]"
+                          disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
+                        >
+                          Ignore
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-3 text-[11px]"
+                        disabled={busy}
+                        onClick={(e) => { e.stopPropagation(); undoTriage(); }}
+                      >
+                        Undo
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -2337,7 +2363,7 @@ function BugCard({
               {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
             </span>
             <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {projectId && dbBug?.id && isOpen && (
+              {projectId && dbBug?.id && (bugStatus === "open" || bugStatus == null) && (
                 <>
                   <Button
                     size="sm"
@@ -2364,6 +2390,17 @@ function BugCard({
                     Ignore
                   </Button>
                 </>
+              )}
+              {projectId && dbBug?.id && bugStatus && bugStatus !== "open" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[11px]"
+                  disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); undoTriage(); }}
+                >
+                  Undo
+                </Button>
               )}
             </div>
           </div>
