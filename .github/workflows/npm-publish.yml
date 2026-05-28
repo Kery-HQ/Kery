@@ -117,6 +117,9 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
             echo "Will publish @keryai/mcp@${VERSION}."
           fi
+      - name: Build @keryai/client (workspace dep)
+        if: steps.check.outputs.skip == 'false'
+        run: npm run build --workspace=packages/client
       - name: Build
         if: steps.check.outputs.skip == 'false'
         run: npm run build --workspace=packages/mcp
