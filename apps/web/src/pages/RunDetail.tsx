@@ -2038,8 +2038,10 @@ function BugCard({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-card overflow-hidden transition-colors",
-        isExpanded && "ring-1 ring-border",
+        "overflow-hidden transition-colors",
+        forceExpanded
+          ? "flex h-full flex-col bg-surface-1 dark:bg-surface-2"
+          : cn("rounded-lg border border-border bg-card", isExpanded && "ring-1 ring-border"),
       )}
     >
       {!forceExpanded && (
@@ -2070,26 +2072,144 @@ function BugCard({
         </button>
       )}
 
-      {isExpanded && (
-        <div className={cn("px-4 py-4 space-y-4 animate-fade-in", forceExpanded ? "" : "border-t border-border bg-muted/10")}>
-          {forceExpanded && (
-            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-              <div className="min-w-0">
-                <h3 className="text-[15px] font-semibold text-foreground truncate">{displayName}</h3>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <BugCategoryTag category={category} />
-                  {dbBug?.status && (
-                    <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
-                      {dbBug.status.replace("_", " ")}
-                    </Badge>
-                  )}
-                  <span className="text-[11px] font-mono text-muted-foreground/60">
-                    {reportedIso ? formatReportedAt(reportedIso) : "—"}
-                  </span>
-                </div>
+      {isExpanded && forceExpanded && (() => {
+        // Prefer dbBug.screenshot_path (UUID-named, from bugs table) over bugs_json path (stale bug-N.jpg)
+        const screenshotPath = dbBug?.screenshot_path ?? bug.screenshotPath ?? bug.screenshot_path;
+        const fileUrl = runScreenshotFileUrl(runId, screenshotPath);
+        const legacyRef = bug.screenshotBase64 ?? bug.screenshot_base64 ?? bug.screenshot;
+        const screenshotSrc = fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined);
+        const stepIndex = dbBug?.step_index ?? (typeof bug.index === "number" ? bug.index : null);
+        const clipRange = run.video_url
+          ? deriveBugClipRange(run.steps_json ?? [], run.recording_started_at ?? null, stepIndex)
+          : null;
+        const videoUrl = run.video_url ? apiMediaUrl(run.video_url) : null;
+
+        return (
+          <div className="flex flex-col animate-fade-in">
+            {/* Header — title left, actions right */}
+            <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="min-w-0 flex-1 text-[15px] font-semibold text-foreground leading-snug truncate">
+                  {displayName}
+                </h2>
+                {projectId && dbBug?.id && isOpen && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-3 text-[11px]"
+                      disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); resolveIssue(); }}
+                    >
+                      Mark as resolved
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-3 text-[11px]"
+                      disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
+                    >
+                      Ignore bug
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+
+            {/* Hero — screenshot + recording */}
+            {(screenshotSrc || (clipRange && videoUrl)) && (
+              <div className="border-b border-border bg-surface-2 dark:bg-surface-3 px-6 py-5">
+                <div className={cn(
+                  "mx-auto grid w-full max-w-4xl gap-4",
+                  screenshotSrc && clipRange && videoUrl ? "md:grid-cols-2" : "grid-cols-1",
+                )}>
+                  {screenshotSrc && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <BugScreenshotZoomDialog
+                        src={screenshotSrc}
+                        triggerClassName="w-full"
+                        thumbnailClassName="w-full max-h-[400px] object-contain"
+                      />
+                    </div>
+                  )}
+                  {clipRange && videoUrl && (
+                    <BugRecordingClip
+                      videoUrl={videoUrl}
+                      startSec={clipRange.startSec}
+                      endSec={clipRange.endSec}
+                      posterSrc={screenshotSrc ?? undefined}
+                      bugName={displayName}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Description */}
+              {detail && (
+                <section>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
+                    Description
+                  </p>
+                  <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
+                </section>
+              )}
+
+              {/* Additional info */}
+              <section className="border-t border-border pt-4">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
+                  Additional info
+                </p>
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <BugCategoryTag category={category} />
+                    {dbBug?.status && (
+                      <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
+                        {dbBug.status.replace("_", " ")}
+                      </Badge>
+                    )}
+                  </div>
+                  {run.environment && (
+                    <div className="flex items-center gap-2">
+                      <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Environment</span>
+                      <span className="text-[12px] text-muted-foreground">{run.environment}</span>
+                    </div>
+                  )}
+                  {reportedIso && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Detected</span>
+                      <span className="text-[12px] font-mono text-muted-foreground">{new Date(reportedIso).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {bug.url && (
+                    <div className="flex items-start gap-2 min-w-0">
+                      <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0 mt-0.5">URL</span>
+                      <a
+                        href={bug.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="truncate">{bug.url}</span>
+                        <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          </div>
+        );
+      })()}
+
+      {isExpanded && !forceExpanded && (
+        <div className="px-4 py-4 space-y-4 animate-fade-in border-t border-border bg-muted/10">
           {detail ? (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
@@ -2100,19 +2220,15 @@ function BugCard({
           ) : null}
 
           {(() => {
-            // Prefer dbBug.screenshot_path (UUID-named, from bugs table) over bugs_json path (stale bug-N.jpg)
             const screenshotPath = dbBug?.screenshot_path ?? bug.screenshotPath ?? bug.screenshot_path;
             const fileUrl = runScreenshotFileUrl(runId, screenshotPath);
-            const legacyRef =
-              bug.screenshotBase64 ?? bug.screenshot_base64 ?? bug.screenshot;
+            const legacyRef = bug.screenshotBase64 ?? bug.screenshot_base64 ?? bug.screenshot;
             const screenshotSrc = fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined);
-
             const stepIndex = dbBug?.step_index ?? (typeof bug.index === "number" ? bug.index : null);
             const clipRange = run.video_url
               ? deriveBugClipRange(run.steps_json ?? [], run.recording_started_at ?? null, stepIndex)
               : null;
             const videoUrl = run.video_url ? apiMediaUrl(run.video_url) : null;
-
             if (!screenshotSrc && !clipRange) return null;
             return (
               <div className="grid gap-4 md:grid-cols-2">
