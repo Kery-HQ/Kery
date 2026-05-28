@@ -42,7 +42,7 @@ const SEV_COLOR: Record<string, RGB> = { high: C.high, medium: C.medium, low: C.
 const SEV_LABEL: Record<string, string> = { high: "HIGH", medium: "MED", low: "LOW" };
 const CAT_LABEL: Record<string, string> = { visual: "Visual", functional: "Functional", ux: "UX", other: "Other" };
 const STATUS_LABEL: Record<string, string> = {
-  open: "Open", in_progress: "In Progress", resolved: "Resolved", wont_fix: "Won't Fix",
+  open: "Needs review", in_progress: "To fix", resolved: "Fixed", wont_fix: "Ignored",
 };
 
 // ── Image helpers ─────────────────────────────────────────────────────────────

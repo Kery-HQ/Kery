@@ -31,7 +31,11 @@ TIMING & WAIT BEHAVIOR:
   • Set wait=true only when you need the full results inline (e.g. automated/CI flows). Then the tool blocks until the run finishes and returns bugs + summary.
   • Either way, results can be fetched later with kery_get_run using the runId.
 
-After the test, call kery_get_bugs to review bugs, or kery_get_run with the runId for full step-by-step details.`,
+POST-RUN TRIAGE — CRITICAL:
+  After the run finishes, the bugs are in 'needs_review' state. Do NOT start fixing them immediately.
+  Instead, share the run/bugs URL with the user and ask them to triage each bug (mark for fix / ignore).
+  Then call kery_get_bugs with status='to_fix' to get the work queue, fix each, and call
+  kery_update_bug status='fixed' when done.`,
     {
       projectId: z
         .string()
@@ -154,10 +158,12 @@ After the test, call kery_get_bugs to review bugs, or kery_get_run with the runI
                 runId,
                 status: "queued",
                 webUrl,
-                message: `Run started. Share this URL with the user so they can watch it live: ${webUrl}`,
+                message: `Run started. Share this URL with the user so they can watch live AND triage any bugs found: ${webUrl}`,
                 nextSteps: [
-                  `Share the webUrl with the user immediately — it is valid during and after the run.`,
-                  `Call kery_get_run with runId="${runId}" later to fetch results, or re-run kery_run_test with wait=true to block until completion.`,
+                  `Share the webUrl with the user — it stays valid during and after the run.`,
+                  `When the run completes, the user must triage each bug on that page (mark for fix or ignore) BEFORE you start fixing anything.`,
+                  `After the user triages, call kery_get_bugs with projectId="${projectId}" and status="to_fix" to get the work queue.`,
+                  `Fix each bug, then call kery_update_bug with status="fixed" to confirm.`,
                 ],
               }),
             }],

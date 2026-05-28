@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 import { SHOW_RUN_DEBUG } from "@/lib/debugFlag";
 import { formatReportedAt } from "@/lib/formatters";
-import { BUG_SEVERITY_STATUS_DOT, bugCategoryTagClass, projectBugDetailDescription } from "@/lib/bug-issue-display";
+import { BUG_SEVERITY_STATUS_DOT, BUG_STATUS_BADGE, bugCategoryTagClass, bugStatusLabel, projectBugDetailDescription } from "@/lib/bug-issue-display";
 import { BugCategoryTag } from "@/components/bug-category-tag";
 import { BugScreenshotZoomDialog } from "@/components/bug-screenshot-zoom-dialog";
 import { useProject } from "@/lib/projectContext";
@@ -93,12 +93,6 @@ const SEVERITY_VARIANT: Record<string, "destructive" | "warning" | "neutral"> = 
   low: "neutral",
 };
 
-const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-  open: "warning",
-  in_progress: "warning",
-  resolved: "success",
-  wont_fix: "neutral",
-};
 
 // ─── Issue detail pane ────────────────────────────────────────────────────────
 
@@ -109,6 +103,7 @@ function IssueDetail({
   onToggleRaw,
   onResolve,
   onIgnore,
+  onUndo,
   onDelete,
   onViewRun,
 }: {
@@ -118,6 +113,7 @@ function IssueDetail({
   onToggleRaw: () => void;
   onResolve: () => void;
   onIgnore: () => void;
+  onUndo: () => void;
   onDelete: () => void;
   onViewRun: () => void;
 }) {
@@ -127,7 +123,7 @@ function IssueDetail({
   const legacy = screenshotRefToSrc(bug.screenshot_base64 ?? bug.screenshotBase64 ?? undefined);
   const screenshotSrc = fileUrl ?? legacy;
   const reportedDate = bug.reportedAt ?? bug.reported_at;
-  const isOpen = bug.status === "open" || bug.status === "in_progress";
+  const isOpen = bug.status === "open";
 
   const hasContext = !!(bug.environment || reportedDate || bug.url || bug.category || bug.status || bug.test_name);
 
@@ -174,25 +170,36 @@ function IssueDetail({
               View Run <ArrowSquareOut className="h-3 w-3" />
             </Button>
             {bug.id && isOpen && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-3 text-[11px]"
-                disabled={actionBusy === bug.id}
-                onClick={onResolve}
-              >
-                Mark as resolved
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 px-3 text-[11px]"
+                  disabled={actionBusy === bug.id}
+                  onClick={onResolve}
+                >
+                  Mark for fix
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 text-[11px]"
+                  disabled={actionBusy === bug.id}
+                  onClick={onIgnore}
+                >
+                  Ignore
+                </Button>
+              </>
             )}
-            {bug.id && isOpen && (
+            {bug.id && !isOpen && (
               <Button
                 size="sm"
                 variant="outline"
                 className="h-7 px-3 text-[11px]"
                 disabled={actionBusy === bug.id}
-                onClick={onIgnore}
+                onClick={onUndo}
               >
-                Ignore bug
+                Undo
               </Button>
             )}
             {bug.id && (
@@ -250,53 +257,19 @@ function IssueDetail({
             </section>
           )}
 
-          {/* Additional info */}
-          {hasContext && (
+          {bug.url && (
             <section className="border-t border-border pt-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
-                Additional info
-              </p>
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <BugCategoryTag category={bug.category} />
-                  <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize text-[10px]">
-                    {bug.status.replace("_", " ")}
-                  </Badge>
-                  {bug.test_name && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {bug.test_name}
-                    </Badge>
-                  )}
-                </div>
-                {bug.environment && (
-                  <div className="flex items-center gap-2">
-                    <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Environment</span>
-                    <span className="text-[12px] text-muted-foreground">{bug.environment}</span>
-                  </div>
-                )}
-                {reportedDate && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Detected</span>
-                    <span className="text-[12px] font-mono text-muted-foreground">{new Date(reportedDate).toLocaleString()}</span>
-                  </div>
-                )}
-                {bug.url && (
-                  <div className="flex items-start gap-2 min-w-0">
-                    <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0 mt-0.5">URL</span>
-                    <a
-                      href={bug.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <span className="truncate">{bug.url}</span>
-                      <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" aria-hidden="true" />
-                    </a>
-                  </div>
-                )}
+              <div className="flex items-start gap-2 min-w-0">
+                <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
+                <a
+                  href={bug.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span className="truncate">{bug.url}</span>
+                  <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" aria-hidden="true" />
+                </a>
               </div>
             </section>
           )}
@@ -372,14 +345,41 @@ export const Bugs: React.FC = () => {
     }
   }
 
-  async function resolveBug(bug: BugRecord) {
+  async function markBugForFix(bug: BugRecord) {
     if (!currentProjectId || !bug.id) return;
     setActionBusy(bug.id);
     try {
-      await patchProjectBug(currentProjectId, bug.id, { status: "resolved" });
+      await patchProjectBug(currentProjectId, bug.id, { status: "in_progress" });
       await load();
     } finally {
       setActionBusy(null);
+    }
+  }
+
+  async function undoBugTriage(bug: BugRecord) {
+    if (!currentProjectId || !bug.id) return;
+    setActionBusy(bug.id);
+    try {
+      await patchProjectBug(currentProjectId, bug.id, { status: "open" });
+      await load();
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  const [bulkBusy, setBulkBusy] = React.useState(false);
+  async function markAllForFix(bugsToMark: BugRecord[]) {
+    if (!currentProjectId || bugsToMark.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        bugsToMark
+          .filter((b) => b.id && b.status === "open")
+          .map((b) => patchProjectBug(currentProjectId, b.id!, { status: "in_progress" })),
+      );
+      await load();
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -571,6 +571,27 @@ export const Bugs: React.FC = () => {
               </span>
             </div>
 
+            {/* Triage banner — only when there are untriaged bugs in current filter */}
+            {(() => {
+              const untriaged = filteredBugs.filter((b) => b.status === "open");
+              if (untriaged.length === 0) return null;
+              return (
+                <div className="flex items-center gap-2 border-b border-border bg-primary/10 px-3 py-2 flex-shrink-0">
+                  <span className="text-[11px] text-foreground flex-1 min-w-0">
+                    <span className="font-medium">{untriaged.length}</span> bug{untriaged.length === 1 ? "" : "s"} need review
+                  </span>
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+                    disabled={bulkBusy}
+                    onClick={() => markAllForFix(untriaged)}
+                  >
+                    Mark all for fix
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* scrollable list */}
             <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
               {filteredBugs.length === 0 ? (
@@ -613,10 +634,10 @@ export const Bugs: React.FC = () => {
                               <div className="mt-1.5 flex flex-wrap items-center gap-1">
                                 <BugCategoryTag category={bug.category} />
                                 <Badge
-                                  variant={STATUS_VARIANT[bug.status] ?? "neutral"}
-                                  className="capitalize text-[10px]"
+                                  variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"}
+                                  className="text-[10px]"
                                 >
-                                  {bug.status.replace("_", " ")}
+                                  {bugStatusLabel(bug.status)}
                                 </Badge>
                                 <span className="ml-auto text-[10px] font-mono text-muted-foreground/50">
                                   {formatReportedAt(reportedIso)}
@@ -649,8 +670,9 @@ export const Bugs: React.FC = () => {
                 actionBusy={actionBusy}
                 showRaw={showRawId === selectedId}
                 onToggleRaw={() => setShowRawId(showRawId === selectedId ? null : selectedId)}
-                onResolve={() => resolveBug(selectedBug)}
+                onResolve={() => markBugForFix(selectedBug)}
                 onIgnore={() => ignoreBug(selectedBug)}
+                onUndo={() => undoBugTriage(selectedBug)}
                 onDelete={() => setDeletePrompt({ kind: "one", bug: selectedBug })}
                 onViewRun={() => navigate(`/runs/${selectedBug.run_id ?? selectedBug.runId}`)}
               />

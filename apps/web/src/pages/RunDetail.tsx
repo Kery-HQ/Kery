@@ -26,6 +26,8 @@ import {
 } from "@/lib/formatters";
 import {
   BUG_SEVERITY_STATUS_DOT,
+  BUG_STATUS_BADGE,
+  bugStatusLabel,
   runJsonBugDisplayName,
   runJsonBugDetailDescription,
 } from "@/lib/bug-issue-display";
@@ -228,13 +230,6 @@ function liveUiFromRun(run: Run): {
 }
 
 // --- Helpers ---
-
-const RUN_BUG_STATUS_BADGE: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-  open: "warning",
-  in_progress: "warning",
-  resolved: "success",
-  wont_fix: "neutral",
-};
 
 /** Vision frame for this step: file ref or legacy inline base64. */
 function visionImageRefForStep(llmCalls: LLMCallRecord[], stepIndex: number, runId: string): string | undefined {
@@ -935,6 +930,7 @@ export const RunDetail: React.FC = () => {
               bugsFound={bugsFound}
               runBugs={runBugs}
               projectId={run.project_id ?? undefined}
+              onRefreshBugs={() => fetchRunBugs(run.id).then((r: any) => setRunBugs(r.bugs ?? []))}
             />
           </TabsContent>
 
@@ -1848,6 +1844,49 @@ function GalleryTab({ groups }: { groups: Record<string, GalleryShot[]> }) {
 }
 
 // ============================================================
+// Run triage banner — appears above issue list when bugs need review
+// ============================================================
+
+function RunTriageBanner({
+  runBugs,
+  projectId,
+  onRefreshBugs,
+}: {
+  runBugs: { id?: string; status?: string }[];
+  projectId?: string;
+  onRefreshBugs?: () => Promise<void> | void;
+}) {
+  const [busy, setBusy] = React.useState(false);
+  const untriaged = runBugs.filter((b) => b.status === "open" && b.id);
+  if (untriaged.length === 0 || !projectId) return null;
+  return (
+    <div className="flex items-center gap-2 border-b border-border bg-primary/10 px-3 py-2 flex-shrink-0">
+      <span className="text-[11px] text-foreground flex-1 min-w-0">
+        <span className="font-medium">{untriaged.length}</span> bug{untriaged.length === 1 ? "" : "s"} need review
+      </span>
+      <button
+        type="button"
+        className="text-[11px] font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await Promise.all(
+              untriaged.map((b) => patchProjectBug(projectId, b.id!, { status: "in_progress" })),
+            );
+            await onRefreshBugs?.();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Mark all for fix
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
 // Issues tab
 // ============================================================
 
@@ -1856,6 +1895,7 @@ function IssuesTab({
   bugsFound,
   runBugs,
   projectId,
+  onRefreshBugs,
 }: {
   run: Run;
   bugsFound: RunStep[];
@@ -1869,6 +1909,7 @@ function IssuesTab({
     reported_at?: string;
   }[];
   projectId?: string;
+  onRefreshBugs?: () => Promise<void> | void;
 }) {
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   React.useEffect(() => {
@@ -1898,6 +1939,7 @@ function IssuesTab({
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Issues</span>
               <span className="text-[11px] font-mono text-muted-foreground/60">{bugsFound.length}</span>
             </div>
+            <RunTriageBanner runBugs={runBugs} projectId={projectId} onRefreshBugs={onRefreshBugs} />
             <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
               {bugsFound.map((bug: RunStep & { name?: string }, i: number) => {
                 const displayName = runJsonBugDisplayName(bug);
@@ -1915,7 +1957,7 @@ function IssuesTab({
                       <div className="mt-1 flex items-center gap-1.5">
                         <BugCategoryTag category={category} />
                         {dbBug?.status && (
-                          <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
+                          <Badge variant={BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
                             {dbBug.status.replace("_", " ")}
                           </Badge>
                         )}
@@ -1931,7 +1973,7 @@ function IssuesTab({
           </div>
           <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
             {selectedBug && (
-              <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded />
+              <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded onRefreshBugs={onRefreshBugs} />
             )}
           </div>
         </div>
@@ -1974,6 +2016,7 @@ function BugCard({
   projectId,
   run,
   forceExpanded = false,
+  onRefreshBugs,
 }: {
   bug: any;
   runBugs: {
@@ -1990,6 +2033,7 @@ function BugCard({
   projectId?: string;
   run: Run;
   forceExpanded?: boolean;
+  onRefreshBugs?: () => Promise<void> | void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [showRaw, setShowRaw] = React.useState(false);
@@ -2003,15 +2047,20 @@ function BugCard({
   const reportedIso = dbBug?.reported_at ?? run.completed_at ?? run.started_at ?? "";
   const isExpanded = forceExpanded || expanded;
 
+  // Sync local status with the latest dbBug.status whenever runBugs refreshes
   const [bugStatus, setBugStatus] = React.useState<string | undefined>(dbBug?.status);
+  React.useEffect(() => {
+    setBugStatus(dbBug?.status);
+  }, [dbBug?.status]);
   const isOpen = !bugStatus || bugStatus === "open" || bugStatus === "in_progress";
 
-  async function resolveIssue() {
+  async function markForFix() {
     if (!projectId || !dbBug?.id || !isOpen) return;
     setBusy(true);
     try {
-      await patchProjectBug(projectId, dbBug.id, { status: "resolved" });
-      setBugStatus("resolved");
+      await patchProjectBug(projectId, dbBug.id, { status: "in_progress" });
+      setBugStatus("in_progress");
+      await onRefreshBugs?.();
     } finally {
       setBusy(false);
     }
@@ -2030,6 +2079,19 @@ function BugCard({
         confidence: 100,
       });
       setBugStatus("wont_fix");
+      await onRefreshBugs?.();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function undoTriage() {
+    if (!projectId || !dbBug?.id) return;
+    setBusy(true);
+    try {
+      await patchProjectBug(projectId, dbBug.id, { status: "open" });
+      setBugStatus("open");
+      await onRefreshBugs?.();
     } finally {
       setBusy(false);
     }
@@ -2060,10 +2122,10 @@ function BugCard({
           <BugCategoryTag category={category} />
           {bugStatus && (
             <Badge
-              variant={RUN_BUG_STATUS_BADGE[bugStatus] ?? "neutral"}
-              className="capitalize flex-shrink-0 text-[10px]"
+              variant={BUG_STATUS_BADGE[bugStatus] ?? "neutral"}
+              className="flex-shrink-0 text-[10px]"
             >
-              {bugStatus.replace("_", " ")}
+              {bugStatusLabel(bugStatus)}
             </Badge>
           )}
           <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0 tabular-nums">
@@ -2092,26 +2154,40 @@ function BugCard({
                 <h2 className="min-w-0 flex-1 text-[15px] font-semibold text-foreground leading-snug truncate">
                   {displayName}
                 </h2>
-                {projectId && dbBug?.id && isOpen && (
+                {projectId && dbBug?.id && (
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-[11px]"
-                      disabled={busy}
-                      onClick={(e) => { e.stopPropagation(); resolveIssue(); }}
-                    >
-                      Mark as resolved
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-[11px]"
-                      disabled={busy}
-                      onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
-                    >
-                      Ignore bug
-                    </Button>
+                    {bugStatus === "open" || bugStatus == null ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 px-3 text-[11px]"
+                          disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); markForFix(); }}
+                        >
+                          Mark for fix
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-3 text-[11px]"
+                          disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
+                        >
+                          Ignore
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-3 text-[11px]"
+                        disabled={busy}
+                        onClick={(e) => { e.stopPropagation(); undoTriage(); }}
+                      >
+                        Undo
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -2146,64 +2222,14 @@ function BugCard({
               </div>
             )}
 
-            <div className="px-6 py-5 space-y-4">
-              {/* Description */}
-              {detail && (
-                <section>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
-                    Description
-                  </p>
-                  <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
-                </section>
-              )}
-
-              {/* Additional info */}
-              <section className="border-t border-border pt-4">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">
-                  Additional info
+            {detail && (
+              <div className="px-6 py-5">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
+                  Description
                 </p>
-                <div className="space-y-2.5">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <BugCategoryTag category={category} />
-                    {dbBug?.status && (
-                      <Badge variant={RUN_BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
-                        {dbBug.status.replace("_", " ")}
-                      </Badge>
-                    )}
-                  </div>
-                  {run.environment && (
-                    <div className="flex items-center gap-2">
-                      <ComputerTower className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Environment</span>
-                      <span className="text-[12px] text-muted-foreground">{run.environment}</span>
-                    </div>
-                  )}
-                  {reportedIso && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0">Detected</span>
-                      <span className="text-[12px] font-mono text-muted-foreground">{new Date(reportedIso).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {bug.url && (
-                    <div className="flex items-start gap-2 min-w-0">
-                      <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 mt-0.5" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40 w-20 shrink-0 mt-0.5">URL</span>
-                      <a
-                        href={bug.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 min-w-0 text-[12px] font-mono text-muted-foreground hover:text-foreground transition-colors"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span className="truncate">{bug.url}</span>
-                        <ArrowSquareOut className="h-3 w-3 flex-shrink-0 opacity-50" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </section>
-            </div>
+                <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -2287,19 +2313,19 @@ function BugCard({
               {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
             </span>
             <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {projectId && dbBug?.id && isOpen && (
+              {projectId && dbBug?.id && (bugStatus === "open" || bugStatus == null) && (
                 <>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     className="h-7 text-[11px]"
                     disabled={busy}
                     onClick={(e) => {
                       e.stopPropagation();
-                      resolveIssue();
+                      markForFix();
                     }}
                   >
-                    Mark as resolved
+                    Mark for fix
                   </Button>
                   <Button
                     size="sm"
@@ -2311,9 +2337,20 @@ function BugCard({
                       ignoreIssue();
                     }}
                   >
-                    Ignore bug
+                    Ignore
                   </Button>
                 </>
+              )}
+              {projectId && dbBug?.id && bugStatus && bugStatus !== "open" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[11px]"
+                  disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); undoTriage(); }}
+                >
+                  Undo
+                </Button>
               )}
             </div>
           </div>

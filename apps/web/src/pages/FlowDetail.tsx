@@ -41,7 +41,7 @@ import {
   updateTest,
   patchProjectBug,
 } from "@/projectApi";
-import { BUG_SEVERITY_STATUS_DOT } from "@/lib/bug-issue-display";
+import { BUG_SEVERITY_STATUS_DOT, BUG_STATUS_BADGE, bugStatusLabel } from "@/lib/bug-issue-display";
 import { runScreenshotFileUrl } from "@/lib/apiAssets";
 import { BugScreenshotZoomDialog } from "@/components/bug-screenshot-zoom-dialog";
 import type { BugRecord } from "@/pages/Bugs";
@@ -314,9 +314,6 @@ export function FlowDetail() {
                     const isExpanded = expandedBugId === id;
                     const reportedIso = bug.reported_at ?? bug.reportedAt ?? "";
                     const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-                    const STATUS_VARIANT: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-                      open: "warning", in_progress: "warning", resolved: "success", wont_fix: "neutral",
-                    };
                     return (
                       <div
                         key={id}
@@ -335,8 +332,8 @@ export function FlowDetail() {
                             {bug.name}
                           </span>
                           <BugCategoryTag category={bug.category} />
-                          <Badge variant={STATUS_VARIANT[bug.status] ?? "neutral"} className="capitalize flex-shrink-0">
-                            {bug.status.replace("_", " ")}
+                          <Badge variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"} className="flex-shrink-0">
+                            {bugStatusLabel(bug.status)}
                           </Badge>
                           <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
                             {reportedIso ? new Date(reportedIso).toLocaleDateString() : ""}
@@ -382,22 +379,22 @@ export function FlowDetail() {
                                 </a>
                               )}
                               <div className="flex flex-wrap items-center gap-2 ml-auto">
-                                {bug.id && (bug.status === "open" || bug.status === "in_progress") && (
+                                {bug.id && bug.status === "open" && (
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="default"
                                     className="h-7 text-[11px]"
                                     disabled={bugActionBusy === bug.id}
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       if (!currentProjectId || !bug.id) return;
                                       setBugActionBusy(bug.id);
-                                      await patchProjectBug(currentProjectId, bug.id, { status: "resolved" }).catch(() => {});
+                                      await patchProjectBug(currentProjectId, bug.id, { status: "in_progress" }).catch(() => {});
                                       await load();
                                       setBugActionBusy(null);
                                     }}
                                   >
-                                    Resolve
+                                    Mark for fix
                                   </Button>
                                 )}
                                 <Button
