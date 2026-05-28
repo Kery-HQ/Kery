@@ -1929,7 +1929,7 @@ function IssuesTab({
               })}
             </div>
           </div>
-          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto px-6 py-5">
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
             {selectedBug && (
               <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded />
             )}
@@ -2040,7 +2040,7 @@ function BugCard({
       className={cn(
         "overflow-hidden transition-colors",
         forceExpanded
-          ? "flex h-full flex-col bg-surface-1 dark:bg-surface-2"
+          ? "flex h-full flex-col"
           : cn("rounded-lg border border-border bg-card", isExpanded && "ring-1 ring-border"),
       )}
     >
