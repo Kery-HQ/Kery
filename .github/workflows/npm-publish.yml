@@ -1,13 +1,19 @@
 name: Publish npm packages
 
-# Fires when you publish a GitHub Release (tag e.g. v0.1.3) or via manual dispatch.
+# Fires when you publish a GitHub Release or via manual dispatch.
 # Auth: npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
 # Each package is enrolled at npmjs.com → package settings → Publishing access.
 #
+# Publishes are idempotent: if a package's local version already exists
+# on the registry, that job skips its publish step (no failure).
+#
+# Note: --provenance is intentionally NOT used. It requires a PUBLIC source repo;
+# this repo is private, so provenance bundles get rejected by npm.
+#
 # Job graph:
 #   publish-client ─┐
-#                   ├─► publish-mcp
-#   publish-keryai ─┘  (mcp depends on @keryai/client being live first)
+#                   ├─► publish-mcp  (mcp depends on @keryai/client being live)
+#   publish-keryai ─┘
 
 on:
   release:
@@ -29,12 +35,25 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Upgrade npm (Trusted Publishing requires >= 11.5.1)
         run: npm install -g npm@latest
-      - name: Install (root, skip internal postinstall builds)
+      - name: Install (skip internal postinstall builds)
         run: npm ci --ignore-scripts
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION=$(node -p "require('./packages/client/package.json').version")
+          if npm view "@keryai/client@${VERSION}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "@keryai/client@${VERSION} already on npm — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Will publish @keryai/client@${VERSION}."
+          fi
       - name: Build
+        if: steps.check.outputs.skip == 'false'
         run: npm run build --workspace=packages/client
       - name: Publish
-        run: npm publish --workspace=packages/client --provenance --access public
+        if: steps.check.outputs.skip == 'false'
+        run: npm publish --workspace=packages/client --access public
 
   publish-keryai:
     name: Publish keryai
@@ -52,10 +71,23 @@ jobs:
         run: npm install -g npm@latest
       - name: Install
         run: npm ci --ignore-scripts
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION=$(node -p "require('./packages/kery/package.json').version")
+          if npm view "keryai@${VERSION}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "keryai@${VERSION} already on npm — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Will publish keryai@${VERSION}."
+          fi
       - name: Build
+        if: steps.check.outputs.skip == 'false'
         run: npm run build --workspace=packages/kery
       - name: Publish
-        run: npm publish --workspace=packages/kery --provenance --access public
+        if: steps.check.outputs.skip == 'false'
+        run: npm publish --workspace=packages/kery --access public
 
   publish-mcp:
     name: Publish @keryai/mcp
@@ -74,7 +106,20 @@ jobs:
         run: npm install -g npm@latest
       - name: Install
         run: npm ci --ignore-scripts
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION=$(node -p "require('./packages/mcp/package.json').version")
+          if npm view "@keryai/mcp@${VERSION}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "@keryai/mcp@${VERSION} already on npm — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Will publish @keryai/mcp@${VERSION}."
+          fi
       - name: Build
+        if: steps.check.outputs.skip == 'false'
         run: npm run build --workspace=packages/mcp
       - name: Publish
-        run: npm publish --workspace=packages/mcp --provenance --access public
+        if: steps.check.outputs.skip == 'false'
+        run: npm publish --workspace=packages/mcp --access public
