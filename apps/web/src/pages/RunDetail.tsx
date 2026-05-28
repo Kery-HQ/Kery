@@ -1973,7 +1973,7 @@ function IssuesTab({
           </div>
           <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
             {selectedBug && (
-              <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded />
+              <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded onRefreshBugs={onRefreshBugs} />
             )}
           </div>
         </div>
@@ -2016,6 +2016,7 @@ function BugCard({
   projectId,
   run,
   forceExpanded = false,
+  onRefreshBugs,
 }: {
   bug: any;
   runBugs: {
@@ -2032,6 +2033,7 @@ function BugCard({
   projectId?: string;
   run: Run;
   forceExpanded?: boolean;
+  onRefreshBugs?: () => Promise<void> | void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [showRaw, setShowRaw] = React.useState(false);
@@ -2045,7 +2047,11 @@ function BugCard({
   const reportedIso = dbBug?.reported_at ?? run.completed_at ?? run.started_at ?? "";
   const isExpanded = forceExpanded || expanded;
 
+  // Sync local status with the latest dbBug.status whenever runBugs refreshes
   const [bugStatus, setBugStatus] = React.useState<string | undefined>(dbBug?.status);
+  React.useEffect(() => {
+    setBugStatus(dbBug?.status);
+  }, [dbBug?.status]);
   const isOpen = !bugStatus || bugStatus === "open" || bugStatus === "in_progress";
 
   async function markForFix() {
@@ -2054,6 +2060,7 @@ function BugCard({
     try {
       await patchProjectBug(projectId, dbBug.id, { status: "in_progress" });
       setBugStatus("in_progress");
+      await onRefreshBugs?.();
     } finally {
       setBusy(false);
     }
@@ -2072,6 +2079,7 @@ function BugCard({
         confidence: 100,
       });
       setBugStatus("wont_fix");
+      await onRefreshBugs?.();
     } finally {
       setBusy(false);
     }
