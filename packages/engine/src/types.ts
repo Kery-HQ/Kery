@@ -207,4 +207,6 @@ export type Bug = {
   source?: BugSource;
   /** Bounding box when the model provided one (same semantics as ReviewBug.region). */
   region?: { x: number; y: number; w: number; h: number };
+  /** How many times this issue has been detected across runs. */
+  occurrence_count?: number;
 };

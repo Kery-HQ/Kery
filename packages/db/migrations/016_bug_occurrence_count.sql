@@ -1,0 +1,1 @@
+ALTER TABLE bugs ADD COLUMN IF NOT EXISTS occurrence_count integer NOT NULL DEFAULT 1;

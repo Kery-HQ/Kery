@@ -62,6 +62,7 @@ export type BugRecord = {
   environment?: string | null;
   index?: number;
   step_index?: number | null;
+  occurrence_count?: number;
 };
 
 type BugStatus = "open" | "in_progress" | "wont_fix";
@@ -145,6 +146,11 @@ function KanbanCard({
       <div className="flex items-center gap-1.5 flex-wrap">
         <SeverityChip severity={bug.severity} />
         <CategoryChip category={bug.category} />
+        {(bug.occurrence_count ?? 1) > 1 && (
+          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-mono font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+            ×{bug.occurrence_count}
+          </span>
+        )}
         <span className="ml-auto text-[10px] font-mono text-muted-foreground/50 flex-shrink-0">
           {formatReportedAt(reportedIso)}
         </span>
@@ -183,7 +189,7 @@ function KanbanColumn({
   };
 
   return (
-    <div className="flex-1 min-w-[240px] flex flex-col min-h-0 border-r border-border last:border-r-0">
+    <div className="flex-1 min-w-[240px] max-w-[360px] flex flex-col min-h-0 border-r border-border">
       <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-border bg-surface-2 dark:bg-surface-3">
         <span className="text-[12px] font-semibold text-foreground">{label}</span>
         <span className="text-[10px] font-mono text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded-full leading-none">
@@ -292,6 +298,11 @@ function IssueDetailDialog({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <SeverityChip severity={bug.severity} />
                 <CategoryChip category={bug.category} />
+                {(bug.occurrence_count ?? 1) > 1 && (
+                  <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-mono font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                    ×{bug.occurrence_count} occurrences
+                  </span>
+                )}
                 {reportedDate && (
                   <span className="text-[11px] font-mono text-muted-foreground/50">
                     {formatReportedAt(reportedDate)}

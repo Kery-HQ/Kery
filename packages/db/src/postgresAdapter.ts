@@ -116,7 +116,14 @@ export class PostgresAdapter implements StorageAdapter {
         `SELECT id FROM bugs WHERE project_id = $1 AND name = $2 AND url IS NOT DISTINCT FROM $3 AND category = $4 LIMIT 1`,
         [projectId, bug.name, bug.url, bug.category],
       );
-      if (existing.length > 0) { skipped++; continue; }
+      if (existing.length > 0) {
+        await this.db.query(
+          `UPDATE bugs SET occurrence_count = occurrence_count + 1 WHERE id = $1`,
+          [existing[0].id],
+        );
+        skipped++;
+        continue;
+      }
 
       const { rows: [newBug] } = await this.db.query(
         `INSERT INTO bugs (project_id, run_id, environment_id, name, description, category, severity, status, url, run_label, reported_at, environment, step_index, screenshot_path, region) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
@@ -134,7 +141,7 @@ export class PostgresAdapter implements StorageAdapter {
 
   async listBugs(projectId: string) {
     const { rows } = await this.db.query(
-      `SELECT b.id, b.project_id, b.run_id, b.environment_id, b.name, b.description, b.category, b.severity, b.status, b.url, b.run_label, b.reported_at, b.environment, b.step_index, b.created_at, b.screenshot_path, b.region,
+      `SELECT b.id, b.project_id, b.run_id, b.environment_id, b.name, b.description, b.category, b.severity, b.status, b.url, b.run_label, b.reported_at, b.environment, b.step_index, b.created_at, b.screenshot_path, b.region, b.occurrence_count,
               tr.test_id, tr.destination_id,
               st.name AS test_name
        FROM bugs b
