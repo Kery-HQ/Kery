@@ -6,10 +6,10 @@ export default defineConfig({
   plugins: [react()],
   envDir: "../../",  // load .env from monorepo root
   server: {
-    port: 11113,
+    port: 11111,
     proxy: {
       // Match production nginx: SPA and API may differ by host/port; relative `/api/*` must reach the backend.
-      "/api": { target: "http://localhost:11111", changeOrigin: true },
+      "/api": { target: "http://localhost:11114", changeOrigin: true },
     },
   },
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
