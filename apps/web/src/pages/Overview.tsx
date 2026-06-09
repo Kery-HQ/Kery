@@ -13,12 +13,12 @@ import {
   Check,
   X,
   Sparkle,
-  ChartPie,
   CurrencyDollar,
+  Bug,
+  ListChecks,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
-import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -214,80 +214,117 @@ function SetupChecklist({
 
 // ─── Dashboard (shown after setup complete) ──────────────────────────────────
 
-const SEVERITY_DOT: Record<string, string> = {
-  high: "bg-status-fail",
-  medium: "bg-status-warn",
-  low: "bg-zinc-400 dark:bg-zinc-500",
+const SEVERITY_COLOR: Record<string, string> = {
+  high: "text-status-fail",
+  medium: "text-status-warn",
+  low: "text-zinc-400 dark:text-zinc-500",
 };
 
-type PageCoverageStats = {
-  total: number;
-  tested: number;
-  clean: number;
-  withIssues: number;
-  untested: number;
+const RUN_STATUS_COLOR: Record<string, string> = {
+  passed: "text-status-pass",
+  pass: "text-status-pass",
+  failed: "text-status-fail",
+  fail: "text-status-fail",
+  running: "text-status-running",
+  queued: "text-status-running",
 };
 
-function PageCoverageKpi({ coverage }: { coverage: PageCoverageStats | null }) {
-  const total = coverage?.total ?? 0;
-  const pass = coverage?.clean ?? 0;
-  const fail = coverage?.withIssues ?? 0;
-  const untested = coverage?.untested ?? 0;
+type BugStats = { open: number; toFix: number; ignored: number; total: number };
+type RunStats = { passed: number; failed: number; other: number; total: number };
+
+function BugsKpi({ bugStats }: { bugStats: BugStats | null }) {
+  const open = bugStats?.open ?? 0;
+  const toFix = bugStats?.toFix ?? 0;
+  const ignored = bugStats?.ignored ?? 0;
+  const total = bugStats?.total ?? 0;
 
   return (
     <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Route coverage
+          Total Bugs
         </span>
-        <ChartPie className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Bug className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
       {total === 0 ? (
-        <p className="text-[12px] text-muted-foreground leading-snug">No scanned routes yet. Run a crawl to map your app.</p>
+        <p className="text-[12px] text-muted-foreground leading-snug">No bugs found yet.</p>
       ) : (
         <>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-semibold tabular-nums text-foreground">
-              {Math.round(((pass + fail) / total) * 100)}
-            </span>
-            <span className="text-[12px] text-muted-foreground">% tested</span>
-          </div>
-          <div className="flex h-2 w-full rounded-full overflow-hidden gap-px bg-border/40">
-            {pass > 0 && (
-              <div
-                className="min-w-[3px] rounded-l-sm bg-status-pass"
-                style={{ flex: pass }}
-                title={`${pass} clean`}
-              />
-            )}
-            {fail > 0 && (
-              <div
-                className="min-w-[3px] bg-status-fail"
-                style={{ flex: fail }}
-                title={`${fail} with issues`}
-              />
-            )}
-            {untested > 0 && (
-              <div
-                className="min-w-[3px] rounded-r-sm bg-muted-foreground/25"
-                style={{ flex: untested }}
-                title={`${untested} untested`}
-              />
-            )}
+            <span className="text-2xl font-semibold tabular-nums text-foreground">{total}</span>
+            <span className="text-[12px] text-muted-foreground">bugs</span>
           </div>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            <span className="text-status-pass">{pass} clean</span>
+            <span className="text-status-fail">{open} open</span>
             {" · "}
-            <span className="text-status-fail">{fail} issues</span>
+            <span className="text-status-warn">{toFix} to fix</span>
             {" · "}
-            <span className="text-muted-foreground">{untested} untested</span>
-            <span className="text-muted-foreground/70"> · {total} routes</span>
+            <span className="text-muted-foreground">{ignored} ignored</span>
           </p>
         </>
       )}
     </div>
   );
 }
+
+function RunPassFailKpi({ runStats }: { runStats: RunStats | null }) {
+  const passed = runStats?.passed ?? 0;
+  const failed = runStats?.failed ?? 0;
+  const other = runStats?.other ?? 0;
+  const total = runStats?.total ?? 0;
+
+  return (
+    <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Runs
+        </span>
+        <Play className="h-4 w-4 text-muted-foreground shrink-0" />
+      </div>
+      {total === 0 ? (
+        <p className="text-[12px] text-muted-foreground leading-snug">No runs yet. Run a test to see results.</p>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-semibold tabular-nums text-foreground">{passed}</span>
+            <span className="text-[12px] text-muted-foreground">passed</span>
+          </div>
+          <div className="flex h-2 w-full rounded-full overflow-hidden gap-px bg-border/40">
+            {passed > 0 && (
+              <div
+                className="min-w-[3px] rounded-l-sm bg-status-pass"
+                style={{ flex: passed }}
+                title={`${passed} passed`}
+              />
+            )}
+            {failed > 0 && (
+              <div
+                className="min-w-[3px] bg-status-fail"
+                style={{ flex: failed }}
+                title={`${failed} failed`}
+              />
+            )}
+            {other > 0 && (
+              <div
+                className="min-w-[3px] rounded-r-sm bg-muted-foreground/25"
+                style={{ flex: other }}
+                title={`${other} other`}
+              />
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            <span className="text-status-pass">{passed} passed</span>
+            {" · "}
+            <span className="text-status-fail">{failed} failed</span>
+            {other > 0 && <>{" · "}<span className="text-muted-foreground">{other} other</span></>}
+            <span className="text-muted-foreground/70"> · {total} total</span>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; tested: number; clean: number; withIssues: number; untested: number } | null }) {
   const total = flowCoverage?.total ?? 0;
@@ -300,9 +337,9 @@ function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; test
     <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Flow coverage
+          App coverage
         </span>
-        <FlowArrow className="h-4 w-4 text-muted-foreground shrink-0" />
+        <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
       {total === 0 ? (
         <p className="text-[12px] text-muted-foreground leading-snug">No flows yet. Create and run flows to measure coverage.</p>
@@ -355,16 +392,18 @@ function Dashboard({
   overview,
   runs,
   bugs,
-  coverage,
   flowCoverage,
+  bugStats,
+  runStats,
   hiddenActiveRuns,
   navigate,
 }: {
   overview: any;
   runs: any[];
   bugs: any[];
-  coverage: PageCoverageStats | null;
   flowCoverage: { total: number; tested: number; clean: number; withIssues: number; untested: number } | null;
+  bugStats: BugStats | null;
+  runStats: RunStats | null;
   hiddenActiveRuns: number;
   navigate: (path: string) => void;
 }) {
@@ -373,9 +412,9 @@ function Dashboard({
     <div className="space-y-5">
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Total Runs" value={overview?.totalRuns ?? 0} icon={<Pulse className="h-4 w-4" />} />
-        <PageCoverageKpi coverage={coverage} />
+        <BugsKpi bugStats={bugStats} />
         <FlowCoverageKpi flowCoverage={flowCoverage} />
+        <RunPassFailKpi runStats={runStats} />
         <KpiCard
           label="Project spend"
           value={formatCost(totalCost)}
@@ -384,6 +423,38 @@ function Dashboard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent Issues */}
+        <Card className="min-h-[20rem]">
+          <div className="flex items-center justify-between p-4 pb-2 border-b glass-divider">
+            <span className="text-[14px] font-medium">Recent Issues</span>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/bugs")} className="h-7 text-[12px] gap-1">
+              View all <CaretRight className="h-3 w-3" />
+            </Button>
+          </div>
+          <CardContent className="pt-2">
+            {bugs.length === 0 ? (
+              <EmptyState icon={<WarningCircle className="h-5 w-5" />} title="No issues found" className="py-8" />
+            ) : (
+              <div className="space-y-1">
+                {bugs.map((bug: any, i: number) => (
+                  <button
+                    key={bug.id ?? i}
+                    onClick={() => bug.run_id && navigate(`/runs/${bug.run_id}`)}
+                    className="glass-row group w-full flex items-center gap-3 px-2.5 py-2 text-left"
+                  >
+                    <Bug className={cn("h-4 w-4 flex-shrink-0", SEVERITY_COLOR[bug.severity] ?? "text-muted-foreground/40")} />
+                    <span className="flex-1 text-[13px] text-foreground truncate">{bug.name || "Issue"}</span>
+                    {bug.category && <Badge variant="outline" className="text-[10px]">{bug.category}</Badge>}
+                    <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
+                      {relativeTime(bug.reported_at ?? bug.reportedAt)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Recent Runs */}
         <Card className="min-h-[20rem]">
           <div className="flex items-center justify-between p-4 pb-2 border-b glass-divider">
@@ -410,7 +481,7 @@ function Dashboard({
                     onClick={() => navigate(`/runs/${r.id}`)}
                     className="glass-row group w-full flex items-center gap-3 px-2.5 py-2 text-left"
                   >
-                    <StatusDot status={r.status} />
+                    <Play className={cn("h-4 w-4 flex-shrink-0", RUN_STATUS_COLOR[String(r.status ?? "").toLowerCase()] ?? "text-muted-foreground/40")} />
                     <span className="flex-1 text-[13px] text-foreground truncate">
                       {runListLabel(r)}
                     </span>
@@ -422,38 +493,6 @@ function Dashboard({
                     </span>
                     <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
                       {relativeTime(r.completed_at ?? r.started_at)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Issues */}
-        <Card className="min-h-[20rem]">
-          <div className="flex items-center justify-between p-4 pb-2 border-b glass-divider">
-            <span className="text-[14px] font-medium">Recent Issues</span>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/bugs")} className="h-7 text-[12px] gap-1">
-              View all <CaretRight className="h-3 w-3" />
-            </Button>
-          </div>
-          <CardContent className="pt-2">
-            {bugs.length === 0 ? (
-              <EmptyState icon={<WarningCircle className="h-5 w-5" />} title="No issues found" className="py-8" />
-            ) : (
-              <div className="space-y-1">
-                {bugs.map((bug: any, i: number) => (
-                  <button
-                    key={bug.id ?? i}
-                    onClick={() => bug.run_id && navigate(`/runs/${bug.run_id}`)}
-                    className="glass-row group w-full flex items-center gap-3 px-2.5 py-2 text-left"
-                  >
-                    <span className={cn("h-2 w-2 rounded-full flex-shrink-0", SEVERITY_DOT[bug.severity] ?? "bg-muted-foreground/40")} />
-                    <span className="flex-1 text-[13px] text-foreground truncate">{bug.name || "Issue"}</span>
-                    {bug.category && <Badge variant="outline" className="text-[10px]">{bug.category}</Badge>}
-                    <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0">
-                      {relativeTime(bug.reported_at ?? bug.reportedAt)}
                     </span>
                   </button>
                 ))}
@@ -477,8 +516,9 @@ export const Overview: React.FC = () => {
   const [runs, setRuns] = React.useState<any[]>([]);
   const [bugs, setBugs] = React.useState<any[]>([]);
   const [hiddenActiveRuns, setHiddenActiveRuns] = React.useState(0);
-  const [pageCoverage, setPageCoverage] = React.useState<PageCoverageStats | null>(null);
   const [flowCoverage, setFlowCoverage] = React.useState<{ total: number; tested: number; clean: number; withIssues: number; untested: number } | null>(null);
+  const [bugStats, setBugStats] = React.useState<BugStats | null>(null);
+  const [runStats, setRunStats] = React.useState<RunStats | null>(null);
   const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
   const [setupDone, setSetupDone] = React.useState(false);
   const [setupDismissed, setSetupDismissed] = React.useState(false);
@@ -527,7 +567,7 @@ export const Overview: React.FC = () => {
       setCompletedSteps(steps);
       setSetupDone(steps.size === 4);
       setOverview(ov);
-      setPageCoverage((pagesRes as { coverage?: PageCoverageStats }).coverage ?? null);
+
       const totalFlows = tests.length;
       const testedFlows = tests.filter((t: any) => (t?.run_count ?? 0) > 0);
       const cleanFlows = testedFlows.filter((t: any) => (t?.issues_count ?? 0) === 0).length;
@@ -539,6 +579,16 @@ export const Overview: React.FC = () => {
         withIssues: issueFlows,
         untested: Math.max(0, totalFlows - testedFlows.length),
       });
+
+      const openBugs = allBugs.filter((b: any) => b.status === "open").length;
+      const toFixBugs = allBugs.filter((b: any) => b.status === "in_progress").length;
+      const ignoredBugs = allBugs.filter((b: any) => b.status === "wont_fix").length;
+      setBugStats({ open: openBugs, toFix: toFixBugs, ignored: ignoredBugs, total: openBugs + toFixBugs + ignoredBugs });
+
+      const passedRuns = allRuns.filter((r: any) => String(r?.status ?? "").toLowerCase() === "passed").length;
+      const failedRuns = allRuns.filter((r: any) => String(r?.status ?? "").toLowerCase() === "failed").length;
+      setRunStats({ passed: passedRuns, failed: failedRuns, other: allRuns.length - passedRuns - failedRuns, total: allRuns.length });
+
       const recentRuns = allRuns.slice(0, 10);
       const isActiveRun = (r: any) => {
         const s = String(r?.status ?? "").toLowerCase();
@@ -617,8 +667,9 @@ export const Overview: React.FC = () => {
                 overview={overview}
                 runs={runs}
                 bugs={bugs}
-                coverage={pageCoverage}
                 flowCoverage={flowCoverage}
+                bugStats={bugStats}
+                runStats={runStats}
                 hiddenActiveRuns={hiddenActiveRuns}
                 navigate={navigate}
               />
