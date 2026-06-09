@@ -39,7 +39,7 @@ const CORE_ITEMS = [
 ];
 
 const TOOLS_ITEMS = [
-  { name: "Environments", href: "/environments",  icon: Code },
+  { name: "Credentials", href: "/environments",  icon: Code },
   { name: "Memory",       href: "/memory",        icon: Brain },
 ];
 

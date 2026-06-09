@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { name: "Flows", href: "/tests", icon: FlowArrow },
   { name: "Runs", href: "/runs", icon: Pulse },
   { name: "Issues", href: "/bugs", icon: Warning },
-  { name: "Environments", href: "/environments", icon: Globe },
+  { name: "Credentials", href: "/environments", icon: Globe },
   { name: "Memory", href: "/memory", icon: Brain },
   { name: "Platform Settings", href: "/settings", icon: Gear },
 ];

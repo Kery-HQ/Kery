@@ -48,11 +48,11 @@ interface SetupStep {
 const SETUP_STEPS: SetupStep[] = [
   {
     key: "environment",
-    label: "Setup App Environment",
-    description: "Setup details of your website or webapp you want to test.",
+    label: "Set up credentials",
+    description: "Add your app's frontend URL and login credentials so Kery knows where and how to test.",
     icon: Globe,
     href: "/environments",
-    buttonLabel: "Add environment",
+    buttonLabel: "Add credentials",
   },
   {
     key: "scan",

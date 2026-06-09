@@ -60,7 +60,7 @@ const AUTH_MODES: readonly {
     subtitle: "Playwright fills your login form before each run",
     icon: SignIn,
     setupHelp:
-      "Set the login page URL, CSS selectors for username, password, and submit, then enter test credentials. Kery navigates to the login URL, fills the fields, submits, and continues the run in that session.",
+      "Enter test credentials. Kery navigates to your login page, fills the fields, and continues the run in that session. Use Advanced settings to override the login URL and field selectors.",
   },
   {
     value: "clerk",
@@ -78,7 +78,6 @@ const AUTH_MODES: readonly {
     setupHelp:
       "Provide your project URL, anon (or service) key, and a test user email and password. Kery signs in via Supabase Auth and attaches the returned JWT for the session.",
   },
-  // "apiToken" and "oauthToken" options hidden for now
 ];
 
 function AuthModeSelect({
@@ -274,6 +273,298 @@ function configFromTokenForm(f: TokenProviderForm, providerType: string): Record
   };
 }
 
+// ── UI form fields shared between onboarding and detail view ──────────────────
+
+function UiAuthFields({
+  form,
+  onChange,
+}: {
+  form: UiAuthForm;
+  onChange: (f: UiAuthForm) => void;
+}) {
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Username</label>
+          <Input
+            autoComplete="off"
+            placeholder="user@example.com"
+            value={form.username}
+            onChange={(e) => onChange({ ...form, username: e.target.value })}
+            className="text-[12px]"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Password</label>
+          <Input
+            type="password"
+            autoComplete="off"
+            placeholder="password"
+            value={form.password}
+            onChange={(e) => onChange({ ...form, password: e.target.value })}
+            className="text-[12px]"
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <CaretDown className={cn("h-3 w-3 transition-transform", showAdvanced && "rotate-180")} />
+        Advanced settings
+      </button>
+
+      {showAdvanced && (
+        <div className="space-y-3 pl-4 border-l border-border">
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Login URL</label>
+            <Input
+              type="url"
+              placeholder="https://your-app.example.com/login"
+              value={form.loginUrl}
+              onChange={(e) => onChange({ ...form, loginUrl: e.target.value })}
+              className="font-mono text-[12px]"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground/70">
+              Optional. Leave blank to start from the frontend URL.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Username field</label>
+              <Input
+                placeholder="#email"
+                value={form.usernameField}
+                onChange={(e) => onChange({ ...form, usernameField: e.target.value })}
+                className="font-mono text-[12px]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Password field</label>
+              <Input
+                placeholder="#password"
+                value={form.passwordField}
+                onChange={(e) => onChange({ ...form, passwordField: e.target.value })}
+                className="font-mono text-[12px]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Submit</label>
+              <Input
+                placeholder="button[type=submit]"
+                value={form.submitButton}
+                onChange={(e) => onChange({ ...form, submitButton: e.target.value })}
+                className="font-mono text-[12px]"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground/70">
+            Selector fields are optional — leave blank to rely on auto-detection.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Onboarding (no environments yet) ─────────────────────────────────────────
+
+function CredentialsOnboarding({
+  projectId,
+  onCreated,
+}: {
+  projectId: string;
+  onCreated: () => void;
+}) {
+  const [url, setUrl] = React.useState("");
+  const [authMode, setAuthMode] = React.useState("none");
+  const [uiForm, setUiForm] = React.useState<UiAuthForm>(DEFAULT_UI_FORM);
+  const [tokenForm, setTokenForm] = React.useState<TokenProviderForm>(DEFAULT_TOKEN_FORM);
+  const [saving, setSaving] = React.useState(false);
+
+  async function handleSubmit() {
+    if (!url.trim()) return;
+    setSaving(true);
+    try {
+      const res = await createEnvironment(projectId, {
+        name: "default",
+        baseUrl: url.trim(),
+        isDefault: true,
+      });
+      const envId = res.environment.id;
+
+      if (authMode !== "none") {
+        let config: Record<string, any>;
+        let mode = authMode;
+        if (authMode === "ui") {
+          config = configFromUiForm(uiForm);
+        } else if (authMode === "clerk" || authMode === "supabase") {
+          config = configFromTokenForm(tokenForm, authMode);
+          mode = "tokenProvider";
+        } else {
+          config = {};
+        }
+        await saveAuth(projectId, envId, mode, config);
+      }
+
+      onCreated();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex-1 flex items-start justify-center p-8 pt-16 animate-fade-in">
+      <div className="w-full max-w-[480px] space-y-6">
+        <div className="space-y-1">
+          <h2 className="text-[18px] font-semibold text-foreground">Set up your app</h2>
+          <p className="text-[13px] text-muted-foreground">
+            Connect your frontend so Kery knows where to test.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Frontend URL</label>
+            <Input
+              type="url"
+              placeholder="https://your-app.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              className="font-mono"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Login method</label>
+            <AuthModeField value={authMode} onChange={setAuthMode} />
+          </div>
+
+          {authMode === "ui" && (
+            <UiAuthFields form={uiForm} onChange={setUiForm} />
+          )}
+
+          {authMode === "clerk" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk Secret Key</label>
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="sk_test_..."
+                  value={tokenForm.apiKey}
+                  onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
+                  className="font-mono text-[12px]"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk API URL</label>
+                <Input
+                  type="url"
+                  placeholder="https://api.clerk.com"
+                  value={tokenForm.apiUrl}
+                  onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
+                  className="font-mono text-[12px]"
+                />
+                <p className="text-[10px] text-muted-foreground/60 mt-1">Clerk Backend API base URL</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
+                  <Input
+                    autoComplete="off"
+                    placeholder="test@example.com"
+                    value={tokenForm.email}
+                    onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
+                    className="text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    placeholder="password"
+                    value={tokenForm.password}
+                    onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
+                    className="text-[12px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {authMode === "supabase" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Project URL</label>
+                <Input
+                  type="url"
+                  placeholder="https://your-ref.supabase.co"
+                  value={tokenForm.apiUrl}
+                  onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
+                  className="font-mono text-[12px]"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Anon Key</label>
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="eyJhbGciOi..."
+                  value={tokenForm.apiKey}
+                  onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
+                  className="font-mono text-[12px]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
+                  <Input
+                    autoComplete="off"
+                    placeholder="test@example.com"
+                    value={tokenForm.email}
+                    onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
+                    className="text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    placeholder="password"
+                    value={tokenForm.password}
+                    onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
+                    className="text-[12px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={handleSubmit}
+            loading={saving}
+            disabled={!url.trim()}
+            className="w-full"
+          >
+            Continue
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 type Env = { id: string; name: string; base_url: string; is_default: boolean };
 
 export const Environments: React.FC = () => {
@@ -288,7 +579,7 @@ export const Environments: React.FC = () => {
   const [editName, setEditName] = React.useState("");
   const [editUrl, setEditUrl] = React.useState("");
 
-  // Create form
+  // Create dialog (alternate credentials)
   const [createOpen, setCreateOpen] = React.useState(false);
   const [newName, setNewName] = React.useState("");
   const [newUrl, setNewUrl] = React.useState("");
@@ -368,9 +659,9 @@ export const Environments: React.FC = () => {
       const res = await createEnvironment(currentProjectId, {
         name: newName.trim(),
         baseUrl: newUrl.trim(),
-        isDefault: envs.length === 0,
+        isDefault: false,
       });
-      setEnvs((prev) => [res.environment, ...prev]);
+      setEnvs((prev) => [...prev, res.environment]);
       setExpandedEnvId(res.environment.id);
       setEditName(res.environment.name);
       setEditUrl(res.environment.base_url);
@@ -422,7 +713,7 @@ export const Environments: React.FC = () => {
       await saveAuth(currentProjectId, expandedEnvId, mode, config);
       setSaveStatus("Saved.");
     } catch (e: any) {
-      setSaveStatus(e?.message?.includes("Save failed") ? "Save failed." : "Save failed.");
+      setSaveStatus("Save failed.");
     } finally {
       setSaving(false);
     }
@@ -442,11 +733,11 @@ export const Environments: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Code className="h-4 w-4" />} title="Environments" />
+        <PageHeader icon={<Code className="h-4 w-4" />} title="Credentials" />
         <EmptyState
           icon={<Globe className="h-8 w-8" />}
           title="No project selected"
-          description="Select a project to manage environments."
+          description="Select a project to manage credentials."
           className="flex-1"
         />
       </div>
@@ -457,62 +748,64 @@ export const Environments: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Code className="h-4 w-4" />} title="Environments">
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" />
-              Add Environment
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Environment</DialogTitle>
-              <DialogDescription>Add a target environment for running tests.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Name</label>
-                <Input
-                  placeholder="e.g. Staging"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Base URL</label>
-                <Input
-                  placeholder="https://staging.example.com"
-                  value={newUrl}
-                  onChange={(e) => setNewUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                  className="font-mono"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="ghost" size="sm">Cancel</Button>
-              </DialogClose>
-              <Button
-                size="sm"
-                onClick={handleCreate}
-                loading={creating}
-                disabled={!newName.trim() || !newUrl.trim()}
-              >
-                Create
+      <PageHeader icon={<Code className="h-4 w-4" />} title="Credentials">
+        {envs.length > 0 && (
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                Add alternate credentials
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New credential</DialogTitle>
+                <DialogDescription>Add an alternate set of credentials for this project.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Name</label>
+                  <Input
+                    placeholder="e.g. Admin user"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Frontend URL</label>
+                  <Input
+                    placeholder="https://your-app.com"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="ghost" size="sm">Cancel</Button>
+                </DialogClose>
+                <Button
+                  size="sm"
+                  onClick={handleCreate}
+                  loading={creating}
+                  disabled={!newName.trim() || !newUrl.trim()}
+                >
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </PageHeader>
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Environment</DialogTitle>
+            <DialogTitle>Delete credential</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete <span className="font-semibold text-foreground">"{deleteTarget?.name}"</span>? This action cannot be undone.
             </DialogDescription>
@@ -540,21 +833,17 @@ export const Environments: React.FC = () => {
             ))}
           </div>
         ) : envs.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={<Globe className="h-8 w-8" />}
-              title="No environments"
-              description="Add your first environment to start running tests."
-              className="py-16"
-            />
-          </div>
+          <CredentialsOnboarding
+            projectId={currentProjectId}
+            onCreated={loadEnvs}
+          />
         ) : (
           <div className="flex h-full min-h-0 overflow-hidden">
-            {/* ── Left: environment list ───────────────────────────── */}
+            {/* ── Left: credential list ───────────────────────────── */}
             <div className="w-[340px] flex-shrink-0 flex flex-col min-h-0 border-r border-border overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-border flex-shrink-0 bg-surface-2 dark:bg-surface-3">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Environments
+                  Credentials
                 </span>
                 <span className="text-[11px] font-mono text-muted-foreground/60">{envs.length}</span>
               </div>
@@ -602,301 +891,224 @@ export const Environments: React.FC = () => {
               </div>
             </div>
 
-            {/* ── Right: selected environment controls ─────────────── */}
+            {/* ── Right: selected credential controls ─────────────── */}
             <div className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
               {selectedEnv ? (
-                  <div className="flex flex-col h-full">
-                    <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-[15px] font-semibold text-foreground leading-snug truncate min-w-0">
-                          {selectedEnv.name}
-                        </h2>
-                        {selectedEnv.is_default && (
-                          <Badge variant="default" className="text-[9px] px-1.5 py-0">default</Badge>
-                        )}
-                      </div>
-                      <p className="text-[12px] font-mono text-muted-foreground mt-0.5 truncate">{selectedEnv.base_url}</p>
+                <div className="flex flex-col h-full">
+                  <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-[15px] font-semibold text-foreground leading-snug truncate min-w-0">
+                        {selectedEnv.name}
+                      </h2>
+                      {selectedEnv.is_default && (
+                        <Badge variant="default" className="text-[9px] px-1.5 py-0">default</Badge>
+                      )}
                     </div>
+                    <p className="text-[12px] font-mono text-muted-foreground mt-0.5 truncate">{selectedEnv.base_url}</p>
+                  </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
-                      {/* Environment details */}
-                      <section className="space-y-3">
+                  <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+                    {/* Credential details */}
+                    <section className="space-y-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        Details
+                      </p>
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Name</label>
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Frontend URL</label>
+                        <Input
+                          value={editUrl}
+                          onChange={(e) => setEditUrl(e.target.value)}
+                          className="font-mono"
+                        />
+                      </div>
+                    </section>
+
+                    {/* Auth configuration */}
+                    <section className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                          Environment
+                          Authentication
                         </p>
-                        <div>
-                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Name</label>
-                          <Input
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Base URL</label>
-                          <Input
-                            value={editUrl}
-                            onChange={(e) => setEditUrl(e.target.value)}
-                            className="font-mono"
-                          />
-                        </div>
-                      </section>
+                      </div>
 
-                      {/* Auth configuration */}
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                            Authentication
-                          </p>
-                        </div>
+                      <div className="w-full min-w-0">
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Mode</label>
+                        <AuthModeField value={authMode} onChange={setAuthMode} />
+                      </div>
 
-                        <div className="w-full min-w-0">
-                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Mode</label>
-                          <AuthModeField value={authMode} onChange={setAuthMode} />
-                        </div>
+                      {authMode === "none" && (
+                        <p className="text-[12px] text-muted-foreground">
+                          No authentication configured. Runs will start directly on the frontend URL.
+                        </p>
+                      )}
 
-                        {authMode === "none" && (
-                          <p className="text-[12px] text-muted-foreground">
-                            No authentication configured. Runs will start directly on the base URL.
-                          </p>
-                        )}
+                      {authMode === "ui" && (
+                        <UiAuthFields form={uiForm} onChange={setUiForm} />
+                      )}
 
-                        {authMode === "ui" && (
-                          <div className="space-y-3">
-                            <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5 space-y-1">
-                              <p className="text-[12px] font-medium text-foreground">Automatic login detection is always on</p>
-                              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                                Kery uses your provided login URL/selectors when available, and automatically falls back to
-                                base-URL route discovery and selector detection when values are missing or a login attempt fails.
-                              </p>
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Login URL</label>
-                              <Input
-                                type="url"
-                                placeholder="https://your-app.example.com/login"
-                                value={uiForm.loginUrl}
-                                onChange={(e) => setUiForm((f) => ({ ...f, loginUrl: e.target.value }))}
-                                className="font-mono text-[12px]"
-                              />
-                              <p className="mt-1 text-[10px] text-muted-foreground/70">
-                                Optional override. Leave blank to start from the environment base URL.
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Username field selector</label>
-                                <Input
-                                  placeholder="#email"
-                                  value={uiForm.usernameField}
-                                  onChange={(e) => setUiForm((f) => ({ ...f, usernameField: e.target.value }))}
-                                  className="font-mono text-[12px]"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Password field selector</label>
-                                <Input
-                                  placeholder="#password"
-                                  value={uiForm.passwordField}
-                                  onChange={(e) => setUiForm((f) => ({ ...f, passwordField: e.target.value }))}
-                                  className="font-mono text-[12px]"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Submit selector</label>
-                                <Input
-                                  placeholder="button[type=submit]"
-                                  value={uiForm.submitButton}
-                                  onChange={(e) => setUiForm((f) => ({ ...f, submitButton: e.target.value }))}
-                                  className="font-mono text-[12px]"
-                                />
-                              </div>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground/70">
-                              Selector fields are optional overrides; leave blank to rely on auto-detection.
-                            </p>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Username</label>
-                                <Input
-                                  autoComplete="off"
-                                  placeholder="user@example.com"
-                                  value={uiForm.username}
-                                  onChange={(e) => setUiForm((f) => ({ ...f, username: e.target.value }))}
-                                  className="text-[12px]"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Password</label>
-                                <Input
-                                  type="password"
-                                  autoComplete="off"
-                                  placeholder="password"
-                                  value={uiForm.password}
-                                  onChange={(e) => setUiForm((f) => ({ ...f, password: e.target.value }))}
-                                  className="text-[12px]"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {authMode === "clerk" && (
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk Secret Key</label>
-                              <Input
-                                type="password"
-                                autoComplete="off"
-                                placeholder="sk_test_..."
-                                value={tokenForm.apiKey}
-                                onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
-                                className="font-mono text-[12px]"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk API URL</label>
-                              <Input
-                                type="url"
-                                placeholder="https://api.clerk.com"
-                                value={tokenForm.apiUrl}
-                                onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
-                                className="font-mono text-[12px]"
-                              />
-                              <p className="text-[10px] text-muted-foreground/60 mt-1">Clerk Backend API base URL</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
-                                <Input
-                                  autoComplete="off"
-                                  placeholder="test@example.com"
-                                  value={tokenForm.email}
-                                  onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
-                                  className="text-[12px]"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
-                                <Input
-                                  type="password"
-                                  autoComplete="off"
-                                  placeholder="password"
-                                  value={tokenForm.password}
-                                  onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
-                                  className="text-[12px]"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {authMode === "supabase" && (
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Project URL</label>
-                              <Input
-                                type="url"
-                                placeholder="https://your-ref.supabase.co"
-                                value={tokenForm.apiUrl}
-                                onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
-                                className="font-mono text-[12px]"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Anon Key</label>
-                              <Input
-                                type="password"
-                                autoComplete="off"
-                                placeholder="eyJhbGciOi..."
-                                value={tokenForm.apiKey}
-                                onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
-                                className="font-mono text-[12px]"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
-                                <Input
-                                  autoComplete="off"
-                                  placeholder="test@example.com"
-                                  value={tokenForm.email}
-                                  onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
-                                  className="text-[12px]"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
-                                <Input
-                                  type="password"
-                                  autoComplete="off"
-                                  placeholder="password"
-                                  value={tokenForm.password}
-                                  onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
-                                  className="text-[12px]"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {(authMode === "apiToken" || authMode === "oauthToken") && (
+                      {authMode === "clerk" && (
+                        <div className="space-y-3">
                           <div>
-                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Config (JSON)</label>
-                            <Textarea
-                              value={authJson}
-                              onChange={(e) => setAuthJson(e.target.value)}
-                              rows={10}
-                              className="font-mono text-[12px] min-h-[180px] resize-y"
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk Secret Key</label>
+                            <Input
+                              type="password"
+                              autoComplete="off"
+                              placeholder="sk_test_..."
+                              value={tokenForm.apiKey}
+                              onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
+                              className="font-mono text-[12px]"
                             />
                           </div>
-                        )}
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Clerk API URL</label>
+                            <Input
+                              type="url"
+                              placeholder="https://api.clerk.com"
+                              value={tokenForm.apiUrl}
+                              onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
+                              className="font-mono text-[12px]"
+                            />
+                            <p className="text-[10px] text-muted-foreground/60 mt-1">Clerk Backend API base URL</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
+                              <Input
+                                autoComplete="off"
+                                placeholder="test@example.com"
+                                value={tokenForm.email}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
+                                className="text-[12px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground hover:text-foreground mb-1 block">Test user password</label>
+                              <Input
+                                type="password"
+                                autoComplete="off"
+                                placeholder="password"
+                                value={tokenForm.password}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
+                                className="text-[12px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                      </section>
-                    </div>
+                      {authMode === "supabase" && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Project URL</label>
+                            <Input
+                              type="url"
+                              placeholder="https://your-ref.supabase.co"
+                              value={tokenForm.apiUrl}
+                              onChange={(e) => setTokenForm((f) => ({ ...f, apiUrl: e.target.value }))}
+                              className="font-mono text-[12px]"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Supabase Anon Key</label>
+                            <Input
+                              type="password"
+                              autoComplete="off"
+                              placeholder="eyJhbGciOi..."
+                              value={tokenForm.apiKey}
+                              onChange={(e) => setTokenForm((f) => ({ ...f, apiKey: e.target.value }))}
+                              className="font-mono text-[12px]"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user email</label>
+                              <Input
+                                autoComplete="off"
+                                placeholder="test@example.com"
+                                value={tokenForm.email}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, email: e.target.value }))}
+                                className="text-[12px]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Test user password</label>
+                              <Input
+                                type="password"
+                                autoComplete="off"
+                                placeholder="password"
+                                value={tokenForm.password}
+                                onChange={(e) => setTokenForm((f) => ({ ...f, password: e.target.value }))}
+                                className="text-[12px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                    {/* Sticky footer */}
-                    <div className="flex-shrink-0 border-t border-border px-6 py-3 flex items-center gap-3 bg-surface-2 dark:bg-surface-3">
+                      {(authMode === "apiToken" || authMode === "oauthToken") && (
+                        <div>
+                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Config (JSON)</label>
+                          <Textarea
+                            value={authJson}
+                            onChange={(e) => setAuthJson(e.target.value)}
+                            rows={10}
+                            className="font-mono text-[12px] min-h-[180px] resize-y"
+                          />
+                        </div>
+                      )}
+                    </section>
+                  </div>
+
+                  {/* Sticky footer */}
+                  <div className="flex-shrink-0 border-t border-border px-6 py-3 flex items-center gap-3 bg-surface-2 dark:bg-surface-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSave}
+                      loading={saving}
+                      disabled={!editName.trim() || !editUrl.trim()}
+                    >
+                      Save
+                    </Button>
+                    {authMode !== "none" && (
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={handleSave}
-                        loading={saving}
-                        disabled={!editName.trim() || !editUrl.trim()}
+                        onClick={handleTestAuth}
+                        loading={testingAuth}
+                        disabled={saving}
                       >
-                        Save config
+                        <Play className="h-3.5 w-3.5" />
+                        Test auth
                       </Button>
-                      {authMode !== "none" && (
-                        <Button
-                          size="sm"
-                          onClick={handleTestAuth}
-                          loading={testingAuth}
-                          disabled={saving}
-                        >
-                          <Play className="h-3.5 w-3.5" />
-                          Test auth
-                        </Button>
-                      )}
-                      {saveStatus && (
-                        <span className={cn(
-                          "text-[12px]",
-                          saveStatus === "Saved." ? "text-status-pass" : "text-destructive",
-                        )}>
-                          {saveStatus}
-                        </span>
-                      )}
-                    </div>
+                    )}
+                    {saveStatus && (
+                      <span className={cn(
+                        "text-[12px]",
+                        saveStatus === "Saved." ? "text-status-pass" : "text-destructive",
+                      )}>
+                        {saveStatus}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <div className="p-6">
-                    <EmptyState
-                      icon={<Globe className="h-8 w-8" />}
-                      title="Select an environment"
-                      description="Choose an environment from the list to edit details and authentication."
-                      className="py-16"
-                    />
-                  </div>
-                )}
+                </div>
+              ) : (
+                <div className="p-6">
+                  <EmptyState
+                    icon={<Globe className="h-8 w-8" />}
+                    title="Select a credential"
+                    description="Choose a credential from the list to edit details and authentication."
+                    className="py-16"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
