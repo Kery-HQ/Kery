@@ -102,13 +102,6 @@ export {
 } from "./liveRunSnapshot.js";
 export type { LiveRunSnapshot, LiveActivityEntry, LiveRunReduceEvent } from "./liveRunSnapshot.js";
 
-// ─── Crawler ─────────────────────────────────────────────────────────────────
-export { runCrawl, executeCrawlRun, generateIntentForNode } from "./crawlerWorker.js";
-export type {
-  CrawlPageData, CrawlResult, CrawlSuggestedFlow, CrawlLlmCostBreakdown, CrawlMetadata,
-  CrawlProgressPhase, CrawlProgressMetadata, CrawlProgressSnapshot, RunCrawlOptions,
-} from "./crawlerWorker.js";
-
 // ─── Run Orchestrator ────────────────────────────────────────────────────────
 export { runOrchestratedJob } from "./runOrchestrator.js";
 export type { RunJob, RunResult } from "./runOrchestrator.js";

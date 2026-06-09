@@ -6,24 +6,19 @@ import { encryptConfigJson } from "@kery/db";
 import {
   ProjectIdParams,
   ProjectEnvParams,
-  ProjectDestParams,
   ProjectMemoryEntryParams,
   ProjectUpdateBody,
 } from "./params.js";
 
-/** Join saved_tests + destinations so list views can show flow name, page title, or adhoc label. */
 const RUN_LIST_FROM = `
   FROM test_runs tr
   LEFT JOIN saved_tests st ON st.id = tr.test_id
-  LEFT JOIN app_tree_destinations d ON d.id = tr.destination_id
 `;
 
 const RUN_DISPLAY_NAME_SQL = `
   COALESCE(
     NULLIF(TRIM(tr.source_label), ''),
-    st.name,
-    NULLIF(TRIM(d.title), ''),
-    d.normalized_route
+    st.name
   ) AS display_name
 `;
 
@@ -76,19 +71,6 @@ const ProjectRunsQuery = z.object({
   search: z.string().trim().max(200).optional(),
   status: z.string().trim().max(40).optional(),
 });
-
-const PagePatchBody = z.object({
-  enabled: z.boolean(),
-});
-
-async function assertDestinationInProject(
-  storage: StorageAdapter,
-  projectId: string,
-  destinationId: string,
-): Promise<boolean> {
-  const dest = await storage.getDestination(destinationId);
-  return !!(dest && String(dest.project_id) === projectId);
-}
 
 export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdapter) {
   const pool = storage.getPool() as Pool;
@@ -163,7 +145,6 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
           FROM test_runs tr
           WHERE tr.project_id = $1
         ), 0)
-        + COALESCE((SELECT SUM(cost_usd) FROM crawl_runs WHERE project_id = $1), 0)
         AS total`,
       [projectId],
     );
@@ -276,7 +257,7 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
 
     if (search) {
       whereParts.push(
-        `(tr.id::text ILIKE $${n} OR COALESCE(NULLIF(TRIM(tr.source_label), ''), st.name, NULLIF(TRIM(d.title), ''), d.normalized_route, '') ILIKE $${n})`,
+        `(tr.id::text ILIKE $${n} OR COALESCE(NULLIF(TRIM(tr.source_label), ''), st.name, '') ILIKE $${n})`,
       );
       params.push(`%${search}%`);
       n += 1;
@@ -392,84 +373,5 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
     const { projectId } = ProjectIdParams.parse(req.params);
     await pool.query(`DELETE FROM memory_entries WHERE scope = 'project' AND project_id = $1`, [projectId]);
     reply.send({ ok: true });
-  });
-
-  // Coverage
-  app.get("/api/projects/:projectId/coverage", async (req, reply) => {
-    const { projectId } = ProjectIdParams.parse(req.params);
-    const coverage = await storage.getProjectCoverage(projectId);
-    reply.send(coverage);
-  });
-
-  // Pages
-  app.get("/api/projects/:projectId/pages", async (req, reply) => {
-    const { projectId } = ProjectIdParams.parse(req.params);
-    const { rows: destinations } = await pool.query(
-      `SELECT id, normalized_route, title, health_status, issues_count, last_inspected_at, enabled, forms_json, interactions_json, plan_status, plan_success_count FROM app_tree_destinations WHERE project_id = $1 ORDER BY normalized_route`,
-      [projectId],
-    );
-    const pages = destinations.map((d: any) => ({
-      id: d.id, route: d.normalized_route, title: d.title,
-      health: d.health_status, issues: d.issues_count, enabled: d.enabled,
-      formCount: (d.forms_json || []).length, interactionCount: (d.interactions_json || []).length,
-      plan_status: d.plan_status ?? "none",
-      plan_success_count: d.plan_success_count ?? 0,
-    }));
-    const coverage = await storage.getProjectCoverage(projectId);
-    const { rows: lastScanRows } = await pool.query(
-      `SELECT id, status, pages_visited, nodes_found, started_at, completed_at, cost_usd,
-              llm_cost_breakdown_json, crawl_metadata_json
-       FROM crawl_runs WHERE project_id = $1 ORDER BY started_at DESC LIMIT 1`,
-      [projectId],
-    );
-    reply.send({ pages, coverage, lastScan: lastScanRows[0] ?? null });
-  });
-
-  app.patch("/api/projects/:projectId/pages/:destinationId", async (req, reply) => {
-    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
-    const parsed = PagePatchBody.safeParse(req.body);
-    if (!parsed.success) {
-      reply.code(400).send({ error: "invalid payload", details: parsed.error.issues });
-      return;
-    }
-    if (!(await assertDestinationInProject(storage, projectId, destinationId))) {
-      reply.code(404).send({ error: "Page not found" });
-      return;
-    }
-    const { rows } = await pool.query(
-      `UPDATE app_tree_destinations SET enabled = $1, updated_at = now()
-       WHERE id = $2 AND project_id = $3 RETURNING id, enabled`,
-      [parsed.data.enabled, destinationId, projectId],
-    );
-    reply.send({ page: rows[0] });
-  });
-
-  app.delete("/api/projects/:projectId/pages/:destinationId", async (req, reply) => {
-    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
-    const { rowCount } = await pool.query(
-      `DELETE FROM app_tree_destinations WHERE id = $1 AND project_id = $2`,
-      [destinationId, projectId],
-    );
-    if (!rowCount) {
-      reply.code(404).send({ error: "Page not found" });
-      return;
-    }
-    reply.send({ ok: true });
-  });
-
-  app.get("/api/projects/:projectId/pages/:destinationId", async (req, reply) => {
-    const { projectId, destinationId } = ProjectDestParams.parse(req.params);
-    const dest = await storage.getDestination(destinationId);
-    if (!dest || String(dest.project_id) !== projectId) {
-      reply.code(404).send({ error: "Page not found" });
-      return;
-    }
-    const { rows: recentRuns } = await pool.query(
-      `SELECT tr.*, ${RUN_DISPLAY_NAME_SQL} ${RUN_LIST_FROM}
-       WHERE tr.project_id = $1 AND tr.destination_id = $2
-       ORDER BY tr.started_at DESC NULLS LAST LIMIT 20`,
-      [projectId, destinationId],
-    );
-    reply.send({ page: dest, recentRuns });
   });
 }

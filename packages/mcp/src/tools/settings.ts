@@ -65,7 +65,7 @@ WHEN TO USE:
 
 MODEL SLOTS:
   'agentModel'       — makes browser automation decisions. Default: openai/gpt-4.1-mini
-  'auxiliaryModel'   — crawl, test plans, summaries, memory curation. Default: gemini-2.5-flash
+  'auxiliaryModel'   — test plans, summaries, memory curation. Default: gemini-2.5-flash
   'reviewAgentModel' — post-run holistic screenshot analysis. Default: gemini-2.5-flash
   'stagehandModel'   — element finding when selectors break. Default: gpt-4o-mini
 

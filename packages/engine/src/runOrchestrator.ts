@@ -37,7 +37,6 @@ export type RunJob = {
   projectId?: string;
   auth?: AuthConfig | null;
   testId?: string;
-  destinationId?: string;
   context?: string;
   saveScreenshots?: boolean;
   maxSteps?: number;
@@ -90,33 +89,9 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
   let context = job.context ?? "";
   let targetUrl: string | undefined;
 
-  // Runs created from a page/destination (i.e. `destinationId` without a saved `testId`)
-  // don't carry `maxSteps`, so apply a higher default for page tests.
-  const isPageTest = Boolean(job.destinationId) && !job.testId;
-  const maxStepsForRun = job.maxSteps ?? (isPageTest ? 200 : undefined);
-
-  // For page tests, compute the navigation target URL. Navigator plans from what it sees on the page.
-  if (job.destinationId) {
-    try {
-      const dest = await storage.getDestination(job.destinationId);
-      if (dest) {
-        targetUrl = buildTargetUrl(job.baseUrl, dest.normalized_route);
-      }
-    } catch (err) {
-      logger.warn({ err: String(err), destinationId: job.destinationId }, "Failed to resolve target URL");
-    }
-  }
+  const maxStepsForRun = job.maxSteps;
 
   // Load memory (with in-memory decay for prompt; DB rows unchanged until curator/boost)
-  let destinationRoute: string | undefined;
-  if (job.destinationId) {
-    try {
-      const d = await storage.getDestination(job.destinationId);
-      destinationRoute = d?.normalized_route;
-    } catch {
-      /* ignore */
-    }
-  }
   const projectMemory = job.projectId ? await loadProjectMemoryWithDecay(storage, job.projectId) : [];
   const allMemory = projectMemory;
 
@@ -372,7 +347,6 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         runStatus: agentResult.status === "passed" ? "passed" : "failed",
         stepsDetail: agentResult.stepsDetail,
         projectId: job.projectId,
-        destinationRoute,
         projectMemory,
         onLLMCall: (call) => {
           memoryCuratorCalls.push(call);

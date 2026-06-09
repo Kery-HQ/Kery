@@ -2,7 +2,6 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { KeryClient } from "@keryai/client";
 
 const KERY_OVERVIEW = `Kery is an AI-powered browser testing platform. It uses LLM agents to:
-  • Crawl your web app and discover all pages/routes (kery_scan)
   • Run AI browser agents that navigate, interact, and find bugs (kery_run_test)
   • Track bugs by severity and category (kery_get_bugs)
   • Save reusable test flows (kery_list_tests)
@@ -11,10 +10,8 @@ const KERY_OVERVIEW = `Kery is an AI-powered browser testing platform. It uses L
 TYPICAL WORKFLOW:
   1. kery_start          — start the platform (local Docker mode only)
   2. kery_setup_project  — create a project with your app URL + auth config
-  3. kery_scan           — crawl the app to discover all pages
-  4. kery_run_test       — run an AI test agent with a natural language intent
-  5. kery_get_bugs       — review bugs found
-  6. kery_get_coverage   — see which pages have been tested
+  3. kery_run_test       — run an AI test agent with a natural language intent
+  4. kery_get_bugs       — review bugs found
 
 WHEN TO CALL kery_status:
   • The user asks "what is kery", "is kery set up", "show me my projects", or anything orientation-related
@@ -60,16 +57,14 @@ Returns full system status: whether Kery is running, all projects with their env
 
       const enriched = await Promise.all(
         projects.map(async (p) => {
-          const [envs, bugs, coverage, overview] = await Promise.allSettled([
+          const [envs, bugs, overview] = await Promise.allSettled([
             client.listEnvironments(p.id),
             client.getBugs(p.id),
-            client.getCoverage(p.id),
             client.getOverview(p.id),
           ]);
 
           const envList = envs.status === "fulfilled" ? envs.value : [];
           const bugList = bugs.status === "fulfilled" ? bugs.value : [];
-          const cov = coverage.status === "fulfilled" ? coverage.value : null;
           const ov = overview.status === "fulfilled" ? overview.value : null;
 
           // Fetch auth for each env
@@ -93,16 +88,6 @@ Returns full system status: whether Kery is running, all projects with their env
             name: p.name,
             domain: p.domain ?? null,
             environments: envsWithAuth,
-            coverage: cov
-              ? {
-                  total: cov.total,
-                  tested: cov.tested,
-                  clean: cov.clean,
-                  withIssues: cov.withIssues,
-                  untested: cov.untested,
-                  coveragePct: cov.total > 0 ? Math.round((cov.tested / cov.total) * 100) : 0,
-                }
-              : null,
             openBugCount: openBugs.length,
             totalRuns: ov?.totalRuns ?? 0,
             passRate: ov?.passRate ?? 0,
@@ -120,15 +105,6 @@ Returns full system status: whether Kery is running, all projects with their env
         );
       } else {
         for (const p of enriched) {
-          if (!p.coverage || p.coverage.total === 0) {
-            nextSteps.push(
-              `Project "${p.name}" has no discovered pages. Call kery_scan with projectId="${p.id}" to crawl the app.`,
-            );
-          } else if (p.coverage.untested > 0) {
-            nextSteps.push(
-              `Project "${p.name}" has ${p.coverage.untested} untested pages. Call kery_run_test with projectId="${p.id}" to test them.`,
-            );
-          }
           if (p.openBugCount > 0) {
             nextSteps.push(
               `Project "${p.name}" has ${p.openBugCount} open bugs. Call kery_get_bugs with projectId="${p.id}" to review them.`,
@@ -136,7 +112,7 @@ Returns full system status: whether Kery is running, all projects with their env
           }
         }
         if (nextSteps.length === 0) {
-          nextSteps.push("All projects are scanned and tested. Run kery_run_test to test a specific flow or re-scan for changes.");
+          nextSteps.push("All projects are healthy. Run kery_run_test to test a specific flow.");
         }
       }
 
@@ -144,7 +120,7 @@ Returns full system status: whether Kery is running, all projects with their env
         content: [{
           type: "text",
           text: JSON.stringify({
-            kery: "AI-powered browser testing platform. Use kery_setup_project to add a new app, kery_scan to discover pages, kery_run_test to run AI tests.",
+            kery: "AI-powered browser testing platform. Use kery_setup_project to add a new app, kery_run_test to run AI tests.",
             connection: {
               isRunning: true,
               apiUrl: client.apiUrl,
@@ -161,14 +137,11 @@ Returns full system status: whether Kery is running, all projects with their env
               "kery_add_environment — add staging/prod environment to a project",
               "kery_update_environment — change environment URL or name",
               "kery_update_auth — update authentication config for an environment",
-              "kery_scan — crawl app to discover all pages",
-              "kery_list_routes — list currently known pages without re-scanning",
               "kery_run_test — run an AI test agent (natural language intent)",
               "kery_list_runs — list recent test runs",
               "kery_get_run — get detailed steps + bugs for a specific run",
               "kery_get_bugs — list open bugs",
               "kery_update_bug — mark bug as resolved / wont_fix / reopen",
-              "kery_get_coverage — coverage stats by page",
               "kery_list_tests — list or create saved reusable test flows",
             ],
           }),

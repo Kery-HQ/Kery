@@ -3,7 +3,6 @@ import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import {
   SquaresFour,
-  Stack,
   FlowArrow,
   Pulse,
   Warning,
@@ -12,18 +11,16 @@ import {
   Gear,
   MagnifyingGlass,
   Play,
-  Scan,
   Plus,
 } from "@phosphor-icons/react";
 import { useProject } from "@/lib/projectContext";
 import { cn } from "@/lib/utils";
-import { fetchTests, fetchProjectRuns, fetchPages } from "@/projectApi";
+import { fetchTests, fetchProjectRuns } from "@/projectApi";
 import { runListLabel } from "@/lib/formatters";
 
 const NAV_ITEMS = [
   { name: "Overview", href: "/overview", icon: SquaresFour },
-  { name: "Routes", href: "/pages", icon: Stack },
-  { name: "Flows", href: "/tests", icon: FlowArrow },
+{ name: "Flows", href: "/tests", icon: FlowArrow },
   { name: "Runs", href: "/runs", icon: Pulse },
   { name: "Issues", href: "/bugs", icon: Warning },
   { name: "Credentials", href: "/environments", icon: Globe },
@@ -44,7 +41,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [entities, setEntities] = React.useState<{
     tests: { id: string; name: string; intent?: string | null }[];
     runs: any[];
-    pages: { id: string; route: string; title: string }[];
   } | null>(null);
 
   React.useEffect(() => {
@@ -60,9 +56,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     Promise.all([
       fetchTests(currentProjectId),
       fetchProjectRuns(currentProjectId),
-      fetchPages(currentProjectId),
     ])
-      .then(([testsRes, runsRes, pagesRes]) => {
+      .then(([testsRes, runsRes]) => {
         if (cancelled) return;
         const runs = (runsRes.runs ?? []).slice().sort((a: any, b: any) => {
           const ta = new Date(a.started_at ?? 0).getTime();
@@ -72,11 +67,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         setEntities({
           tests: (testsRes.tests ?? []).filter(Boolean).slice(0, 80),
           runs: runs.slice(0, 80),
-          pages: (pagesRes.pages ?? []).slice(0, 80),
         });
       })
       .catch(() => {
-        if (!cancelled) setEntities({ tests: [], runs: [], pages: [] });
+        if (!cancelled) setEntities({ tests: [], runs: [] });
       });
     return () => {
       cancelled = true;
@@ -192,28 +186,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
               </>
             )}
 
-            {currentProjectId && entities && entities.pages.length > 0 && (
-              <>
-                <Command.Separator className="my-1.5 h-px bg-border" />
-                <Command.Group heading="Routes" className="[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
-                  {entities.pages.map((p) => (
-                    <Command.Item
-                      key={p.id}
-                      value={`page ${p.title ?? ""} ${p.route ?? ""}`}
-                      onSelect={() => go(`/pages/${p.id}`)}
-                      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
-                    >
-                      <Stack className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">{p.title || p.route || "Route"}</span>
-                      <span className="font-mono text-[11px] text-muted-foreground/60 flex-shrink-0 max-w-[40%] truncate">
-                        {p.route}
-                      </span>
-                    </Command.Item>
-                  ))}
-                </Command.Group>
-              </>
-            )}
-
             <Command.Separator className="my-1.5 h-px bg-border" />
 
             <Command.Group heading="Actions" className="[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
@@ -225,15 +197,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 <Play className="h-4 w-4 text-muted-foreground" />
                 Run ad-hoc test
               </Command.Item>
-              <Command.Item
-                value="Scan routes"
-                onSelect={() => go("/pages")}
-                className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
-              >
-                <Scan className="h-4 w-4 text-muted-foreground" />
-                Scan routes
-              </Command.Item>
-              <Command.Item
+<Command.Item
                 value="Create test flow"
                 onSelect={() => go("/tests")}
                 className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"

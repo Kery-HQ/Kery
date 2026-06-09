@@ -10,12 +10,11 @@ import { initPool } from "@kery/db";
 import { PostgresAdapter } from "@kery/db";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerRunRoutes } from "./routes/runs.js";
-import { registerCrawlRoutes } from "./routes/crawl.js";
 import { registerTestRoutes } from "./routes/tests.js";
 import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings, applyDbApiKeySettings } from "./routes/settings.js";
 import { Redis } from "ioredis";
-import { createRunQueue, createCrawlQueue } from "./runQueue.js";
+import { createRunQueue } from "./runQueue.js";
 import { withRunCorrelation } from "@kery/engine";
 
 // Initialize engine config from environment
@@ -41,7 +40,6 @@ const storage = new PostgresAdapter(pool);
 
 // Initialize BullMQ queues (enqueue only — execution handled by the worker process)
 const { queue: runQueue } = createRunQueue(config.redisUrl);
-const { queue: crawlQueue } = createCrawlQueue(config.redisUrl);
 /** Redis client for live snapshot reads and run stop signals. */
 const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 
@@ -78,7 +76,6 @@ app.get("/health", async () => ({ status: "ok" }));
 // Register routes — pass storage adapter and run queue
 registerProjectRoutes(app, storage);
 registerRunRoutes(app, storage, runQueue, redis, config.redisUrl);
-registerCrawlRoutes(app, storage, crawlQueue);
 registerTestRoutes(app, storage);
 registerBugRoutes(app, storage);
 registerSettingsRoutes(app, storage);
@@ -110,7 +107,6 @@ try {
 async function shutdown() {
   console.log("Shutting down gracefully...");
   await runQueue.close();
-  await crawlQueue.close();
   await app.close();
   await pool.end();
   await redis.quit().catch(() => {});

@@ -6,7 +6,6 @@ import {
   WarningCircle,
   CaretRight,
   Globe,
-  Scan,
   FlowArrow,
   Play,
   Circle,
@@ -15,7 +14,6 @@ import {
   Sparkle,
   CurrencyDollar,
   Bug,
-  ListChecks,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
@@ -29,7 +27,7 @@ import { statusVariant, duration, relativeTime, formatCost, formatRunCost, runLi
 import { useProject } from "@/lib/projectContext";
 import {
   fetchProjectOverview, fetchProjectRuns, fetchProjectBugs,
-  fetchEnvironments, fetchPages, fetchTests,
+  fetchEnvironments, fetchTests,
 } from "@/projectApi";
 
 // ─── Setup steps ──────────────────────────────────────────────────────────────
@@ -53,15 +51,6 @@ const SETUP_STEPS: SetupStep[] = [
     icon: Globe,
     href: "/environments",
     buttonLabel: "Add credentials",
-  },
-  {
-    key: "scan",
-    label: "Scan your app",
-    description:
-      "Kery scans your app and learns its routes, flows, and interactions so testing knows where to focus.",
-    icon: Scan,
-    href: "/pages",
-    buttonLabel: "Scan routes",
   },
   {
     key: "flow",
@@ -326,73 +315,10 @@ function RunPassFailKpi({ runStats }: { runStats: RunStats | null }) {
 }
 
 
-function FlowCoverageKpi({ flowCoverage }: { flowCoverage: { total: number; tested: number; clean: number; withIssues: number; untested: number } | null }) {
-  const total = flowCoverage?.total ?? 0;
-  const tested = flowCoverage?.tested ?? 0;
-  const clean = flowCoverage?.clean ?? 0;
-  const withIssues = flowCoverage?.withIssues ?? 0;
-  const untested = flowCoverage?.untested ?? 0;
-
-  return (
-    <div className="glass-card-flat card-stagger p-4 flex flex-col gap-2 min-h-[88px]">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          App coverage
-        </span>
-        <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
-      </div>
-      {total === 0 ? (
-        <p className="text-[12px] text-muted-foreground leading-snug">No flows yet. Create and run flows to measure coverage.</p>
-      ) : (
-        <>
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-semibold tabular-nums text-foreground">
-              {Math.round((tested / total) * 100)}
-            </span>
-            <span className="text-[12px] text-muted-foreground">% tested</span>
-          </div>
-          <div className="flex h-2 w-full rounded-full overflow-hidden gap-px bg-border/40">
-            {clean > 0 && (
-              <div
-                className="min-w-[3px] rounded-l-sm bg-status-pass"
-                style={{ flex: clean }}
-                title={`${clean} clean`}
-              />
-            )}
-            {withIssues > 0 && (
-              <div
-                className="min-w-[3px] bg-status-fail"
-                style={{ flex: withIssues }}
-                title={`${withIssues} with issues`}
-              />
-            )}
-            {untested > 0 && (
-              <div
-                className="min-w-[3px] rounded-r-sm bg-muted-foreground/25"
-                style={{ flex: untested }}
-                title={`${untested} untested`}
-              />
-            )}
-          </div>
-          <p className="text-[11px] text-muted-foreground leading-snug">
-            <span className="text-status-pass">{clean} clean</span>
-            {" · "}
-            <span className="text-status-fail">{withIssues} issues</span>
-            {" · "}
-            <span className="text-muted-foreground">{untested} untested</span>
-            <span className="text-muted-foreground/70"> · {total} flows</span>
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
 function Dashboard({
   overview,
   runs,
   bugs,
-  flowCoverage,
   bugStats,
   runStats,
   hiddenActiveRuns,
@@ -401,7 +327,6 @@ function Dashboard({
   overview: any;
   runs: any[];
   bugs: any[];
-  flowCoverage: { total: number; tested: number; clean: number; withIssues: number; untested: number } | null;
   bugStats: BugStats | null;
   runStats: RunStats | null;
   hiddenActiveRuns: number;
@@ -411,9 +336,8 @@ function Dashboard({
   return (
     <div className="space-y-5">
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <BugsKpi bugStats={bugStats} />
-        <FlowCoverageKpi flowCoverage={flowCoverage} />
         <RunPassFailKpi runStats={runStats} />
         <KpiCard
           label="Project spend"
@@ -516,7 +440,6 @@ export const Overview: React.FC = () => {
   const [runs, setRuns] = React.useState<any[]>([]);
   const [bugs, setBugs] = React.useState<any[]>([]);
   const [hiddenActiveRuns, setHiddenActiveRuns] = React.useState(0);
-  const [flowCoverage, setFlowCoverage] = React.useState<{ total: number; tested: number; clean: number; withIssues: number; untested: number } | null>(null);
   const [bugStats, setBugStats] = React.useState<BugStats | null>(null);
   const [runStats, setRunStats] = React.useState<RunStats | null>(null);
   const [completedSteps, setCompletedSteps] = React.useState<Set<string>>(new Set());
@@ -546,39 +469,24 @@ export const Overview: React.FC = () => {
 
     Promise.all([
       fetchEnvironments(currentProjectId).catch(() => ({ environments: [] })),
-      fetchPages(currentProjectId).catch(() => ({ pages: [] })),
       fetchTests(currentProjectId).catch(() => ({ tests: [] })),
       fetchProjectRuns(currentProjectId).catch(() => ({ runs: [] })),
       fetchProjectOverview(currentProjectId).catch(() => null),
       fetchProjectBugs(currentProjectId).catch(() => ({ bugs: [] })),
-    ]).then(([envRes, pagesRes, testsRes, runsRes, ov, bugsRes]) => {
+    ]).then(([envRes, testsRes, runsRes, ov, bugsRes]) => {
       const envs = envRes.environments ?? [];
-      const pages = pagesRes.pages ?? [];
       const tests = testsRes.tests ?? [];
       const allRuns = runsRes.runs ?? [];
       const allBugs = bugsRes.bugs ?? [];
 
       const steps = new Set<string>();
       if (envs.length > 0) steps.add("environment");
-      if (pages.length > 0) steps.add("scan");
       if (tests.length > 0) steps.add("flow");
       if (allRuns.length > 0) steps.add("run");
 
       setCompletedSteps(steps);
-      setSetupDone(steps.size === 4);
+      setSetupDone(steps.size === 3);
       setOverview(ov);
-
-      const totalFlows = tests.length;
-      const testedFlows = tests.filter((t: any) => (t?.run_count ?? 0) > 0);
-      const cleanFlows = testedFlows.filter((t: any) => (t?.issues_count ?? 0) === 0).length;
-      const issueFlows = testedFlows.filter((t: any) => (t?.issues_count ?? 0) > 0).length;
-      setFlowCoverage({
-        total: totalFlows,
-        tested: testedFlows.length,
-        clean: cleanFlows,
-        withIssues: issueFlows,
-        untested: Math.max(0, totalFlows - testedFlows.length),
-      });
 
       const openBugs = allBugs.filter((b: any) => b.status === "open").length;
       const toFixBugs = allBugs.filter((b: any) => b.status === "in_progress").length;
@@ -641,8 +549,8 @@ export const Overview: React.FC = () => {
         {loading ? (
           <div className="glass-stage flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full">
             <div className="flex-1 min-w-0 space-y-6 w-full">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[1, 2, 3, 4].map((i) => (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                {[1, 2, 3].map((i) => (
                   <Skeleton key={i} className="h-[72px] rounded-lg" />
                 ))}
               </div>
@@ -667,7 +575,6 @@ export const Overview: React.FC = () => {
                 overview={overview}
                 runs={runs}
                 bugs={bugs}
-                flowCoverage={flowCoverage}
                 bugStats={bugStats}
                 runStats={runStats}
                 hiddenActiveRuns={hiddenActiveRuns}

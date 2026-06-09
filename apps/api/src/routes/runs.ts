@@ -35,7 +35,6 @@ const RunSchema = z.object({
   environmentId: z.string().uuid(),
   intent: z.string().min(3).optional(),
   testId: z.string().uuid().optional(),
-  destinationId: z.string().uuid().optional(),
   authTest: z.boolean().optional(),
 });
 
@@ -68,18 +67,11 @@ export function registerRunRoutes(
     const parsed = RunSchema.safeParse({ ...(req.body as Record<string, unknown>), projectId });
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
 
-    const { environmentId, testId, destinationId, authTest } = parsed.data;
+    const { environmentId, testId, authTest } = parsed.data;
     let intent = parsed.data.intent;
     let context: string | undefined;
     let maxSteps: number | undefined;
     if (authTest) maxSteps = 8;
-
-    let dest: Awaited<ReturnType<StorageAdapter["getDestination"]>> = null;
-    if (destinationId) {
-      dest = await storage.getDestination(destinationId);
-      if (!dest) { reply.code(404).send({ error: "destination not found" }); return; }
-      intent = intent || `Inspect ${dest.normalized_route} ("${dest.title}") for bugs`;
-    }
 
     let savedTest: Awaited<ReturnType<StorageAdapter["getSavedTest"]>> = null;
     if (testId) {
@@ -93,14 +85,10 @@ export function registerRunRoutes(
     if (!intent) { reply.code(400).send({ error: "intent is required" }); return; }
 
     let sourceLabel: string;
-    let sourceType: "test" | "page" | "adhoc";
+    let sourceType: "test" | "adhoc";
     if (testId && savedTest) {
       sourceLabel = String(savedTest.name ?? "").trim() || "Saved test";
       sourceType = "test";
-    } else if (destinationId && dest) {
-      const title = String(dest.title ?? "").trim();
-      sourceLabel = title || String(dest.normalized_route ?? "");
-      sourceType = "page";
     } else {
       sourceLabel = authTest ? "Test auth" : intent.trim();
       if (sourceLabel.length > 500) sourceLabel = `${sourceLabel.slice(0, 497)}...`;
@@ -114,7 +102,7 @@ export function registerRunRoutes(
 
     const run = await storage.createTestRun({
       project_id: projectId, environment_id: environmentId,
-      test_id: testId ?? null, destination_id: destinationId ?? null,
+      test_id: testId ?? null,
       trigger_type: "manual", trigger_ref: authTest ? "auth_test" : "dashboard",
       // The job has only been enqueued here; worker flips this to `running`.
       status: "queued", started_at: new Date().toISOString(),
@@ -134,7 +122,6 @@ export function registerRunRoutes(
       environmentName: env.name,
       auth: authConfig,
       testId,
-      destinationId,
       context,
       saveScreenshots: true,
       maxSteps,

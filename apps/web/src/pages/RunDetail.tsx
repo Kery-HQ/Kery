@@ -51,7 +51,6 @@ import {
   FileText,
   FlowArrow,
   Stack,
-  Funnel,
   GitBranch,
   Circle,
   Image as ImageIcon,
@@ -120,9 +119,6 @@ type LLMAgentType =
   | "summary"
   | "filmstrip"
   | "bug_triage"
-  | "crawl_link_filter"
-  | "crawl_route_filter"
-  | "crawl_suggested_flows"
   | "memory_curator"
   | "stagehand";
 
@@ -157,7 +153,7 @@ type LLMCallRecord = {
   response: string;
   role?: "action" | "dom-scan";
   agent?: LLMAgentType;
-  crawlContext?: Record<string, unknown>;
+
 };
 
 type MemoryEntryBrief = {
@@ -577,9 +573,6 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
   summary:              { label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: FileText },
   filmstrip:            { label: "Review / Filmstrip",  color: "text-violet-600 dark:text-violet-400", badgeClass: "border-violet-500/50 bg-violet-500/12 text-violet-700 dark:text-violet-300", Icon: Stack },
   bug_triage:           { label: "Support / Bug Triage",color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: WarningCircle },
-  crawl_link_filter:    { label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Funnel },
-  crawl_route_filter:   { label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Funnel },
-  crawl_suggested_flows:{ label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: FlowArrow },
   memory_curator:       { label: "Support / Memory",    color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Brain },
   stagehand:            { label: "Support / Stagehand", color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Lightning },
 };

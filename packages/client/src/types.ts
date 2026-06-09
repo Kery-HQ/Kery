@@ -26,7 +26,6 @@ export type TestRun = {
   project_id: string;
   environment_id: string;
   test_id?: string | null;
-  destination_id?: string | null;
   trigger_type: string;
   trigger_ref: string;
   status: "queued" | "running" | "passed" | "failed";
@@ -102,53 +101,6 @@ export type SavedTest = {
   created_at: string;
 };
 
-/** A discovered page/route in the app. */
-export type AppTreeDestination = {
-  id: string;
-  project_id: string;
-  normalized_route: string;
-  title: string;
-  health_status: "clean" | "issues" | "stale" | "untested";
-  issues_count: number;
-  last_inspected_at: string | null;
-  last_crawled_at: string;
-};
-
-/** LLM cost breakdown for a crawl (USD). */
-export type CrawlLlmCostBreakdownJson = {
-  linkFilterUsd: number;
-  suggestedFlowsUsd: number;
-};
-
-/** A crawl/scan run. */
-export type CrawlRun = {
-  id: string;
-  project_id: string;
-  environment_id: string;
-  status: "running" | "completed" | "failed";
-  pages_visited: number | null;
-  nodes_found: number | null;
-  destinations_built: number | null;
-  started_at: string;
-  completed_at: string | null;
-  cost_usd: number | null;
-  llm_cost_breakdown_json: CrawlLlmCostBreakdownJson | null;
-  /** Full LLM audit (when migration 010 applied). */
-  llm_calls_json?: unknown[] | null;
-  crawl_metadata_json?: Record<string, unknown> | null;
-  sitemap_json?: unknown;
-};
-
-/** Coverage statistics for a project. */
-export type CoverageStats = {
-  total: number;
-  tested: number;
-  clean: number;
-  withIssues: number;
-  stale: number;
-  untested: number;
-};
-
 /** Project overview statistics. */
 export type OverviewStats = {
   totalRuns: number;
@@ -156,7 +108,7 @@ export type OverviewStats = {
   passed: number;
   failed: number;
   running: number;
-  /** Sum of test run + crawl LLM costs (USD). */
+  /** Sum of test run LLM costs (USD). */
   totalCostUsd: number;
 };
 

@@ -35,22 +35,7 @@ export interface StorageAdapter {
   /** Incrementally append LLM calls mid-run (crash-safe persistence). */
   appendRunLlmCalls(runId: string, calls: any[]): Promise<void>;
 
-  // Destinations
-  getDestination(id: string): Promise<any>;
-  upsertDestinations(projectId: string, destinations: any[]): Promise<void>;
-
-  // Coverage
-  getProjectCoverage(projectId: string): Promise<{
-    total: number;
-    tested: number;
-    clean: number;
-    withIssues: number;
-    stale: number;
-    untested: number;
-  }>;
-
   // Path generator needs
-  getPastRunsForDestination(destinationId: string, limit: number): Promise<any[]>;
   getOpenBugs(projectId: string, limit: number): Promise<any[]>;
 
   // Regression plans
@@ -58,17 +43,8 @@ export interface StorageAdapter {
   updateRegressionPlan(table: string, id: string, data: Record<string, any>): Promise<void>;
 
   // Crawl
-  getCrawlEnvironment(projectId: string, environmentId: string): Promise<any>;
-  createCrawlRun(data: Record<string, any>): Promise<any>;
-  updateCrawlRun(id: string, data: Record<string, any>): Promise<void>;
   getExistingTestNames(projectId: string): Promise<string[]>;
   getAuthConfig(projectId: string, environmentId: string): Promise<any>;
-  buildAppTree(projectId: string, crawlRunId: string, sitemap: any[]): Promise<any>;
-  upsertCrawlNodes(projectId: string, crawlRunId: string, result: any): Promise<void>;
-
-  // Run coverage tracking
-  upsertRunCoverage(runId: string, destinationId: string, bugsFound: number): Promise<void>;
-  updateDestinationHealth(destinationId: string, data: Record<string, any>): Promise<void>;
 
   // Saved tests
   getSavedTest(id: string): Promise<any>;

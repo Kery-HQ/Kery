@@ -1,7 +1,7 @@
 import React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Path, ListChecks, Bug } from "@phosphor-icons/react";
+import { Play, ListChecks, Bug } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -12,9 +12,9 @@ const WELCOMED_KEY = "kery_welcomed";
 
 const FEATURES = [
   {
-    icon: Path,
-    title: "Map every route",
-    description: "Kery crawls your app like a real user and builds a full map of your routes and flows.",
+    icon: Play,
+    title: "Run flows instantly",
+    description: "Point Kery at your app, describe a user flow in plain language, and the agent runs it end-to-end.",
   },
   {
     icon: ListChecks,
@@ -212,7 +212,7 @@ function FeaturesSlide() {
     <div className="flex flex-col gap-3 flex-1 px-6 pt-6 pb-4">
       <div className="space-y-0.5">
         <p className="text-[14px] font-semibold text-foreground">What Kery does</p>
-        <p className="text-[12px] text-muted-foreground">Three steps from zero to coverage.</p>
+        <p className="text-[12px] text-muted-foreground">AI-powered testing in plain language.</p>
       </div>
       <div className="space-y-2 pt-1">
         {FEATURES.map((f, i) => (
@@ -281,7 +281,7 @@ function CreateSlide({
             onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onCreate(); }}
           />
           <p className="text-[11px] text-muted-foreground">
-            Used as a default base URL when scanning your app.
+            Used to scope test runs to your app's domain.
           </p>
         </div>
       </div>

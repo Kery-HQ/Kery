@@ -2,7 +2,6 @@ import { Queue } from "bullmq";
 
 /** BullMQ forbids ':' in queue names (reserved for Redis Cluster key tags). */
 export const RUN_QUEUE_NAME = "kery-runs";
-export const CRAWL_QUEUE_NAME = "kery-crawls";
 
 export interface RunJobData {
   runId: string;
@@ -13,18 +12,11 @@ export interface RunJobData {
   environmentName: string;
   auth: any;
   testId?: string;
-  destinationId?: string;
   context?: string;
   saveScreenshots?: boolean;
   maxSteps?: number;
   recordVideo: boolean;
   triggerRef: string;
-}
-
-export interface CrawlJobData {
-  projectId: string;
-  environmentId: string;
-  triggerType: "manual" | "webhook" | "scheduled";
 }
 
 function parseRedisUrl(redisUrl: string) {
@@ -42,8 +34,3 @@ export function createRunQueue(redisUrl: string) {
   return { queue, connection };
 }
 
-export function createCrawlQueue(redisUrl: string) {
-  const connection = parseRedisUrl(redisUrl);
-  const queue = new Queue<CrawlJobData>(CRAWL_QUEUE_NAME, { connection });
-  return { queue, connection };
-}

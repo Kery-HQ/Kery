@@ -28,7 +28,6 @@ export interface RunJobData {
   environmentName: string;
   auth: any;
   testId?: string;
-  destinationId?: string;
   context?: string;
   saveScreenshots?: boolean;
   maxSteps?: number;
@@ -104,7 +103,6 @@ async function refreshEngineConfigFromDb(storage: StorageAdapter): Promise<void>
     }
     const auxiliaryModel =
       all["model.auxiliaryModel"] ??
-      all["model.crawlModel"] ??
       all["model.scriptModel"] ??
       all["model.summaryModel"] ??
       all["model.reviewModel"];
@@ -130,7 +128,6 @@ async function refreshEngineConfigFromDb(storage: StorageAdapter): Promise<void>
     }
     const auxiliaryPriceRaw =
       all["modelPrice.auxiliaryModel"] ??
-      all["modelPrice.crawlModel"] ??
       all["modelPrice.scriptModel"] ??
       all["modelPrice.summaryModel"] ??
       all["modelPrice.reviewModel"];
@@ -234,7 +231,6 @@ export async function createRunWorker(
           projectId: data.projectId,
           auth: data.auth,
           testId: data.testId,
-          destinationId: data.destinationId,
           context: data.context,
           saveScreenshots: data.saveScreenshots ?? true,
           maxSteps: data.maxSteps,
@@ -301,19 +297,6 @@ export async function createRunWorker(
           const persistResult = await tx.persistBugsFromRun(data.projectId, data.runId, data.triggerRef, completedAt, data.environmentId, data.environmentName, enrichedBugs);
           insertedBugs = persistResult.insertedBugs;
 
-          if (data.destinationId) {
-            await tx.upsertRunCoverage(data.runId, data.destinationId, enrichedBugs.length);
-            const healthData: any = { last_inspected_at: completedAt };
-            if (enrichedBugs.length > 0) {
-              healthData.health_status = "issues";
-              healthData.issues_count = enrichedBugs.length;
-            } else {
-              healthData.health_status = "clean";
-              healthData.issues_count = 0;
-            }
-            await tx.updateDestinationHealth(data.destinationId, healthData);
-
-          }
         });
 
         // Move bug screenshots after transaction commits so updateBugScreenshotPath can see the inserted rows

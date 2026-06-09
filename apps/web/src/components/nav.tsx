@@ -6,7 +6,6 @@ import {
   Plus,
   SquaresFour,
   Code,
-  Path,
   ListChecks,
   Play,
   Brain,
@@ -32,7 +31,6 @@ export type { Theme } from "@/lib/hooks";
 
 const CORE_ITEMS = [
   { name: "Overview",     href: "/overview",      icon: SquaresFour },
-  { name: "Routes",       href: "/pages",         icon: Path },
   { name: "Flows",        href: "/tests",         icon: ListChecks },
   { name: "Runs",         href: "/runs",          icon: Play },
   { name: "Issues",       href: "/bugs",          icon: Bug },
