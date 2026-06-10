@@ -9,13 +9,10 @@ import { registerStatusTool } from "./tools/status.js";
 import { registerSetupTool } from "./tools/setup.js";
 import { registerProjectTools } from "./tools/projects.js";
 import { registerAuthTool } from "./tools/auth.js";
-import { registerScanTool } from "./tools/scan.js";
-import { registerRouteTools } from "./tools/routes.js";
 import { registerRunTestTool } from "./tools/run.js";
 import { registerRunsTool } from "./tools/runs.js";
 import { registerRunDetailTool } from "./tools/runDetail.js";
 import { registerBugsTool } from "./tools/bugs.js";
-import { registerCoverageTool } from "./tools/coverage.js";
 import { registerTestsTool } from "./tools/tests.js";
 import { registerMemoryTool } from "./tools/memory.js";
 import { registerSettingsTools } from "./tools/settings.js";
@@ -43,10 +40,6 @@ registerSetupTool(server, client);
 registerProjectTools(server, client);
 registerAuthTool(server, client);
 
-// ── Discovery ───────────────────────────────────────────────────────────────
-registerScanTool(server, client);
-registerRouteTools(server, client);   // includes kery_update_page
-
 // ── Testing ─────────────────────────────────────────────────────────────────
 registerRunTestTool(server, client);
 registerRunsTool(server, client);     // includes kery_stop_run
@@ -54,7 +47,6 @@ registerRunDetailTool(server, client);
 
 // ── Results & triage ────────────────────────────────────────────────────────
 registerBugsTool(server, client);
-registerCoverageTool(server, client);
 
 // ── Test management ─────────────────────────────────────────────────────────
 registerTestsTool(server, client);    // includes kery_update_test, kery_delete_test

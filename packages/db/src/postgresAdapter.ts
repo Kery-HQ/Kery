@@ -142,7 +142,7 @@ export class PostgresAdapter implements StorageAdapter {
   async listBugs(projectId: string) {
     const { rows } = await this.db.query(
       `SELECT b.id, b.project_id, b.run_id, b.environment_id, b.name, b.description, b.category, b.severity, b.status, b.url, b.run_label, b.reported_at, b.environment, b.step_index, b.created_at, b.screenshot_path, b.region, b.occurrence_count,
-              tr.test_id, tr.destination_id,
+              tr.test_id,
               st.name AS test_name
        FROM bugs b
        LEFT JOIN test_runs tr ON tr.id = b.run_id
@@ -229,48 +229,6 @@ export class PostgresAdapter implements StorageAdapter {
     return rows[0];
   }
 
-  // ─── Destinations ───────────────────────────────────────────────────────────
-
-  async getDestination(id: string) {
-    const { rows } = await this.db.query(`SELECT * FROM app_tree_destinations WHERE id = $1`, [id]);
-    return rows[0] ?? null;
-  }
-
-  async upsertDestinations(_projectId: string, _destinations: any[]) {
-    // Implemented via buildAppTree
-  }
-
-  // ─── Coverage ───────────────────────────────────────────────────────────────
-
-  async getProjectCoverage(projectId: string) {
-    const { rows } = await this.db.query(
-      `SELECT health_status FROM app_tree_destinations WHERE project_id = $1`,
-      [projectId],
-    );
-    const total = rows.length;
-    const clean = rows.filter((d: any) => d.health_status === "clean").length;
-    const withIssues = rows.filter((d: any) => d.health_status === "issues").length;
-    const stale = rows.filter((d: any) => d.health_status === "stale").length;
-    const untested = rows.filter((d: any) => d.health_status === "untested").length;
-    return { total, tested: clean + withIssues, clean, withIssues, stale, untested };
-  }
-
-  // ─── Path Generator ─────────────────────────────────────────────────────────
-
-  async getPastRunsForDestination(destinationId: string, limit: number) {
-    const { rows: coverage } = await this.db.query(
-      `SELECT run_id FROM run_coverage WHERE destination_id = $1 ORDER BY inspected_at DESC LIMIT $2`,
-      [destinationId, limit],
-    );
-    if (coverage.length === 0) return [];
-    const runIds = coverage.map((r: any) => r.run_id);
-    const { rows } = await this.db.query(
-      `SELECT id, status, summary, steps_json FROM test_runs WHERE id = ANY($1)`,
-      [runIds],
-    );
-    return rows;
-  }
-
   async getOpenBugs(projectId: string, limit: number) {
     const { rows } = await this.db.query(
       `SELECT name, description, category, severity, url FROM bugs WHERE project_id = $1 AND status = 'open' ORDER BY reported_at DESC LIMIT $2`,
@@ -293,34 +251,9 @@ export class PostgresAdapter implements StorageAdapter {
     await this.db.query(`UPDATE ${table} SET ${sets} WHERE id = $1`, [id, ...values]);
   }
 
-  // ─── Crawl ──────────────────────────────────────────────────────────────────
-
-  async getCrawlEnvironment(_projectId: string, environmentId: string) {
-    const { rows } = await this.db.query(`SELECT * FROM environments WHERE id = $1`, [environmentId]);
-    return rows[0] ?? null;
-  }
-
-  async createCrawlRun(data: Record<string, any>) {
-    const keys = Object.keys(data);
-    const values = Object.values(data);
-    const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
-    const { rows } = await this.db.query(
-      `INSERT INTO crawl_runs (${keys.join(", ")}) VALUES (${placeholders}) RETURNING *`,
-      values,
-    );
-    return rows[0];
-  }
-
-  async updateCrawlRun(id: string, data: Record<string, any>) {
-    const keys = Object.keys(data);
-    const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
-    const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.db.query(`UPDATE crawl_runs SET ${sets} WHERE id = $1`, [id, ...values]);
-  }
-
-  async getExistingTestNames(projectId: string) {
-    const { rows } = await this.db.query(`SELECT name FROM saved_tests WHERE project_id = $1`, [projectId]);
-    return rows.map((r: any) => r.name);
+  async getExistingTests(projectId: string) {
+    const { rows } = await this.db.query(`SELECT name, intent FROM saved_tests WHERE project_id = $1`, [projectId]);
+    return rows.map((r: any) => ({ name: r.name as string, intent: r.intent as string }));
   }
 
   async getAuthConfig(projectId: string, environmentId: string) {
@@ -334,81 +267,6 @@ export class PostgresAdapter implements StorageAdapter {
       rows[0].config_json = decryptConfigJson(rows[0].config_json);
     }
     return rows[0];
-  }
-
-  async buildAppTree(projectId: string, crawlRunId: string, sitemap: any[]) {
-    const now = new Date().toISOString();
-    const validPages = sitemap.filter(p => p.route);
-    if (validPages.length === 0) return { added: 0, updated: 0 };
-
-    const routesThisRun = validPages.map((p: any) => p.route);
-
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      // Batch upsert: single INSERT ... ON CONFLICT DO UPDATE
-      const values: any[] = [];
-      const placeholders: string[] = [];
-      let idx = 1;
-      for (const page of validPages) {
-        placeholders.push(
-          `($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, true)`,
-        );
-        values.push(
-          projectId, page.route, page.title,
-          JSON.stringify(page.forms), JSON.stringify(page.buttons),
-          JSON.stringify(page.interactions), JSON.stringify(page.navLinks),
-          now, crawlRunId,
-        );
-        idx += 9;
-      }
-
-      const { rows } = await client.query(
-        `INSERT INTO app_tree_destinations (project_id, normalized_route, title, forms_json, buttons_json, interactions_json, nav_links, last_crawled_at, crawl_run_id, enabled)
-         VALUES ${placeholders.join(", ")}
-         ON CONFLICT (project_id, normalized_route) DO UPDATE SET
-           title = EXCLUDED.title,
-           forms_json = EXCLUDED.forms_json,
-           buttons_json = EXCLUDED.buttons_json,
-           interactions_json = EXCLUDED.interactions_json,
-           nav_links = EXCLUDED.nav_links,
-           last_crawled_at = EXCLUDED.last_crawled_at,
-           crawl_run_id = EXCLUDED.crawl_run_id,
-           updated_at = EXCLUDED.last_crawled_at
-         RETURNING (xmax = 0) AS inserted`,
-        values,
-      );
-      const added = rows.filter((r: any) => r.inserted).length;
-
-      await client.query("COMMIT");
-      return { added, updated: rows.length - added };
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  async upsertCrawlNodes(_projectId: string, _crawlRunId: string, _result: any) {
-    // Simplified for OSS — handled by buildAppTree
-  }
-
-  // ─── Run Coverage ───────────────────────────────────────────────────────────
-
-  async upsertRunCoverage(runId: string, destinationId: string, bugsFound: number) {
-    await this.db.query(
-      `INSERT INTO run_coverage (run_id, destination_id, bugs_found) VALUES ($1, $2, $3) ON CONFLICT (run_id, destination_id) DO UPDATE SET bugs_found = $3`,
-      [runId, destinationId, bugsFound],
-    );
-  }
-
-  async updateDestinationHealth(destinationId: string, data: Record<string, any>) {
-    const keys = Object.keys(data);
-    const values = Object.values(data);
-    const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-    await this.db.query(`UPDATE app_tree_destinations SET ${sets} WHERE id = $1`, [destinationId, ...values]);
   }
 
   // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -437,6 +295,15 @@ export class PostgresAdapter implements StorageAdapter {
   async getSavedTest(id: string) {
     const { rows } = await this.db.query(`SELECT * FROM saved_tests WHERE id = $1`, [id]);
     return rows[0] ?? null;
+  }
+
+  async createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string }) {
+    const { rows } = await this.db.query(
+      `INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots, discovery_source, discovery_run_id)
+       VALUES ($1, $2, $3, $4, true, $5, $6) RETURNING *`,
+      [data.project_id, data.name, data.intent, data.context ?? null, data.discovery_source ?? "manual", data.discovery_run_id ?? null],
+    );
+    return rows[0];
   }
 
   async updateSavedTest(id: string, data: Record<string, any>) {

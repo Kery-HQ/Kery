@@ -13,7 +13,6 @@ export type ExportIssueRow = {
   reportedAt?: string;
   reported_at?: string;
   test_id?: string | null;
-  destination_id?: string | null;
   test_name?: string | null;
   run_id?: string;
   runId: string;
@@ -215,9 +214,7 @@ export async function downloadIssuesPdf(opts: {
     const source =
       bug.test_id != null
         ? `Flow${bug.test_name ? ` · ${bug.test_name}` : ""}`
-        : bug.destination_id != null
-          ? "Page"
-          : null;
+        : null;
 
     const metaParts = [
       CAT_LABEL[bug.category]    ?? bug.category,

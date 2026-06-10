@@ -104,7 +104,8 @@ export type LLMAgentType =
   | "crawl_suggested_flows"
   | "memory_curator"
   | "script_generator"
-  | "regression_heal";
+  | "regression_heal"
+  | "flow_discovery";
 
 /** Serializable multimodal message for run-detail UI (no raw base64 — images are parallel `imageBase64s` / `imagePaths`). */
 export type LLMStoredContentPart =

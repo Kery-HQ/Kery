@@ -1,7 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun, patchProjectBug, createMemoryEntry } from "@/projectApi";
+import { fetchRun, fetchRunBugs, getRunStreamUrl, stopRun, deleteRun, patchProjectBug, createMemoryEntry, fetchDiscoveredFlows } from "@/projectApi";
 import { apiMediaUrl, runScreenshotFileUrl, screenshotRefToSrc } from "@/lib/apiAssets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +51,6 @@ import {
   FileText,
   FlowArrow,
   Stack,
-  Funnel,
   GitBranch,
   Circle,
   Image as ImageIcon,
@@ -66,8 +65,11 @@ import {
   ImagesSquare,
   DotsSixVertical,
   MagnifyingGlass,
+  MagnifyingGlassPlus,
   Play,
   X,
+  ListChecks,
+  Trash,
 } from "@phosphor-icons/react";
 import { BugRecordingClip, deriveBugClipRange } from "@/components/bug-recording-clip";
 
@@ -120,11 +122,9 @@ type LLMAgentType =
   | "summary"
   | "filmstrip"
   | "bug_triage"
-  | "crawl_link_filter"
-  | "crawl_route_filter"
-  | "crawl_suggested_flows"
   | "memory_curator"
-  | "stagehand";
+  | "stagehand"
+  | "flow_discovery";
 
 type UIAgentGroup = "navigator" | "review" | "support";
 
@@ -157,7 +157,7 @@ type LLMCallRecord = {
   response: string;
   role?: "action" | "dom-scan";
   agent?: LLMAgentType;
-  crawlContext?: Record<string, unknown>;
+
 };
 
 type MemoryEntryBrief = {
@@ -200,7 +200,9 @@ type Run = {
   };
 };
 
-type Tab = "overview" | "issues" | "gallery" | "llm" | "memory";
+type Tab = "overview" | "issues" | "flows" | "gallery" | "llm" | "memory";
+
+type DiscoveredFlow = { id: string; name: string; intent: string; context?: string | null; created_at: string };
 
 /** Derive overview tab state from `GET /api/runs/:id` (includes merged Redis live data while running). */
 function liveUiFromRun(run: Run): {
@@ -577,11 +579,9 @@ const LLM_AGENT_CONFIG: Record<LLMAgentType, LlmAgentDisplay> = {
   summary:              { label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: FileText },
   filmstrip:            { label: "Review / Filmstrip",  color: "text-violet-600 dark:text-violet-400", badgeClass: "border-violet-500/50 bg-violet-500/12 text-violet-700 dark:text-violet-300", Icon: Stack },
   bug_triage:           { label: "Support / Bug Triage",color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: WarningCircle },
-  crawl_link_filter:    { label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Funnel },
-  crawl_route_filter:   { label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Funnel },
-  crawl_suggested_flows:{ label: "Support",             color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: FlowArrow },
   memory_curator:       { label: "Support / Memory",    color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Brain },
   stagehand:            { label: "Support / Stagehand", color: "text-amber-600 dark:text-amber-400", badgeClass: "border-amber-500/50 bg-amber-500/12 text-amber-700 dark:text-amber-300", Icon: Lightning },
+  flow_discovery:       { label: "Flow Discovery",      color: "text-emerald-600 dark:text-emerald-400", badgeClass: "border-emerald-500/50 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", Icon: MagnifyingGlassPlus },
 };
 
 /** Legacy or engine-only agents (e.g. memory_curator) still render in the LLM tab. */
@@ -638,6 +638,8 @@ export const RunDetail: React.FC = () => {
   const [activityFeed, setActivityFeed] = React.useState<ActivityEntry[]>([]);
   const [tab, setTab] = React.useState<Tab>("overview");
   const [stopping, setStopping] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [discoveredFlows, setDiscoveredFlows] = React.useState<DiscoveredFlow[]>([]);
 
   // --- SSE or polling ---
 
@@ -661,7 +663,11 @@ export const RunDetail: React.FC = () => {
           setActivityFeed(ui.activityFeed);
           setLivePreviewDisk(ui.livePreviewDisk);
           if (res.run.status !== "running") {
-            fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
+            if (res.run.trigger_ref === "discovery") {
+              fetchDiscoveredFlows(runId!).then((r) => { setDiscoveredFlows(r.flows ?? []); setTab("flows"); });
+            } else {
+              fetchRunBugs(runId!).then((r: any) => setRunBugs(r.bugs ?? []));
+            }
           }
         }
       } finally {
@@ -726,7 +732,11 @@ export const RunDetail: React.FC = () => {
             }
             setLivePreviewDisk(null);
             setLiveScreenshot(null);
-            if (msg.run?.id) fetchRunBugs(msg.run.id).then((r: any) => setRunBugs(r.bugs ?? []));
+            if (msg.run?.trigger_ref === "discovery") {
+              fetchDiscoveredFlows(msg.run.id).then((r) => { setDiscoveredFlows(r.flows ?? []); setTab("flows"); });
+            } else if (msg.run?.id) {
+              fetchRunBugs(msg.run.id).then((r: any) => setRunBugs(r.bugs ?? []));
+            }
             es?.close();
           }
         } catch { /* ignore parse errors */ }
@@ -820,24 +830,27 @@ export const RunDetail: React.FC = () => {
   const galleryGroups = collectGalleryShots(run.id, steps, llmCalls, runBugs);
   const galleryCount = Object.values(galleryGroups).reduce((acc, arr) => acc + arr.length, 0);
 
-  const backUrl = run.project_id && run.source_back_path
+  const isDiscovery = run.trigger_ref === "discovery";
+  const backUrl = isDiscovery ? "/flows" : (run.project_id && run.source_back_path
     ? `/projects/${run.project_id}/${run.source_back_path}`
-    : "/runs";
-  const runTitle = (run.source_label?.trim() || run.summary?.trim() || "Run");
+    : "/runs");
+  const runTitle = isDiscovery ? "Flow Discovery" : (run.source_label?.trim() || run.summary?.trim() || "Run");
 
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full">
       {/* Back + breadcrumb + PageHeader */}
       <PageHeader
-        icon={<Pulse className="h-4 w-4" />}
+        icon={isDiscovery ? <MagnifyingGlassPlus className="h-4 w-4" /> : <Pulse className="h-4 w-4" />}
         title={runTitle}
       >
         <Badge variant={badgeVariantForStatus(run.status)} dot>
           {run.status}
         </Badge>
-        {run.status === "running" && (
+        {(run.status === "running" || run.status === "queued") && (
           <>
-            <Spinner className="h-3.5 w-3.5 text-status-running animate-spin" />
+            {run.status === "running" && (
+              <Spinner className="h-3.5 w-3.5 text-status-running animate-spin" />
+            )}
             <Button
               size="sm"
               variant="destructive"
@@ -852,6 +865,23 @@ export const RunDetail: React.FC = () => {
             </Button>
           </>
         )}
+        {run.status !== "running" && run.status !== "queued" && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[11px] px-2.5 gap-1.5"
+            disabled={deleting}
+            onClick={async () => {
+              if (!confirm("Delete this run? This cannot be undone.")) return;
+              setDeleting(true);
+              await deleteRun(run.id).catch(() => {});
+              navigate(backUrl);
+            }}
+          >
+            <Trash className="h-3 w-3" />
+            {deleting ? "Deleting..." : "Delete"}
+          </Button>
+        )}
       </PageHeader>
 
       {/* Breadcrumb bar */}
@@ -862,9 +892,7 @@ export const RunDetail: React.FC = () => {
         >
           <ArrowLeft className="h-3 w-3" />
           <span>
-            {backUrl !== "/runs" && run.source_label
-              ? run.source_label
-              : "Runs"}
+            {isDiscovery ? "Flows" : (backUrl !== "/runs" && run.source_label ? run.source_label : "Runs")}
           </span>
         </button>
         <span className="text-muted-foreground/30">/</span>
@@ -878,14 +906,25 @@ export const RunDetail: React.FC = () => {
             <TabsTrigger value="overview">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="issues">
-              Issues
-              {bugsFound.length > 0 && (
-                <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
-                  {bugsFound.length}
-                </span>
-              )}
-            </TabsTrigger>
+            {isDiscovery ? (
+              <TabsTrigger value="flows">
+                Flows
+                {discoveredFlows.length > 0 && (
+                  <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    {discoveredFlows.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            ) : (
+              <TabsTrigger value="issues">
+                Issues
+                {bugsFound.length > 0 && (
+                  <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                    {bugsFound.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            )}
             {SHOW_RUN_DEBUG && (
               <>
                 <TabsTrigger value="gallery">
@@ -932,6 +971,10 @@ export const RunDetail: React.FC = () => {
               projectId={run.project_id ?? undefined}
               onRefreshBugs={() => fetchRunBugs(run.id).then((r: any) => setRunBugs(r.bugs ?? []))}
             />
+          </TabsContent>
+
+          <TabsContent value="flows" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
+            <DiscoveryFlowsTab flows={discoveredFlows} runStatus={run.status} />
           </TabsContent>
 
           <TabsContent value="gallery" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
@@ -2950,6 +2993,59 @@ function LLMCallDetailSheet({
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ============================================================
+// Discovery flows tab
+// ============================================================
+
+function DiscoveryFlowsTab({ flows, runStatus }: { flows: DiscoveredFlow[]; runStatus: string }) {
+  const navigate = useNavigate();
+  const isActive = runStatus === "running" || runStatus === "queued";
+
+  if (flows.length === 0) {
+    return (
+      <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in">
+        <EmptyState
+          icon={<MagnifyingGlassPlus className="h-5 w-5" />}
+          title={isActive ? "Discovery in progress..." : "No flows discovered"}
+          description={
+            isActive
+              ? "Flows will appear here as they are discovered."
+              : "No flows were extracted from this discovery run."
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in space-y-4">
+      <SectionLabel
+        icon={<ListChecks className="h-3.5 w-3.5" />}
+        text={`Discovered Flows (${flows.length})`}
+      />
+      <div className="space-y-2">
+        {flows.map((flow) => (
+          <div key={flow.id} className="bg-card border rounded-lg p-4 flex items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium text-foreground">{flow.name}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">{flow.intent}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0 text-[12px] gap-1.5"
+              onClick={() => navigate(`/flows?highlight=${flow.id}`)}
+            >
+              <ArrowSquareOut className="h-3.5 w-3.5" />
+              View
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

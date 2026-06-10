@@ -2,7 +2,7 @@ export * from "./types.js";
 
 import type {
   Project, Environment, TestRun, Bug, SavedTest,
-  AppTreeDestination, CrawlRun, CoverageStats, OverviewStats,
+  OverviewStats,
   RunStreamEvent,
 } from "./types.js";
 
@@ -122,34 +122,6 @@ export class KeryClient {
     );
   }
 
-  // ── Scanning ─────────────────────────────────────────────────────────
-
-  async startScan(projectId: string): Promise<void> {
-    await this.fetch(`/api/projects/${projectId}/scan`, { method: "POST" });
-  }
-
-  async getScanStatus(projectId: string): Promise<CrawlRun | null> {
-    const data = await this.fetch<{ scan: CrawlRun | null }>(
-      `/api/projects/${projectId}/scan/status`,
-    );
-    return data.scan;
-  }
-
-  /**
-   * Trigger a scan and wait for it to complete.
-   * Polls every 3 seconds, times out after `timeoutMs` (default 5 minutes).
-   */
-  async waitForScan(projectId: string, timeoutMs = 300_000): Promise<CrawlRun> {
-    await this.startScan(projectId);
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      await sleep(3_000);
-      const status = await this.getScanStatus(projectId);
-      if (status && status.status !== "running") return status;
-    }
-    throw new Error("Scan timed out");
-  }
-
   // ── Runs ─────────────────────────────────────────────────────────────
 
   async startRun(
@@ -158,7 +130,6 @@ export class KeryClient {
       environmentId: string;
       intent?: string;
       testId?: string;
-      destinationId?: string;
     },
   ): Promise<{ runId: string }> {
     const data = await this.fetch<{ runId: string }>(
@@ -258,14 +229,6 @@ export class KeryClient {
   }
 
   // ── Pages & Coverage ─────────────────────────────────────────────────
-
-  async getPages(projectId: string): Promise<{ pages: AppTreeDestination[]; coverage: CoverageStats }> {
-    return this.fetch(`/api/projects/${projectId}/pages`);
-  }
-
-  async getCoverage(projectId: string): Promise<CoverageStats> {
-    return this.fetch(`/api/projects/${projectId}/coverage`);
-  }
 
   async getOverview(projectId: string): Promise<OverviewStats> {
     return this.fetch(`/api/projects/${projectId}/overview`);

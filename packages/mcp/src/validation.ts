@@ -296,7 +296,7 @@ export const ModelKeyField = z
   .describe(
     "Model slot:\n" +
     "  'agentModel'       — browser automation decisions (default: gpt-4.1-mini)\n" +
-    "  'auxiliaryModel'   — crawl, test plans, summaries, memory (default: gemini-2.5-flash)\n" +
+    "  'auxiliaryModel'   — test plans, summaries, memory (default: gemini-2.5-flash)\n" +
     "  'reviewAgentModel' — post-run screenshot analysis (default: gemini-2.5-flash)\n" +
     "  'stagehandModel'   — Stagehand element finding (default: gpt-4o-mini)",
   );

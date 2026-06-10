@@ -35,7 +35,6 @@ const RunSchema = z.object({
   environmentId: z.string().uuid(),
   intent: z.string().min(3).optional(),
   testId: z.string().uuid().optional(),
-  destinationId: z.string().uuid().optional(),
   authTest: z.boolean().optional(),
 });
 
@@ -68,18 +67,11 @@ export function registerRunRoutes(
     const parsed = RunSchema.safeParse({ ...(req.body as Record<string, unknown>), projectId });
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
 
-    const { environmentId, testId, destinationId, authTest } = parsed.data;
+    const { environmentId, testId, authTest } = parsed.data;
     let intent = parsed.data.intent;
     let context: string | undefined;
     let maxSteps: number | undefined;
     if (authTest) maxSteps = 8;
-
-    let dest: Awaited<ReturnType<StorageAdapter["getDestination"]>> = null;
-    if (destinationId) {
-      dest = await storage.getDestination(destinationId);
-      if (!dest) { reply.code(404).send({ error: "destination not found" }); return; }
-      intent = intent || `Inspect ${dest.normalized_route} ("${dest.title}") for bugs`;
-    }
 
     let savedTest: Awaited<ReturnType<StorageAdapter["getSavedTest"]>> = null;
     if (testId) {
@@ -93,14 +85,10 @@ export function registerRunRoutes(
     if (!intent) { reply.code(400).send({ error: "intent is required" }); return; }
 
     let sourceLabel: string;
-    let sourceType: "test" | "page" | "adhoc";
+    let sourceType: "test" | "adhoc";
     if (testId && savedTest) {
       sourceLabel = String(savedTest.name ?? "").trim() || "Saved test";
       sourceType = "test";
-    } else if (destinationId && dest) {
-      const title = String(dest.title ?? "").trim();
-      sourceLabel = title || String(dest.normalized_route ?? "");
-      sourceType = "page";
     } else {
       sourceLabel = authTest ? "Test auth" : intent.trim();
       if (sourceLabel.length > 500) sourceLabel = `${sourceLabel.slice(0, 497)}...`;
@@ -114,7 +102,7 @@ export function registerRunRoutes(
 
     const run = await storage.createTestRun({
       project_id: projectId, environment_id: environmentId,
-      test_id: testId ?? null, destination_id: destinationId ?? null,
+      test_id: testId ?? null,
       trigger_type: "manual", trigger_ref: authTest ? "auth_test" : "dashboard",
       // The job has only been enqueued here; worker flips this to `running`.
       status: "queued", started_at: new Date().toISOString(),
@@ -134,7 +122,6 @@ export function registerRunRoutes(
       environmentName: env.name,
       auth: authConfig,
       testId,
-      destinationId,
       context,
       saveScreenshots: true,
       maxSteps,
@@ -148,6 +135,85 @@ export function registerRunRoutes(
     }
 
     reply.send({ runId: run.id, status: "queued" });
+  });
+
+  // Check if there's an active discovery run for a project
+  app.get("/api/projects/:projectId/discover-flows/status", async (req, reply) => {
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT id, status FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') ORDER BY started_at DESC LIMIT 1`,
+      [projectId],
+    );
+    if (rows[0]) {
+      reply.send({ active: true, runId: rows[0].id, status: rows[0].status });
+    } else {
+      reply.send({ active: false });
+    }
+  });
+
+  app.post("/api/projects/:projectId/discover-flows", async (req, reply) => {
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
+    const { environmentId } = z.object({ environmentId: z.string().uuid() }).parse(req.body);
+
+    // Block parallel discovery runs — return the active run instead of creating a new one
+    const { rows: active } = await pool.query(
+      `SELECT id FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') LIMIT 1`,
+      [projectId],
+    );
+    if (active[0]) {
+      reply.send({ runId: active[0].id, alreadyRunning: true });
+      return;
+    }
+
+    const { rows: [env] } = await pool.query("SELECT * FROM environments WHERE id = $1 AND project_id = $2", [environmentId, projectId]);
+    if (!env) { reply.code(404).send({ error: "environment not found" }); return; }
+
+    const authRow = await storage.getAuthConfig(projectId, environmentId);
+    const authConfig = authRow ? { mode: authRow.mode, ...authRow.config_json } : null;
+
+    const run = await storage.createTestRun({
+      project_id: projectId,
+      environment_id: environmentId,
+      test_id: null,
+      trigger_type: "manual",
+      trigger_ref: "discovery",
+      status: "queued",
+      started_at: new Date().toISOString(),
+      source_type: "adhoc",
+      source_label: "Flow discovery",
+    });
+
+    await runQueue.add("run", {
+      runId: run.id,
+      baseUrl: env.base_url,
+      intent:
+        "Explore this application's structure and navigation. Visit every main section by clicking " +
+        "navigation bars, side menus, tab bars, and top-level menu items. When you land on a new page, " +
+        "use observe to understand what it does and what forms or features are present. " +
+        "DO NOT fill out or submit any forms — just note that they exist. " +
+        "Click through all primary navigation items before exploring secondary ones. " +
+        "Your goal is to map every distinct section and feature of the app.",
+      projectId,
+      environmentId,
+      environmentName: env.name,
+      auth: authConfig,
+      saveScreenshots: false,
+      maxSteps: 100,
+      recordVideo: false,
+      triggerRef: "discovery",
+    } satisfies RunJobData);
+
+    reply.send({ runId: run.id, alreadyRunning: false });
+  });
+
+  // Return the flows discovered by a specific discovery run
+  app.get("/api/runs/:runId/discovered-flows", async (req, reply) => {
+    const { runId } = RunIdParams.parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT id, name, intent, context, created_at FROM saved_tests WHERE discovery_run_id = $1 ORDER BY created_at ASC`,
+      [runId],
+    );
+    reply.send({ flows: rows });
   });
 
   // SSE streaming — uses Redis Pub/Sub so the worker process can be separate
@@ -247,6 +313,32 @@ export function registerRunRoutes(
       reply.send({ ok: true, status: run.status });
       return;
     }
+
+    if (run.status === "queued") {
+      // Queued runs haven't started yet — remove the BullMQ job and mark failed immediately.
+      // Don't rely on the worker to pick it up and check the stop signal.
+      try {
+        const waiting = await runQueue.getWaiting();
+        const job = waiting.find((j) => j.data?.runId === runId);
+        if (job) await job.remove();
+      } catch (err) {
+        logger.warn({ runId, err: String(err) }, "Stop queued: could not remove BullMQ job");
+      }
+      await storage.updateTestRun(runId, {
+        status: "failed",
+        summary: "Stopped by user",
+        completed_at: new Date().toISOString(),
+      });
+      const updatedRun = await storage.getTestRun(runId);
+      await redis.publish(
+        runEventsChannel(runId),
+        JSON.stringify({ type: "done", run: updatedRun ?? { id: runId, status: "failed", summary: "Stopped by user" } }),
+      ).catch(() => {});
+      reply.send({ ok: true });
+      return;
+    }
+
+    // Running run — set the Redis signal; the worker polls it and stops gracefully.
     try {
       await markRunStopRequested(redis, runId);
     } catch (err) {

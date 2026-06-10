@@ -24,8 +24,6 @@ import { Settings } from "@/pages/Settings";
 import { ProjectSettings } from "@/pages/ProjectSettings";
 import { RunDetail } from "@/pages/RunDetail";
 import { Bugs } from "@/pages/Bugs";
-import { Pages } from "@/pages/Pages";
-import { PageDetail } from "@/pages/PageDetail";
 import { FlowDetail } from "@/pages/FlowDetail";
 import { ProjectProvider } from "@/lib/projectContext";
 import { WelcomeModal } from "@/components/welcome-modal";
@@ -91,11 +89,6 @@ function App() {
               <Route index element={<Navigate to="/overview" replace />} />
               <Route path="overview" element={<Overview />} />
               <Route path="environments" element={<Environments />} />
-              <Route path="pages" element={<Outlet />}>
-                <Route index element={<Pages />} />
-                <Route path=":destinationId" element={<PageDetail />} />
-              </Route>
-              <Route path="discover" element={<Navigate to="/pages" replace />} />
               <Route path="tests" element={<Outlet />}>
                 <Route index element={<TestsPlans />} />
                 <Route path=":testId" element={<FlowDetail />} />

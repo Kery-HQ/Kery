@@ -88,14 +88,12 @@ export async function applyDbModelSettings(storage: StorageAdapter): Promise<voi
       if (key === "auxiliaryModel") {
         const v =
           all["model.auxiliaryModel"] ??
-          all["model.crawlModel"] ??
           all["model.scriptModel"] ??
           all["model.summaryModel"] ??
           all["model.reviewModel"];
         if (v) overrides.auxiliaryModel = v;
         const priceRaw =
           all["modelPrice.auxiliaryModel"] ??
-          all["modelPrice.crawlModel"] ??
           all["modelPrice.scriptModel"] ??
           all["modelPrice.summaryModel"] ??
           all["modelPrice.reviewModel"];
@@ -189,7 +187,6 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
         if (key === "auxiliaryModel") {
           const v =
             all["model.auxiliaryModel"] ??
-            all["model.crawlModel"] ??
             all["model.scriptModel"] ??
             all["model.summaryModel"] ??
             all["model.reviewModel"];
@@ -235,12 +232,10 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       if (value !== undefined) {
         const dbKey = `model.${key}`;
         if (value === "") {
-          // Empty string = reset to default (crawl merge: clear legacy keys too)
           const keysToDelete =
             key === "auxiliaryModel"
               ? [
                   "model.auxiliaryModel",
-                  "model.crawlModel",
                   "model.scriptModel",
                   "model.summaryModel",
                   "model.reviewModel",
@@ -256,7 +251,6 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
           overrides[key] = value;
           if (key === "auxiliaryModel") {
             await storage.deleteSettings([
-              "model.crawlModel",
               "model.scriptModel",
               "model.summaryModel",
               "model.reviewModel",
@@ -277,7 +271,6 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
             k === "auxiliaryModel"
               ? [
                   "modelPrice.auxiliaryModel",
-                  "modelPrice.crawlModel",
                   "modelPrice.scriptModel",
                   "modelPrice.summaryModel",
                   "modelPrice.reviewModel",
@@ -292,7 +285,6 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
           await storage.saveSetting(dbPriceKey, JSON.stringify({ input: v.input, output: v.output }));
           if (k === "auxiliaryModel") {
             await storage.deleteSettings([
-              "modelPrice.crawlModel",
               "modelPrice.scriptModel",
               "modelPrice.summaryModel",
               "modelPrice.reviewModel",
@@ -313,8 +305,7 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
     const dbKeys = MODEL_KEYS.map((k) => `model.${k}`);
     const priceKeys = MODEL_KEYS.map((k) => `modelPrice.${k}`);
     const legacyDbKeys = LEGACY_MODEL_KEYS.flatMap((k) => [`model.${k}`, `modelPrice.${k}`]);
-    const legacyCrawlRename = ["model.crawlModel", "modelPrice.crawlModel"] as const;
-    await storage.deleteSettings([...dbKeys, ...priceKeys, ...legacyDbKeys, ...legacyCrawlRename]);
+    await storage.deleteSettings([...dbKeys, ...priceKeys, ...legacyDbKeys]);
 
     // Re-init from env defaults
     updateEngineConfig({

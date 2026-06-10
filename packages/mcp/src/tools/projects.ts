@@ -13,14 +13,14 @@ export function registerProjectTools(server: McpServer, client: KeryClient) {
 
   server.tool(
     "kery_list_projects",
-    `List all Kery projects with their environments, coverage stats, and open bug counts.
+    `List all Kery projects with their environments and open bug counts.
 
 WHEN TO USE:
   • You need a project ID to pass to other tools
   • User asks "what projects do I have" or "show me my kery projects"
   • Before running a test and you don't know the projectId
 
-Returns each project's ID (needed for all other tools), environments (with auth mode and base URL), coverage summary, and open bug count.`,
+Returns each project's ID (needed for all other tools), environments (with auth mode and base URL), and open bug count.`,
     {},
     async () => {
       const err = await requireRunning(client);
@@ -43,15 +43,13 @@ Returns each project's ID (needed for all other tools), environments (with auth 
 
       const enriched = await Promise.all(
         projects.map(async (p) => {
-          const [envs, bugs, coverage] = await Promise.allSettled([
+          const [envs, bugs] = await Promise.allSettled([
             client.listEnvironments(p.id),
             client.getBugs(p.id),
-            client.getCoverage(p.id),
           ]);
 
           const envList = envs.status === "fulfilled" ? envs.value : [];
           const bugList = bugs.status === "fulfilled" ? bugs.value : [];
-          const cov = coverage.status === "fulfilled" ? coverage.value : null;
 
           const envsWithAuth = await Promise.all(
             envList.map(async (env) => {
@@ -74,14 +72,6 @@ Returns each project's ID (needed for all other tools), environments (with auth 
             domain: p.domain ?? null,
             environments: envsWithAuth,
             openBugCount: openBugs.length,
-            coverage: cov
-              ? {
-                  total: cov.total,
-                  tested: cov.tested,
-                  untested: cov.untested,
-                  coveragePct: cov.total > 0 ? Math.round((cov.tested / cov.total) * 100) : 0,
-                }
-              : null,
             webUrl: client.buildWebUrl(`/projects/${p.id}`),
           };
         }),
@@ -93,7 +83,7 @@ Returns each project's ID (needed for all other tools), environments (with auth 
           text: JSON.stringify({
             totalCount: enriched.length,
             projects: enriched,
-            tip: "Use the 'id' field as projectId in kery_run_test, kery_scan, kery_get_bugs, etc.",
+            tip: "Use the 'id' field as projectId in kery_run_test, kery_get_bugs, etc.",
           }),
         }],
       };
@@ -108,7 +98,6 @@ Returns each project's ID (needed for all other tools), environments (with auth 
 
 WHEN TO USE:
   • User wants to rename a project
-  • User wants to update the domain used by the crawler
   • Correcting a typo in the project name
 
 Provide projectId and whichever fields you want to change (name, domain, or both).`,
@@ -119,7 +108,7 @@ Provide projectId and whichever fields you want to change (name, domain, or both
         .string()
         .optional()
         .nullable()
-        .describe("Domain hint for the crawler (e.g. 'myapp.com'). Pass null to clear it."),
+        .describe("Domain hint for the project (e.g. 'myapp.com'). Pass null to clear it."),
     },
     async ({ projectId, name, domain }) => {
       const err = await requireRunning(client);
@@ -240,7 +229,7 @@ Provide environmentId (from kery_list_projects) and whichever fields you want to
             },
             nextSteps: [
               "Environment updated.",
-              baseUrl ? `Tests will now run against ${env.base_url}. Consider running kery_scan again if the URL changed significantly.` : null,
+              baseUrl ? `Tests will now run against ${env.base_url}.` : null,
             ].filter(Boolean),
           }),
         }],

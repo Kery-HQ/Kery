@@ -50,7 +50,7 @@ STATUS VALUES (user-facing → DB):
   • ignored     (wont_fix)    — user dismissed
   • fixed       (resolved)    — agent confirmed fix
 
-Each bug returned includes destination_id (route) and test_id (flow) so you can filter by source.`,
+Each bug returned includes test_id (flow) so you can filter by source.`,
     {
       projectId: z.string().uuid().describe("Project ID (get from kery_list_projects)"),
       status: z
@@ -137,7 +137,6 @@ Each bug returned includes destination_id (route) and test_id (flow) so you can 
               status: FRIENDLY_STATUS[b.status] ?? b.status,
               url: b.url,
               reportedAt: b.reportedAt,
-              destination_id: (b as any).destination_id ?? null,
               test_id: (b as any).test_id ?? null,
             })),
             webUrl,

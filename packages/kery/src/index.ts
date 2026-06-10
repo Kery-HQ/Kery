@@ -314,12 +314,10 @@ Figure out what they want and call the right Kery MCP tool. The Kery MCP tools a
 
 - \`kery_start\` / \`kery_stop\` / \`kery_status\` — manage the local Kery platform
 - \`kery_list_projects\` / \`kery_setup_project\` / \`kery_update_project\` — projects
-- \`kery_list_routes\` / \`kery_scan\` — discover pages in the app
 - \`kery_list_tests\` / \`kery_run_test\` / \`kery_update_test\` / \`kery_delete_test\` — tests
 - \`kery_list_runs\` / \`kery_get_run\` / \`kery_stop_run\` — run history & results
 - \`kery_get_bugs\` / \`kery_update_bug\` — bug triage
-- \`kery_get_coverage\` — coverage report
-- \`kery_get_settings\` / \`kery_update_settings\` / \`kery_update_auth\` / \`kery_add_environment\` / \`kery_update_environment\` / \`kery_update_page\` — configuration
+- \`kery_get_settings\` / \`kery_update_settings\` / \`kery_update_auth\` / \`kery_add_environment\` / \`kery_update_environment\` — configuration
 
 Rules:
 1. If a Kery tool returns "Kery is not running", call \`kery_start\` first and retry.

@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash,
   MagnifyingGlass,
+  MagnifyingGlassPlus,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ import { relativeTime } from "@/lib/formatters";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, fetchTests, createTest, updateTest, deleteTest,
-  toggleTest, runProjectTest,
+  toggleTest, runProjectTest, discoverFlows, fetchDiscoveryStatus,
 } from "@/projectApi";
 import { toast } from "sonner";
 
@@ -75,6 +76,8 @@ export const TestsPlans: React.FC = () => {
 
   const [running, setRunning] = React.useState<string | null>(null);
   const [runAllBusy, setRunAllBusy] = React.useState(false);
+  const [discovering, setDiscovering] = React.useState(false);
+  const [activeDiscoveryRunId, setActiveDiscoveryRunId] = React.useState<string | null>(null);
 
   // ─── Init ───────────────────────────────────────────────────────────────
 
@@ -87,6 +90,15 @@ export const TestsPlans: React.FC = () => {
     });
     loadTests();
     setDialogOpen(false);
+    fetchDiscoveryStatus(currentProjectId).then((res) => {
+      if (res.active && res.runId) {
+        setActiveDiscoveryRunId(res.runId);
+        setDiscovering(true);
+      } else {
+        setActiveDiscoveryRunId(null);
+        setDiscovering(false);
+      }
+    }).catch(() => {});
   }, [currentProjectId]);
 
   async function loadTests() {
@@ -193,6 +205,23 @@ export const TestsPlans: React.FC = () => {
       toast.success(`${targets.length} run${targets.length === 1 ? "" : "s"} queued`);
     } finally {
       setRunAllBusy(false);
+    }
+  }
+
+  async function handleDiscover() {
+    if (activeDiscoveryRunId) {
+      navigate(`/runs/${activeDiscoveryRunId}`);
+      return;
+    }
+    if (!currentProjectId || !selectedEnvId) return;
+    setDiscovering(true);
+    try {
+      const { runId } = await discoverFlows(currentProjectId, selectedEnvId);
+      setActiveDiscoveryRunId(runId);
+      navigate(`/runs/${runId}`);
+    } catch {
+      setDiscovering(false);
+      toast.error("Discovery failed to start");
     }
   }
 
@@ -346,6 +375,17 @@ export const TestsPlans: React.FC = () => {
                     >
                       {!runAllBusy && <Play className="h-3.5 w-3.5" />}
                       Run all{enabledCount > 0 ? ` (${enabledCount})` : ""}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!selectedEnvId || discovering}
+                      loading={discovering}
+                      onClick={() => void handleDiscover()}
+                      className="gap-1.5 h-8 text-[12px]"
+                    >
+                      {!discovering && <MagnifyingGlassPlus className="h-3.5 w-3.5" />}
+                      {discovering ? "Discovering..." : "Discover"}
                     </Button>
                     <Button
                       size="sm"

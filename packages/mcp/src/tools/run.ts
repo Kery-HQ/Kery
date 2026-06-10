@@ -11,19 +11,17 @@ export function registerRunTestTool(server: McpServer, client: KeryClient) {
 WHEN TO USE:
   • User says "run a test", "test my app", "check if X works", "verify the signup flow"
   • After making code changes and wanting to regression test
-  • Testing a specific page or user flow
+  • Testing a specific user flow
   • Running a saved test by ID
 
 PREREQUISITES:
   • Kery must be running (call kery_start if needed)
   • Project must exist (call kery_setup_project first)
-  • For pageRoute: must have scanned the app first (call kery_scan)
 
 HOW TO PROVIDE THE TEST:
   • Use 'intent' for natural language: "verify the checkout flow completes successfully"
-  • Use 'pageRoute' to test a specific page: "/dashboard", "/settings", "/checkout"
   • Use 'testId' to rerun a saved test (get IDs from kery_list_tests)
-  • Omitting all three runs a general health check of the app
+  • Omitting both runs a general health check of the app
 
 TIMING & WAIT BEHAVIOR:
   • Tests take 1-5 minutes to complete.
@@ -47,14 +45,6 @@ POST-RUN TRIAGE — CRITICAL:
         .uuid()
         .optional()
         .describe("ID of a saved test to run (get from kery_list_tests)"),
-      pageRoute: z
-        .string()
-        .optional()
-        .describe(
-          "Test a specific page by its route, e.g. '/settings', '/dashboard', '/checkout'. " +
-          "The app must have been scanned first (kery_scan). " +
-          "Get available routes from kery_list_routes.",
-        ),
       environmentId: z
         .string()
         .uuid()
@@ -73,7 +63,7 @@ POST-RUN TRIAGE — CRITICAL:
           "Use kery_get_run later to fetch results.",
         ),
     },
-    async ({ projectId, intent, testId, pageRoute, environmentId, wait }) => {
+    async ({ projectId, intent, testId, environmentId, wait }) => {
       const healthy = await client.checkHealth();
       if (!healthy) {
         return {
@@ -107,46 +97,11 @@ POST-RUN TRIAGE — CRITICAL:
         }
       }
 
-      // Resolve pageRoute to destinationId
-      let destinationId: string | undefined;
-      if (pageRoute) {
-        const { pages } = await client.getPages(projectId);
-        if (pages.length === 0) {
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify({
-                error: "No pages discovered yet.",
-                fix: `Call kery_scan with projectId="${projectId}" first to crawl the app and discover pages, then retry.`,
-              }),
-            }],
-            isError: true,
-          };
-        }
-        const match = pages.find((p) => p.normalized_route === pageRoute);
-        if (!match) {
-          const available = pages.map((p) => p.normalized_route).slice(0, 20);
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify({
-                error: `Page route "${pageRoute}" not found in discovered pages.`,
-                availableRoutes: available,
-                fix: "Use one of the availableRoutes, or call kery_scan again if you added this page recently.",
-              }),
-            }],
-            isError: true,
-          };
-        }
-        destinationId = match.id;
-      }
-
       try {
         const { runId } = await client.startRun(projectId, {
           environmentId,
           intent,
           testId,
-          destinationId,
         });
 
         if (!wait) {
@@ -179,7 +134,7 @@ POST-RUN TRIAGE — CRITICAL:
         const nextSteps: string[] = [];
         if (run.status === "passed" && bugs.length === 0) {
           nextSteps.push("Test passed with no bugs found.");
-          nextSteps.push("Run more tests with different intents, or call kery_get_coverage to see untested pages.");
+          nextSteps.push("Run more tests with different intents.");
         } else if (bugs.length > 0) {
           nextSteps.push(
             `Found ${bugs.length} bug(s)${highBugs.length > 0 ? ` (${highBugs.length} high severity)` : ""}. Call kery_get_bugs with projectId="${projectId}" to review them in detail.`,

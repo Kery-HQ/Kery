@@ -57,7 +57,6 @@ export type BugRecord = {
   reportedAt?: string;
   reported_at?: string;
   test_id?: string | null;
-  destination_id?: string | null;
   test_name?: string | null;
   environment?: string | null;
   index?: number;

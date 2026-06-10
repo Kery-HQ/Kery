@@ -102,12 +102,9 @@ export {
 } from "./liveRunSnapshot.js";
 export type { LiveRunSnapshot, LiveActivityEntry, LiveRunReduceEvent } from "./liveRunSnapshot.js";
 
-// ─── Crawler ─────────────────────────────────────────────────────────────────
-export { runCrawl, executeCrawlRun, generateIntentForNode } from "./crawlerWorker.js";
-export type {
-  CrawlPageData, CrawlResult, CrawlSuggestedFlow, CrawlLlmCostBreakdown, CrawlMetadata,
-  CrawlProgressPhase, CrawlProgressMetadata, CrawlProgressSnapshot, RunCrawlOptions,
-} from "./crawlerWorker.js";
+// ─── Flow Discovery ──────────────────────────────────────────────────────────
+export { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
+export type { DiscoveredFlow, FlowDiscoveryResult } from "./flowDiscoveryAgent.js";
 
 // ─── Run Orchestrator ────────────────────────────────────────────────────────
 export { runOrchestratedJob } from "./runOrchestrator.js";

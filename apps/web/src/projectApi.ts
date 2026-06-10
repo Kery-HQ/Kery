@@ -161,6 +161,10 @@ export async function stopRun(runId: string) {
   return apiFetch(`${API_BASE}/api/runs/${runId}/stop`, { method: "POST", body: JSON.stringify({}) });
 }
 
+export async function deleteRun(runId: string) {
+  return apiFetch<{ ok: boolean }>(`${API_BASE}/api/runs/${runId}`, { method: "DELETE" });
+}
+
 export async function deleteAllRuns(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/runs`, { method: "DELETE" });
 }
@@ -219,11 +223,6 @@ export async function clearMemory(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/memory`, { method: "DELETE" });
 }
 
-
-export async function resetPageData(projectId: string, destinationId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}/reset`, { method: "DELETE" });
-}
-
 // --- Saved tests ---
 
 export async function fetchTests(projectId: string) {
@@ -266,46 +265,26 @@ export async function deleteTest(projectId: string, testId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, { method: "DELETE" });
 }
 
+export async function discoverFlows(projectId: string, environmentId: string) {
+  return apiFetch<{ runId: string; alreadyRunning: boolean }>(`${API_BASE}/api/projects/${projectId}/discover-flows`, {
+    method: "POST",
+    body: JSON.stringify({ environmentId }),
+  });
+}
+
+export async function fetchDiscoveryStatus(projectId: string) {
+  return apiFetch<{ active: boolean; runId?: string; status?: string }>(`${API_BASE}/api/projects/${projectId}/discover-flows/status`);
+}
+
+export async function fetchDiscoveredFlows(runId: string) {
+  return apiFetch<{ flows: { id: string; name: string; intent: string; context?: string | null; created_at: string }[] }>(`${API_BASE}/api/runs/${runId}/discovered-flows`);
+}
+
+
 // --- Test memory (uses project memory) ---
 
 export async function fetchTestMemory(projectId: string, _testId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/memory`);
-}
-
-// --- Crawl Discovery ---
-
-export async function triggerCrawl(projectId: string, force = false) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl${force ? "?force=true" : ""}`, { method: "POST" });
-}
-
-export async function fetchCrawlRuns(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/runs`);
-}
-
-export async function fetchCrawlRun(projectId: string, crawlRunId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/runs/${crawlRunId}`);
-}
-
-export async function fetchCrawlNodes(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/nodes`);
-}
-
-export async function toggleCrawlNode(projectId: string, nodeId: string, enabled: boolean) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/nodes/${nodeId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ enabled }),
-  });
-}
-
-export async function fetchCrawlSettings(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/settings`);
-}
-
-export async function saveCrawlSettings(projectId: string, settings: { crawlEnvironmentId: string | null; autoCrawlWeekly: boolean }) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl/settings`, {
-    method: "PUT",
-    body: JSON.stringify(settings),
-  });
 }
 
 // --- Model settings (global) ---
@@ -396,63 +375,4 @@ export async function saveApiKeys(keys: Partial<Record<ApiKeyProvider, string>>)
 
 export async function deleteApiKey(provider: ApiKeyProvider) {
   return apiFetch(`${API_BASE}/api/settings/api-keys/${provider}`, { method: "DELETE" });
-}
-
-export async function resetCrawlData(projectId: string, deleteFlows = false) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/crawl${deleteFlows ? "?deleteFlows=true" : ""}`, { method: "DELETE" });
-}
-
-// --- Pages (unified: replaces Discover + App Tree) ---
-
-export async function fetchPages(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages`);
-}
-
-export async function fetchPageDetail(projectId: string, destinationId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${destinationId}`);
-}
-
-export async function togglePage(projectId: string, pageId: string, enabled: boolean) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${pageId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ enabled }),
-  });
-}
-
-export async function deletePage(projectId: string, pageId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/${pageId}`, { method: "DELETE" });
-}
-
-export async function triggerScan(projectId: string, force = false) {
-  const url = `${API_BASE}/api/projects/${projectId}/scan${force ? "?force=true" : ""}`;
-  const res = await fetch(url, { method: "POST" });
-  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (res.status === 429) return { _status: 429 as const, ...body };
-  if (!res.ok) throw new Error(`API ${res.status}: ${JSON.stringify(body)}`);
-  return body;
-}
-
-export async function fetchScanStatus(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/scan/status`);
-}
-
-export async function fetchEnabledPageIds(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/pages/enabled-ids`);
-}
-
-// --- App Tree (legacy) ---
-
-export async function fetchAppTree(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/tree`);
-}
-
-export async function fetchCoverage(projectId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/coverage`);
-}
-
-export async function runDestination(projectId: string, environmentId: string, destinationId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/run`, {
-    method: "POST",
-    body: JSON.stringify({ environmentId, destinationId }),
-  });
 }
