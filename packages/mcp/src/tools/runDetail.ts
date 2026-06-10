@@ -57,6 +57,38 @@ Get runIds from kery_run_test results or kery_list_runs.`,
         });
 
         const failedSteps = (run.steps_json ?? []).filter((s) => s.status === "failed");
+        const isDiscovery = (run as any).trigger_ref === "discovery";
+
+        // For discovery runs, fetch the flows that were found
+        let discoveredFlows: { id: string; name: string; intent: string }[] = [];
+        if (isDiscovery && (run.status === "passed" || run.status === "failed")) {
+          try {
+            discoveredFlows = await client.getDiscoveredFlows(run.id);
+          } catch {
+            // non-fatal
+          }
+        }
+
+        const nextSteps: string[] = [];
+        if (isDiscovery) {
+          if (run.status === "queued" || run.status === "running") {
+            nextSteps.push("Discovery is still in progress. Call kery_get_run again once it completes.");
+          } else if (discoveredFlows.length > 0) {
+            nextSteps.push(`Discovered ${discoveredFlows.length} flow(s). Call kery_list_tests to see them all.`);
+            nextSteps.push(`Run any discovered flow with kery_run_test testId="<id from discoveredFlows>"`);
+          } else {
+            nextSteps.push("Discovery completed but no new flows were found.");
+          }
+        } else {
+          if (bugs.length > 0) {
+            nextSteps.push(`${bugs.length} bug(s) found. Call kery_update_bug to mark them as resolved or wont_fix after reviewing.`);
+          } else {
+            nextSteps.push("No bugs found in this run.");
+          }
+          if (failedSteps.length > 0) {
+            nextSteps.push(`${failedSteps.length} steps failed. Check the steps array above for details on what the agent couldn't do.`);
+          }
+        }
 
         return {
           content: [{
@@ -64,6 +96,7 @@ Get runIds from kery_run_test results or kery_list_runs.`,
             text: JSON.stringify({
               runId: run.id,
               status: run.status,
+              runType: isDiscovery ? "discovery" : "test",
               displayName: (run as any).display_name ?? null,
               summary: run.summary ?? null,
               startedAt: run.started_at,
@@ -79,19 +112,16 @@ Get runIds from kery_run_test results or kery_list_runs.`,
                 reasoning: s.reasoning,
                 url: s.url,
               })),
-              bugs,
-              ...(includeScreenshots && {
-                screenshotNote:
-                  "screenshotUrl fields are direct JPEG URLs served by the Kery API, accessible while Kery is running.",
-              }),
-              nextSteps: [
-                bugs.length > 0
-                  ? `${bugs.length} bug(s) found. Call kery_update_bug to mark them as resolved or wont_fix after reviewing.`
-                  : "No bugs found in this run.",
-                failedSteps.length > 0
-                  ? `${failedSteps.length} steps failed. Check the steps array above for details on what the agent couldn't do.`
-                  : null,
-              ].filter(Boolean),
+              ...(isDiscovery
+                ? { discoveredFlows }
+                : {
+                    bugs,
+                    ...(includeScreenshots && {
+                      screenshotNote:
+                        "screenshotUrl fields are direct JPEG URLs served by the Kery API, accessible while Kery is running.",
+                    }),
+                  }),
+              nextSteps,
               webUrl: client.buildWebUrl(`/runs/${run.id}`),
             }),
           }],

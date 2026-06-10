@@ -2,16 +2,18 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { KeryClient } from "@keryai/client";
 
 const KERY_OVERVIEW = `Kery is an AI-powered browser testing platform. It uses LLM agents to:
+  • Discover flows in your app automatically (kery_discover_flows)
   • Run AI browser agents that navigate, interact, and find bugs (kery_run_test)
   • Track bugs by severity and category (kery_get_bugs)
   • Save reusable test flows (kery_list_tests)
   • Build regression test scripts from successful runs
 
 TYPICAL WORKFLOW:
-  1. kery_start          — start the platform (local Docker mode only)
-  2. kery_setup_project  — create a project with your app URL + auth config
-  3. kery_run_test       — run an AI test agent with a natural language intent
-  4. kery_get_bugs       — review bugs found
+  1. kery_start           — start the platform (local Docker mode only)
+  2. kery_setup_project   — create a project with your app URL + auth config
+  3. kery_discover_flows  — explore the app and save discovered flows as tests (optional but recommended)
+  4. kery_run_test        — run an AI test agent with a natural language intent or a saved flow
+  5. kery_get_bugs        — review bugs found
 
 WHEN TO CALL kery_status:
   • The user asks "what is kery", "is kery set up", "show me my projects", or anything orientation-related
@@ -112,7 +114,7 @@ Returns full system status: whether Kery is running, all projects with their env
           }
         }
         if (nextSteps.length === 0) {
-          nextSteps.push("All projects are healthy. Run kery_run_test to test a specific flow.");
+          nextSteps.push("All projects are healthy. Run kery_discover_flows to map your app's flows, or kery_run_test to test a specific flow.");
         }
       }
 
@@ -137,9 +139,10 @@ Returns full system status: whether Kery is running, all projects with their env
               "kery_add_environment — add staging/prod environment to a project",
               "kery_update_environment — change environment URL or name",
               "kery_update_auth — update authentication config for an environment",
-              "kery_run_test — run an AI test agent (natural language intent)",
+              "kery_discover_flows — explore the app to discover and save its flows as tests",
+              "kery_run_test — run an AI test agent (natural language intent or saved flow)",
               "kery_list_runs — list recent test runs",
-              "kery_get_run — get detailed steps + bugs for a specific run",
+              "kery_get_run — get detailed steps + bugs (or discovered flows) for a specific run",
               "kery_get_bugs — list open bugs",
               "kery_update_bug — mark bug as resolved / wont_fix / reopen",
               "kery_list_tests — list or create saved reusable test flows",

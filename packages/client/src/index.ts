@@ -387,6 +387,33 @@ export class KeryClient {
     await this.fetch("/api/settings/api-keys", { method: "PUT", body: JSON.stringify(keys) });
   }
 
+  // ── Flow discovery ───────────────────────────────────────────────────
+
+  async discoverFlows(
+    projectId: string,
+    environmentId: string,
+  ): Promise<{ runId: string; alreadyRunning: boolean }> {
+    return this.fetch(`/api/projects/${projectId}/discover-flows`, {
+      method: "POST",
+      body: JSON.stringify({ environmentId }),
+    });
+  }
+
+  async getDiscoveryStatus(
+    projectId: string,
+  ): Promise<{ active: boolean; runId?: string; status?: string }> {
+    return this.fetch(`/api/projects/${projectId}/discover-flows/status`);
+  }
+
+  async getDiscoveredFlows(
+    runId: string,
+  ): Promise<{ id: string; name: string; intent: string; context?: string | null; created_at: string }[]> {
+    const data = await this.fetch<{ flows: { id: string; name: string; intent: string; context?: string | null; created_at: string }[] }>(
+      `/api/runs/${runId}/discovered-flows`,
+    );
+    return data.flows;
+  }
+
   // ── Saved Tests ──────────────────────────────────────────────────────
 
   async listTests(projectId: string): Promise<SavedTest[]> {

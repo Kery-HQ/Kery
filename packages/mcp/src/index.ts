@@ -9,6 +9,7 @@ import { registerStatusTool } from "./tools/status.js";
 import { registerSetupTool } from "./tools/setup.js";
 import { registerProjectTools } from "./tools/projects.js";
 import { registerAuthTool } from "./tools/auth.js";
+import { registerDiscoverTool } from "./tools/discover.js";
 import { registerRunTestTool } from "./tools/run.js";
 import { registerRunsTool } from "./tools/runs.js";
 import { registerRunDetailTool } from "./tools/runDetail.js";
@@ -41,6 +42,7 @@ registerProjectTools(server, client);
 registerAuthTool(server, client);
 
 // ── Testing ─────────────────────────────────────────────────────────────────
+registerDiscoverTool(server, client);
 registerRunTestTool(server, client);
 registerRunsTool(server, client);     // includes kery_stop_run
 registerRunDetailTool(server, client);
