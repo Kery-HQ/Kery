@@ -161,6 +161,10 @@ export async function stopRun(runId: string) {
   return apiFetch(`${API_BASE}/api/runs/${runId}/stop`, { method: "POST", body: JSON.stringify({}) });
 }
 
+export async function deleteRun(runId: string) {
+  return apiFetch<{ ok: boolean }>(`${API_BASE}/api/runs/${runId}`, { method: "DELETE" });
+}
+
 export async function deleteAllRuns(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/runs`, { method: "DELETE" });
 }
@@ -260,6 +264,22 @@ export async function toggleTest(projectId: string, testId: string, enabled: boo
 export async function deleteTest(projectId: string, testId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}`, { method: "DELETE" });
 }
+
+export async function discoverFlows(projectId: string, environmentId: string) {
+  return apiFetch<{ runId: string; alreadyRunning: boolean }>(`${API_BASE}/api/projects/${projectId}/discover-flows`, {
+    method: "POST",
+    body: JSON.stringify({ environmentId }),
+  });
+}
+
+export async function fetchDiscoveryStatus(projectId: string) {
+  return apiFetch<{ active: boolean; runId?: string; status?: string }>(`${API_BASE}/api/projects/${projectId}/discover-flows/status`);
+}
+
+export async function fetchDiscoveredFlows(runId: string) {
+  return apiFetch<{ flows: { id: string; name: string; intent: string; context?: string | null; created_at: string }[] }>(`${API_BASE}/api/runs/${runId}/discovered-flows`);
+}
+
 
 // --- Test memory (uses project memory) ---
 

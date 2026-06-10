@@ -70,6 +70,14 @@ await pool.query(
   if (rowCount && rowCount > 0) console.log(`Recovered ${rowCount} zombie run(s) from previous crash`);
 }).catch(() => {});
 
+// Mark stale "queued" runs as failed — these were never picked up by the worker
+// (e.g., their BullMQ job failed before the DB status was updated to "running")
+await pool.query(
+  `UPDATE test_runs SET status = 'failed', summary = 'Job lost — server restarted', completed_at = now() WHERE status = 'queued' AND started_at < now() - interval '5 minutes'`,
+).then(({ rowCount }) => {
+  if (rowCount && rowCount > 0) console.log(`Cleared ${rowCount} stale queued run(s)`);
+}).catch(() => {});
+
 // Health check
 app.get("/health", async () => ({ status: "ok" }));
 

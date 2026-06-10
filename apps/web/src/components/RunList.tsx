@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { CaretRight } from "@phosphor-icons/react";
+import { CaretRight, MagnifyingGlassPlus } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
@@ -13,6 +13,7 @@ type Run = {
   summary?: string | null;
   display_name?: string | null;
   source_label?: string | null;
+  trigger_ref?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
   bugs_json?: unknown[] | null;
@@ -79,6 +80,12 @@ export function RunList({
             <Badge variant={statusVariant(r.status)} dot className="flex-shrink-0 text-[10px]">
               {r.status}
             </Badge>
+            {r.trigger_ref === "discovery" && (
+              <Badge variant="outline" className="flex-shrink-0 text-[10px] gap-1">
+                <MagnifyingGlassPlus className="h-2.5 w-2.5" />
+                Discovery
+              </Badge>
+            )}
             <span className="flex-1 text-[13px] text-foreground truncate min-w-0">
               {runListLabel(r)}
             </span>

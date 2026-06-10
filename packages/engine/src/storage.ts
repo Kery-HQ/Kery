@@ -42,12 +42,12 @@ export interface StorageAdapter {
   getRegressionPlan(table: string, id: string): Promise<any>;
   updateRegressionPlan(table: string, id: string, data: Record<string, any>): Promise<void>;
 
-  // Crawl
-  getExistingTestNames(projectId: string): Promise<string[]>;
+  getExistingTests(projectId: string): Promise<{ name: string; intent: string }[]>;
   getAuthConfig(projectId: string, environmentId: string): Promise<any>;
 
   // Saved tests
   getSavedTest(id: string): Promise<any>;
+  createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string }): Promise<any>;
   updateSavedTest(id: string, data: Record<string, any>): Promise<void>;
 
   // Global settings

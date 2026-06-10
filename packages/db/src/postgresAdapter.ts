@@ -251,9 +251,9 @@ export class PostgresAdapter implements StorageAdapter {
     await this.db.query(`UPDATE ${table} SET ${sets} WHERE id = $1`, [id, ...values]);
   }
 
-  async getExistingTestNames(projectId: string) {
-    const { rows } = await this.db.query(`SELECT name FROM saved_tests WHERE project_id = $1`, [projectId]);
-    return rows.map((r: any) => r.name);
+  async getExistingTests(projectId: string) {
+    const { rows } = await this.db.query(`SELECT name, intent FROM saved_tests WHERE project_id = $1`, [projectId]);
+    return rows.map((r: any) => ({ name: r.name as string, intent: r.intent as string }));
   }
 
   async getAuthConfig(projectId: string, environmentId: string) {
@@ -295,6 +295,15 @@ export class PostgresAdapter implements StorageAdapter {
   async getSavedTest(id: string) {
     const { rows } = await this.db.query(`SELECT * FROM saved_tests WHERE id = $1`, [id]);
     return rows[0] ?? null;
+  }
+
+  async createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string }) {
+    const { rows } = await this.db.query(
+      `INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots, discovery_source, discovery_run_id)
+       VALUES ($1, $2, $3, $4, true, $5, $6) RETURNING *`,
+      [data.project_id, data.name, data.intent, data.context ?? null, data.discovery_source ?? "manual", data.discovery_run_id ?? null],
+    );
+    return rows[0];
   }
 
   async updateSavedTest(id: string, data: Record<string, any>) {

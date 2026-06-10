@@ -68,17 +68,29 @@ export function formatRunCost(run: { cost_usd?: number | null; llm_calls_json?: 
   return formatCost(runCostUsd(run));
 }
 
-/** Primary line for run lists: resolved test/page/adhoc name, else first summary line (e.g. errors). */
+function runTimeLabel(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  if (d.toDateString() === now.toDateString()) return time;
+  return `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${time}`;
+}
+
+/** Primary line for run lists: resolved name + time, else first summary line. */
 export function runListLabel(run: {
   summary?: string | null;
   display_name?: string | null;
   source_label?: string | null;
+  started_at?: string | null;
 }): string {
   const named = (run.display_name ?? run.source_label ?? "").trim();
-  if (named) return named;
+  const time = runTimeLabel(run.started_at);
+  if (named) return time ? `${named} · ${time}` : named;
   const summaryLine = run.summary?.split("\n")[0]?.trim();
-  if (summaryLine) return summaryLine;
-  return "—";
+  if (summaryLine) return time ? `${summaryLine} · ${time}` : summaryLine;
+  return time || "—";
 }
 
 export function formatMs(ms: number): string {

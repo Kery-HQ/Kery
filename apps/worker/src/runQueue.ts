@@ -338,7 +338,7 @@ export async function createRunWorker(
     if (runId) {
       storage.getTestRun(runId)
         .then((run) => {
-          if (run && run.status === "running") {
+          if (run && (run.status === "running" || run.status === "queued")) {
             return storage.updateTestRun(runId, {
               status: "failed",
               summary: `Worker crash: ${String(err).slice(0, 300)}`,

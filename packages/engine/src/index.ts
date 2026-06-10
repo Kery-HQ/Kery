@@ -102,6 +102,10 @@ export {
 } from "./liveRunSnapshot.js";
 export type { LiveRunSnapshot, LiveActivityEntry, LiveRunReduceEvent } from "./liveRunSnapshot.js";
 
+// ─── Flow Discovery ──────────────────────────────────────────────────────────
+export { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
+export type { DiscoveredFlow, FlowDiscoveryResult } from "./flowDiscoveryAgent.js";
+
 // ─── Run Orchestrator ────────────────────────────────────────────────────────
 export { runOrchestratedJob } from "./runOrchestrator.js";
 export type { RunJob, RunResult } from "./runOrchestrator.js";

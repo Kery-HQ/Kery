@@ -28,6 +28,7 @@ import { initStagehandSession, destroyStagehandSession, type StagehandSession } 
 import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
 import { dedupeRunStepBugs } from "./bugDedup.js";
 import { runBugTriageAgent } from "./bugTriageAgent.js";
+import { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
 import type { StorageAdapter } from "./storage.js";
 
 export type RunJob = {
@@ -213,6 +214,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
 
     const wasStopped = agentResult.failReason === "Stopped by user";
     const isAuthTest = job.triggerRef === "auth_test";
+    const isDiscovery = job.triggerRef === "discovery";
 
     // Hard stop — close browser immediately and return without any post-run work.
     // No review agents, no bug triage, no memory curator, no saved bugs.
@@ -234,6 +236,68 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         memoryProposed: 0,
         bugsFound: [],
         llmCalls: stoppedCalls,
+      };
+    }
+
+    // Discovery run: skip bug review pipeline, extract flows and write them to storage.
+    if (isDiscovery) {
+      netMonitor.stop();
+      if (shSession) {
+        await finalizeStagehandRecording(shSession, videoTmpDir, job.runId).catch(() => {});
+      } else {
+        await browserContext?.close();
+        await browser?.close();
+      }
+      const videoUrl = await finalizeVideo(videoTmpDir, job.videosDir, job.runId);
+      const discoveryCalls: LLMCallRecord[] = [];
+      emitActivity("Extracting flows from exploration...");
+      const discoveryResult = await runFlowDiscoveryAgent(agentResult.stepsDetail, {
+        onLLMCall: (call) => {
+          discoveryCalls.push({ ...call, seq: 0 });
+          job.onLLMCall?.({ ...call, seq: 0 });
+        },
+      });
+      if (discoveryResult.flows.length > 0 && job.projectId) {
+        const existingTests = await storage.getExistingTests(job.projectId).catch(() => [] as { name: string; intent: string }[]);
+        const newFlows = await deduplicateFlowsWithLLM(discoveryResult.flows, existingTests, {
+          onLLMCall: (call) => {
+            discoveryCalls.push({ ...call, seq: 0 });
+            job.onLLMCall?.({ ...call, seq: 0 });
+          },
+        });
+        let savedCount = 0;
+        for (const flow of newFlows) {
+          try {
+            await storage.createSavedTest({
+              project_id: job.projectId,
+              name: flow.name,
+              intent: flow.intent,
+              discovery_source: "auto",
+              discovery_run_id: job.runId,
+            });
+            savedCount++;
+          } catch (err) {
+            logger.error({ err: String(err), flowName: flow.name }, "Flow discovery: failed to save flow — check DB schema (discovery_run_id column may be missing)");
+          }
+        }
+        emitActivity(newFlows.length > 0 ? `Created ${savedCount} new flows.` : "No new flows found.");
+        logger.info({ discovered: discoveryResult.flows.length, dedupedNew: newFlows.length, saved: savedCount }, "Flow discovery: complete");
+      }
+      const mergedCalls = [
+        ...agentResult.llmCalls.map((c) => ({ ...c, agent: (c.agent ?? "navigator") as LLMAgentType })),
+        ...discoveryCalls.map((c) => ({ ...c, agent: "flow_discovery" as LLMAgentType })),
+      ];
+      mergedCalls.forEach((c, i) => { c.seq = i + 1; });
+      return {
+        status: agentResult.status,
+        steps: agentResult.stepsDetail.map(s => `[${s.index}] ${s.action} → ${s.target ?? ""}`),
+        stepsDetail: agentResult.stepsDetail,
+        memoryLoaded: allMemory,
+        memoryProposed: 0,
+        bugsFound: [],
+        llmCalls: mergedCalls,
+        videoUrl,
+        recordingStartedAt,
       };
     }
 

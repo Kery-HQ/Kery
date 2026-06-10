@@ -137,6 +137,85 @@ export function registerRunRoutes(
     reply.send({ runId: run.id, status: "queued" });
   });
 
+  // Check if there's an active discovery run for a project
+  app.get("/api/projects/:projectId/discover-flows/status", async (req, reply) => {
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT id, status FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') ORDER BY started_at DESC LIMIT 1`,
+      [projectId],
+    );
+    if (rows[0]) {
+      reply.send({ active: true, runId: rows[0].id, status: rows[0].status });
+    } else {
+      reply.send({ active: false });
+    }
+  });
+
+  app.post("/api/projects/:projectId/discover-flows", async (req, reply) => {
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
+    const { environmentId } = z.object({ environmentId: z.string().uuid() }).parse(req.body);
+
+    // Block parallel discovery runs — return the active run instead of creating a new one
+    const { rows: active } = await pool.query(
+      `SELECT id FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') LIMIT 1`,
+      [projectId],
+    );
+    if (active[0]) {
+      reply.send({ runId: active[0].id, alreadyRunning: true });
+      return;
+    }
+
+    const { rows: [env] } = await pool.query("SELECT * FROM environments WHERE id = $1 AND project_id = $2", [environmentId, projectId]);
+    if (!env) { reply.code(404).send({ error: "environment not found" }); return; }
+
+    const authRow = await storage.getAuthConfig(projectId, environmentId);
+    const authConfig = authRow ? { mode: authRow.mode, ...authRow.config_json } : null;
+
+    const run = await storage.createTestRun({
+      project_id: projectId,
+      environment_id: environmentId,
+      test_id: null,
+      trigger_type: "manual",
+      trigger_ref: "discovery",
+      status: "queued",
+      started_at: new Date().toISOString(),
+      source_type: "adhoc",
+      source_label: "Flow discovery",
+    });
+
+    await runQueue.add("run", {
+      runId: run.id,
+      baseUrl: env.base_url,
+      intent:
+        "Explore this application's structure and navigation. Visit every main section by clicking " +
+        "navigation bars, side menus, tab bars, and top-level menu items. When you land on a new page, " +
+        "use observe to understand what it does and what forms or features are present. " +
+        "DO NOT fill out or submit any forms — just note that they exist. " +
+        "Click through all primary navigation items before exploring secondary ones. " +
+        "Your goal is to map every distinct section and feature of the app.",
+      projectId,
+      environmentId,
+      environmentName: env.name,
+      auth: authConfig,
+      saveScreenshots: false,
+      maxSteps: 100,
+      recordVideo: false,
+      triggerRef: "discovery",
+    } satisfies RunJobData);
+
+    reply.send({ runId: run.id, alreadyRunning: false });
+  });
+
+  // Return the flows discovered by a specific discovery run
+  app.get("/api/runs/:runId/discovered-flows", async (req, reply) => {
+    const { runId } = RunIdParams.parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT id, name, intent, context, created_at FROM saved_tests WHERE discovery_run_id = $1 ORDER BY created_at ASC`,
+      [runId],
+    );
+    reply.send({ flows: rows });
+  });
+
   // SSE streaming — uses Redis Pub/Sub so the worker process can be separate
   app.get("/api/runs/:runId/stream", async (req, reply) => {
     const { runId } = RunIdParams.parse(req.params);
@@ -234,6 +313,32 @@ export function registerRunRoutes(
       reply.send({ ok: true, status: run.status });
       return;
     }
+
+    if (run.status === "queued") {
+      // Queued runs haven't started yet — remove the BullMQ job and mark failed immediately.
+      // Don't rely on the worker to pick it up and check the stop signal.
+      try {
+        const waiting = await runQueue.getWaiting();
+        const job = waiting.find((j) => j.data?.runId === runId);
+        if (job) await job.remove();
+      } catch (err) {
+        logger.warn({ runId, err: String(err) }, "Stop queued: could not remove BullMQ job");
+      }
+      await storage.updateTestRun(runId, {
+        status: "failed",
+        summary: "Stopped by user",
+        completed_at: new Date().toISOString(),
+      });
+      const updatedRun = await storage.getTestRun(runId);
+      await redis.publish(
+        runEventsChannel(runId),
+        JSON.stringify({ type: "done", run: updatedRun ?? { id: runId, status: "failed", summary: "Stopped by user" } }),
+      ).catch(() => {});
+      reply.send({ ok: true });
+      return;
+    }
+
+    // Running run — set the Redis signal; the worker polls it and stops gracefully.
     try {
       await markRunStopRequested(redis, runId);
     } catch (err) {
