@@ -98,6 +98,18 @@ export type SavedTest = {
   name: string;
   intent: string;
   context?: string | null;
+  group_id?: string | null;
+  created_at: string;
+};
+
+/** A test group (folder). */
+export type TestGroup = {
+  id: string;
+  project_id: string;
+  name: string;
+  is_default: boolean;
+  is_auto_scan: boolean;
+  test_count: number;
   created_at: string;
 };
 

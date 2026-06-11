@@ -831,7 +831,7 @@ export const RunDetail: React.FC = () => {
   const galleryCount = Object.values(galleryGroups).reduce((acc, arr) => acc + arr.length, 0);
 
   const isDiscovery = run.trigger_ref === "discovery";
-  const backUrl = isDiscovery ? "/flows" : (run.project_id && run.source_back_path
+  const backUrl = isDiscovery ? "/tests" : (run.project_id && run.source_back_path
     ? `/projects/${run.project_id}/${run.source_back_path}`
     : "/runs");
   const runTitle = isDiscovery ? "Flow Discovery" : (run.source_label?.trim() || run.summary?.trim() || "Run");
@@ -892,7 +892,7 @@ export const RunDetail: React.FC = () => {
         >
           <ArrowLeft className="h-3 w-3" />
           <span>
-            {isDiscovery ? "Flows" : (backUrl !== "/runs" && run.source_label ? run.source_label : "Runs")}
+            {isDiscovery ? "Tests" : (backUrl !== "/runs" && run.source_label ? run.source_label : "Runs")}
           </span>
         </button>
         <span className="text-muted-foreground/30">/</span>
@@ -908,7 +908,7 @@ export const RunDetail: React.FC = () => {
             </TabsTrigger>
             {isDiscovery ? (
               <TabsTrigger value="flows">
-                Flows
+                Tests
                 {discoveredFlows.length > 0 && (
                   <span className="normal-case text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                     {discoveredFlows.length}
@@ -963,7 +963,7 @@ export const RunDetail: React.FC = () => {
             />
           </TabsContent>
 
-          <TabsContent value="issues" className="mt-0 flex-1 min-h-0 overflow-y-auto outline-none data-[state=inactive]:hidden">
+          <TabsContent value="issues" className="mt-0 flex-1 min-h-0 flex flex-col overflow-hidden outline-none data-[state=inactive]:hidden">
             <IssuesTab
               run={run}
               bugsFound={bugsFound}
@@ -1065,6 +1065,45 @@ function AgentCostBreakdownCard({ llmCalls }: { llmCalls: LLMCallRecord[] }) {
 // ============================================================
 // Overview tab
 // ============================================================
+
+// ============================================================
+// Severity / category chips (matching Issues page style)
+// ============================================================
+
+const SEVERITY_CHIP: Record<string, string> = {
+  high:   "bg-destructive/10 text-destructive border-destructive/20",
+  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  low:    "bg-muted text-muted-foreground border-border",
+};
+
+const CATEGORY_CHIP_RD: Record<string, string> = {
+  visual:     "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+  functional: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  ux:         "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  other:      "bg-muted text-muted-foreground border-border",
+};
+
+function SeverityChip({ severity }: { severity: string }) {
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+      SEVERITY_CHIP[severity] ?? "bg-muted text-muted-foreground border-border",
+    )}>
+      {severity}
+    </span>
+  );
+}
+
+function CategoryChip({ category }: { category: string }) {
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize",
+      CATEGORY_CHIP_RD[category] ?? "bg-muted text-muted-foreground border-border",
+    )}>
+      {category}
+    </span>
+  );
+}
 
 // ============================================================
 // Step timeline (Progress tab)
@@ -1748,7 +1787,7 @@ function OverviewTab({
                   </div>
                 </>
               ) : (
-                <>
+                <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain flex flex-col gap-3">
                   <div className="flex items-start gap-2.5 rounded-xl border border-border bg-surface-2 dark:bg-surface-3 px-3 py-2.5 flex-shrink-0">
                     {run.status === "running" ? (
                       <Spinner className="mt-0.5 h-3.5 w-3.5 animate-spin text-primary shrink-0" />
@@ -1778,15 +1817,13 @@ function OverviewTab({
                       )}
                     </div>
                   </div>
-                  <div className="min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden pb-0.5 [scrollbar-gutter:stable] touch-pan-y overscroll-contain">
-                    <StepTimeline
-                      activityFeed={activityOldestFirst}
-                      stepTimeline={stepTimeline}
-                      replayCurrentIndex={replayCurrentIndex}
-                      replayActiveStepRef={replayActiveStepRef}
-                    />
-                  </div>
-                </>
+                  <StepTimeline
+                    activityFeed={activityOldestFirst}
+                    stepTimeline={stepTimeline}
+                    replayCurrentIndex={replayCurrentIndex}
+                    replayActiveStepRef={replayActiveStepRef}
+                  />
+                </div>
               )}
             </div>
           </>
@@ -1977,13 +2014,9 @@ function IssuesTab({
         </div>
       ) : (
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <div className="w-[340px] flex-shrink-0 flex flex-col min-h-0 border-r border-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border flex-shrink-0 bg-surface-2 dark:bg-surface-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Issues</span>
-              <span className="text-[11px] font-mono text-muted-foreground/60">{bugsFound.length}</span>
-            </div>
+          <div className="w-[340px] flex-shrink-0 flex flex-col border-r border-border">
             <RunTriageBanner runBugs={runBugs} projectId={projectId} onRefreshBugs={onRefreshBugs} />
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1.5">
+            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5">
               {bugsFound.map((bug: RunStep & { name?: string }, i: number) => {
                 const displayName = runJsonBugDisplayName(bug);
                 const category = String(bug.category ?? bug.bugType ?? "other");
@@ -1992,19 +2025,20 @@ function IssuesTab({
                 const selected = i === selectedIndex;
                 return (
                   <button key={i} type="button" onClick={() => setSelectedIndex(i)} className="w-full text-left block">
-                    <div className={cn("glass-card-flat p-2.5 transition-all", selected && "ring-2 ring-ring/20 border-border bg-accent/25")}>
-                      <div className="flex items-center gap-2">
-                        <StatusDot status={(bug.severity ? BUG_SEVERITY_STATUS_DOT[bug.severity] : undefined) ?? "stale"} />
-                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{displayName}</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <BugCategoryTag category={category} />
-                        {dbBug?.status && (
+                    <div className={cn(
+                      "bg-card border border-border rounded-lg p-3 transition-all hover:border-primary/30",
+                      selected && "border-primary/40 bg-primary/5",
+                    )}>
+                      <p className="text-[13px] font-medium text-foreground leading-snug mb-1.5">{displayName}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {bug.severity && <SeverityChip severity={bug.severity} />}
+                        <CategoryChip category={category} />
+                        {dbBug?.status && dbBug.status !== "open" && (
                           <Badge variant={BUG_STATUS_BADGE[dbBug.status] ?? "neutral"} className="capitalize text-[10px]">
-                            {dbBug.status.replace("_", " ")}
+                            {bugStatusLabel(dbBug.status)}
                           </Badge>
                         )}
-                        <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">
+                        <span className="ml-auto text-[10px] font-mono text-muted-foreground/50 flex-shrink-0">
                           {reportedIso ? formatReportedAt(reportedIso) : "—"}
                         </span>
                       </div>
@@ -2014,7 +2048,7 @@ function IssuesTab({
               })}
             </div>
           </div>
-          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
+          <div className="flex-1 min-w-0 overflow-y-auto">
             {selectedBug && (
               <BugCard bug={selectedBug} runBugs={runBugs} runId={run.id} projectId={projectId} run={run} forceExpanded onRefreshBugs={onRefreshBugs} />
             )}
@@ -2191,49 +2225,46 @@ function BugCard({
 
         return (
           <div className="flex flex-col animate-fade-in">
-            {/* Header — title left, actions right */}
-            <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="min-w-0 flex-1 text-[15px] font-semibold text-foreground leading-snug truncate">
-                  {displayName}
-                </h2>
-                {projectId && dbBug?.id && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {bugStatus === "open" || bugStatus == null ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="h-7 px-3 text-[11px]"
-                          disabled={busy}
-                          onClick={(e) => { e.stopPropagation(); markForFix(); }}
-                        >
-                          Mark for fix
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-3 text-[11px]"
-                          disabled={busy}
-                          onClick={(e) => { e.stopPropagation(); ignoreIssue(); }}
-                        >
-                          Ignore
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-3 text-[11px]"
-                        disabled={busy}
-                        onClick={(e) => { e.stopPropagation(); undoTriage(); }}
-                      >
-                        Undo
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
+            {/* Actions bar — primary CTA */}
+            <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3 flex items-center gap-2">
+              {projectId && dbBug?.id ? (
+                isOpen ? (
+                  <>
+                    <Button
+                      variant="default"
+                      disabled={busy}
+                      loading={busy}
+                      onClick={(e) => { e.stopPropagation(); void markForFix(); }}
+                    >
+                      Mark for fix
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); void ignoreIssue(); }}
+                    >
+                      Ignore
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Badge variant={BUG_STATUS_BADGE[bugStatus!] ?? "neutral"} className="capitalize">
+                      {bugStatusLabel(bugStatus!)}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-3 text-[11px]"
+                      disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); void undoTriage(); }}
+                    >
+                      Undo
+                    </Button>
+                  </>
+                )
+              ) : (
+                <span className="text-[12px] text-muted-foreground">No project linked</span>
+              )}
             </div>
 
             {/* Hero — screenshot + recording */}
@@ -2265,11 +2296,35 @@ function BugCard({
               </div>
             )}
 
+            {/* Title + chips */}
+            <div className="px-6 pt-5 pb-3">
+              <h2 className="text-[15px] font-semibold text-foreground leading-snug">
+                {displayName}
+              </h2>
+              <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                {bug.severity && <SeverityChip severity={bug.severity} />}
+                <CategoryChip category={category} />
+                {bug.url && (
+                  <a
+                    href={bug.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/60 hover:text-foreground transition-colors truncate max-w-[200px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Globe className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{bug.url}</span>
+                  </a>
+                )}
+                <span className="ml-auto text-[10px] font-mono text-muted-foreground/50 flex-shrink-0">
+                  {reportedIso ? formatReportedAt(reportedIso) : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Description */}
             {detail && (
-              <div className="px-6 py-5">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-2">
-                  Description
-                </p>
+              <div className="px-6 pb-6">
                 <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{detail}</p>
               </div>
             )}
@@ -3009,11 +3064,11 @@ function DiscoveryFlowsTab({ flows, runStatus }: { flows: DiscoveredFlow[]; runS
       <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in">
         <EmptyState
           icon={<MagnifyingGlassPlus className="h-5 w-5" />}
-          title={isActive ? "Discovery in progress..." : "No flows discovered"}
+          title={isActive ? "Discovery in progress..." : "No tests discovered"}
           description={
             isActive
-              ? "Flows will appear here as they are discovered."
-              : "No flows were extracted from this discovery run."
+              ? "Tests will appear here as they are discovered."
+              : "No tests were extracted from this discovery run."
           }
         />
       </div>
@@ -3024,7 +3079,7 @@ function DiscoveryFlowsTab({ flows, runStatus }: { flows: DiscoveredFlow[]; runS
     <div className="px-6 py-5 max-w-4xl w-full mx-auto animate-fade-in space-y-4">
       <SectionLabel
         icon={<ListChecks className="h-3.5 w-3.5" />}
-        text={`Discovered Flows (${flows.length})`}
+        text={`Discovered Tests (${flows.length})`}
       />
       <div className="space-y-2">
         {flows.map((flow) => (
@@ -3037,7 +3092,7 @@ function DiscoveryFlowsTab({ flows, runStatus }: { flows: DiscoveredFlow[]; runS
               variant="outline"
               size="sm"
               className="flex-shrink-0 text-[12px] gap-1.5"
-              onClick={() => navigate(`/flows?highlight=${flow.id}`)}
+              onClick={() => navigate(`/tests?highlight=${flow.id}`)}
             >
               <ArrowSquareOut className="h-3.5 w-3.5" />
               View

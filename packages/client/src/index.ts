@@ -1,7 +1,7 @@
 export * from "./types.js";
 
 import type {
-  Project, Environment, TestRun, Bug, SavedTest,
+  Project, Environment, TestRun, Bug, SavedTest, TestGroup,
   OverviewStats,
   RunStreamEvent,
 } from "./types.js";
@@ -412,6 +412,42 @@ export class KeryClient {
       `/api/runs/${runId}/discovered-flows`,
     );
     return data.flows;
+  }
+
+  // ── Test Groups ──────────────────────────────────────────────────────
+
+  async listGroupsWithTests(projectId: string): Promise<{ groups: TestGroup[]; tests: SavedTest[] }> {
+    return this.fetch(`/api/projects/${projectId}/groups`);
+  }
+
+  async createGroup(projectId: string, name: string): Promise<TestGroup> {
+    const data = await this.fetch<{ group: TestGroup }>(`/api/projects/${projectId}/groups`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    return data.group;
+  }
+
+  async renameGroup(projectId: string, groupId: string, name: string): Promise<TestGroup> {
+    const data = await this.fetch<{ group: TestGroup }>(`/api/projects/${projectId}/groups/${groupId}`, {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    });
+    return data.group;
+  }
+
+  async deleteGroup(projectId: string, groupId: string, deleteTests: boolean): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/groups/${groupId}`, {
+      method: "DELETE",
+      body: JSON.stringify({ deleteTests }),
+    });
+  }
+
+  async moveTest(projectId: string, testId: string, groupId: string): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/tests/${testId}/group`, {
+      method: "PATCH",
+      body: JSON.stringify({ groupId }),
+    });
   }
 
   // ── Saved Tests ──────────────────────────────────────────────────────

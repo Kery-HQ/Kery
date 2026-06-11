@@ -47,8 +47,11 @@ export interface StorageAdapter {
 
   // Saved tests
   getSavedTest(id: string): Promise<any>;
-  createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string }): Promise<any>;
+  createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string; group_id?: string }): Promise<any>;
   updateSavedTest(id: string, data: Record<string, any>): Promise<void>;
+
+  // Test groups
+  ensureAutoScanGroup(projectId: string): Promise<string>;
 
   // Global settings
   getSettings(): Promise<Record<string, string>>;

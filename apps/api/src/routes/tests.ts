@@ -8,6 +8,7 @@ const TestSchema = z.object({
   name: z.string().min(2),
   intent: z.string().min(3),
   context: z.string().optional(),
+  group_id: z.string().uuid().optional(),
 });
 
 export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter) {
@@ -33,9 +34,14 @@ export function registerTestRoutes(app: FastifyInstance, storage: StorageAdapter
     const { projectId } = ProjectIdParams.parse(req.params);
     const parsed = TestSchema.safeParse(req.body);
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
+    // Resolve group: use provided group_id or fall back to project's default group
+    let groupId = parsed.data.group_id ?? null;
+    if (!groupId) {
+      groupId = await (storage as any).ensureDefaultGroup(projectId);
+    }
     const { rows } = await pool.query(
-      "INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots) VALUES ($1, $2, $3, $4, true) RETURNING *",
-      [projectId, parsed.data.name, parsed.data.intent, parsed.data.context ?? null],
+      "INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots, group_id) VALUES ($1, $2, $3, $4, true, $5) RETURNING *",
+      [projectId, parsed.data.name, parsed.data.intent, parsed.data.context ?? null, groupId],
     );
     reply.send({ test: rows[0] });
   });

@@ -74,10 +74,10 @@ Get runIds from kery_run_test results or kery_list_runs.`,
           if (run.status === "queued" || run.status === "running") {
             nextSteps.push("Discovery is still in progress. Call kery_get_run again once it completes.");
           } else if (discoveredFlows.length > 0) {
-            nextSteps.push(`Discovered ${discoveredFlows.length} flow(s). Call kery_list_tests to see them all.`);
-            nextSteps.push(`Run any discovered flow with kery_run_test testId="<id from discoveredFlows>"`);
+            nextSteps.push(`Discovered ${discoveredFlows.length} test(s). Call kery_list_tests to see them all.`);
+            nextSteps.push(`Run any discovered test with kery_run_test testId="<id from discoveredFlows>"`);
           } else {
-            nextSteps.push("Discovery completed but no new flows were found.");
+            nextSteps.push("Discovery completed but no new tests were found.");
           }
         } else {
           if (bugs.length > 0) {

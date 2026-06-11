@@ -452,8 +452,8 @@ export const Runs: React.FC = () => {
                     <EmptyState
                       icon={<Pulse className="h-6 w-6" />}
                       title="No runs yet"
-                      description="Trigger a run from the Flows page to get started."
-                      action={{ label: "Go to Flows", onClick: () => navigate("/tests") }}
+                      description="Trigger a run from the Tests page to get started."
+                      action={{ label: "Go to Tests", onClick: () => navigate("/tests") }}
                     />
                   )}
                 </CardContent>

@@ -265,6 +265,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
             job.onLLMCall?.({ ...call, seq: 0 });
           },
         });
+        const autoScanGroupId = await storage.ensureAutoScanGroup(job.projectId).catch(() => undefined);
         let savedCount = 0;
         for (const flow of newFlows) {
           try {
@@ -274,6 +275,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
               intent: flow.intent,
               discovery_source: "auto",
               discovery_run_id: job.runId,
+              group_id: autoScanGroupId,
             });
             savedCount++;
           } catch (err) {

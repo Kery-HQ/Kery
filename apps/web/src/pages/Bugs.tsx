@@ -116,26 +116,36 @@ function CategoryChip({ category }: { category: string }) {
 function KanbanCard({
   bug,
   busy,
+  dragging,
   onClick,
   onDragStart,
+  onDragEnd,
 }: {
   bug: BugRecord;
   busy: boolean;
+  dragging: boolean;
   onClick: () => void;
   onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
 }) {
   const reportedIso = bug.reportedAt ?? bug.reported_at ?? "";
+
   return (
     <div
       draggable={!busy && !!bug.id}
       onDragStart={onDragStart}
-      onClick={onClick}
+      onDragEnd={onDragEnd}
+      onClick={!dragging ? onClick : undefined}
       className={cn(
-        "bg-card border border-border rounded-lg p-3 cursor-pointer select-none",
-        "hover:border-primary/30 transition-all",
+        "rounded-lg border p-3 select-none transition-colors",
+        dragging
+          ? "border-dashed border-border/50 bg-transparent"
+          : "bg-card border-border cursor-pointer hover:border-primary/30",
         busy && "opacity-50 pointer-events-none",
       )}
     >
+      <div className={cn(dragging && "invisible")}>
+
       <p className="text-[13px] font-medium text-foreground leading-snug mb-1.5">{bug.name}</p>
       {bug.description && (
         <p className="text-[12px] text-muted-foreground line-clamp-2 leading-relaxed mb-2">
@@ -154,6 +164,7 @@ function KanbanCard({
           {formatReportedAt(reportedIso)}
         </span>
       </div>
+      </div>
     </div>
   );
 }
@@ -165,8 +176,10 @@ function KanbanColumn({
   status,
   bugs,
   actionBusy,
+  draggedId,
   onCardClick,
   onDragStart,
+  onDragEnd,
   onDrop,
   headerSlot,
 }: {
@@ -174,8 +187,10 @@ function KanbanColumn({
   status: BugStatus;
   bugs: BugRecord[];
   actionBusy: string | null;
+  draggedId: string | null;
   onCardClick: (bug: BugRecord) => void;
   onDragStart: (bug: BugRecord, e: React.DragEvent) => void;
+  onDragEnd: () => void;
   onDrop: (status: BugStatus) => void;
   headerSlot?: React.ReactNode;
 }) {
@@ -215,8 +230,10 @@ function KanbanColumn({
               key={bug.id ?? `${bug.run_id ?? bug.runId}-${i}`}
               bug={bug}
               busy={actionBusy === bug.id}
+              dragging={draggedId === bug.id}
               onClick={() => onCardClick(bug)}
               onDragStart={(e) => onDragStart(bug, e)}
+              onDragEnd={onDragEnd}
             />
           ))
         )}
@@ -558,23 +575,6 @@ export const Bugs: React.FC = () => {
           <Button
             size="sm"
             variant="outline"
-            disabled={exportBusy}
-            onClick={() => {
-              setExportBusy(true);
-              downloadIssuesPdf({ projectName: currentProject?.name, issues: bugs })
-                .then(() => toast.success("Exported issues as PDF"))
-                .catch(() => toast.error("Could not export PDF"))
-                .finally(() => setExportBusy(false));
-            }}
-          >
-            <FilePdf className="h-3.5 w-3.5" />
-            {exportBusy ? "Exporting…" : "Export PDF"}
-          </Button>
-        )}
-        {!loading && bugs.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
             className="text-destructive border-destructive/30 hover:bg-destructive/10"
             onClick={() => setDeletePrompt({ kind: "all" })}
           >
@@ -582,10 +582,6 @@ export const Bugs: React.FC = () => {
             Delete all
           </Button>
         )}
-        <Button size="sm" variant="outline" onClick={load}>
-          <ArrowsClockwise className="h-3.5 w-3.5" />
-          Refresh
-        </Button>
       </PageHeader>
 
       {loading ? (
@@ -604,7 +600,7 @@ export const Bugs: React.FC = () => {
           icon={<Warning className="h-8 w-8" />}
           title="No issues yet"
           description="Issues are reported by the agent during test runs. Run a test to start finding problems."
-          action={{ label: "Go to Flows", onClick: () => navigate("/tests") }}
+          action={{ label: "Go to Tests", onClick: () => navigate("/tests") }}
           className="flex-1"
         />
       ) : (
@@ -617,11 +613,14 @@ export const Bugs: React.FC = () => {
                 status={col.key}
                 bugs={col.bugs}
                 actionBusy={actionBusy}
+                draggedId={draggedId}
                 onCardClick={setDetailBug}
                 onDragStart={(bug, e) => {
                   e.dataTransfer.effectAllowed = "move";
-                  setDraggedId(bug.id ?? null);
+                  // Defer so browser captures ghost before re-render
+                  requestAnimationFrame(() => setDraggedId(bug.id ?? null));
                 }}
+                onDragEnd={() => setDraggedId(null)}
                 onDrop={handleDrop}
                 headerSlot={
                   col.key === "open" && openCount > 0 ? (

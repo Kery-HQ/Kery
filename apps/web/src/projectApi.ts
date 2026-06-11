@@ -229,7 +229,7 @@ export async function fetchTests(projectId: string) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests`);
 }
 
-export async function createTest(projectId: string, payload: { name: string; intent: string; context?: string; max_steps?: number }) {
+export async function createTest(projectId: string, payload: { name: string; intent: string; context?: string; max_steps?: number; group_id?: string }) {
   return apiFetch(`${API_BASE}/api/projects/${projectId}/tests`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -278,6 +278,50 @@ export async function fetchDiscoveryStatus(projectId: string) {
 
 export async function fetchDiscoveredFlows(runId: string) {
   return apiFetch<{ flows: { id: string; name: string; intent: string; context?: string | null; created_at: string }[] }>(`${API_BASE}/api/runs/${runId}/discovered-flows`);
+}
+
+// --- Test Groups ---
+
+export type TestGroup = {
+  id: string;
+  project_id: string;
+  name: string;
+  is_default: boolean;
+  is_auto_scan: boolean;
+  test_count: number;
+  created_at: string;
+};
+
+export async function fetchGroups(projectId: string) {
+  return apiFetch<{ groups: TestGroup[]; tests: any[] }>(`${API_BASE}/api/projects/${projectId}/groups`);
+}
+
+export async function createGroup(projectId: string, name: string) {
+  return apiFetch<{ group: TestGroup }>(`${API_BASE}/api/projects/${projectId}/groups`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function renameGroup(projectId: string, groupId: string, name: string) {
+  return apiFetch<{ group: TestGroup }>(`${API_BASE}/api/projects/${projectId}/groups/${groupId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteGroup(projectId: string, groupId: string, deleteTests: boolean) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/groups/${groupId}`, {
+    method: "DELETE",
+    body: JSON.stringify({ deleteTests }),
+  });
+}
+
+export async function moveTestToGroup(projectId: string, testId: string, groupId: string) {
+  return apiFetch(`${API_BASE}/api/projects/${projectId}/tests/${testId}/group`, {
+    method: "PATCH",
+    body: JSON.stringify({ groupId }),
+  });
 }
 
 

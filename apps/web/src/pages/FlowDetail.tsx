@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/status-dot";
 import { BugCategoryTag } from "@/components/bug-category-tag";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -58,6 +59,32 @@ type SavedTest = {
 
 const DEFAULT_FLOW_MAX_STEPS = 50;
 
+const SEVERITY_CHIP_FD: Record<string, string> = {
+  high:   "bg-destructive/10 text-destructive border-destructive/20",
+  medium: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  low:    "bg-muted text-muted-foreground border-border",
+};
+const CATEGORY_CHIP_FD: Record<string, string> = {
+  visual:     "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+  functional: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  ux:         "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  other:      "bg-muted text-muted-foreground border-border",
+};
+function FlowSeverityChip({ severity }: { severity: string }) {
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", SEVERITY_CHIP_FD[severity] ?? "bg-muted text-muted-foreground border-border")}>
+      {severity}
+    </span>
+  );
+}
+function FlowCategoryChip({ category }: { category: string }) {
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize", CATEGORY_CHIP_FD[category] ?? "bg-muted text-muted-foreground border-border")}>
+      {category}
+    </span>
+  );
+}
+
 export function FlowDetail() {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
@@ -70,7 +97,7 @@ export function FlowDetail() {
   const [loading, setLoading] = React.useState(true);
   const [running, setRunning] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [expandedBugId, setExpandedBugId] = React.useState<string | null>(null);
+  const [selectedBugIndex, setSelectedBugIndex] = React.useState(0);
   const [bugActionBusy, setBugActionBusy] = React.useState<string | null>(null);
   const [editOpen, setEditOpen] = React.useState(false);
   const [formName, setFormName] = React.useState("");
@@ -238,10 +265,10 @@ export function FlowDetail() {
       </div>
 
       {/* Tabbed content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="animate-fade-in">
-          <Tabs defaultValue="overview">
-            <TabsList>
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div className="animate-fade-in flex flex-col flex-1 min-h-0">
+          <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0">
+            <TabsList className="pl-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="issues">
                 Issues
@@ -255,7 +282,7 @@ export function FlowDetail() {
             </TabsList>
 
             {/* Overview */}
-            <TabsContent value="overview">
+            <TabsContent value="overview" className="px-6 py-4 overflow-y-auto">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Main — intent + context */}
                 <div className="lg:col-span-2 space-y-3">
@@ -299,94 +326,71 @@ export function FlowDetail() {
             </TabsContent>
 
             {/* Issues */}
-            <TabsContent value="issues">
+            <TabsContent value="issues" className="mt-0 flex-1 min-h-0 flex flex-col overflow-hidden outline-none data-[state=inactive]:hidden">
               {bugs.length === 0 ? (
-                <EmptyState
-                  icon={<Warning className="h-5 w-5" />}
-                  title="No issues found"
-                  description="Run this flow to start discovering issues."
-                  className="py-16"
-                />
+                <div className="px-6 py-5">
+                  <EmptyState
+                    icon={<Warning className="h-5 w-5" />}
+                    title="No issues found"
+                    description="Run this flow to start discovering issues."
+                    className="py-16"
+                  />
+                </div>
               ) : (
-                <div className="space-y-1.5">
-                  {bugs.map((bug, i) => {
-                    const id = bug.id ?? `${bug.run_id}-${i}`;
-                    const isExpanded = expandedBugId === id;
-                    const reportedIso = bug.reported_at ?? bug.reportedAt ?? "";
-                    const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-                    return (
-                      <div
-                        key={id}
-                        className={`rounded-lg border border-border bg-surface-2 dark:bg-surface-3 overflow-hidden ${isExpanded ? "ring-1 ring-border" : ""}`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setExpandedBugId(isExpanded ? null : id)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors min-w-0"
-                        >
-                          {isExpanded
-                            ? <CaretDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                            : <CaretRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                          <StatusDot status={BUG_SEVERITY_STATUS_DOT[bug.severity] ?? "stale"} />
-                          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
-                            {bug.name}
-                          </span>
-                          <BugCategoryTag category={bug.category} />
-                          <Badge variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"} className="flex-shrink-0">
-                            {bugStatusLabel(bug.status)}
-                          </Badge>
-                          <span className="text-[11px] font-mono text-muted-foreground/50 flex-shrink-0">
-                            {reportedIso ? new Date(reportedIso).toLocaleDateString() : ""}
-                          </span>
-                        </button>
-
-                        {isExpanded && (
-                          <div className="border-t border-border px-4 py-4 space-y-4 bg-surface-1 dark:bg-surface-2 animate-fade-in">
-                            {bug.description && (
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
-                                  Description
-                                </p>
-                                <p className="text-[13px] text-foreground whitespace-pre-wrap">{bug.description}</p>
+                <div className="flex flex-1 min-h-0 overflow-hidden">
+                  {/* Sidebar */}
+                  <div className="w-[340px] flex-shrink-0 flex flex-col border-r border-border">
+                    <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5">
+                      {bugs.map((bug, i) => {
+                        const selected = i === selectedBugIndex;
+                        const reportedIso = bug.reported_at ?? bug.reportedAt ?? "";
+                        return (
+                          <button key={bug.id ?? i} type="button" onClick={() => setSelectedBugIndex(i)} className="w-full text-left block">
+                            <div className={cn(
+                              "bg-card border border-border rounded-lg p-3 transition-all hover:border-primary/30",
+                              selected && "border-primary/40 bg-primary/5",
+                            )}>
+                              <p className="text-[13px] font-medium text-foreground leading-snug mb-1.5">{bug.name}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <FlowSeverityChip severity={bug.severity} />
+                                <FlowCategoryChip category={bug.category} />
+                                {bug.status && bug.status !== "open" && (
+                                  <Badge variant={BUG_STATUS_BADGE[bug.status] ?? "neutral"} className="capitalize text-[10px]">
+                                    {bugStatusLabel(bug.status)}
+                                  </Badge>
+                                )}
+                                <span className="ml-auto text-[10px] font-mono text-muted-foreground/50 flex-shrink-0">
+                                  {reportedIso ? new Date(reportedIso).toLocaleDateString() : ""}
+                                </span>
                               </div>
-                            )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                            {(() => {
-                              const runKey = bug.run_id ?? bug.runId;
-                              const src = runScreenshotFileUrl(runKey, bug.screenshot_path ?? bug.screenshotPath);
-                              if (!src) return null;
-                              return (
-                                <div>
-                                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
-                                    Screenshot
-                                  </p>
-                                  <BugScreenshotZoomDialog src={src} />
-                                </div>
-                              );
-                            })()}
-
-                            <div className="flex flex-wrap items-center gap-4 text-[12px] text-muted-foreground">
-                              {bug.url && (
-                                <a
-                                  href={bug.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 hover:text-foreground transition-colors font-mono truncate max-w-xs"
-                                >
-                                  <Globe className="h-3.5 w-3.5 flex-shrink-0" />
-                                  <span className="truncate">{bug.url}</span>
-                                  <ArrowSquareOut className="h-3 w-3 flex-shrink-0" />
-                                </a>
-                              )}
-                              <div className="flex flex-wrap items-center gap-2 ml-auto">
-                                {bug.id && bug.status === "open" && (
+                  {/* Detail panel */}
+                  <div className="flex-1 min-w-0 overflow-y-auto">
+                    {(() => {
+                      const bug = bugs[selectedBugIndex];
+                      if (!bug) return null;
+                      const runKey = bug.run_id ?? bug.runId;
+                      const src = runScreenshotFileUrl(runKey, bug.screenshot_path ?? bug.screenshotPath);
+                      const isOpen = !bug.status || bug.status === "open" || bug.status === "in_progress";
+                      const reportedIso = bug.reported_at ?? bug.reportedAt ?? "";
+                      return (
+                        <div className="flex flex-col animate-fade-in">
+                          {/* Actions — primary CTA */}
+                          <div className="flex-shrink-0 border-b border-border px-5 py-3 bg-surface-2 dark:bg-surface-3 flex items-center gap-2">
+                            {bug.id && currentProjectId ? (
+                              isOpen ? (
+                                <>
                                   <Button
-                                    size="sm"
                                     variant="default"
-                                    className="h-7 text-[11px]"
                                     disabled={bugActionBusy === bug.id}
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
+                                    loading={bugActionBusy === bug.id}
+                                    onClick={async () => {
                                       if (!currentProjectId || !bug.id) return;
                                       setBugActionBusy(bug.id);
                                       await patchProjectBug(currentProjectId, bug.id, { status: "in_progress" }).catch(() => {});
@@ -396,32 +400,102 @@ export function FlowDetail() {
                                   >
                                     Mark for fix
                                   </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-[11px] gap-1"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/runs/${bug.run_id ?? bug.runId}`);
-                                  }}
-                                >
-                                  View Run
-                                  <ArrowSquareOut className="h-3 w-3" />
-                                </Button>
+                                  <Button
+                                    variant="outline"
+                                    disabled={bugActionBusy === bug.id}
+                                    onClick={async () => {
+                                      if (!currentProjectId || !bug.id) return;
+                                      setBugActionBusy(bug.id);
+                                      await patchProjectBug(currentProjectId, bug.id, { status: "wont_fix" }).catch(() => {});
+                                      await load();
+                                      setBugActionBusy(null);
+                                    }}
+                                  >
+                                    Ignore
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Badge variant={BUG_STATUS_BADGE[bug.status!] ?? "neutral"} className="capitalize">
+                                    {bugStatusLabel(bug.status!)}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-3 text-[11px]"
+                                    disabled={bugActionBusy === bug.id}
+                                    onClick={async () => {
+                                      if (!currentProjectId || !bug.id) return;
+                                      setBugActionBusy(bug.id);
+                                      await patchProjectBug(currentProjectId, bug.id, { status: "open" }).catch(() => {});
+                                      await load();
+                                      setBugActionBusy(null);
+                                    }}
+                                  >
+                                    Undo
+                                  </Button>
+                                </>
+                              )
+                            ) : (
+                              <Button size="sm" variant="ghost" className="h-7 px-3 text-[11px] gap-1"
+                                onClick={() => navigate(`/runs/${runKey}`)}>
+                                View Run <ArrowSquareOut className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" className="h-7 px-3 text-[11px] gap-1 ml-auto"
+                              onClick={() => navigate(`/runs/${runKey}`)}>
+                              View Run <ArrowSquareOut className="h-3 w-3" />
+                            </Button>
+                          </div>
+
+                          {/* Screenshot */}
+                          {src && (
+                            <div className="border-b border-border bg-surface-2 dark:bg-surface-3 px-6 py-5">
+                              <div className="mx-auto w-full max-w-4xl">
+                                <BugScreenshotZoomDialog
+                                  src={src}
+                                  triggerClassName="w-full"
+                                  thumbnailClassName="w-full max-h-[400px] object-contain"
+                                />
                               </div>
                             </div>
+                          )}
+
+                          {/* Title + chips */}
+                          <div className="px-6 pt-5 pb-3">
+                            <h2 className="text-[15px] font-semibold text-foreground leading-snug">{bug.name}</h2>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                              <FlowSeverityChip severity={bug.severity} />
+                              <FlowCategoryChip category={bug.category} />
+                              {bug.url && (
+                                <a href={bug.url} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/60 hover:text-foreground transition-colors truncate max-w-[200px]">
+                                  <Globe className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">{bug.url}</span>
+                                </a>
+                              )}
+                              <span className="ml-auto text-[10px] font-mono text-muted-foreground/50 flex-shrink-0">
+                                {reportedIso ? new Date(reportedIso).toLocaleString() : "—"}
+                              </span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                          {/* Description */}
+                          {bug.description && (
+                            <div className="px-6 pb-6">
+                              <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{bug.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
             </TabsContent>
 
             {/* Runs */}
-            <TabsContent value="runs">
+            <TabsContent value="runs" className="px-6 py-4 overflow-y-auto">
               <RunList
                 runs={runs}
                 emptyMessage="No runs yet. Hit Run to execute this flow."

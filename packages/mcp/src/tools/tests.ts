@@ -6,10 +6,10 @@ import { TestNameField, TestIntentField } from "../validation.js";
 export function registerTestsTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_list_tests",
-    `List or create saved, reusable test flows for a project.
+    `List or create saved, reusable tests for a project.
 
 WHEN TO USE:
-  • User says "save this test", "create a reusable test for the checkout flow"
+  • User says "save this test", "create a reusable test for the checkout"
   • Listing saved tests to find a testId for kery_run_test
   • Building a named test suite (signup, login, checkout, settings, etc.)
 
@@ -30,7 +30,7 @@ After creating, run anytime with: kery_run_test testId="<id>"`,
         .describe("'list' to list saved tests, 'create' to save a new one"),
       name: TestNameField
         .optional()
-        .describe("Test name — required for create, min 2 chars (e.g. 'Checkout Flow', 'User Signup')"),
+        .describe("Test name — required for create, min 2 chars (e.g. 'Checkout', 'User Signup')"),
       intent: TestIntentField
         .optional()
         .describe(
@@ -63,7 +63,7 @@ After creating, run anytime with: kery_run_test testId="<id>"`,
                 error: "Both 'name' (min 2 chars) and 'intent' (min 3 chars) are required to create a test.",
                 example: {
                   action: "create",
-                  name: "Checkout Flow",
+                  name: "Checkout",
                   intent: "User can complete the checkout process and receive a confirmation",
                 },
               }),
@@ -105,7 +105,7 @@ After creating, run anytime with: kery_run_test testId="<id>"`,
               tests.length === 0
                 ? [
                     "No saved tests yet. Create one with action='create', name, and intent.",
-                    "Example: kery_list_tests action='create' name='Signup Flow' intent='User can register with email and land on the dashboard'",
+                    "Example: kery_list_tests action='create' name='Signup' intent='User can register with email and land on the dashboard'",
                   ]
                 : [`Run any test with kery_run_test testId="<id from list above>"`],
           }),
@@ -198,7 +198,7 @@ Get testId from kery_list_tests.`,
 
 WHEN TO USE:
   • User says "delete that test", "remove the checkout test"
-  • Cleaning up obsolete test flows
+  • Cleaning up obsolete tests
 
 Get testId from kery_list_tests. This action is irreversible.`,
     {

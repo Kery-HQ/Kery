@@ -297,11 +297,11 @@ export class PostgresAdapter implements StorageAdapter {
     return rows[0] ?? null;
   }
 
-  async createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string }) {
+  async createSavedTest(data: { project_id: string; name: string; intent: string; context?: string; discovery_source?: string; discovery_run_id?: string; group_id?: string }) {
     const { rows } = await this.db.query(
-      `INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots, discovery_source, discovery_run_id)
-       VALUES ($1, $2, $3, $4, true, $5, $6) RETURNING *`,
-      [data.project_id, data.name, data.intent, data.context ?? null, data.discovery_source ?? "manual", data.discovery_run_id ?? null],
+      `INSERT INTO saved_tests (project_id, name, intent, context, save_screenshots, discovery_source, discovery_run_id, group_id)
+       VALUES ($1, $2, $3, $4, true, $5, $6, $7) RETURNING *`,
+      [data.project_id, data.name, data.intent, data.context ?? null, data.discovery_source ?? "manual", data.discovery_run_id ?? null, data.group_id ?? null],
     );
     return rows[0];
   }
@@ -311,5 +311,80 @@ export class PostgresAdapter implements StorageAdapter {
     const values = Object.values(data).map(v => typeof v === "object" && v !== null ? JSON.stringify(v) : v);
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
     await this.db.query(`UPDATE saved_tests SET ${sets} WHERE id = $1`, [id, ...values]);
+  }
+
+  // ─── Test Groups ─────────────────────────────────────────────────────────────
+
+  async ensureDefaultGroup(projectId: string): Promise<string> {
+    const { rows } = await this.db.query(
+      `INSERT INTO test_groups (project_id, name, is_default) VALUES ($1, 'Default', true)
+       ON CONFLICT (project_id) WHERE is_default = true DO NOTHING
+       RETURNING id`,
+      [projectId],
+    );
+    if (rows[0]) return rows[0].id;
+    const { rows: existing } = await this.db.query(
+      `SELECT id FROM test_groups WHERE project_id = $1 AND is_default = true`,
+      [projectId],
+    );
+    return existing[0].id;
+  }
+
+  async ensureAutoScanGroup(projectId: string): Promise<string> {
+    const { rows } = await this.db.query(
+      `INSERT INTO test_groups (project_id, name, is_auto_scan) VALUES ($1, 'Auto-Scan', true)
+       ON CONFLICT (project_id) WHERE is_auto_scan = true DO NOTHING
+       RETURNING id`,
+      [projectId],
+    );
+    if (rows[0]) return rows[0].id;
+    const { rows: existing } = await this.db.query(
+      `SELECT id FROM test_groups WHERE project_id = $1 AND is_auto_scan = true`,
+      [projectId],
+    );
+    return existing[0].id;
+  }
+
+  async listGroups(projectId: string) {
+    const { rows } = await this.db.query(
+      `SELECT tg.*,
+              COUNT(st.id)::int AS test_count
+       FROM test_groups tg
+       LEFT JOIN saved_tests st ON st.group_id = tg.id
+       WHERE tg.project_id = $1
+       GROUP BY tg.id
+       ORDER BY tg.is_default DESC, tg.is_auto_scan DESC, tg.created_at ASC`,
+      [projectId],
+    );
+    return rows;
+  }
+
+  async createGroup(projectId: string, name: string) {
+    const { rows } = await this.db.query(
+      `INSERT INTO test_groups (project_id, name) VALUES ($1, $2) RETURNING *`,
+      [projectId, name],
+    );
+    return rows[0];
+  }
+
+  async renameGroup(groupId: string, name: string) {
+    const { rows } = await this.db.query(
+      `UPDATE test_groups SET name = $2 WHERE id = $1 RETURNING *`,
+      [groupId, name],
+    );
+    return rows[0] ?? null;
+  }
+
+  async deleteGroup(groupId: string, deleteTests: boolean, defaultGroupId: string) {
+    if (deleteTests) {
+      await this.db.query(`DELETE FROM saved_tests WHERE group_id = $1`, [groupId]);
+    } else {
+      await this.db.query(`UPDATE saved_tests SET group_id = $2 WHERE group_id = $1`, [groupId, defaultGroupId]);
+    }
+    await this.db.query(`DELETE FROM test_groups WHERE id = $1`, [groupId]);
+  }
+
+  async moveTest(testId: string, groupId: string) {
+    await this.db.query(`UPDATE saved_tests SET group_id = $2 WHERE id = $1`, [testId, groupId]);
   }
 }

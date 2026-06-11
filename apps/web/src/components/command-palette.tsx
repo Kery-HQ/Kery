@@ -3,14 +3,13 @@ import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import {
   SquaresFour,
-  FlowArrow,
-  Pulse,
-  Warning,
-  Globe,
+  ListChecks,
+  Play,
+  Bug,
+  Code,
   Brain,
   Gear,
   MagnifyingGlass,
-  Play,
   Plus,
 } from "@phosphor-icons/react";
 import { useProject } from "@/lib/projectContext";
@@ -20,10 +19,10 @@ import { runListLabel } from "@/lib/formatters";
 
 const NAV_ITEMS = [
   { name: "Overview", href: "/overview", icon: SquaresFour },
-{ name: "Flows", href: "/tests", icon: FlowArrow },
-  { name: "Runs", href: "/runs", icon: Pulse },
-  { name: "Issues", href: "/bugs", icon: Warning },
-  { name: "Credentials", href: "/environments", icon: Globe },
+  { name: "Tests", href: "/tests", icon: ListChecks },
+  { name: "Runs", href: "/runs", icon: Play },
+  { name: "Issues", href: "/bugs", icon: Bug },
+  { name: "Credentials", href: "/environments", icon: Code },
   { name: "Memory", href: "/memory", icon: Brain },
   { name: "Platform Settings", href: "/settings", icon: Gear },
 ];
@@ -145,7 +144,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             {currentProjectId && entities && entities.tests.length > 0 && (
               <>
                 <Command.Separator className="my-1.5 h-px bg-border" />
-                <Command.Group heading="Flows" className="[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
+                <Command.Group heading="Tests" className="[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/60 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
                   {entities.tests.map((t) => (
                     <Command.Item
                       key={t.id}
@@ -156,7 +155,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       }}
                       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
                     >
-                      <FlowArrow className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <ListChecks className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="min-w-0 truncate">{t.name}</span>
                     </Command.Item>
                   ))}
@@ -175,7 +174,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       onSelect={() => go(`/runs/${r.id}`)}
                       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-foreground cursor-default aria-selected:bg-accent"
                     >
-                      <Pulse className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <Play className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{runListLabel(r)}</span>
                       <span className="font-mono text-[11px] text-muted-foreground/70 flex-shrink-0 tabular-nums">
                         {typeof r.id === "string" ? r.id.slice(0, 8) : ""}
@@ -221,7 +220,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                         p.id === currentProjectId ? "text-primary" : "text-foreground",
                       )}
                     >
-                      <div className="h-4 w-4 flex items-center justify-center rounded bg-primary/10 text-primary text-[9px] font-semibold flex-shrink-0">
+                      <div className="h-4 w-4 flex items-center justify-center rounded-[3px] bg-primary text-primary-foreground text-[9px] font-bold flex-shrink-0">
                         {p.name.charAt(0).toUpperCase()}
                       </div>
                       {p.name}

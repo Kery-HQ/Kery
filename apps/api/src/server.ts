@@ -11,6 +11,7 @@ import { PostgresAdapter } from "@kery/db";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerRunRoutes } from "./routes/runs.js";
 import { registerTestRoutes } from "./routes/tests.js";
+import { registerGroupRoutes } from "./routes/groups.js";
 import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings, applyDbApiKeySettings } from "./routes/settings.js";
 import { Redis } from "ioredis";
@@ -85,6 +86,7 @@ app.get("/health", async () => ({ status: "ok" }));
 registerProjectRoutes(app, storage);
 registerRunRoutes(app, storage, runQueue, redis, config.redisUrl);
 registerTestRoutes(app, storage);
+registerGroupRoutes(app, storage);
 registerBugRoutes(app, storage);
 registerSettingsRoutes(app, storage);
 

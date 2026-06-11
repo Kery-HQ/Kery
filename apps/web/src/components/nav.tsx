@@ -31,7 +31,7 @@ export type { Theme } from "@/lib/hooks";
 
 const CORE_ITEMS = [
   { name: "Overview",     href: "/overview",      icon: SquaresFour },
-  { name: "Flows",        href: "/tests",         icon: ListChecks },
+  { name: "Tests",        href: "/tests",         icon: ListChecks },
   { name: "Runs",         href: "/runs",          icon: Play },
   { name: "Issues",       href: "/bugs",          icon: Bug },
 ];
@@ -65,7 +65,7 @@ function normalizeDomain(input: string): string {
 function ProjectIcon({ project, size = 6 }: { project: { name: string; domain?: string | null }; size?: 5 | 6 }) {
   const sizeCls = size === 5 ? "h-5 w-5" : "h-6 w-6";
   return (
-    <div className={cn(sizeCls, "flex items-center justify-center rounded-md bg-primary/10 text-primary font-semibold text-[10px] flex-shrink-0")}>
+    <div className={cn(sizeCls, "flex items-center justify-center rounded-[5px] bg-primary text-primary-foreground font-bold text-[11px] flex-shrink-0")}>
       {project.name.charAt(0).toUpperCase() || "?"}
     </div>
   );
@@ -155,101 +155,108 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
         )}
       </div>
 
-      {/* Project selector */}
+      {/* Project selector + search */}
       {!collapsed && (
         <div className="px-2 pt-3 pb-1">
-          <div ref={dropdownRef} className="relative">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className={cn(
-                  "w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-semibold transition-all",
-                  "text-foreground dark:text-white/90 hover:bg-black/6 dark:hover:bg-white/10",
-                  dropdownOpen && "bg-black/8 dark:bg-white/12",
-                )}
-              >
-                {currentProject ? <ProjectIcon project={currentProject} size={5} /> : (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-muted-foreground font-semibold text-[10px]">?</div>
-                )}
-                <span className="flex-1 text-left truncate text-[13px]">{currentProject?.name ?? "Select project"}</span>
-                <CaretDown className={cn("h-3 w-3 text-muted-foreground/40 transition-transform", dropdownOpen && "rotate-180")} />
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/project-settings")}
-                className="h-8 w-8 shrink-0 rounded-md text-muted-foreground/70 hover:bg-sidebar-accent hover:text-foreground transition-colors"
-                aria-label="Project settings"
-                title="Project settings"
-              >
-                <Gear className="h-3.5 w-3.5 mx-auto" />
-              </button>
-            </div>
-
-            {dropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md overflow-hidden animate-fade-in bg-popover border border-border shadow-[var(--shadow-md)]">
-                {projects.length > 0 && (
-                  <div className="py-1 max-h-48 overflow-y-auto">
-                    {projects.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => { setCurrentProjectId(p.id); setDropdownOpen(false); navigate("/overview"); }}
-                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[13px] hover:bg-accent transition-colors text-left"
-                      >
-                        <ProjectIcon project={p} size={5} />
-                        <span className="flex-1 truncate">{p.name}</span>
-                        {p.id === currentProjectId && <Check className="h-3 w-3 text-primary flex-shrink-0" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="border-t border-border">
-                  {creatingProject ? (
-                    <div className="p-2 space-y-1.5">
-                      <input autoFocus value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newProjectName.trim()) handleCreateProject();
-                          if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }
-                        }}
-                        placeholder="Project name"
-                        className="w-full rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
-                      />
-                      <input value={newProjectDomain}
-                        onChange={(e) => setNewProjectDomain(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && newProjectName.trim()) handleCreateProject();
-                          if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }
-                        }}
-                        placeholder="Domain (optional)"
-                        className="w-full rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
-                      />
-                      <div className="flex gap-1.5">
-                        <button onClick={handleCreateProject} disabled={!newProjectName.trim()}
-                          className="text-[12px] font-medium text-primary hover:text-primary/80 disabled:opacity-40 px-2 py-0.5 rounded hover:bg-primary/5 transition-colors">Create</button>
-                        <button onClick={() => { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }}
-                          className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors">Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => setCreatingProject(true)}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                      <Plus className="h-3.5 w-3.5" /> New project
-                    </button>
+          <div className="rounded-md border border-border">
+            {/* Project row */}
+            <div ref={dropdownRef} className="relative">
+              <div className="flex items-center">
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className={cn(
+                    "flex-1 flex items-center gap-2 px-2.5 py-1.5 text-[13px] font-semibold transition-all rounded-tl-md",
+                    "text-foreground dark:text-white/90 hover:bg-black/6 dark:hover:bg-white/10",
+                    dropdownOpen && "bg-black/8 dark:bg-white/12",
                   )}
+                >
+                  {currentProject ? <ProjectIcon project={currentProject} size={5} /> : (
+                    <div className="flex h-5 w-5 items-center justify-center rounded-md bg-muted text-muted-foreground font-semibold text-[10px]">?</div>
+                  )}
+                  <span className="flex-1 text-left truncate">{currentProject?.name ?? "Select project"}</span>
+                  <CaretDown className={cn("h-3 w-3 text-muted-foreground/40 transition-transform", dropdownOpen && "rotate-180")} />
+                </button>
+                <div className="border-l border-border self-stretch flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/project-settings")}
+                    className="h-full px-2 text-muted-foreground/50 hover:text-foreground hover:bg-black/6 dark:hover:bg-white/10 transition-colors rounded-tr-md"
+                    aria-label="Project settings"
+                    title="Project settings"
+                  >
+                    <Gear className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Cmd+K trigger */}
-          <button
-            onClick={onOpenCommandPalette}
-            className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 mt-1 text-[12px] text-foreground/45 dark:text-white/45 hover:text-foreground dark:hover:text-white hover:bg-black/6 dark:hover:bg-white/8 transition-colors"
-          >
-            <MagnifyingGlass className="h-3.5 w-3.5" />
-            <span className="flex-1 text-left">Search...</span>
-            <Kbd>⌘K</Kbd>
-          </button>
+              {dropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md overflow-hidden animate-fade-in bg-popover border border-border shadow-[var(--shadow-md)]">
+                  {projects.length > 0 && (
+                    <div className="py-1 max-h-48 overflow-y-auto">
+                      {projects.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => { setCurrentProjectId(p.id); setDropdownOpen(false); navigate("/overview"); }}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[13px] hover:bg-accent transition-colors text-left"
+                        >
+                          <ProjectIcon project={p} size={5} />
+                          <span className="flex-1 truncate">{p.name}</span>
+                          {p.id === currentProjectId && <Check className="h-3 w-3 text-primary flex-shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="border-t border-border">
+                    {creatingProject ? (
+                      <div className="p-2 space-y-1.5">
+                        <input autoFocus value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newProjectName.trim()) handleCreateProject();
+                            if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }
+                          }}
+                          placeholder="Project name"
+                          className="w-full rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
+                        />
+                        <input value={newProjectDomain}
+                          onChange={(e) => setNewProjectDomain(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newProjectName.trim()) handleCreateProject();
+                            if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }
+                          }}
+                          placeholder="Domain (optional)"
+                          className="w-full rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
+                        />
+                        <div className="flex gap-1.5">
+                          <button onClick={handleCreateProject} disabled={!newProjectName.trim()}
+                            className="text-[12px] font-medium text-primary hover:text-primary/80 disabled:opacity-40 px-2 py-0.5 rounded hover:bg-primary/5 transition-colors">Create</button>
+                          <button onClick={() => { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }}
+                            className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setCreatingProject(true)}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                        <Plus className="h-3.5 w-3.5" /> New project
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border" />
+
+            {/* Search row */}
+            <button
+              onClick={onOpenCommandPalette}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-foreground/40 dark:text-white/35 hover:text-foreground dark:hover:text-white hover:bg-black/6 dark:hover:bg-white/8 transition-colors rounded-b-md"
+            >
+              <MagnifyingGlass className="h-3.5 w-3.5" />
+              <span className="flex-1 text-left">Search...</span>
+            </button>
+          </div>
         </div>
       )}
 

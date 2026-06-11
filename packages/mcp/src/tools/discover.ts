@@ -5,39 +5,39 @@ import type { KeryClient } from "@keryai/client";
 export function registerDiscoverTool(server: McpServer, client: KeryClient) {
   server.tool(
     "kery_discover_flows",
-    `Explore a web app automatically to discover its flows and save them as reusable tests.
+    `Explore a web app automatically to discover its tests and save them as reusable tests.
 
 WHAT IT DOES:
   An AI agent navigates the app's menus, tabs, and nav bars — mapping every distinct section.
-  After the run completes, the discovered flows are saved as named tests visible in kery_list_tests
-  and on the Flows page in the Kery UI.
+  After the run completes, the discovered tests are saved as named tests visible in kery_list_tests
+  and on the Tests page in the Kery UI.
 
 WHEN TO USE:
-  • First time setting up a project — "discover what flows exist"
-  • User asks "what can Kery test on my app?", "map out my app's flows"
-  • After major app restructuring to re-discover changed flows
+  • First time setting up a project — "discover what tests exist"
+  • User asks "what can Kery test on my app?", "map out my app's tests"
+  • After major app restructuring to re-discover changed tests
 
 TIMING & WAIT BEHAVIOR:
   • Discovery takes 2-10 minutes depending on app complexity.
   • Returns immediately with runId and webUrl (non-blocking). Share the URL with the user.
   • If a discovery run is already in progress, returns the existing runId instead of starting a new one.
-  • Call kery_get_run later to check status and see how many flows were found.
+  • Call kery_get_run later to check status and see how many tests were found.
 
 AFTER DISCOVERY:
-  • Call kery_list_tests to see the discovered flows.
-  • Run any discovered flow with kery_run_test testId="<id>".`,
+  • Call kery_list_tests to see the discovered tests.
+  • Run any discovered test with kery_run_test testId="<id>".`,
     {
       projectId: z
         .string()
         .uuid()
-        .describe("Project ID to discover flows for (get from kery_list_projects or kery_setup_project)"),
+        .describe("Project ID to discover tests for (get from kery_list_projects or kery_setup_project)"),
       environmentId: z
         .string()
         .uuid()
         .optional()
         .describe(
           "Environment to explore (defaults to the project's default environment). " +
-          "Use this to discover flows in staging or production.",
+          "Use this to discover tests in staging or production.",
         ),
     },
     async ({ projectId, environmentId }) => {
@@ -91,8 +91,8 @@ AFTER DISCOVERY:
                 : `Discovery run started. Share this URL with the user so they can watch live: ${webUrl}`,
               nextSteps: [
                 `Share the webUrl with the user — it shows live progress.`,
-                `When the run completes, call kery_get_run with runId="${runId}" to see how many flows were discovered.`,
-                `Then call kery_list_tests to see all discovered flows and run them individually.`,
+                `When the run completes, call kery_get_run with runId="${runId}" to see how many tests were discovered.`,
+                `Then call kery_list_tests to see all discovered tests and run them individually.`,
               ],
             }),
           }],
