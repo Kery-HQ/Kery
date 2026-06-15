@@ -20,8 +20,8 @@
 Point Kery at your web app, pick an LLM provider, and let it loose. It crawls every route, runs intent-driven tests, and hands you a report of visual, functional, and UX bugs — with screenshots and bounding boxes. No selectors to write. No scripts to maintain.
 
 <div align="center">
-  <a href="https://youtu.be/CsXTu7LbE24">
-    <img src="https://img.youtube.com/vi/CsXTu7LbE24/maxresdefault.jpg" width="800" alt="Watch the Kery demo" />
+  <a href="https://youtu.be/XlHBvW5y2cI">
+    <img src="https://img.youtube.com/vi/XlHBvW5y2cI/maxresdefault.jpg" width="800" alt="Watch the Kery demo" />
   </a>
 </div>
 
