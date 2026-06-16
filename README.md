@@ -13,11 +13,16 @@
   <a href="https://www.npmjs.com/package/keryai"><img src="https://img.shields.io/npm/v/keryai.svg" alt="npm version" /></a>
   <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/MCP-compatible-8A2BE2" alt="MCP" />
+  <a href="https://discord.gg/8npJXGWREM"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
 <br />
 
 Point Kery at your web app, pick an LLM provider, and let it loose. It crawls every route, runs intent-driven tests, and hands you a report of visual, functional, and UX bugs — with screenshots and bounding boxes. No selectors to write. No scripts to maintain.
+
+<p align="center">
+  <strong><a href="https://discord.gg/8npJXGWREM">👾 Join the Discord</a> — get help, share what you find, follow development.</strong>
+</p>
 
 <div align="center">
   <a href="https://youtu.be/XlHBvW5y2cI">
