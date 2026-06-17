@@ -187,18 +187,20 @@ export function registerRunRoutes(
       runId: run.id,
       baseUrl: env.base_url,
       intent:
-        "Explore this application's structure and navigation. Visit every main section by clicking " +
-        "navigation bars, side menus, tab bars, and top-level menu items. When you land on a new page, " +
-        "use observe to understand what it does and what forms or features are present. " +
-        "DO NOT fill out or submit any forms — just note that they exist. " +
-        "Click through all primary navigation items before exploring secondary ones. " +
-        "Your goal is to map every distinct section and feature of the app.",
+        "Do a quick breadth-first survey of this application. " +
+        "Click each top-level navigation item (sidebar links, nav bars, tab bars) exactly once. " +
+        "On each page, use observe to note what the page does and what forms or features exist, then move on. " +
+        "For list pages, open at most ONE detail item to understand the detail view — do not open multiple. " +
+        "If a click fails or does not navigate as expected, try once more then move on — never retry the same element more than twice. " +
+        "DO NOT fill out or submit any forms. " +
+        "Stop as soon as you have visited every top-level section once. " +
+        "Your goal is a shallow map of the app's sections, not an exhaustive crawl.",
       projectId,
       environmentId,
       environmentName: env.name,
       auth: authConfig,
       saveScreenshots: false,
-      maxSteps: 100,
+      maxSteps: 40,
       recordVideo: false,
       triggerRef: "discovery",
     } satisfies RunJobData);

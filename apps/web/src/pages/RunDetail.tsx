@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusDot } from "@/components/status-dot";
 import { EmptyState } from "@/components/empty-state";
 import { humanizeRunStep } from "@/lib/agentActivity";
-import { SHOW_RUN_DEBUG } from "@/lib/debugFlag";
+import { useDevMode } from "@/lib/debugFlag";
 import { cn } from "@/lib/utils";
 import {
   statusVariant,
@@ -609,6 +609,7 @@ const UI_AGENT_GROUP_ORDER: UIAgentGroup[] = ["navigator", "review", "support"];
 export const RunDetail: React.FC = () => {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
+  const devMode = useDevMode();
   const [run, setRun] = React.useState<Run | null>(null);
   const [steps, setSteps] = React.useState<RunStep[]>([]);
   const [llmCalls, setLlmCalls] = React.useState<LLMCallRecord[]>([]);
@@ -925,7 +926,7 @@ export const RunDetail: React.FC = () => {
                 )}
               </TabsTrigger>
             )}
-            {SHOW_RUN_DEBUG && (
+            {devMode && (
               <>
                 <TabsTrigger value="gallery">
                   Gallery
@@ -2112,6 +2113,7 @@ function BugCard({
   forceExpanded?: boolean;
   onRefreshBugs?: () => Promise<void> | void;
 }) {
+  const devMode = useDevMode();
   const [expanded, setExpanded] = React.useState(false);
   const [showRaw, setShowRaw] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -2453,7 +2455,7 @@ function BugCard({
             </div>
           </div>
 
-          {SHOW_RUN_DEBUG && (
+          {devMode && (
             <div className="border-t border-border pt-3">
               <button
                 type="button"

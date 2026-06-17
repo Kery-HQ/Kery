@@ -46,21 +46,11 @@ function Logo() {
     <img
       src="/logo/kery.png"
       alt="Kery"
-      className="h-[18px] w-[18px] flex-shrink-0 object-contain [image-rendering:pixelated]"
+      className="h-[22px] w-[22px] flex-shrink-0 object-contain"
     />
   );
 }
 
-function normalizeDomain(input: string): string {
-  const s = input.trim().toLowerCase();
-  if (!s) return "";
-  try {
-    const u = new URL(s.startsWith("http") ? s : `https://${s}`);
-    return u.hostname.replace(/^www\./, "");
-  } catch {
-    return s.replace(/^www\./, "");
-  }
-}
 
 function ProjectIcon({ project, size = 6 }: { project: { name: string; domain?: string | null }; size?: 5 | 6 }) {
   const sizeCls = size === 5 ? "h-5 w-5" : "h-6 w-6";
@@ -92,7 +82,6 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [creatingProject, setCreatingProject] = React.useState(false);
   const [newProjectName, setNewProjectName] = React.useState("");
-  const [newProjectDomain, setNewProjectDomain] = React.useState("");
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
@@ -109,7 +98,6 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
         setDropdownOpen(false);
         setCreatingProject(false);
         setNewProjectName("");
-        setNewProjectDomain("");
       }
     }
     document.addEventListener("mousedown", onClickOutside);
@@ -118,8 +106,7 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
 
   async function handleCreateProject() {
     if (!newProjectName.trim()) return;
-    const domain = normalizeDomain(newProjectDomain);
-    const res = await createProject(newProjectName.trim(), domain || undefined);
+    const res = await createProject(newProjectName.trim());
     await refreshProjects();
     if (res.project?.id) {
       setCurrentProjectId(res.project.id);
@@ -127,7 +114,6 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
     }
     setCreatingProject(false);
     setNewProjectName("");
-    setNewProjectDomain("");
     setDropdownOpen(false);
   }
 
@@ -213,24 +199,15 @@ export function Nav({ onOpenCommandPalette }: NavProps) {
                           onChange={(e) => setNewProjectName(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && newProjectName.trim()) handleCreateProject();
-                            if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }
+                            if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); }
                           }}
                           placeholder="Project name"
-                          className="w-full rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
-                        />
-                        <input value={newProjectDomain}
-                          onChange={(e) => setNewProjectDomain(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && newProjectName.trim()) handleCreateProject();
-                            if (e.key === "Escape") { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }
-                          }}
-                          placeholder="Domain (optional)"
                           className="w-full rounded-md border border-border bg-background px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
                         />
                         <div className="flex gap-1.5">
                           <button onClick={handleCreateProject} disabled={!newProjectName.trim()}
                             className="text-[12px] font-medium text-primary hover:text-primary/80 disabled:opacity-40 px-2 py-0.5 rounded hover:bg-primary/5 transition-colors">Create</button>
-                          <button onClick={() => { setCreatingProject(false); setNewProjectName(""); setNewProjectDomain(""); }}
+                          <button onClick={() => { setCreatingProject(false); setNewProjectName(""); }}
                             className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded hover:bg-accent transition-colors">Cancel</button>
                         </div>
                       </div>

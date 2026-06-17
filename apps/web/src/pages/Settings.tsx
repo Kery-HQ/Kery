@@ -1,8 +1,10 @@
 import React from "react";
 import {
   Gear, ArrowCounterClockwise, Robot, NotePencil, Eye, CursorClick, CheckCircle,
-  Key, Eye as EyeIcon, EyeSlash, Trash, PencilSimple, Warning, Queue,
+  Key, Eye as EyeIcon, EyeSlash, Trash, PencilSimple, Warning, Queue, Code,
 } from "@phosphor-icons/react";
+import { Switch } from "@/components/ui/switch";
+import { getDevMode, setDevMode } from "@/lib/debugFlag";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -237,6 +239,11 @@ export const Settings: React.FC = () => {
 
           <Separator />
 
+          {/* ── Developer Mode section ── */}
+          <DeveloperModeSection />
+
+          <Separator />
+
           {/* ── Model agents section ── */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -321,6 +328,50 @@ export const Settings: React.FC = () => {
     </div>
   );
 };
+
+// ─── Developer Mode ─────────────────────────────────────────────────────────
+
+function DeveloperModeSection() {
+  const [enabled, setEnabled] = React.useState(getDevMode);
+
+  function handleToggle(next: boolean) {
+    setEnabled(next);
+    setDevMode(next);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-[14px] font-semibold text-foreground">Developer Mode</h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">
+          Exposes LLM call inspector, screenshot gallery, memory viewer, and raw data panels on run and issues pages.
+        </p>
+      </div>
+
+      <div className="glass-card-flat">
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "h-8 w-8 rounded-xl flex items-center justify-center shrink-0",
+                enabled ? "bg-primary/10 text-primary" : "bg-foreground/6 text-muted-foreground",
+              )}>
+                <Code className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold text-foreground">Show debug surfaces</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  LLM Calls tab, Gallery tab, Memory tab, raw data toggles
+                </p>
+              </div>
+            </div>
+            <Switch checked={enabled} onCheckedChange={handleToggle} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── API Key configuration ──────────────────────────────────────────────────
 
@@ -1000,6 +1051,9 @@ function ModelSlotCard({
     </div>
   );
 }
+
+
+
 
 
 

@@ -22,7 +22,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { SHOW_RUN_DEBUG } from "@/lib/debugFlag";
+import { useDevMode } from "@/lib/debugFlag";
 import { formatReportedAt } from "@/lib/formatters";
 import { projectBugDetailDescription } from "@/lib/bug-issue-display";
 import { BugScreenshotZoomDialog } from "@/components/bug-screenshot-zoom-dialog";
@@ -146,12 +146,7 @@ function KanbanCard({
     >
       <div className={cn(dragging && "invisible")}>
 
-      <p className="text-[13px] font-medium text-foreground leading-snug mb-1.5">{bug.name}</p>
-      {bug.description && (
-        <p className="text-[12px] text-muted-foreground line-clamp-2 leading-relaxed mb-2">
-          {bug.description}
-        </p>
-      )}
+      <p className="text-[13px] font-medium text-foreground leading-snug mb-2 line-clamp-3">{bug.name}</p>
       <div className="flex items-center gap-1.5 flex-wrap">
         <SeverityChip severity={bug.severity} />
         <CategoryChip category={bug.category} />
@@ -261,6 +256,7 @@ function IssueDetailDialog({
   onDelete: () => void;
   onViewRun: () => void;
 }) {
+  const devMode = useDevMode();
   const [showRaw, setShowRaw] = React.useState(false);
   React.useEffect(() => { setShowRaw(false); }, [bug?.id]);
 
@@ -305,7 +301,7 @@ function IssueDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-full p-0 gap-0 overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }}>
+      <DialogContent hideClose className="max-w-3xl w-full p-0 gap-0 overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }}>
         {/* Header */}
         <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-border">
           <div className="flex items-start gap-3">
@@ -391,7 +387,7 @@ function IssueDetailDialog({
               </section>
             )}
 
-            {SHOW_RUN_DEBUG && (
+            {devMode && (
               <section className="border-t border-border pt-3">
                 <button
                   type="button"

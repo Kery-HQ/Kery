@@ -3,7 +3,7 @@ import { logger } from "./logger.js";
 import { llmChat, calcCostUsd, MAX_OUTPUT_TOKENS } from "./llmClient.js";
 import type { LLMCallRecord, RunStep } from "./agent.js";
 import { serializeWireMessagesForStorage } from "./agent.js";
-import { parseFirstJsonObject } from "./jsonResponse.js";
+import { parseFirstJson } from "./jsonResponse.js";
 
 export type DiscoveredFlow = {
   name: string;
@@ -139,7 +139,7 @@ export async function deduplicateFlowsWithLLM(
     };
     opts?.onLLMCall?.(llmCall);
 
-    const parsed = parseFirstJsonObject<number[]>(raw);
+    const parsed = parseFirstJson<number[]>(raw);
     if (!Array.isArray(parsed)) {
       logger.warn({ raw }, "Flow dedup: unexpected LLM response, keeping all discovered flows");
       return discovered;
@@ -206,7 +206,7 @@ export async function runFlowDiscoveryAgent(
     };
     opts?.onLLMCall?.(llmCall);
 
-    const parsed = parseFirstJsonObject<DiscoveredFlow[] | { flows?: DiscoveredFlow[] }>(raw);
+    const parsed = parseFirstJson<DiscoveredFlow[] | { flows?: DiscoveredFlow[] }>(raw);
     let flows: DiscoveredFlow[] = [];
     if (Array.isArray(parsed)) {
       flows = parsed;

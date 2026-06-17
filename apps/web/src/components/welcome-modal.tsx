@@ -28,9 +28,6 @@ const FEATURES = [
   },
 ];
 
-function normalizeDomain(input: string): string {
-  return input.trim().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-}
 
 export function WelcomeModal() {
   const navigate = useNavigate();
@@ -44,7 +41,6 @@ export function WelcomeModal() {
   );
   const [step, setStep] = React.useState(0);
   const [projectName, setProjectName] = React.useState("");
-  const [projectDomain, setProjectDomain] = React.useState("");
   const [creating, setCreating] = React.useState(false);
 
   const open = preview || (projectsLoaded && projects.length === 0 && !dismissed);
@@ -69,8 +65,7 @@ export function WelcomeModal() {
     if (!projectName.trim()) return;
     setCreating(true);
     try {
-      const domain = normalizeDomain(projectDomain);
-      const res = await createProject(projectName.trim(), domain || undefined);
+      const res = await createProject(projectName.trim());
       await refreshProjects();
       if (res.project?.id) {
         setCurrentProjectId(res.project.id);
@@ -101,9 +96,7 @@ export function WelcomeModal() {
                 {step === 2 && (
                   <CreateSlide
                     name={projectName}
-                    domain={projectDomain}
                     onNameChange={setProjectName}
-                    onDomainChange={setProjectDomain}
                     onCreate={handleCreate}
                   />
                 )}
@@ -238,15 +231,11 @@ function FeaturesSlide() {
 
 function CreateSlide({
   name,
-  domain,
   onNameChange,
-  onDomainChange,
   onCreate,
 }: {
   name: string;
-  domain: string;
   onNameChange: (v: string) => void;
-  onDomainChange: (v: string) => void;
   onCreate: () => void;
 }) {
   return (
@@ -258,32 +247,15 @@ function CreateSlide({
           can rename it or add more projects any time.
         </p>
       </div>
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <label className="text-[12px] font-medium text-foreground">Project name</label>
-          <Input
-            autoFocus
-            placeholder="My App"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onCreate(); }}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[12px] font-medium text-foreground">
-            Domain{" "}
-            <span className="text-muted-foreground font-normal">(optional)</span>
-          </label>
-          <Input
-            placeholder="myapp.com"
-            value={domain}
-            onChange={(e) => onDomainChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onCreate(); }}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Used to scope test runs to your app's domain.
-          </p>
-        </div>
+      <div className="space-y-1.5">
+        <label className="text-[12px] font-medium text-foreground">Project name</label>
+        <Input
+          autoFocus
+          placeholder="My App"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onCreate(); }}
+        />
       </div>
     </div>
   );
