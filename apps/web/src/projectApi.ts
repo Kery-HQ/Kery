@@ -115,6 +115,40 @@ export async function deleteEnvironment(projectId: string, environmentId: string
   return apiFetch(`${API_BASE}/api/projects/${projectId}/environments/${environmentId}`, { method: "DELETE" });
 }
 
+export type ConnectionAuditStatus = "ok" | "warning" | "failed";
+
+export type ConnectionAuditResult = {
+  status: ConnectionAuditStatus;
+  summary: string;
+  targetUrl: string;
+  runtime: "docker" | "local";
+  checkedAt: string;
+  checks: Array<{
+    name: string;
+    status: "passed" | "warning" | "failed" | "skipped";
+    message: string;
+    details?: Record<string, unknown>;
+  }>;
+  observations: string[];
+  recommendations: string[];
+  probe?: {
+    url: string;
+    hostHeader?: string;
+    durationMs: number;
+    statusCode?: number;
+    location?: string;
+    responseSnippet?: string;
+    error?: Record<string, unknown>;
+  };
+};
+
+export async function testEnvironmentConnection(projectId: string, environmentId: string, baseUrl?: string) {
+  return apiFetch<{ audit: ConnectionAuditResult }>(
+    `${API_BASE}/api/projects/${projectId}/environments/${environmentId}/test-connection`,
+    { method: "POST", body: JSON.stringify({ baseUrl }) },
+  );
+}
+
 // --- Auth config ---
 
 export async function fetchAuth(projectId: string, environmentId: string) {
@@ -138,12 +172,23 @@ export async function runProjectTest(projectId: string, environmentId: string, i
 }
 
 export async function runAuthTest(projectId: string, environmentId: string) {
-  return apiFetch(`${API_BASE}/api/projects/${projectId}/run`, {
+  return apiFetch<{ runId: string; status: string }>(`${API_BASE}/api/projects/${projectId}/run`, {
     method: "POST",
     body: JSON.stringify({
       environmentId,
       authTest: true,
-      intent: "Log in using the configured credentials. Once you have successfully authenticated and can see the main app (not the login page), take a screenshot and stop immediately. Do not navigate to any other pages or perform any other actions. Your only goal is to confirm whether authentication succeeds.",
+      intent: "Log in using the configured credentials. Once authenticated, stop and report whether the session reached the app.",
+    }),
+  });
+}
+
+export async function runConnectionVerification(projectId: string, environmentId: string) {
+  return apiFetch<{ runId: string; status: string }>(`${API_BASE}/api/projects/${projectId}/run`, {
+    method: "POST",
+    body: JSON.stringify({
+      environmentId,
+      connectionTest: true,
+      intent: "Open the configured app URL, confirm the page loads, then stop.",
     }),
   });
 }

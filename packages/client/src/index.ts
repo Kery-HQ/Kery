@@ -4,6 +4,7 @@ import type {
   Project, Environment, TestRun, Bug, SavedTest, TestGroup,
   OverviewStats,
   RunStreamEvent,
+  ConnectionAuditResult,
 } from "./types.js";
 
 export interface KeryClientOptions {
@@ -265,6 +266,14 @@ export class KeryClient {
     await this.fetch(`/api/projects/${projectId}/environments/${environmentId}`, {
       method: "DELETE",
     });
+  }
+
+  async testConnection(projectId: string, environmentId: string, baseUrl?: string): Promise<ConnectionAuditResult> {
+    const result = await this.fetch<{ audit: ConnectionAuditResult }>(
+      `/api/projects/${projectId}/environments/${environmentId}/test-connection`,
+      { method: "POST", body: JSON.stringify({ baseUrl }) },
+    );
+    return result.audit;
   }
 
   // ── Auth management ──────────────────────────────────────────────────────

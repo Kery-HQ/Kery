@@ -17,6 +17,7 @@ WHEN TO USE:
 PREREQUISITES:
   • Kery must be running (call kery_start if needed)
   • Project must exist (call kery_setup_project first)
+  • For new or failing environments, call kery_test_connection before starting another browser run
 
 HOW TO PROVIDE THE TEST:
   • Use 'intent' for natural language: "verify the checkout flow completes successfully"
@@ -172,6 +173,7 @@ POST-RUN TRIAGE — CRITICAL:
             text: JSON.stringify({
               error: `Test run failed: ${err instanceof Error ? err.message : String(err)}`,
               nextSteps: [
+                "Call kery_test_connection for this project/environment to get reachability diagnostics.",
                 "Make sure the app is running and accessible at the configured URL.",
                 "Check kery_list_projects to verify the environment's baseUrl is correct.",
                 "If auth is needed, verify credentials with kery_update_auth.",

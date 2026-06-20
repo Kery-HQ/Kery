@@ -33,13 +33,12 @@ AUTH MODE GUIDE:
                     Do NOT make / a public route — unauthenticated users must hit /sign-in first.
                  3. Set NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in in .env.local so auth.protect()
                     redirects to your app's own sign-in page, not the hosted accounts.dev/sign-in.
-                 4. Add host.docker.internal (and any other origins Kery uses) to:
-                    - Clerk dashboard → allowed_origins (via PATCH /v1/instance or the dashboard UI)
-                    - ClerkProvider allowedRedirectOrigins prop in your app layout
-                    Without these, the redirect after sign-in goes to accounts.dev/default-redirect.
+                 4. Make sure the configured environment URL origin is allowed anywhere your app
+                    or identity provider enforces allowed origins or redirect destinations.
                If running against a local dev server:
-                 - Start Next.js with: npm run dev -- -H 0.0.0.0 (binds to all interfaces, not just 127.0.0.1)
-                 - Set the environment baseUrl to http://host.docker.internal:<port>, not localhost
+                 - Use the same base URL a user would open in a browser.
+                 - Make sure the app server is reachable from Kery.
+                 - Call kery_test_connection to verify reachability before running a browser test.
                  - Create the test user in the Clerk dashboard for your app (not your personal Clerk account)
   'supabase' — app uses Supabase Auth. Provide projectUrl, anonKey, email, password.
 
@@ -85,8 +84,8 @@ VALIDATION enforced before the API call:
             message: statusMessages[auth.mode],
             nextSteps: [
               auth.mode !== "none"
-                ? `Auth set (${auth.mode}). Call kery_run_test to verify sign-in works — if the test reaches authenticated pages, auth is working.`
-                : "Auth cleared. Call kery_run_test to test public pages.",
+                ? `Auth set (${auth.mode}). Call kery_test_connection to verify the environment is reachable, then call kery_run_test to verify sign-in works.`
+                : "Auth cleared. Call kery_test_connection to verify reachability, then call kery_run_test to test public pages.",
             ],
           }),
         }],

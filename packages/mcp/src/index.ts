@@ -9,6 +9,7 @@ import { registerStatusTool } from "./tools/status.js";
 import { registerSetupTool } from "./tools/setup.js";
 import { registerProjectTools } from "./tools/projects.js";
 import { registerAuthTool } from "./tools/auth.js";
+import { registerAuditTool } from "./tools/audit.js";
 import { registerDiscoverTool } from "./tools/discover.js";
 import { registerRunTestTool } from "./tools/run.js";
 import { registerRunsTool } from "./tools/runs.js";
@@ -40,6 +41,7 @@ registerStatusTool(server, client, isCloud);
 registerSetupTool(server, client);
 registerProjectTools(server, client);
 registerAuthTool(server, client);
+registerAuditTool(server, client);
 
 // ── Testing ─────────────────────────────────────────────────────────────────
 registerDiscoverTool(server, client);

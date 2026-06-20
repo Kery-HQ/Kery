@@ -14,6 +14,32 @@ export type Environment = {
   is_default: boolean;
 };
 
+/** Result of checking whether Kery can reach an environment URL. */
+export type ConnectionAuditResult = {
+  status: "ok" | "warning" | "failed";
+  summary: string;
+  targetUrl: string;
+  runtime: "docker" | "local";
+  checkedAt: string;
+  checks: Array<{
+    name: string;
+    status: "passed" | "warning" | "failed" | "skipped";
+    message: string;
+    details?: Record<string, unknown>;
+  }>;
+  observations: string[];
+  recommendations: string[];
+  probe?: {
+    url: string;
+    hostHeader?: string;
+    durationMs: number;
+    statusCode?: number;
+    location?: string;
+    responseSnippet?: string;
+    error?: Record<string, unknown>;
+  };
+};
+
 /** Auth configuration for an environment. */
 export type AuthConfig = {
   mode: "ui" | "apiToken" | "oauthToken" | "tokenProvider" | "none";

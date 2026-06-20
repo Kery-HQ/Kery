@@ -35,7 +35,7 @@ VALIDATION enforced before the API call:
   • auth.mode='supabase': projectUrl must be a URL, anonKey and password non-empty
   • Each auth mode only accepts its own fields
 
-After setup → call kery_run_test`,
+After setup → call kery_test_connection, then kery_run_test`,
     {
       name: ProjectNameField.describe("Project name (min 2 chars), e.g. 'my-saas-app', 'acme-dashboard'"),
       baseUrl: z
@@ -109,8 +109,9 @@ After setup → call kery_run_test`,
               : `Project "${name}" already exists — reusing it.`,
             nextSteps: [
               `Step 1 ✓ — Project set up. projectId="${project.id}", environmentId="${env.id}"`,
-              `Step 2 — Call kery_run_test with projectId="${project.id}" and an intent like "verify the main user flow works".`,
-              `Step 3 — Call kery_get_bugs with projectId="${project.id}" to review any bugs found.`,
+              `Step 2 — Call kery_test_connection with projectId="${project.id}" and environmentId="${env.id}".`,
+              `Step 3 — Call kery_run_test with projectId="${project.id}" and an intent like "verify the main user flow works".`,
+              `Step 4 — Call kery_get_bugs with projectId="${project.id}" to review any bugs found.`,
               authLabel === "none"
                 ? "Note: No auth configured. If your app requires login, call kery_update_auth to add credentials."
                 : `Auth configured (${authLabel}). Kery will automatically sign in before each test run.`,

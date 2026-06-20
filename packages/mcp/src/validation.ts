@@ -103,9 +103,9 @@ export const AuthInput = z.discriminatedUnion("mode", [
       "App uses Clerk for authentication. Kery obtains a session token via the Clerk API " +
       "(@clerk/testing) before each test run. " +
       "Requires: clerkMiddleware() in middleware, a /sign-in route with <SignIn />, " +
-      "NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in in .env.local, and host.docker.internal " +
-      "in both the Clerk dashboard allowed_origins and ClerkProvider allowedRedirectOrigins. " +
-      "For local dev servers, start with -H 0.0.0.0 and use host.docker.internal as the baseUrl.",
+      "NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in in .env.local, and allowed origin/redirect settings " +
+      "that include the configured environment URL. For local dev servers, use the same base URL " +
+      "a user opens in a browser and verify reachability with kery_test_connection.",
     ),
     frontendApiUrl: z
       .string()

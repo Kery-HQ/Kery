@@ -36,7 +36,9 @@ import { cn } from "@/lib/utils";
 import { useProject } from "@/lib/projectContext";
 import {
   fetchEnvironments, createEnvironment, deleteEnvironment,
-  fetchAuth, saveAuth, updateEnvironment, runAuthTest,
+  fetchAuth, saveAuth, updateEnvironment, testEnvironmentConnection, runAuthTest, runConnectionVerification, fetchRun,
+  type ConnectionAuditResult,
+  type ConnectionAuditStatus,
 } from "@/projectApi";
 
 const AUTH_MODES: readonly {
@@ -186,6 +188,231 @@ function AuthModeField({
   );
 }
 
+function auditVariant(status: ConnectionAuditStatus): "success" | "warning" | "destructive" {
+  if (status === "ok") return "success";
+  if (status === "warning") return "warning";
+  return "destructive";
+}
+
+function formatProbeError(error: Record<string, unknown> | undefined): string | null {
+  if (!error) return null;
+  const code = typeof error.code === "string" ? error.code : "";
+  const message = typeof error.message === "string" ? error.message : "";
+  return [code, message].filter(Boolean).join(": ") || null;
+}
+
+function buildTroubleshootingPrompt(
+  audit: ConnectionAuditResult,
+  projectId: string | null,
+  environmentId: string | null,
+): string {
+  const probeError = formatProbeError(audit.probe?.error);
+  const status = typeof audit.probe?.statusCode === "number" ? `HTTP ${audit.probe.statusCode}` : null;
+  const observed = [
+    `Kery summary: ${audit.summary}`,
+    `Target URL: ${audit.targetUrl}`,
+    `Runtime: ${audit.runtime}`,
+    audit.probe?.url ? `Probe URL: ${audit.probe.url}` : null,
+    audit.probe?.hostHeader ? `Host header: ${audit.probe.hostHeader}` : null,
+    status,
+    probeError ? `Probe error: ${probeError}` : null,
+  ].filter(Boolean).join("\n");
+
+  return [
+    "Diagnose why Kery cannot reach this app.",
+    projectId && environmentId
+      ? `If Kery MCP is available, call kery_test_connection with projectId="${projectId}" and environmentId="${environmentId}".`
+      : "If Kery MCP is available, list projects and run kery_test_connection for this environment.",
+    "If MCP asks for projectDir, ask me for the local app project directory and rerun with projectDir.",
+    "Also inspect how the app server is started, what host/port it listens on, and whether the configured URL is blocked by app or auth-provider origin settings.",
+    "Show what you checked and the smallest exact change needed.",
+    "",
+    observed,
+  ].join("\n");
+}
+
+type ConnectionTestPhase = "idle" | "checking" | "starting-browser" | "running-browser" | "passed" | "failed";
+
+type ConnectionTestRun = {
+  runId: string;
+  status: "queued" | "running" | "passed" | "failed" | string;
+  summary?: string | null;
+};
+
+function TestConnectionDialog({
+  open,
+  onOpenChange,
+  phase,
+  audit,
+  error,
+  run,
+  authMode,
+  projectId,
+  environmentId,
+  onRun,
+  onOpenRun,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  phase: ConnectionTestPhase;
+  audit: ConnectionAuditResult | null;
+  error: string;
+  run: ConnectionTestRun | null;
+  authMode: string;
+  projectId: string | null;
+  environmentId: string | null;
+  onRun: () => void;
+  onOpenRun: (runId: string) => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const busy = phase === "checking" || phase === "starting-browser" || phase === "running-browser";
+  const isAuth = authMode !== "none";
+  const browserFailed = run?.status === "failed" || (phase === "failed" && audit?.status !== "failed");
+  const browserPassed = run?.status === "passed" || phase === "passed";
+  const browserStarting = phase === "starting-browser";
+  const browserChecking = phase === "running-browser";
+
+  React.useEffect(() => {
+    setCopied(false);
+  }, [audit?.checkedAt, open]);
+
+  const badge = audit ? (
+    <Badge variant={auditVariant(audit.status)} dot className="uppercase">
+      {audit.status}
+    </Badge>
+  ) : (
+    <Badge variant="destructive" dot className="uppercase">failed</Badge>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Test connection</DialogTitle>
+          <DialogDescription>
+            First Kery checks that it can reach your app. If that works, Kery creates a browser run.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {phase === "idle" && (
+            <div className="rounded-md border border-border bg-surface-1 p-3">
+              <p className="text-[13px] text-foreground">Credential saved</p>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                Run this check now to make sure Kery can use it.
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-md border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[12px] font-medium text-foreground">Can Kery reach your app?</p>
+                <p className={cn(
+                  "mt-1 text-[12px] leading-relaxed",
+                  audit?.status === "failed" || (!audit && error) ? "text-destructive" : "text-muted-foreground",
+                )}>
+                  {phase === "checking"
+                    ? "Checking..."
+                    : audit?.summary || error || "Not checked yet."}
+                </p>
+              </div>
+              {phase === "checking" ? (
+                <Badge variant="running" dot>checking</Badge>
+              ) : audit || error ? badge : (
+                <Badge variant="neutral">pending</Badge>
+              )}
+            </div>
+            {audit?.recommendations[0] && audit.status !== "ok" && (
+              <p className="mt-2 text-[12px] text-muted-foreground">{audit.recommendations[0]}</p>
+            )}
+          </div>
+
+          <div className="rounded-md border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[12px] font-medium text-foreground">
+                  {isAuth ? "Can Kery sign in?" : "Can Kery open it in a browser?"}
+                </p>
+                <p className={cn(
+                  "mt-1 text-[12px] leading-relaxed",
+                  browserFailed ? "text-destructive" : "text-muted-foreground",
+                )}>
+                  {browserStarting
+                    ? "Starting..."
+                    : browserChecking
+                    ? "Checking..."
+                    : browserPassed
+                      ? "OK"
+                      : browserFailed
+                        ? run?.summary || error || "Failed"
+                      : audit?.status === "failed"
+                        ? "Skipped until Kery can reach your app."
+                        : "Waiting for the reachability check."}
+                </p>
+              </div>
+              {browserStarting ? (
+                <Badge variant="running" dot>starting</Badge>
+              ) : browserChecking ? (
+                <Badge variant="running" dot>checking</Badge>
+              ) : browserPassed ? (
+                <Badge variant="success" dot>OK</Badge>
+              ) : browserFailed ? (
+                <Badge variant="destructive" dot>failed</Badge>
+              ) : (
+                <Badge variant="neutral">pending</Badge>
+              )}
+            </div>
+            {browserFailed && run && (
+              <div className="mt-2 flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onOpenRun(run.runId)}>
+                  See run
+                </Button>
+              </div>
+            )}
+            {browserFailed && error && !run && (
+              <p className="mt-2 text-[12px] text-destructive">{error}</p>
+            )}
+          </div>
+
+          {audit?.status === "failed" && (
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[12px] text-muted-foreground">
+                Need help fixing this? Copy a diagnostic prompt for your AI assistant or support workflow.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 h-7 text-[11px]"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(buildTroubleshootingPrompt(audit, projectId, environmentId)).catch(() => {});
+                  setCopied(true);
+                }}
+              >
+                {copied ? "Copied" : "Copy fix prompt"}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          {browserFailed && run ? (
+            <Button onClick={() => onOpenRun(run.runId)}>See run</Button>
+          ) : (
+            <Button onClick={onRun} loading={busy} disabled={busy}>
+              {busy ? "Checking" : phase === "idle" ? "Run check" : "Retry"}
+            </Button>
+          )}
+          <DialogClose asChild>
+            <Button variant="outline" disabled={busy}>Close</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type UiAuthForm = {
   loginUrl: string;
   usernameField: string;
@@ -217,6 +444,25 @@ const DEFAULT_TOKEN_FORM: TokenProviderForm = {
   email: "",
   password: "",
 };
+
+function normalizeFrontendUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+
+  const hostPart = trimmed.split(/[/?#]/, 1)[0]?.replace(/^\[/, "").replace(/\]$/, "") ?? "";
+  const hostname = hostPart.split(":")[0]?.toLowerCase() ?? "";
+  const isLocal =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.endsWith(".local") ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+
+  return `${isLocal ? "http" : "https"}://${trimmed}`;
+}
 
 function uiFormFromConfig(config: Record<string, any>): UiAuthForm {
   const s = config?.selectors ?? {};
@@ -597,7 +843,13 @@ export const Environments: React.FC = () => {
   // Unified footer state
   const [saving, setSaving] = React.useState(false);
   const [saveStatus, setSaveStatus] = React.useState("");
-  const [testingAuth, setTestingAuth] = React.useState(false);
+  const [testingConnection, setTestingConnection] = React.useState(false);
+  const [connectionAudit, setConnectionAudit] = React.useState<ConnectionAuditResult | null>(null);
+  const [connectionError, setConnectionError] = React.useState("");
+  const [connectionDialogOpen, setConnectionDialogOpen] = React.useState(false);
+  const [connectionPhase, setConnectionPhase] = React.useState<ConnectionTestPhase>("idle");
+  const [connectionRun, setConnectionRun] = React.useState<ConnectionTestRun | null>(null);
+  const connectionPollToken = React.useRef(0);
 
   React.useEffect(() => {
     if (!currentProjectId) return;
@@ -619,12 +871,42 @@ export const Environments: React.FC = () => {
     setLoading(false);
   }
 
+  function resetConnectionTest(phase: ConnectionTestPhase = "idle") {
+    connectionPollToken.current += 1;
+    setConnectionAudit(null);
+    setConnectionError("");
+    setConnectionRun(null);
+    setConnectionPhase(phase);
+  }
+
+  async function waitForVerificationRun(runId: string, token: number): Promise<ConnectionTestRun | null> {
+    const deadline = Date.now() + 180_000;
+    while (Date.now() < deadline) {
+      if (connectionPollToken.current !== token) return null;
+      const res = await fetchRun(runId);
+      const run = res.run ?? res;
+      const status = String(run.status ?? "running");
+      const nextRun: ConnectionTestRun = {
+        runId,
+        status,
+        summary: run.summary ?? null,
+      };
+      setConnectionRun(nextRun);
+      if (status !== "queued" && status !== "running") return nextRun;
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
+    if (connectionPollToken.current !== token) return null;
+    return { runId, status: "failed", summary: "Timed out waiting for the browser check." };
+  }
+
   async function expandEnv(env: Env) {
     if (expandedEnvId === env.id) return;
     setExpandedEnvId(env.id);
     setEditName(env.name);
     setEditUrl(env.base_url);
     setSaveStatus("");
+    setConnectionDialogOpen(false);
+    resetConnectionTest();
     if (!currentProjectId) return;
     try {
       const { auth } = await fetchAuth(currentProjectId, env.id);
@@ -654,11 +936,13 @@ export const Environments: React.FC = () => {
 
   async function handleCreate() {
     if (!currentProjectId || !newName.trim() || !newUrl.trim()) return;
+    const normalizedUrl = normalizeFrontendUrl(newUrl);
+    setNewUrl(normalizedUrl);
     setCreating(true);
     try {
       const res = await createEnvironment(currentProjectId, {
         name: newName.trim(),
-        baseUrl: newUrl.trim(),
+        baseUrl: normalizedUrl,
         isDefault: false,
       });
       setEnvs((prev) => [...prev, res.environment]);
@@ -666,6 +950,7 @@ export const Environments: React.FC = () => {
       setEditName(res.environment.name);
       setEditUrl(res.environment.base_url);
       setSaveStatus("");
+      resetConnectionTest();
       setAuthMode("none");
       setAuthJson("{}");
       setUiForm(DEFAULT_UI_FORM);
@@ -673,6 +958,7 @@ export const Environments: React.FC = () => {
       setCreateOpen(false);
       setNewName("");
       setNewUrl("");
+      setConnectionDialogOpen(true);
     } finally {
       setCreating(false);
     }
@@ -686,32 +972,41 @@ export const Environments: React.FC = () => {
     setDeleteTarget(null);
   }
 
-  async function handleSave() {
-    if (!currentProjectId || !expandedEnvId) return;
+  async function persistCurrentCredential(): Promise<Env> {
+    if (!currentProjectId || !expandedEnvId) throw new Error("No credential selected.");
     const name = editName.trim();
-    const url = editUrl.trim();
-    if (!name || !url) return;
+    const url = normalizeFrontendUrl(editUrl);
+    if (!name || !url) throw new Error("Name and frontend URL are required.");
+    setEditUrl(url);
+
+    const res = await updateEnvironment(currentProjectId, expandedEnvId, { name, baseUrl: url });
+    const updated: Env = res.environment;
+    setEnvs((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+
+    let config: Record<string, any>;
+    let mode = authMode;
+    if (authMode === "none") {
+      config = {};
+    } else if (authMode === "ui") {
+      config = configFromUiForm(uiForm);
+    } else if (authMode === "clerk" || authMode === "supabase") {
+      config = configFromTokenForm(tokenForm, authMode);
+      mode = "tokenProvider";
+    } else {
+      config = JSON.parse(authJson);
+    }
+    await saveAuth(currentProjectId, expandedEnvId, mode, config);
+    return updated;
+  }
+
+  async function handleSave() {
     setSaving(true);
     setSaveStatus("");
+    resetConnectionTest();
     try {
-      const res = await updateEnvironment(currentProjectId, expandedEnvId, { name, baseUrl: url });
-      const updated: Env = res.environment;
-      setEnvs((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-
-      let config: Record<string, any>;
-      let mode = authMode;
-      if (authMode === "none") {
-        config = {};
-      } else if (authMode === "ui") {
-        config = configFromUiForm(uiForm);
-      } else if (authMode === "clerk" || authMode === "supabase") {
-        config = configFromTokenForm(tokenForm, authMode);
-        mode = "tokenProvider";
-      } else {
-        config = JSON.parse(authJson);
-      }
-      await saveAuth(currentProjectId, expandedEnvId, mode, config);
+      await persistCurrentCredential();
       setSaveStatus("Saved.");
+      setConnectionDialogOpen(true);
     } catch (e: any) {
       setSaveStatus("Save failed.");
     } finally {
@@ -719,14 +1014,39 @@ export const Environments: React.FC = () => {
     }
   }
 
-  async function handleTestAuth() {
+  async function handleTestConnection() {
     if (!currentProjectId || !expandedEnvId) return;
-    setTestingAuth(true);
+    setConnectionDialogOpen(true);
+    setTestingConnection(true);
+    setSaveStatus("");
+    resetConnectionTest("checking");
+    const pollToken = connectionPollToken.current;
     try {
-      const res = await runAuthTest(currentProjectId, expandedEnvId);
-      navigate(`/runs/${res.runId}`);
+      const updated = await persistCurrentCredential();
+      setSaveStatus("Saved.");
+      const res = await testEnvironmentConnection(currentProjectId, expandedEnvId, updated.base_url);
+      setConnectionAudit(res.audit);
+      if (res.audit.status === "failed") {
+        setConnectionPhase("failed");
+        return;
+      }
+      setConnectionPhase("starting-browser");
+      const verificationRun = authMode !== "none"
+        ? await runAuthTest(currentProjectId, expandedEnvId)
+        : await runConnectionVerification(currentProjectId, expandedEnvId);
+      setConnectionRun({
+        runId: verificationRun.runId,
+        status: verificationRun.status,
+      });
+      setConnectionPhase("running-browser");
+      const completedRun = await waitForVerificationRun(verificationRun.runId, pollToken);
+      if (!completedRun) return;
+      setConnectionPhase(completedRun.status === "passed" ? "passed" : "failed");
+    } catch (e: any) {
+      setConnectionError(e?.message ?? "Connection check failed.");
+      setConnectionPhase("failed");
     } finally {
-      setTestingAuth(false);
+      setTestingConnection(false);
     }
   }
 
@@ -778,6 +1098,7 @@ export const Environments: React.FC = () => {
                     placeholder="https://your-app.com"
                     value={newUrl}
                     onChange={(e) => setNewUrl(e.target.value)}
+                    onBlur={() => setNewUrl((url) => normalizeFrontendUrl(url))}
                     onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                     className="font-mono"
                   />
@@ -925,6 +1246,7 @@ export const Environments: React.FC = () => {
                         <Input
                           value={editUrl}
                           onChange={(e) => setEditUrl(e.target.value)}
+                          onBlur={() => setEditUrl((url) => normalizeFrontendUrl(url))}
                           className="font-mono"
                         />
                       </div>
@@ -1078,17 +1400,15 @@ export const Environments: React.FC = () => {
                     >
                       Save
                     </Button>
-                    {authMode !== "none" && (
-                      <Button
-                        size="sm"
-                        onClick={handleTestAuth}
-                        loading={testingAuth}
-                        disabled={saving}
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                        Test auth
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleTestConnection}
+                      loading={testingConnection}
+                      disabled={saving || !editUrl.trim()}
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      Test connection
+                    </Button>
                     {saveStatus && (
                       <span className={cn(
                         "text-[12px]",
@@ -1113,6 +1433,21 @@ export const Environments: React.FC = () => {
           </div>
         )}
       </div>
+      <TestConnectionDialog
+        open={connectionDialogOpen}
+        onOpenChange={(open) => {
+          if (!testingConnection) setConnectionDialogOpen(open);
+        }}
+        phase={connectionPhase}
+        audit={connectionAudit}
+        error={connectionError}
+        run={connectionRun}
+        authMode={authMode}
+        projectId={currentProjectId}
+        environmentId={expandedEnvId}
+        onRun={handleTestConnection}
+        onOpenRun={(runId) => navigate(`/runs/${runId}`)}
+      />
     </div>
   );
 };

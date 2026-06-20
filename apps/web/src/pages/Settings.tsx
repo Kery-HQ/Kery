@@ -1052,12 +1052,3 @@ function ModelSlotCard({
   );
 }
 
-
-
-
-
-
-
-
-
-
