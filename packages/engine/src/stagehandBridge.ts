@@ -4,6 +4,7 @@
 import { Stagehand, type ObserveResult, type ActResult, type Page as StagehandPage } from "@browserbasehq/stagehand";
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
+import { dockerHostResolverArgs } from "./dockerHost.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export async function initStagehandSession(opts?: {
     localBrowserLaunchOptions: {
       headless: true,
       executablePath: process.env.CHROMIUM_PATH || undefined,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: ["--no-sandbox", "--disable-setuid-sandbox", ...dockerHostResolverArgs()],
       recordVideo: opts?.recordVideo,
     },
     logger: (line) => {

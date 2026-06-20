@@ -6,11 +6,12 @@ import { Pool } from "pg";
 import type { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import type { StorageAdapter } from "@kery/engine";
-import { logger, LIVE_PREVIEW_FILENAME } from "@kery/engine";
-import type { RunJobData } from "../runQueue.js";
+import { logger, LIVE_PREVIEW_FILENAME, serializeError } from "@kery/engine";
+import { RUN_QUEUE_NAME, type RunJobData } from "../runQueue.js";
 import { markRunStopRequested } from "../runStopRedis.js";
 import { mergeDbRunWithLiveSnapshot, readLiveRunSnapshotFromRedis, runEventsChannel } from "../liveRunBridge.js";
 import { RunIdParams, RunFilenameParams } from "./params.js";
+import { reconcileQueuedRun } from "../runQueueRecovery.js";
 
 const VIDEOS_DIR = process.env.VIDEOS_DIR || path.join(process.cwd(), "data", "videos");
 const SCREENSHOTS_DIR = process.env.SCREENSHOTS_DIR || path.join(process.cwd(), "data", "screenshots");
@@ -36,6 +37,7 @@ const RunSchema = z.object({
   intent: z.string().min(3).optional(),
   testId: z.string().uuid().optional(),
   authTest: z.boolean().optional(),
+  connectionTest: z.boolean().optional(),
 });
 
 export function registerRunRoutes(
@@ -67,11 +69,12 @@ export function registerRunRoutes(
     const parsed = RunSchema.safeParse({ ...(req.body as Record<string, unknown>), projectId });
     if (!parsed.success) { reply.code(400).send({ error: "invalid payload" }); return; }
 
-    const { environmentId, testId, authTest } = parsed.data;
+    const { environmentId, testId, authTest, connectionTest } = parsed.data;
     let intent = parsed.data.intent;
     let context: string | undefined;
     let maxSteps: number | undefined;
     if (authTest) maxSteps = 8;
+    if (connectionTest) maxSteps = 4;
 
     let savedTest: Awaited<ReturnType<StorageAdapter["getSavedTest"]>> = null;
     if (testId) {
@@ -90,7 +93,7 @@ export function registerRunRoutes(
       sourceLabel = String(savedTest.name ?? "").trim() || "Saved test";
       sourceType = "test";
     } else {
-      sourceLabel = authTest ? "Test auth" : intent.trim();
+      sourceLabel = authTest ? "Test auth" : connectionTest ? "Test connection" : intent.trim();
       if (sourceLabel.length > 500) sourceLabel = `${sourceLabel.slice(0, 497)}...`;
       sourceType = "adhoc";
     }
@@ -103,7 +106,7 @@ export function registerRunRoutes(
     const run = await storage.createTestRun({
       project_id: projectId, environment_id: environmentId,
       test_id: testId ?? null,
-      trigger_type: "manual", trigger_ref: authTest ? "auth_test" : "dashboard",
+      trigger_type: "manual", trigger_ref: authTest ? "auth_test" : connectionTest ? "connection_test" : "dashboard",
       // The job has only been enqueued here; worker flips this to `running`.
       status: "queued", started_at: new Date().toISOString(),
       source_type: sourceType,
@@ -112,8 +115,7 @@ export function registerRunRoutes(
 
     const authConfig = authRow ? { mode: authRow.mode, ...authRow.config_json } : null;
 
-    // Enqueue run job via BullMQ instead of setImmediate
-    await runQueue.add("run", {
+    const jobData = {
       runId: run.id,
       baseUrl: env.base_url,
       intent: intent!,
@@ -127,7 +129,44 @@ export function registerRunRoutes(
       maxSteps,
       recordVideo: process.env.RECORD_VIDEO !== "false",
       triggerRef: run.trigger_ref,
-    } satisfies RunJobData);
+    } satisfies RunJobData;
+
+    logger.info(
+      {
+        runId: run.id,
+        queue: RUN_QUEUE_NAME,
+        triggerRef: run.trigger_ref,
+        projectId,
+        environmentId,
+        baseUrl: env.base_url,
+      },
+      "API enqueueing run job",
+    );
+
+    try {
+      const bullJob = await runQueue.add("run", jobData, { jobId: run.id });
+      logger.info(
+        {
+          runId: run.id,
+          jobId: bullJob.id,
+          queue: RUN_QUEUE_NAME,
+          triggerRef: run.trigger_ref,
+        },
+        "API run job enqueued",
+      );
+    } catch (err) {
+      logger.error(
+        { runId: run.id, queue: RUN_QUEUE_NAME, triggerRef: run.trigger_ref, err: serializeError(err) },
+        "API failed to enqueue run job",
+      );
+      await storage.updateTestRun(run.id, {
+        status: "failed",
+        summary: "Failed to enqueue run job",
+        completed_at: new Date().toISOString(),
+      }).catch(() => {});
+      reply.code(500).send({ error: "failed to enqueue run job", runId: run.id });
+      return;
+    }
 
     // Cache idempotency key
     if (idempotencyKey) {
@@ -141,11 +180,15 @@ export function registerRunRoutes(
   app.get("/api/projects/:projectId/discover-flows/status", async (req, reply) => {
     const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.params);
     const { rows } = await pool.query(
-      `SELECT id, status FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') ORDER BY started_at DESC LIMIT 1`,
+      `SELECT * FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') ORDER BY started_at DESC LIMIT 1`,
       [projectId],
     );
-    if (rows[0]) {
-      reply.send({ active: true, runId: rows[0].id, status: rows[0].status });
+    let run = rows[0];
+    if (run?.status === "queued") {
+      run = await reconcileQueuedRun(storage, runQueue, redis, run, "discover-status");
+    }
+    if (run && (run.status === "queued" || run.status === "running")) {
+      reply.send({ active: true, runId: run.id, status: run.status });
     } else {
       reply.send({ active: false });
     }
@@ -157,11 +200,15 @@ export function registerRunRoutes(
 
     // Block parallel discovery runs — return the active run instead of creating a new one
     const { rows: active } = await pool.query(
-      `SELECT id FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') LIMIT 1`,
+      `SELECT * FROM test_runs WHERE project_id = $1 AND trigger_ref = 'discovery' AND status IN ('queued', 'running') LIMIT 1`,
       [projectId],
     );
-    if (active[0]) {
-      reply.send({ runId: active[0].id, alreadyRunning: true });
+    let activeRun = active[0];
+    if (activeRun?.status === "queued") {
+      activeRun = await reconcileQueuedRun(storage, runQueue, redis, activeRun, "discover-create");
+    }
+    if (activeRun && (activeRun.status === "queued" || activeRun.status === "running")) {
+      reply.send({ runId: activeRun.id, alreadyRunning: true });
       return;
     }
 
@@ -183,7 +230,7 @@ export function registerRunRoutes(
       source_label: "Flow discovery",
     });
 
-    await runQueue.add("run", {
+    const jobData = {
       runId: run.id,
       baseUrl: env.base_url,
       intent:
@@ -203,7 +250,27 @@ export function registerRunRoutes(
       maxSteps: 40,
       recordVideo: false,
       triggerRef: "discovery",
-    } satisfies RunJobData);
+    } satisfies RunJobData;
+
+    try {
+      const bullJob = await runQueue.add("run", jobData, { jobId: run.id });
+      logger.info(
+        { runId: run.id, jobId: bullJob.id, queue: RUN_QUEUE_NAME, triggerRef: "discovery" },
+        "API discovery run job enqueued",
+      );
+    } catch (err) {
+      logger.error(
+        { runId: run.id, queue: RUN_QUEUE_NAME, triggerRef: "discovery", err: serializeError(err) },
+        "API failed to enqueue discovery run job",
+      );
+      await storage.updateTestRun(run.id, {
+        status: "failed",
+        summary: "Failed to enqueue run job",
+        completed_at: new Date().toISOString(),
+      }).catch(() => {});
+      reply.code(500).send({ error: "failed to enqueue run job", runId: run.id });
+      return;
+    }
 
     reply.send({ runId: run.id, alreadyRunning: false });
   });
@@ -234,11 +301,14 @@ export function registerRunRoutes(
     };
 
     // Check if run exists and is still active
-    const run = await storage.getTestRun(runId);
+    let run = await storage.getTestRun(runId);
     if (!run) {
       send({ type: "error", message: "run not found" });
       reply.raw.end();
       return;
+    }
+    if (run.status === "queued") {
+      run = await reconcileQueuedRun(storage, runQueue, redis, run, "run-stream");
     }
 
     // Run already finished — send final state immediately
@@ -287,6 +357,9 @@ export function registerRunRoutes(
     const { runId } = RunIdParams.parse(req.params);
     let run = await storage.getTestRun(runId);
     if (!run) { reply.code(404).send({ error: "run not found" }); return; }
+    if (run.status === "queued") {
+      run = await reconcileQueuedRun(storage, runQueue, redis, run, "get-run");
+    }
     if (run.status === "running") {
       const live = await readLiveRunSnapshotFromRedis(redis, runId);
       if (live) {
@@ -320,8 +393,11 @@ export function registerRunRoutes(
       // Queued runs haven't started yet — remove the BullMQ job and mark failed immediately.
       // Don't rely on the worker to pick it up and check the stop signal.
       try {
-        const waiting = await runQueue.getWaiting();
-        const job = waiting.find((j) => j.data?.runId === runId);
+        let job = await runQueue.getJob(runId);
+        if (!job) {
+          const waiting = await runQueue.getWaiting();
+          job = waiting.find((j) => j.data?.runId === runId);
+        }
         if (job) await job.remove();
       } catch (err) {
         logger.warn({ runId, err: String(err) }, "Stop queued: could not remove BullMQ job");

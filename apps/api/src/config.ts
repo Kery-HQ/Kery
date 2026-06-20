@@ -1,5 +1,9 @@
 import dotenv from "dotenv";
+import path from "path";
 dotenv.config();
+if (process.env.INIT_CWD && process.env.INIT_CWD !== process.cwd()) {
+  dotenv.config({ path: path.resolve(process.env.INIT_CWD, ".env") });
+}
 
 export const config = {
   port: Number(process.env.PORT || 11111),

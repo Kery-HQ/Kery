@@ -11,8 +11,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { getConfig } from "./config.js";
-import { logger } from "./logger.js";
-import { runAgent, type RunStep, type LLMCallRecord, type LLMAgentType, type AgentPlanItem } from "./agent.js";
+import { logger, serializeError } from "./logger.js";
+import { runAgent, type RunStep, type LLMCallRecord, type LLMAgentType, type AgentPlanItem, type AgentResult } from "./agent.js";
 import type { AuthConfig } from "./types.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { runHolisticFlowReview } from "./holisticReviewAgent.js";
@@ -30,6 +30,7 @@ import { dedupeRunStepBugs } from "./bugDedup.js";
 import { runBugTriageAgent } from "./bugTriageAgent.js";
 import { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
 import type { StorageAdapter } from "./storage.js";
+import { dockerHostResolverArgs } from "./dockerHost.js";
 
 export type RunJob = {
   runId?: string;
@@ -73,17 +74,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     job.onActivity?.({ kind: "observe", text, at: Date.now() });
   };
 
-  // When running inside Docker, the browser cannot reach `localhost` — that resolves to the
-  // container itself, not the host machine. Historically we rewrote URLs to
-  // `host.docker.internal`, but that made ClerkJS report a key-mismatch redirect loop because
-  // `host.docker.internal` is not in Clerk's Dashboard allowed-origins list (and never will be
-  // for apps that haven't configured it). The fix is to keep all app URLs as `localhost` and
-  // instead tell Chrome to resolve `localhost` to `host.docker.internal` at the DNS layer via
-  // --host-resolver-rules. From the browser's security model the origin stays `localhost`, so
-  // Clerk (and any other auth provider) accepts it without any dashboard configuration.
-  const DOCKER_BROWSER_ARGS = process.env.KERY_DOCKER
-    ? ["--host-resolver-rules=MAP localhost host.docker.internal"]
-    : [];
+  const DOCKER_BROWSER_ARGS = dockerHostResolverArgs();
 
   logger.info({ intent: job.intent }, "Starting orchestrated run");
 
@@ -100,6 +91,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
   let browser;
   let browserContext: BrowserContext | undefined;
   let shSession: StagehandSession | undefined;
+  let lastAgentResult: AgentResult | undefined;
   const collectedLLMCalls: LLMCallRecord[] = [];
   const origOnLLMCall = job.onLLMCall;
   job.onLLMCall = (call) => {
@@ -211,9 +203,12 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         : () => (job.shouldStop?.() ?? false) || (job.runId ? isStopRequested(job.runId) : false),
       netMonitor,
     );
+    lastAgentResult = agentResult;
 
     const wasStopped = agentResult.failReason === "Stopped by user";
     const isAuthTest = job.triggerRef === "auth_test";
+    const isConnectionTest = job.triggerRef === "connection_test";
+    const isVerificationRun = isAuthTest || isConnectionTest;
     const isDiscovery = job.triggerRef === "discovery";
 
     // Hard stop — close browser immediately and return without any post-run work.
@@ -236,6 +231,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         memoryProposed: 0,
         bugsFound: [],
         llmCalls: stoppedCalls,
+        error: "Stopped by user",
       };
     }
 
@@ -300,6 +296,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         llmCalls: mergedCalls,
         videoUrl,
         recordingStartedAt,
+        error: agentResult.status === "failed" ? agentResult.failReason : undefined,
       };
     }
 
@@ -327,7 +324,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const navigatorStatus = agentResult.status === "passed" ? "passed" : "failed";
 
     emitActivity("Running post-run review agents...");
-    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = isAuthTest
+    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = isVerificationRun
       ? [{ bugs: [] }, { bugs: [] }]
       : await Promise.all([
           runHolisticFlowReview(
@@ -374,7 +371,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     }
     const triageCalls: LLMCallRecord[] = [];
     let triageResult: Awaited<ReturnType<typeof runBugTriageAgent>>;
-    if (isAuthTest) {
+    if (isVerificationRun) {
       triageResult = { bugs: bugsFound, skippedCount: 0, llmCall: null };
     } else {
       const openProjectBugs = job.projectId
@@ -402,7 +399,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const memoryCuratorCalls: LLMCallRecord[] = [];
     let memoryProposed = 0;
 
-    if (!isAuthTest) {
+    if (!isVerificationRun) {
       if (agentResult.status === "passed" && allMemory.length > 0) {
         await boostConfidence(storage, allMemory.map((e) => e.id), 3);
       }
@@ -453,12 +450,15 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       memoryLoaded: allMemory, memoryProposed: memoryProposed,
       bugsFound, llmCalls: mergedCalls, videoUrl,
       recordingStartedAt,
+      error: finalStatus === "failed" ? agentResult.failReason : undefined,
     };
   } catch (err) {
-    logger.error({ err: String(err) }, "Run failed");
+    const errorInfo = serializeError(err);
+    const errorMessage = typeof errorInfo.message === "string" ? errorInfo.message : String(err);
+    logger.error({ err: errorInfo, runId: job.runId, baseUrl: job.baseUrl }, "Run failed");
     if (shSession) {
       await destroyStagehandSession(shSession).catch((e) =>
-        logger.warn({ err: String(e).slice(0, 200) }, "Stagehand destroy after run error (non-fatal)"),
+        logger.warn({ err: serializeError(e) }, "Stagehand destroy after run error (non-fatal)"),
       );
     }
     else {
@@ -466,9 +466,27 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       if (browser) await browser.close().catch(() => {});
     }
     cleanupVideoTmpDir(videoTmpDir);
+    const fallbackStep: RunStep = {
+      index: 1,
+      action: "navigate",
+      target: job.baseUrl,
+      reasoning: "Run failed before the navigator could complete.",
+      url: job.baseUrl,
+      status: "failed",
+      error: errorMessage,
+      fromMemory: false,
+      at: Date.now(),
+    };
+    const stepsDetail = lastAgentResult?.stepsDetail?.length ? lastAgentResult.stepsDetail : [fallbackStep];
     return {
-      status: "failed", steps: [], stepsDetail: [], memoryLoaded: [], memoryProposed: 0,
-      bugsFound: [], llmCalls: collectedLLMCalls, error: String(err),
+      status: "failed",
+      steps: stepsDetail.map(s => `[${s.index}] ${s.action} \u2192 ${s.target ?? ""}${s.error ? ` (${s.error})` : ""}`),
+      stepsDetail,
+      memoryLoaded: allMemory,
+      memoryProposed: 0,
+      bugsFound: [],
+      llmCalls: collectedLLMCalls,
+      error: errorMessage,
     };
   }
 }

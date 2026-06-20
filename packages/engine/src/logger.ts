@@ -45,3 +45,32 @@ export function setRunCorrelationId(runId: string): void {
     logger.debug({ runId }, "setRunCorrelationId called outside async scope — use withRunCorrelation instead");
   }
 }
+
+export function serializeError(err: unknown, depth = 0): Record<string, unknown> {
+  if (err instanceof Error) {
+    const out: Record<string, unknown> = {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    };
+    const errorWithExtras = err as Error & {
+      code?: unknown;
+      syscall?: unknown;
+      address?: unknown;
+      port?: unknown;
+      cause?: unknown;
+    };
+    if (errorWithExtras.code !== undefined) out.code = errorWithExtras.code;
+    if (errorWithExtras.syscall !== undefined) out.syscall = errorWithExtras.syscall;
+    if (errorWithExtras.address !== undefined) out.address = errorWithExtras.address;
+    if (errorWithExtras.port !== undefined) out.port = errorWithExtras.port;
+    if (errorWithExtras.cause !== undefined && depth < 2) {
+      out.cause = serializeError(errorWithExtras.cause, depth + 1);
+    }
+    if (err instanceof AggregateError) {
+      out.errors = err.errors.slice(0, 5).map((e) => serializeError(e, depth + 1));
+    }
+    return out;
+  }
+  return { message: String(err) };
+}

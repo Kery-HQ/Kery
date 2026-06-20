@@ -16,7 +16,7 @@ import { registerBugRoutes } from "./routes/bugs.js";
 import { registerSettingsRoutes, applyDbModelSettings, applyDbApiKeySettings } from "./routes/settings.js";
 import { Redis } from "ioredis";
 import { createRunQueue } from "./runQueue.js";
-import { withRunCorrelation } from "@kery/engine";
+import { recoverInterruptedRuns } from "./runQueueRecovery.js";
 
 // Initialize engine config from environment
 initEngineConfig({
@@ -64,26 +64,13 @@ app.addHook("onRequest", (request, _reply, done) => {
 await applyDbApiKeySettings(storage);
 await applyDbModelSettings(storage);
 
-// Mark zombie runs (stuck in "running" from a previous crash) as failed
-await pool.query(
-  `UPDATE test_runs SET status = 'failed', summary = 'Interrupted — server restarted', completed_at = now() WHERE status = 'running'`,
-).then(({ rowCount }) => {
-  if (rowCount && rowCount > 0) console.log(`Recovered ${rowCount} zombie run(s) from previous crash`);
-}).catch(() => {});
-
-// Mark stale "queued" runs as failed — these were never picked up by the worker
-// (e.g., their BullMQ job failed before the DB status was updated to "running")
-await pool.query(
-  `UPDATE test_runs SET status = 'failed', summary = 'Job lost — server restarted', completed_at = now() WHERE status = 'queued' AND started_at < now() - interval '5 minutes'`,
-).then(({ rowCount }) => {
-  if (rowCount && rowCount > 0) console.log(`Cleared ${rowCount} stale queued run(s)`);
-}).catch(() => {});
+await recoverInterruptedRuns(storage, runQueue, redis);
 
 // Health check
 app.get("/health", async () => ({ status: "ok" }));
 
 // Register routes — pass storage adapter and run queue
-registerProjectRoutes(app, storage);
+registerProjectRoutes(app, storage, runQueue, redis);
 registerRunRoutes(app, storage, runQueue, redis, config.redisUrl);
 registerTestRoutes(app, storage);
 registerGroupRoutes(app, storage);

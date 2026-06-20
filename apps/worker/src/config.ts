@@ -1,8 +1,12 @@
 import dotenv from "dotenv";
+import path from "path";
 dotenv.config();
+if (process.env.INIT_CWD && process.env.INIT_CWD !== process.cwd()) {
+  dotenv.config({ path: path.resolve(process.env.INIT_CWD, ".env") });
+}
 
 export const config = {
-  databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:11111/kery",
+  databaseUrl: process.env.DATABASE_URL || "postgresql://kery:kery@localhost:11112/kery",
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openrouterApiKey: process.env.OPENROUTER_API_KEY || "",

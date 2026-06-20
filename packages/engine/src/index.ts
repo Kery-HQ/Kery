@@ -1,5 +1,5 @@
 // ─── Docker Host ────────────────────────────────────────────────────────────
-export { rewriteForDocker } from "./dockerHost.js";
+export { rewriteForDocker, dockerHostResolverArgs, dockerHostProbeUrl } from "./dockerHost.js";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 export {
@@ -10,7 +10,7 @@ export {
   type EngineConfig,
   type ModelConfigKey,
 } from "./config.js";
-export { logger, withRunCorrelation, getRunCorrelationId } from "./logger.js";
+export { logger, withRunCorrelation, getRunCorrelationId, serializeError } from "./logger.js";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
 export type { StorageAdapter } from "./storage.js";
@@ -79,6 +79,15 @@ export type { FilmstripFrame } from "./filmstripReview.js";
 // ─── Network Monitor ─────────────────────────────────────────────────────────
 export { attachNetworkMonitor } from "./networkMonitor.js";
 export type { NetworkMonitorResult } from "./networkMonitor.js";
+export { auditConnection } from "./connectionAudit.js";
+export type {
+  ConnectionAuditCheck,
+  ConnectionAuditCheckStatus,
+  ConnectionAuditOptions,
+  ConnectionAuditProbe,
+  ConnectionAuditResult,
+  ConnectionAuditStatus,
+} from "./connectionAudit.js";
 
 // ─── Bug Enrichment ──────────────────────────────────────────────────────────
 export { enrichBugsForRun } from "./bugEnrichment.js";

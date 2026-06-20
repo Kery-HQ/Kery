@@ -59,7 +59,7 @@ try {
   // settings table may not exist yet — skip silently
 }
 
-const { connection: redisConnection } = createRunQueue(config.redisUrl);
+const { queue: runQueue, connection: redisConnection } = createRunQueue(config.redisUrl);
 
 /** Shared Redis client for run stop signals (API sets key, worker polls). */
 const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
@@ -67,13 +67,14 @@ const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 /** Dedicated Redis client for pub/sub publishing (cannot share with commands client). */
 const redisPub = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 
-const runWorker = await createRunWorker(redisConnection, storage, redis, redisPub);
+const runWorker = await createRunWorker(redisConnection, storage, redis, redisPub, runQueue);
 
 console.log("Kery worker started — waiting for jobs");
 
 async function shutdown() {
   console.log("Worker shutting down gracefully...");
   await runWorker.close();
+  await runQueue.close();
   await pool.end();
   await redis.quit().catch(() => {});
   await redisPub.quit().catch(() => {});

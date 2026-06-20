@@ -1,8 +1,12 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { StorageAdapter } from "@kery/engine";
+import { auditConnection, logger, type StorageAdapter } from "@kery/engine";
 import { Pool } from "pg";
 import { encryptConfigJson } from "@kery/db";
+import type { Queue } from "bullmq";
+import type { Redis } from "ioredis";
+import type { RunJobData } from "../runQueue.js";
+import { reconcileQueuedRunsForProject } from "../runQueueRecovery.js";
 import {
   ProjectIdParams,
   ProjectEnvParams,
@@ -47,6 +51,10 @@ const AuthSchema = z.object({
   config: z.any().optional(),
 });
 
+const ConnectionTestSchema = z.object({
+  baseUrl: z.string().optional(),
+});
+
 const MemoryEntryTypeEnum = z.enum(["learned_path", "ignore_region", "avoid_region", "bug_pattern", "tip"]);
 
 const MemoryCreateBody = z.object({
@@ -72,8 +80,20 @@ const ProjectRunsQuery = z.object({
   status: z.string().trim().max(40).optional(),
 });
 
-export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdapter) {
+export function registerProjectRoutes(
+  app: FastifyInstance,
+  storage: StorageAdapter,
+  runQueue?: Queue<RunJobData>,
+  redis?: Redis,
+) {
   const pool = storage.getPool() as Pool;
+
+  async function reconcileProjectQueue(projectId: string, reason: string): Promise<void> {
+    if (!runQueue || !redis) return;
+    await reconcileQueuedRunsForProject(storage, runQueue, redis, projectId, reason).catch((err) => {
+      logger.warn({ projectId, reason, err: String(err) }, "Project queued run reconciliation failed");
+    });
+  }
 
   app.get("/api/projects", async (_req, reply) => {
     const { rows } = await pool.query("SELECT * FROM projects ORDER BY created_at DESC");
@@ -121,6 +141,7 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
   // Overview
   app.get("/api/projects/:projectId/overview", async (req, reply) => {
     const { projectId } = ProjectIdParams.parse(req.params);
+    await reconcileProjectQueue(projectId, "project-overview");
     const { rows: runs } = await pool.query(
       "SELECT status FROM test_runs WHERE project_id = $1", [projectId],
     );
@@ -206,6 +227,27 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
     reply.send({ ok: true });
   });
 
+  app.post("/api/projects/:projectId/environments/:environmentId/test-connection", async (req, reply) => {
+    const { projectId, environmentId } = ProjectEnvParams.parse(req.params);
+    const parsed = ConnectionTestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      reply.code(400).send({ error: "invalid payload", details: parsed.error.flatten() });
+      return;
+    }
+    const { rows: [env] } = await pool.query(
+      "SELECT * FROM environments WHERE id = $1 AND project_id = $2",
+      [environmentId, projectId],
+    );
+    if (!env) {
+      reply.code(404).send({ error: "environment not found" });
+      return;
+    }
+
+    const baseUrl = parsed.data.baseUrl?.trim() || env.base_url;
+    const audit = await auditConnection(baseUrl);
+    reply.send({ audit });
+  });
+
   // Auth config
   app.get("/api/projects/:projectId/environments/:environmentId/auth", async (req, reply) => {
     const { projectId, environmentId } = ProjectEnvParams.parse(req.params);
@@ -245,6 +287,9 @@ export function registerProjectRoutes(app: FastifyInstance, storage: StorageAdap
     const search = parsedQuery.data.search?.trim() || undefined;
     const status = parsedQuery.data.status?.trim() || undefined;
     const normalizedStatus = status && status !== "all" ? status : undefined;
+    if (!normalizedStatus || normalizedStatus === "queued") {
+      await reconcileProjectQueue(projectId, "project-runs-list");
+    }
 
     const whereParts = ["tr.project_id = $1"];
     const params: unknown[] = [projectId];
