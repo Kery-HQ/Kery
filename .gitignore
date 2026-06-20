@@ -5,3 +5,11 @@ dist/
 *.log
 *.tsbuildinfo
 data/
+
+# Local AI-agent workspace/config artifacts
+.agents/
+.claude/
+.codex/
+
+# Generated local install output from the Kery CLI
+packages/kery/kery/
