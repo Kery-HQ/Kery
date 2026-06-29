@@ -38,6 +38,10 @@ export type RunJob = {
   intent: string;
   projectId?: string;
   auth?: AuthConfig | null;
+  vercelProtectionBypass?: {
+    secret: string;
+    setCookie?: "true" | "samesitenone";
+  };
   testId?: string;
   context?: string;
   saveScreenshots?: boolean;
@@ -161,6 +165,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       }
     }
     await page.setDefaultTimeout(10000);
+    await primeVercelProtectionBypass(page, job.baseUrl, job.vercelProtectionBypass);
 
     // Capture recording start epoch so the frontend can sync video time with step timestamps.
     const recordingStartedAt = videoEnabled ? Date.now() : undefined;
@@ -495,6 +500,43 @@ function buildTargetUrl(baseUrl: string, normalizedRoute: string): string {
   const base = baseUrl.replace(/\/$/, "");
   const route = normalizedRoute.startsWith("/") ? normalizedRoute : `/${normalizedRoute}`;
   return `${base}${route}`;
+}
+
+async function primeVercelProtectionBypass(
+  page: Page,
+  baseUrl: string,
+  bypass?: RunJob["vercelProtectionBypass"],
+): Promise<void> {
+  const secret = bypass?.secret?.trim();
+  if (!secret) return;
+
+  let target: URL;
+  try {
+    target = new URL(baseUrl);
+  } catch {
+    logger.warn("Vercel protection bypass skipped because the base URL is invalid");
+    return;
+  }
+
+  try {
+    const response = await page.context().request.get(target.toString(), {
+      headers: {
+        "x-vercel-protection-bypass": secret,
+        "x-vercel-set-bypass-cookie": bypass?.setCookie ?? "true",
+      },
+      failOnStatusCode: false,
+      maxRedirects: 0,
+      timeout: 15_000,
+    });
+    const cookies = await page.context().cookies(target.origin).catch(() => []);
+    if (cookies.length > 0) {
+      logger.info({ host: target.host, status: response.status() }, "Vercel protection bypass cookie primed");
+    } else {
+      logger.warn({ host: target.host, status: response.status() }, "Vercel protection bypass did not set a cookie");
+    }
+  } catch (err) {
+    logger.warn({ host: target.host, err: String(err).slice(0, 200) }, "Vercel protection bypass cookie priming failed");
+  }
 }
 
 function mergeLLMCalls(
