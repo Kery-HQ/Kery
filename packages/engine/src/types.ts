@@ -1,3 +1,21 @@
+/**
+ * Email OTP / magic-link login: the test account's email is an API-readable
+ * inbox. When a "check your email" screen appears during login, the engine
+ * polls the inbox, extracts the code or magic link, and completes the login
+ * in the same browser session (magic links are often session-bound).
+ */
+export type EmailOtpConfig = {
+  /** Inbox address the test account uses (e.g. ns.tag@inbox.testmail.app). */
+  address: string;
+  provider: "testmail" | "custom";
+  /** testmail.app JSON API — livequery long-polls until an email arrives. */
+  testmail?: { apiKey: string; namespace: string; tag: string };
+  /** Generic adapter: GET url returning { emails: [{subject,text,html,timestamp}] }. */
+  custom?: { url: string; headers?: Record<string, string> };
+  /** Max seconds to wait for the email (default 90). */
+  timeoutSeconds?: number;
+};
+
 export type AuthConfig = {
   mode: "ui" | "apiToken" | "oauthToken" | "tokenProvider";
   loginUrl?: string;
@@ -14,6 +32,8 @@ export type AuthConfig = {
   };
   /** TOTP secret for 2FA/MFA (base32-encoded). Used to generate one-time codes. */
   totp_secret?: string;
+  /** Email OTP / magic-link login via an API-readable inbox. */
+  emailOtp?: EmailOtpConfig;
   tokenProvider?: {
     type: "supabase" | "clerk" | "custom";
     apiUrl: string;
