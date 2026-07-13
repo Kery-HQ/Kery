@@ -19,6 +19,7 @@ import { llmAgentChat, calcCostUsd } from "./llmClient.js";
 import { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText, type A11yElement, type A11yTextNode } from "./a11yTree.js";
 import { drawGridOnScreenshot } from "./gridScan.js";
 import { handleTokenAuth, refreshIfNeeded } from "./tokenAuth.js";
+import { detectEmailOtpScreen, handleEmailOtp } from "./emailOtp.js";
 import {
   stagehandObserve, formatObserveForLLM, hasSufficientObserve,
   stagehandAct, actionToInstruction, isObserveCircuitOpen,
@@ -1457,6 +1458,8 @@ export async function handleAuth(
   if (!auth.credentials) return { ok: false, llmCalls: [] };
   const authStartUrl = auth.loginUrl || baseUrl || page.url();
   const baseAuthUrl = baseUrl || page.url();
+  // Email-OTP flows only accept messages that arrive after the attempt starts.
+  const authStartedAt = Date.now();
 
   logger.info({ url: authStartUrl }, "Authenticating");
   if (page.url() !== authStartUrl) {
@@ -1470,7 +1473,15 @@ export async function handleAuth(
   if (selectors) {
     const ok = await trySelectorsAuth(page, selectors, auth, authStartUrl);
     if (ok) {
+      // "Success" may actually be a "check your email" interstitial.
+      await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
       logger.info({ url: page.url() }, "Auth complete (selectors)");
+      return { ok: true, llmCalls: [] };
+    }
+    // Passwordless forms (email-only) count as "failed" selector auth but may
+    // already have sent the code — try to complete before escalating.
+    if (await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl)) {
+      logger.info({ url: page.url() }, "Auth complete (selectors + email OTP)");
       return { ok: true, llmCalls: [] };
     }
     logger.info({ url: authStartUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
@@ -1478,7 +1489,7 @@ export async function handleAuth(
 
   // Robust fallback: if a provided login URL is stale/wrong, retry Navigator auth from base URL.
   const preferredNavigatorStartUrl = auth.loginUrl ? baseAuthUrl : authStartUrl;
-  return await tryAgentAuthViaRunAgent(
+  const navigatorResult = await tryAgentAuthViaRunAgent(
     page,
     auth,
     context,
@@ -1488,6 +1499,29 @@ export async function handleAuth(
     preferredNavigatorStartUrl,
     shouldStop,
   );
+  if (auth.emailOtp?.address) {
+    const handled = await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
+    if (handled) return { ok: true, llmCalls: navigatorResult.llmCalls };
+  }
+  return navigatorResult;
+}
+
+/**
+ * If an email-OTP inbox is configured and the page looks like a "we emailed
+ * you a code / link" screen, complete the login from the inbox. Returns true
+ * only when the flow was handled AND the page no longer looks like a login.
+ */
+async function maybeCompleteEmailOtp(
+  page: Page,
+  auth: AuthConfig,
+  sinceMs: number,
+  baseUrl?: string,
+): Promise<boolean> {
+  if (!auth.emailOtp?.address) return false;
+  if (!(await detectEmailOtpScreen(page))) return false;
+  const handled = await handleEmailOtp(page, auth.emailOtp, sinceMs, baseUrl);
+  if (!handled) return false;
+  return !(await isLikelyLoginScreen(page));
 }
 
 function normalizeSelectorOverrides(selectors: AuthConfig["selectors"] | undefined):
@@ -1621,8 +1655,9 @@ async function tryAgentAuthViaRunAgent(
   shouldStop?: () => boolean,
 ): Promise<AuthHandleResult> {
   const { username, password } = auth.credentials!;
-  const loginIntent =
-    `Log in with username "${username}" and password "${password}", then submit the login form.`;
+  const loginIntent = password
+    ? `Log in with username "${username}" and password "${password}", then submit the login form.`
+    : `Log in with the email "${username}". Enter the email and submit the form. If the page then asks for a verification code sent by email, stop — the code is handled separately.`;
   const authBase = preferredStartUrl || auth.loginUrl || baseUrl || page.url();
 
   const result = await runAgent(

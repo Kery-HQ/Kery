@@ -28,6 +28,9 @@ export type {
 // ─── Token Auth (Clerk, Supabase) ────────────────────────────────────────────
 export { handleTokenAuth, authenticateWithClerk, authenticateWithSupabase, refreshIfNeeded } from "./tokenAuth.js";
 
+// ─── Email OTP / magic-link login ────────────────────────────────────────────
+export { handleEmailOtp, detectEmailOtpScreen, extractOtpCode, extractMagicLink } from "./emailOtp.js";
+
 // ─── Memory ──────────────────────────────────────────────────────────────────
 export {
   loadProjectMemory,
