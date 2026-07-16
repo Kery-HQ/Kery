@@ -42,6 +42,10 @@ export type RunJob = {
     secret: string;
     setCookie?: "true" | "samesitenone";
   };
+  /** HTTP Basic Auth for password-protected targets (Netlify, htpasswd, …). */
+  httpCredentials?: { username: string; password: string };
+  /** Extra headers on every request (e.g. Cloudflare Access service tokens). */
+  extraHTTPHeaders?: Record<string, string>;
   testId?: string;
   context?: string;
   saveScreenshots?: boolean;
@@ -148,6 +152,10 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       const contextOpts: any = { viewport: { width: recordW, height: recordH } };
       if (videoTmpDir) {
         contextOpts.recordVideo = { dir: videoTmpDir, size: { width: recordW, height: recordH } };
+      }
+      if (job.httpCredentials) contextOpts.httpCredentials = job.httpCredentials;
+      if (job.extraHTTPHeaders && Object.keys(job.extraHTTPHeaders).length > 0) {
+        contextOpts.extraHTTPHeaders = job.extraHTTPHeaders;
       }
       try {
         browserContext = await browser.newContext(contextOpts);

@@ -2167,6 +2167,19 @@ export async function runAgent(
       if (action.action === "done") {
         const raw = action.result ?? "completed";
         const dr: DoneResult = raw === "blocked" ? "blocked" : "completed";
+        // Finalize the plan: a successful finish completes the in-flight item
+        // (otherwise the last plan entry stays "current" forever in the UI).
+        if (agentPlan.length > 0) {
+          const finalized = agentPlan.map((item) =>
+            item.status === "current"
+              ? { ...item, status: (dr === "completed" ? "done" : "failed") as AgentPlanItem["status"] }
+              : item,
+          );
+          if (finalized.some((item, i) => item.status !== agentPlan[i].status)) {
+            agentPlan = finalized;
+            onAgentPlan?.(finalized);
+          }
+        }
         const doneStep: RunStep = {
           index: stepCounter, action: "done", reasoning: action.reasoning,
           url, status: "ok", fromMemory: false, at: stepTimestamp(),
