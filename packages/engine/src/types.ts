@@ -35,13 +35,17 @@ export type AuthConfig = {
   /** Email OTP / magic-link login via an API-readable inbox. */
   emailOtp?: EmailOtpConfig;
   tokenProvider?: {
-    type: "supabase" | "clerk" | "custom";
-    apiUrl: string;
+    type: "supabase" | "clerk" | "auth0" | "firebase" | "custom";
+    /** Provider endpoint: Clerk frontend API URL, Supabase project URL, or Auth0 tenant domain. Unused for Firebase. */
+    apiUrl?: string;
+    /** Provider key: Clerk secret key, Supabase anon key, Auth0 client ID, or Firebase web API key. */
     apiKey: string;
     credentials?: {
       email: string;
       password: string;
     };
+    /** Auth0 only: API audience for the access token (optional). */
+    audience?: string;
     appDomain?: string;
     refreshToken?: string;
   };
