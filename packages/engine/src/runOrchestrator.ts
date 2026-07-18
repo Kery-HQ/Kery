@@ -31,6 +31,7 @@ import { runBugTriageAgent } from "./bugTriageAgent.js";
 import { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
 import type { StorageAdapter } from "./storage.js";
 import { dockerHostResolverArgs } from "./dockerHost.js";
+import { enforceSingleTab } from "./singleTab.js";
 
 export type RunJob = {
   runId?: string;
@@ -173,6 +174,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       }
     }
     await page.setDefaultTimeout(10000);
+    await enforceSingleTab(page);
     await primeVercelProtectionBypass(page, job.baseUrl, job.vercelProtectionBypass);
 
     // Capture recording start epoch so the frontend can sync video time with step timestamps.

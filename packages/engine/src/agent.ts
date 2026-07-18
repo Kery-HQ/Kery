@@ -25,6 +25,7 @@ import {
   stagehandAct, actionToInstruction, isObserveCircuitOpen,
   type ObservedElement, type StagehandSession,
 } from "./stagehandBridge.js";
+import { consumeNewTabNote } from "./singleTab.js";
 
 export type DoneResult = "completed" | "blocked";
 
@@ -464,10 +465,12 @@ async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSig
   a11yElements?: A11yElement[];
   a11yTextNodes?: A11yTextNode[];
   observedElements?: ObservedElement[];
+  newTabNote?: string;
 }> {
   await waitForPageStable(page, 3000);
   const url = page.url();
   const title = await page.title().catch(() => "");
+  const newTabNote = await consumeNewTabNote(page);
 
   // Take clean screenshot (before any marker injection — for review agent)
   // Higher quality (90%) for review agent accuracy; marked screenshot uses 75% to save navigator tokens
@@ -487,7 +490,7 @@ async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSig
         { url, domSource: "stagehand", observeCount: observedElements.length, screenshotBytes: cleanScreenshot.length },
         "Snapshot complete",
       );
-      return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, observedElements };
+      return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, observedElements, newTabNote };
     }
     logger.info({ url, observeCount: observedElements?.length ?? 0 }, "Snapshot: Stagehand observe insufficient, falling back to a11y");
   }
@@ -509,14 +512,14 @@ async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSig
       },
       "Snapshot complete",
     );
-    return { screenshot: markedScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes };
+    return { screenshot: markedScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes, newTabNote };
   }
 
   // Fallback to DOM extraction
   const { text: dom } = await extractDOM(page);
   const pageText = await extractVisibleText(page);
   logger.info({ url, domSource: "dom_extract", screenshotBytes: cleanScreenshot.length }, "Snapshot complete");
-  return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes };
+  return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes, newTabNote };
 }
 
 // ─── System prompt builder ────────────────────────────────────────────────────
@@ -602,6 +605,7 @@ function buildObservation(params: {
   targetUrl?: string;
   planState?: string;
   bugTrackerState?: string;
+  newTabNote?: string;
   stuckHint?: string;
   domStagnationAdvisory?: { action: string; elementName?: string };
   repetitionLoopAdvisory?: boolean;
@@ -630,6 +634,8 @@ function buildObservation(params: {
       parts.push(`Previous: ${a.action}${loc}${target} \u2192 FAILED: ${params.prevResult.error}`);
     }
   }
+
+  if (params.newTabNote) parts.push(params.newTabNote);
 
   if (params.planState) parts.push(params.planState);
   if (params.bugTrackerState) parts.push(params.bugTrackerState);
@@ -1852,6 +1858,13 @@ export async function runAgent(
       const domHash = simpleDomHash(url, dom);
       const preActionDomHash = domHash;
 
+      if (pendingStagnation && snapshot.newTabNote) {
+        // The action did have an effect — it tried to open a new tab and was
+        // intercepted. Not stagnation, and not an application bug.
+        pendingStagnation = null;
+        stagnantActions = 0;
+        lastStagnationContext = null;
+      }
       if (pendingStagnation) {
         if (pendingStagnation.url === currentUrl && domHash === pendingStagnation.preHash) {
           // Backoff retry: before counting a stagnation, wait progressively and re-check DOM.
@@ -1954,6 +1967,7 @@ export async function runAgent(
         prevResult,
         planState: planState || undefined,
         bugTrackerState,
+        newTabNote: snapshot.newTabNote,
         domStagnationAdvisory: stagnantActions >= 1 && lastStagnationContext ? lastStagnationContext : undefined,
         repetitionLoopAdvisory: repetitionStuck,
         repeatedKey: loopResult.repeatedKey,
