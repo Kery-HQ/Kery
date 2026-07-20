@@ -70,6 +70,8 @@ export type SupabaseTokens = {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+  /** Full user object from the auth response — apps read session.user, so it must round-trip. */
+  user: Record<string, unknown> | null;
 };
 
 export async function authenticateWithSupabase(
@@ -110,8 +112,12 @@ export async function authenticateWithSupabase(
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+    user: data.user ?? null,
   };
 }
+
+/** Max cookie-value chunk size used by @supabase/ssr (its MAX_CHUNK_SIZE). */
+const SUPABASE_COOKIE_CHUNK_SIZE = 3180;
 
 export async function injectSupabaseSession(
   page: Page,
@@ -129,9 +135,30 @@ export async function injectSupabaseSession(
     expires_at: tokens.expiresAt,
     token_type: "bearer",
     expires_in: tokens.expiresAt - Math.floor(Date.now() / 1000),
+    user: tokens.user,
   });
 
-  // localStorage requires same-origin — navigate to the app first
+  // Cookie-based clients (@supabase/ssr — Next.js middleware / server components)
+  // never read localStorage; they expect the session in sb-<ref>-auth-token
+  // cookies, base64url-encoded with a "base64-" prefix and chunked at 3180 chars.
+  const encoded = "base64-" + Buffer.from(tokenPayload, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const chunks: string[] = [];
+  for (let i = 0; i < encoded.length; i += SUPABASE_COOKIE_CHUNK_SIZE) {
+    chunks.push(encoded.slice(i, i + SUPABASE_COOKIE_CHUNK_SIZE));
+  }
+  const cookies = chunks.length === 1
+    ? [{ name: storageKey, value: encoded }]
+    : chunks.map((chunk, i) => ({ name: `${storageKey}.${i}`, value: chunk }));
+  await page.context().addCookies(
+    cookies.map((cookie) => ({ ...cookie, url: baseUrl, path: "/" })),
+  );
+
+  // Browser-only clients (supabase-js default) read localStorage instead —
+  // same-origin required, so navigate to the app first.
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.evaluate(
     ({ key, value }) => { localStorage.setItem(key, value); },
@@ -141,7 +168,7 @@ export async function injectSupabaseSession(
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
-  logger.info({ projectRef }, "Supabase session injected into localStorage");
+  logger.info({ projectRef, cookieChunks: cookies.length }, "Supabase session injected (cookies + localStorage)");
 }
 
 // ─── Firebase ───────────────────────────────────────────────────────────────
@@ -624,6 +651,7 @@ async function refreshSupabaseToken(session: TokenSession, page: Page): Promise<
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+    user: data.user ?? session.supabaseTokens?.user ?? null,
   };
   await injectSupabaseSession(page, tokens, apiUrl, session.baseUrl);
   session.supabaseTokens = tokens;
