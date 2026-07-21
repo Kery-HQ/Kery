@@ -153,8 +153,17 @@ export async function injectSupabaseSession(
   const cookies = chunks.length === 1
     ? [{ name: storageKey, value: encoded }]
     : chunks.map((chunk, i) => ({ name: `${storageKey}.${i}`, value: chunk }));
+  // Playwright accepts url OR domain+path, never both; domain+path pins the
+  // cookie to "/" regardless of any path in baseUrl.
+  const base = new URL(baseUrl);
   await page.context().addCookies(
-    cookies.map((cookie) => ({ ...cookie, url: baseUrl, path: "/" })),
+    cookies.map((cookie) => ({
+      ...cookie,
+      domain: base.hostname,
+      path: "/",
+      secure: base.protocol === "https:",
+      sameSite: "Lax" as const,
+    })),
   );
 
   // Browser-only clients (supabase-js default) read localStorage instead —
