@@ -18,7 +18,8 @@ type TokenProviderConfig = {
 
 function requireApiUrl(provider: TokenProviderConfig): string {
   if (!provider.apiUrl) throw new Error(`${provider.type} auth requires apiUrl`);
-  return provider.apiUrl;
+  // Stored configs may hold a bare host (your-tenant.us.auth0.com); fetch() needs a scheme.
+  return /^https?:\/\//i.test(provider.apiUrl) ? provider.apiUrl : `https://${provider.apiUrl}`;
 }
 
 // ─── Clerk ──────────────────────────────────────────────────────────────────
