@@ -573,6 +573,10 @@ RULES:
 - If you accidentally land on a login screen mid-run, use the login action to re-authenticate rather than trying to fill credentials manually.
 - If on wrong page, use navigate to go directly to the target URL.
 - When the observation mentions DOM stagnation or loop warnings, reason about whether the app is broken vs. a different strategy is needed; call done with result "blocked" if the app is genuinely non-responsive.
+- VERIFY BEFORE CLAIMING: before stating an element is missing, broken, or stuck visible, take one "observe" to re-check on a fresh snapshot, and account for state-dependent visibility (hover, scroll position, viewport) in your reasoning. Only describe what the snapshot actually shows.
+- NO-EFFECT INTERACTIONS ARE FINDINGS: when clicking a link, button, or submit control produces no navigation and no DOM change, re-verify once, then report_bug — this matters most for primary CTAs (sign-up, checkout, create, save). Do not silently work around a dead control by navigating directly.
+- PLACEHOLDER vs VALUE: greyed example text in an empty input is a placeholder, not user data. Treat a field as prefilled only when the element list shows a non-empty "value".
+- BLOCKED AUTH: if the configured login cannot complete, report_bug the blocker itself, then call done with result "blocked". Keep observations limited to pages you actually reached — never speculate about screens behind the failed login.
 - Keep one clear goal: satisfy the Intent exactly and do not wander to unrelated flows.
 - Before calling done, ALWAYS verify final state with at least one observe action and confirm expected evidence (counts, labels, destination page state).
 

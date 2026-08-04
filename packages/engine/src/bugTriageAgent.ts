@@ -27,6 +27,9 @@ Rules:
 - Match open issues semantically (not exact text only).
 - Keep output deterministic and concise.
 - Date/year bugs: before flagging a displayed year as "wrong" or "future", check it against the current date provided in the system prompt. A year that equals the current year is NOT a bug.
+- Placeholder text: drop bugs that describe placeholder/example text in empty inputs as "prefilled data" — that is styling, not state.
+- Blocked runs: if the run was blocked before reaching a surface, drop bugs that speculate about that unreached surface; keep the blocker bug itself.
+- Change-scoped runs (PR/preview tests): prefer bugs plausibly caused by the change under test. Keep clearly unrelated, likely pre-existing defects only when their impact is high, and say "likely pre-existing" in the reason so the report separates them from regressions.
 
 Return JSON only in this exact shape:
 {

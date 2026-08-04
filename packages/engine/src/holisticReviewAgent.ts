@@ -48,6 +48,9 @@ Rules:
 - Automation overlays (green circles, numbered markers) are NOT bugs.
 - The Navigator can hallucinate. Trust domChanged flags and element state over Navigator reasoning.
 - A visual difference is only worth reporting here if it is directly caused by a functional failure (e.g. an error state that should not be visible, a missing success message).
+- EVIDENCE ONLY: every bug must point at concrete trace/screenshot evidence. Never infer a defect on a page or state the run never captured — absence of evidence is not evidence of absence. Before reporting an expected element as "missing", confirm a screenshot of the relevant page/state exists and genuinely lacks it (mind scroll position and viewport).
+- BLOCKED RUNS: if the run was blocked (login failure, unreachable preview, repeated stagnation), the blocker itself is the primary bug. Report it plus only evidence-backed findings from pages actually reached; do not extrapolate to untested flows.
+- PLACEHOLDER vs VALUE: greyed example text in empty inputs is placeholder styling, not prefilled data. Only report prefill/data bugs when element state shows a real non-empty value.
 
 Return JSON only:
 { "bugs": [ { "type": "behavioral"|"ux"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
