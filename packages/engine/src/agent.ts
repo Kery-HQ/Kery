@@ -576,7 +576,7 @@ RULES:
 - VERIFY BEFORE CLAIMING: before stating an element is missing, broken, or stuck visible, take one "observe" to re-check on a fresh snapshot, and account for state-dependent visibility (hover, scroll position, viewport) in your reasoning. Only describe what the snapshot actually shows.
 - NO-EFFECT INTERACTIONS ARE FINDINGS: when clicking a link, button, or submit control produces no navigation and no DOM change, re-verify once, then report_bug — this matters most for primary CTAs (sign-up, checkout, create, save). Do not silently work around a dead control by navigating directly.
 - PLACEHOLDER vs VALUE: greyed example text in an empty input is a placeholder, not user data. Treat a field as prefilled only when the element list shows a non-empty "value".
-- BLOCKED AUTH: if the configured login cannot complete, report_bug the blocker itself, then call done with result "blocked". Keep observations limited to pages you actually reached — never speculate about screens behind the failed login.
+- AUTH TROUBLE: if login fails or you find yourself logged out, first try to recover once — use the "login" action, or navigate straight to the target/base URL (many test surfaces are public). Report the login failure with report_bug, then keep testing every surface that IS reachable logged-out. Only call done with result "blocked" when the intent's core surfaces truly require the failed login AND recovery did not help. Never speculate about screens behind a failed login.
 - Keep one clear goal: satisfy the Intent exactly and do not wander to unrelated flows.
 - Before calling done, ALWAYS verify final state with at least one observe action and confirm expected evidence (counts, labels, destination page state).
 
@@ -1732,7 +1732,25 @@ async function tryAgentAuthViaRunAgent(
     shouldStop,
   );
 
-  const success = page.url() !== authStartUrl;
+  // "Navigated somewhere" is not success — hosted flows can strand the browser
+  // on the IdP's origin (error interstitials, expired-state pages). Success
+  // means we escaped the login screen; if we're still on a third-party origin,
+  // return to the app first so its own auth redirect reveals the session state
+  // and the run never starts from a stranded page.
+  let success = !(await isLikelyLoginScreen(page));
+  if (success && baseUrl) {
+    let onAppOrigin = false;
+    try {
+      onAppOrigin = new URL(page.url()).host === new URL(baseUrl).host;
+    } catch {
+      onAppOrigin = false;
+    }
+    if (!onAppOrigin) {
+      await page.goto(baseUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+      success = !(await isLikelyLoginScreen(page));
+    }
+  }
   logger.info({ success, url: page.url(), status: result.status }, "Agent auth (full runAgent) complete");
   return { ok: success, llmCalls: result.llmCalls };
 }
