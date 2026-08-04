@@ -158,8 +158,21 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
         contextOpts.recordVideo = { dir: videoTmpDir, size: { width: recordW, height: recordH } };
       }
       if (job.httpCredentials) contextOpts.httpCredentials = job.httpCredentials;
-      if (job.extraHTTPHeaders && Object.keys(job.extraHTTPHeaders).length > 0) {
-        contextOpts.extraHTTPHeaders = job.extraHTTPHeaders;
+      // Deployment-protection bypass rides as context-level headers so EVERY
+      // request carries it — the primed cookie alone dies with any session
+      // reset (e.g. the clean-slate login retry) and the run hits the wall.
+      const bypassSecret = job.vercelProtectionBypass?.secret?.trim();
+      const mergedHeaders: Record<string, string> = {
+        ...(job.extraHTTPHeaders ?? {}),
+        ...(bypassSecret
+          ? {
+              "x-vercel-protection-bypass": bypassSecret,
+              "x-vercel-set-bypass-cookie": job.vercelProtectionBypass?.setCookie ?? "true",
+            }
+          : {}),
+      };
+      if (Object.keys(mergedHeaders).length > 0) {
+        contextOpts.extraHTTPHeaders = mergedHeaders;
       }
       try {
         browserContext = await browser.newContext(contextOpts);

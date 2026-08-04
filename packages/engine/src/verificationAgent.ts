@@ -30,7 +30,10 @@ Grades:
 
 Rules:
 - Derive claims from the intent and change background, phrased as plain user-facing outcomes ("Clicking X opens Y", "The total updates when quantity changes").
-- STRICT EVIDENCE BAR: "verified" requires an observed effect in the trace — an action with domChanged=NO, or a claim never exercised, is NEVER verified. Treat the change description as a claim to check, not a fact.
+- CLAIMS ARE INVARIANTS, NOT NARRATIVE: assert user-facing correctness (data complete, values accurate, actions produce their effect, navigation reaches the right place). When the change reformats, simplifies, or reorders displayed data, include a claim that no information was lost or corrupted — regardless of how the description frames the change.
+- STRICT EVIDENCE BAR: "verified" requires an observed effect in the trace — a recorded observation, domChanged=yes with a matching effect, a navigation, or a concrete value. Treat the change description as a claim to check, not a fact.
+- NAVIGATOR CLAIMS ARE NOT EVIDENCE: reasoning text like "verified X" or "confirmed Y" without a recorded observation, DOM change, or navigation does NOT support "verified". Cite only actions plus their observed effects.
+- ATTEMPTED-BUT-SILENT IS CONTRADICTED: if the claim's action was directly performed and the trace shows no observed effect (domChanged=NO, no observation, no navigation), grade "contradicted" — silent controls are failures, not unknowns. Reserve "not_testable" for claims whose actions were never attempted (blocked or unreached).
 - 2-6 claims. Prefer the claims a reviewer would need before merging.
 - "evidence" is one sentence citing the step(s) or observation that decides the grade.
 
@@ -48,14 +51,17 @@ export async function runVerificationReview(input: {
   navigatorStatus: "passed" | "failed";
   onLLMCall?: (call: Omit<LLMCallRecord, "seq">) => void;
 }): Promise<RunVerification[]> {
+  let prevHash: string | undefined;
   const trace = input.stepsDetail
     .map((s) => {
       const parts = [`[${s.index}] ${s.action}`];
       if (s.target) parts.push(`target=${String(s.target).slice(0, 120)}`);
       if (s.status) parts.push(`status=${s.status}`);
-      if (typeof (s as Record<string, unknown>).domChanged === "boolean") {
-        parts.push(`domChanged=${(s as Record<string, unknown>).domChanged ? "yes" : "NO"}`);
+      if (s.preActionDomHash != null && prevHash != null) {
+        parts.push(s.preActionDomHash !== prevHash ? "domChanged=yes" : "domChanged=NO ⚠️");
       }
+      if (s.preActionDomHash != null) prevHash = s.preActionDomHash;
+      if (s.observation) parts.push(`observation="${String(s.observation).slice(0, 160)}"`);
       if (s.reasoning) parts.push(`— ${String(s.reasoning).slice(0, 200)}`);
       return parts.join(" ");
     })

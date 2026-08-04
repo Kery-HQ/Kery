@@ -551,7 +551,7 @@ Example: To click the Login button shown as [3], use {"action":"click","element"
 Example: To fill Username shown as [1], use {"action":"fill","element":1,"value":"test@example.com","reasoning":"..."}
 
 Optional fields (use when relevant):
-- "observation": Short note on unexpected application behavior (e.g. button state unchanged after click, missing feedback). These notes are forwarded to the Review Agent for analysis. Do not report bugs here — only describe what you observe.
+- "observation": REQUIRED after every state-changing action (click, fill, selectOption, submit, dragAndDrop, setDate): in your NEXT action, record the concrete effect you can see — what value/count/element changed, where navigation landed — or explicitly "no visible change". Reviewers only trust recorded observations; an unrecorded outcome counts as unverified. Do not report bugs here — only describe what you observe.
 - "result" (only with action "done"): "completed" when you finish the flow (even if bugs might still be found by reviewers), "blocked" if you cannot proceed due to app issues (non-responsive UI, errors).
 
 FALLBACK: If an element is not in the list, use x,y coordinates (integers 0-1000) instead.
@@ -574,6 +574,7 @@ RULES:
 - If on wrong page, use navigate to go directly to the target URL.
 - When the observation mentions DOM stagnation or loop warnings, reason about whether the app is broken vs. a different strategy is needed; call done with result "blocked" if the app is genuinely non-responsive.
 - VERIFY BEFORE CLAIMING: before stating an element is missing, broken, or stuck visible, take one "observe" to re-check on a fresh snapshot, and account for state-dependent visibility (hover, scroll position, viewport) in your reasoning. Only describe what the snapshot actually shows.
+- COVER EVERY CHANGED CONTROL: when the intent or context names specific controls (a toggle, a button, an input), exercise each named control directly at least once — do not substitute an alternative path (e.g. a dropdown) for the named control and count it as covered.
 - NO-EFFECT INTERACTIONS ARE FINDINGS: when clicking a link, button, or submit control produces no navigation and no DOM change, re-verify once, then report_bug — this matters most for primary CTAs (sign-up, checkout, create, save). Do not silently work around a dead control by navigating directly.
 - PLACEHOLDER vs VALUE: greyed example text in an empty input is a placeholder, not user data. Treat a field as prefilled only when the element list shows a non-empty "value".
 - AUTH TROUBLE: if login fails or you find yourself logged out, first try to recover once — use the "login" action, or navigate straight to the target/base URL (many test surfaces are public). Report the login failure with report_bug, then keep testing every surface that IS reachable logged-out. Only call done with result "blocked" when the intent's core surfaces truly require the failed login AND recovery did not help. Never speculate about screens behind a failed login.
@@ -1459,6 +1460,8 @@ export async function handleAuth(
     // any provider-specific handling.
     logger.warn({ provider: auth.tokenProvider.type, url: page.url() }, "Navigator fallback failed — clearing session state and retrying once");
     await clearBrowserSessionState(page);
+    // Hosted IdPs rate-limit rapid retries ("Too many attempts") — back off first.
+    await new Promise((r) => setTimeout(r, 12_000 + Math.floor(Math.random() * 8_000)));
     await page.goto(url, { waitUntil: "domcontentloaded" }).catch(() => {});
     const retryResult = await tryAgentAuthViaRunAgent(page, fallbackAuth, context, baseUrl, url, onLLMCall, undefined, shouldStop);
     logger.info(
@@ -1493,6 +1496,9 @@ export async function handleAuth(
       if (shouldStop?.()) break;
       logger.warn({ url: page.url() }, "Auth attempt failed — clearing session state and retrying once");
       await clearBrowserSessionState(page);
+      // Hosted IdPs rate-limit rapid retries ("Too many attempts") — back off
+      // with jitter before the clean-slate attempt.
+      await new Promise((r) => setTimeout(r, 12_000 + Math.floor(Math.random() * 8_000)));
     }
     // Email-OTP flows only accept messages that arrive after the attempt starts.
     const authStartedAt = Date.now();
