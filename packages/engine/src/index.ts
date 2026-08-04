@@ -75,6 +75,8 @@ export type { GenerateScriptResult } from "./scriptGenerator.js";
 
 // ─── Flow & visual review (post-run) ───────────────────────────────────────
 export { runHolisticFlowReview } from "./holisticReviewAgent.js";
+export { runVerificationReview } from "./verificationAgent.js";
+export type { RunVerification } from "./verificationAgent.js";
 export type { HolisticReviewInput } from "./holisticReviewAgent.js";
 export { runFilmstripReview, capFilmstripFrames } from "./filmstripReview.js";
 export type { FilmstripFrame } from "./filmstripReview.js";

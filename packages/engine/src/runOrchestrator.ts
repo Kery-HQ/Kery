@@ -16,6 +16,7 @@ import { runAgent, type RunStep, type LLMCallRecord, type LLMAgentType, type Age
 import type { AuthConfig } from "./types.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { runHolisticFlowReview } from "./holisticReviewAgent.js";
+import { runVerificationReview, type RunVerification } from "./verificationAgent.js";
 import { isStopRequested } from "./runEvents.js";
 import type { ReviewBug } from "./types.js";
 import {
@@ -75,6 +76,8 @@ export type RunResult = {
   /** Epoch ms when Playwright started recording — used to sync video time with step timestamps. */
   recordingStartedAt?: number;
   error?: string;
+  /** Evidence record: intended behaviors graded against the trace (verified / contradicted / not testable). */
+  verifications?: RunVerification[];
 };
 
 export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): Promise<RunResult> {
@@ -339,8 +342,8 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
     const navigatorStatus = agentResult.status === "passed" ? "passed" : "failed";
 
     emitActivity("Running post-run review agents...");
-    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }] = isVerificationRun
-      ? [{ bugs: [] }, { bugs: [] }]
+    const [{ bugs: holisticBugs }, { bugs: filmstripBugs }, verifications] = isVerificationRun
+      ? [{ bugs: [] }, { bugs: [] }, [] as RunVerification[]]
       : await Promise.all([
           runHolisticFlowReview(
             {
@@ -357,6 +360,16 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
             onLLMCall: (call) => filmstripCalls.push({ ...call, seq: 0 }),
             intent: job.intent,
             navigatorStatus,
+          }),
+          runVerificationReview({
+            intent: job.intent,
+            context,
+            stepsDetail: agentResult.stepsDetail,
+            navigatorStatus,
+            onLLMCall: (call) => holisticCalls.push({ ...call, seq: 0 } as never),
+          }).catch((err) => {
+            logger.warn({ err: String(err).split("\n")[0] }, "Verification review failed (non-fatal)");
+            return [] as RunVerification[];
           }),
         ]);
     emitActivity("Post-run review complete.");
@@ -467,6 +480,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
       bugsFound, llmCalls: mergedCalls, videoUrl,
       recordingStartedAt,
       error: finalStatus === "failed" ? agentResult.failReason : undefined,
+      verifications,
     };
   } catch (err) {
     const errorInfo = serializeError(err);
