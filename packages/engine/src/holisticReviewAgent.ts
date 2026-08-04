@@ -51,6 +51,7 @@ Rules:
 - EVIDENCE ONLY: every bug must point at concrete trace/screenshot evidence. Never infer a defect on a page or state the run never captured — absence of evidence is not evidence of absence. Before reporting an expected element as "missing", confirm a screenshot of the relevant page/state exists and genuinely lacks it (mind scroll position and viewport).
 - BLOCKED RUNS: if the run was blocked (login failure, unreachable preview, repeated stagnation), the blocker itself is the primary bug. Report it plus only evidence-backed findings from pages actually reached; do not extrapolate to untested flows.
 - PLACEHOLDER vs VALUE: greyed example text in empty inputs is placeholder styling, not prefilled data. Only report prefill/data bugs when element state shows a real non-empty value.
+- DATA CONSISTENCY SWEEP: cross-check displayed data against the same data elsewhere in the trace — counts vs the lists they summarize, dates vs sibling dates (missing year/month), totals vs line items, label→style mappings vs their meaning elsewhere (e.g. severity colors). A value that is internally inconsistent across surfaces is a reportable data bug even when each surface looks fine alone.
 
 Return JSON only:
 { "bugs": [ { "type": "behavioral"|"ux"|"a11y"|"performance"|"data", "description": string (max 120 chars), "severity": "high"|"medium"|"low", "frameIndex"?: number (0-based index into the screenshot list), "region"?: { "x": number, "y": number, "w": number, "h": number } } ] }
@@ -146,6 +147,8 @@ function parseHolisticResponse(
 
 export type HolisticReviewInput = {
   intent: string;
+  /** Background on the change under test (e.g. what the PR intends), when known. */
+  context?: string;
   stepsDetail: RunStep[];
   frames: FilmstripFrame[];
   navigatorStatus: "passed" | "failed";
@@ -165,6 +168,9 @@ export async function runHolisticFlowReview(
 
   const textIntro =
     `Test intent: "${input.intent}"\n` +
+    (input.context?.trim()
+      ? `Change under test (background): ${input.context.trim()}\nWhen behavior contradicts this intended change, name the delta explicitly (what was intended vs what the app does) instead of describing the symptom vaguely.\n`
+      : "") +
     `Navigator run finished with status: ${input.navigatorStatus} (passed = Navigator called done or completed path; failed = error, blocked, or step limit).\n` +
     (input.networkSummary?.trim()
       ? `\nNetwork / API signals during actions:\n${input.networkSummary}\n`

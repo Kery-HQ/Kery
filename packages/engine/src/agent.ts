@@ -1446,11 +1446,26 @@ export async function handleAuth(
       },
     };
     const fallbackResult = await tryAgentAuthViaRunAgent(page, fallbackAuth, context, baseUrl, url, onLLMCall, undefined, shouldStop);
+    if (fallbackResult.ok || shouldStop?.()) {
+      logger.info(
+        { provider: auth.tokenProvider.type, method: "navigator-fallback", ok: fallbackResult.ok },
+        "Auth complete via Navigator fallback",
+      );
+      return fallbackResult;
+    }
+    // Hosted login pages (OAuth/SSO) can wedge on a dead interstitial — an
+    // expired state error, a half-finished transaction — with no form to fill.
+    // One clean-slate retry (cookies + storage cleared) recovers those without
+    // any provider-specific handling.
+    logger.warn({ provider: auth.tokenProvider.type, url: page.url() }, "Navigator fallback failed — clearing session state and retrying once");
+    await clearBrowserSessionState(page);
+    await page.goto(url, { waitUntil: "domcontentloaded" }).catch(() => {});
+    const retryResult = await tryAgentAuthViaRunAgent(page, fallbackAuth, context, baseUrl, url, onLLMCall, undefined, shouldStop);
     logger.info(
-      { provider: auth.tokenProvider.type, method: "navigator-fallback", ok: fallbackResult.ok },
+      { provider: auth.tokenProvider.type, method: "navigator-fallback-retry", ok: retryResult.ok },
       "Auth complete via Navigator fallback",
     );
-    return fallbackResult;
+    return { ok: retryResult.ok, llmCalls: [...fallbackResult.llmCalls, ...retryResult.llmCalls] };
   }
 
   // API Token auth — inject header on all requests via page.route()
@@ -1468,52 +1483,81 @@ export async function handleAuth(
   if (!auth.credentials) return { ok: false, llmCalls: [] };
   const authStartUrl = auth.loginUrl || baseUrl || page.url();
   const baseAuthUrl = baseUrl || page.url();
-  // Email-OTP flows only accept messages that arrive after the attempt starts.
-  const authStartedAt = Date.now();
+  const allLlmCalls: LLMCallRecord[] = [];
 
-  logger.info({ url: authStartUrl }, "Authenticating");
-  if (page.url() !== authStartUrl) {
-    await page.goto(authStartUrl, { waitUntil: "domcontentloaded" });
-    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-  }
-
-  const selectorOverrides = normalizeSelectorOverrides(auth.selectors);
-  const shouldAutoDetectSelectors = auth.autoDetectSelectors !== false;
-  const selectors = selectorOverrides ?? (shouldAutoDetectSelectors ? await detectLoginSelectors(page) : null);
-  if (selectors) {
-    const ok = await trySelectorsAuth(page, selectors, auth, authStartUrl);
-    if (ok) {
-      // "Success" may actually be a "check your email" interstitial.
-      await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
-      logger.info({ url: page.url() }, "Auth complete (selectors)");
-      return { ok: true, llmCalls: [] };
+  // Two attempts: hosted login pages can wedge on a dead interstitial (expired
+  // OAuth state, half-finished transaction) with no form to fill. The second
+  // attempt starts from a clean slate — cookies and storage cleared.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      if (shouldStop?.()) break;
+      logger.warn({ url: page.url() }, "Auth attempt failed — clearing session state and retrying once");
+      await clearBrowserSessionState(page);
     }
-    // Passwordless forms (email-only) count as "failed" selector auth but may
-    // already have sent the code — try to complete before escalating.
-    if (await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl)) {
-      logger.info({ url: page.url() }, "Auth complete (selectors + email OTP)");
-      return { ok: true, llmCalls: [] };
-    }
-    logger.info({ url: authStartUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
-  }
+    // Email-OTP flows only accept messages that arrive after the attempt starts.
+    const authStartedAt = Date.now();
 
-  // Robust fallback: if a provided login URL is stale/wrong, retry Navigator auth from base URL.
-  const preferredNavigatorStartUrl = auth.loginUrl ? baseAuthUrl : authStartUrl;
-  const navigatorResult = await tryAgentAuthViaRunAgent(
-    page,
-    auth,
-    context,
-    baseUrl,
-    authStartUrl,
-    onLLMCall,
-    preferredNavigatorStartUrl,
-    shouldStop,
-  );
-  if (auth.emailOtp?.address) {
-    const handled = await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
-    if (handled) return { ok: true, llmCalls: navigatorResult.llmCalls };
+    logger.info({ url: authStartUrl, attempt }, "Authenticating");
+    if (attempt > 0 || page.url() !== authStartUrl) {
+      await page.goto(authStartUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+    }
+
+    const selectorOverrides = normalizeSelectorOverrides(auth.selectors);
+    const shouldAutoDetectSelectors = auth.autoDetectSelectors !== false;
+    const selectors = selectorOverrides ?? (shouldAutoDetectSelectors ? await detectLoginSelectors(page) : null);
+    if (selectors) {
+      const ok = await trySelectorsAuth(page, selectors, auth, authStartUrl);
+      if (ok) {
+        // "Success" may actually be a "check your email" interstitial.
+        await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
+        logger.info({ url: page.url() }, "Auth complete (selectors)");
+        return { ok: true, llmCalls: allLlmCalls };
+      }
+      // Passwordless forms (email-only) count as "failed" selector auth but may
+      // already have sent the code — try to complete before escalating.
+      if (await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl)) {
+        logger.info({ url: page.url() }, "Auth complete (selectors + email OTP)");
+        return { ok: true, llmCalls: allLlmCalls };
+      }
+      logger.info({ url: authStartUrl }, "Selector auth failed or incomplete — falling back to Navigator (full agent)");
+    }
+
+    // Robust fallback: if a provided login URL is stale/wrong, retry Navigator auth from base URL.
+    const preferredNavigatorStartUrl = auth.loginUrl ? baseAuthUrl : authStartUrl;
+    const navigatorResult = await tryAgentAuthViaRunAgent(
+      page,
+      auth,
+      context,
+      baseUrl,
+      authStartUrl,
+      onLLMCall,
+      preferredNavigatorStartUrl,
+      shouldStop,
+    );
+    allLlmCalls.push(...navigatorResult.llmCalls);
+    if (auth.emailOtp?.address) {
+      const handled = await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
+      if (handled) return { ok: true, llmCalls: allLlmCalls };
+    }
+    if (navigatorResult.ok) return { ok: true, llmCalls: allLlmCalls };
   }
-  return navigatorResult;
+  return { ok: false, llmCalls: allLlmCalls };
+}
+
+/** Clear cookies + web storage so a retried login starts from a clean slate. */
+async function clearBrowserSessionState(page: Page): Promise<void> {
+  await page.context().clearCookies().catch(() => {});
+  await page
+    .evaluate(() => {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        /* cross-origin page — storage is inaccessible, cookies already cleared */
+      }
+    })
+    .catch(() => {});
 }
 
 /**
@@ -1769,6 +1813,18 @@ export async function runAgent(
       };
       stepsDetail.push(authStep);
       steps.push(`[${stepCounter}] auth \u2192 ${auth?.loginUrl} (Login complete)`);
+      onStep?.(authStep);
+    } else if (auth) {
+      // Record the blocker explicitly: reviewers and CI feedback need to know
+      // the run was auth-limited rather than silently testing logged-out.
+      stepCounter++;
+      const authStep: RunStep = {
+        index: stepCounter, action: "auth", target: auth.loginUrl,
+        reasoning: "Configured login could not complete after retry \u2014 coverage limited to pre-auth surfaces",
+        url: page.url(), status: "failed", fromMemory: false, at: stepTimestamp(),
+      };
+      stepsDetail.push(authStep);
+      steps.push(`[${stepCounter}] auth FAILED (login could not complete; testing logged-out surfaces only)`);
       onStep?.(authStep);
     }
 

@@ -345,6 +345,7 @@ export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): 
           runHolisticFlowReview(
             {
               intent: job.intent,
+              context,
               stepsDetail: agentResult.stepsDetail,
               frames: holisticFinalFrames,
               navigatorStatus,
