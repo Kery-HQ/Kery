@@ -1,0 +1,197 @@
+#!/usr/bin/env node
+/**
+ * Local benchmark harness.
+ *
+ * Runs the REAL engine (same runOrchestratedJob the cloud worker calls) against
+ * a locally served app, using an in-memory storage adapter. Scores the result
+ * against a suite file that declares each case's planted bugs and how to detect
+ * them, then writes a JSON result so runs are comparable over time.
+ *
+ *   node harness/run-benchmark.mjs --suite ../../harness-suite.json          # all cases
+ *   node harness/run-benchmark.mjs --suite ... --case quote-builder          # one case
+ *   node harness/run-benchmark.mjs --suite ... --repeat 3                    # variance
+ *
+ * Requires OPENAI_API_KEY. Everything else is local.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createMemoryStorage } from "./memoryStorage.mjs";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const { initEngineConfig, runOrchestratedJob } = await import(path.join(here, "../dist/index.js"));
+
+function arg(name, fallback = null) {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+}
+const flag = (name) => process.argv.includes(`--${name}`);
+
+const suitePath = path.resolve(arg("suite", path.join(here, "../../../harness-suite.json")));
+const suite = JSON.parse(fs.readFileSync(suitePath, "utf8"));
+const only = arg("case");
+const repeat = Number(arg("repeat", "1"));
+const outDir = path.resolve(arg("out", path.join(here, "../../../harness-results")));
+/**
+ * "review" mode is the honest one: it runs the SAME review pass the cloud CI
+ * uses to turn a diff into a test plan, so improvements to that prompt are
+ * measured here. "scripted" mode uses the suite's hand-written intent and acts
+ * as the ceiling — what the agent achieves when the plan is already perfect.
+ */
+const mode = arg("mode", "scripted");
+const PR_REVIEW_PATH = "/Users/kevalshah/Documents/repo/Kery-Cloud/apps/worker/dist/prReview.js";
+fs.mkdirSync(outDir, { recursive: true });
+
+const MODELS = {
+  agentModel: process.env.KERY_AGENT_MODEL || "openai/gpt-5.6-terra",
+  auxiliaryModel: process.env.KERY_AUXILIARY_MODEL || "openai/gpt-5.6-luna",
+  reviewAgentModel: process.env.KERY_REVIEW_MODEL || "openai/gpt-5.6-terra",
+  stagehandModel: process.env.KERY_STAGEHAND_MODEL || "openai/gpt-5.6-luna",
+};
+
+initEngineConfig({
+  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  openrouterApiKey: process.env.OPENROUTER_API_KEY ?? "",
+  anthropicApiKey: "",
+  geminiApiKey: "",
+  ...MODELS,
+  stagehandEnabled: false,
+  runTimeoutMinutes: Number(process.env.KERY_RUN_TIMEOUT_MIN || 12),
+  llmTimeoutMs: 120_000,
+  reviewTimeoutMs: 120_000,
+});
+
+/** A planted bug counts as caught if any of its regexes matches a finding or a contradicted check. */
+function scoreCase(testCase, result) {
+  const haystacks = [
+    ...(result.bugsFound ?? []).map((b) => `${b.reasoning ?? ""} ${b.bugDescription ?? ""}`),
+    ...(result.verifications ?? [])
+      .filter((v) => v.status === "contradicted")
+      .map((v) => `${v.claim} ${v.evidence}`),
+  ].map((s) => s.toLowerCase());
+
+  return testCase.plantedBugs.map((bug) => {
+    const patterns = bug.detect.map((p) => new RegExp(p, "i"));
+    const hit = haystacks.find((h) => patterns.every((re) => re.test(h)));
+    return { id: bug.id, class: bug.class, caught: Boolean(hit), evidence: hit ? hit.slice(0, 220) : null };
+  });
+}
+
+/** Parse a unified diff into the {filename, patch, additions, deletions} shape the review pass expects. */
+function parseDiff(patchText) {
+  const files = [];
+  for (const chunk of patchText.split(/^diff --git /m).slice(1)) {
+    const nameMatch = chunk.match(/^a\/(\S+) b\/(\S+)/);
+    if (!nameMatch) continue;
+    const body = chunk.slice(chunk.indexOf("@@") >= 0 ? chunk.indexOf("@@") : 0);
+    files.push({
+      filename: nameMatch[2],
+      patch: body.slice(0, 12_000),
+      additions: (body.match(/^\+/gm) ?? []).length,
+      deletions: (body.match(/^-/gm) ?? []).length,
+    });
+  }
+  return files;
+}
+
+async function intentForCase(testCase) {
+  if (mode !== "review") return { intent: testCase.intent, context: testCase.context ?? "", plan: null };
+  if (!testCase.diffFile) throw new Error(`case ${testCase.id} has no diffFile for review mode`);
+  const { reviewPullRequest, intentWithPlan } = await import(PR_REVIEW_PATH);
+  const files = parseDiff(fs.readFileSync(testCase.diffFile, "utf8"));
+  const review = await reviewPullRequest(
+    { number: 1, title: testCase.prTitle ?? testCase.id, body: testCase.prBody ?? "", headSha: "local", branch: "bench" },
+    files,
+    { reachability: [], conventions: [] },
+  );
+  return {
+    intent: intentWithPlan(review),
+    context: review.context,
+    plan: review.testPlan,
+    codeFindings: review.codeFindings,
+    skipBrowser: review.skipBrowser,
+  };
+}
+
+async function runCase(testCase, attempt) {
+  const storage = createMemoryStorage();
+  const runId = `${testCase.id}-${attempt}-${Date.now()}`;
+  const started = Date.now();
+  let result;
+  let planned;
+  try {
+    planned = await intentForCase(testCase);
+    result = await runOrchestratedJob(storage, {
+      runId,
+      baseUrl: testCase.baseUrl,
+      intent: planned.intent,
+      context: planned.context ?? "",
+      projectId: `harness-${testCase.id}`,
+      auth: testCase.auth ?? null,
+      saveScreenshots: false,
+      recordVideo: false,
+      maxSteps: testCase.maxSteps ?? 40,
+    });
+  } catch (err) {
+    return {
+      case: testCase.id, attempt, error: String(err).slice(0, 400),
+      durationMs: Date.now() - started, scored: [], checks: 0, contradicted: 0, findings: 0, costUsd: 0,
+    };
+  }
+
+  const costUsd = (result.llmCalls ?? []).reduce((s, c) => s + (c.costUsd ?? 0), 0);
+  const scored = scoreCase(testCase, result);
+  return {
+    case: testCase.id,
+    attempt,
+    durationMs: Date.now() - started,
+    status: result.status,
+    steps: (result.stepsDetail ?? []).length,
+    findings: (result.bugsFound ?? []).length,
+    checks: (result.verifications ?? []).length,
+    contradicted: (result.verifications ?? []).filter((v) => v.status === "contradicted").length,
+    costUsd: Number(costUsd.toFixed(4)),
+    caught: scored.filter((s) => s.caught).length,
+    planted: scored.length,
+    scored,
+    verifications: result.verifications ?? [],
+    findingTexts: (result.bugsFound ?? []).map((b) => (b.reasoning ?? b.bugDescription ?? "").slice(0, 200)),
+    mode,
+    plan: planned?.plan ?? null,
+    codeFindings: planned?.codeFindings ?? null,
+    intentUsed: planned?.intent?.slice(0, 1500) ?? null,
+  };
+}
+
+const cases = suite.cases.filter((c) => (only ? c.id === only : true) && !c.disabled);
+if (cases.length === 0) {
+  console.error(`No cases matched (suite has ${suite.cases.length}).`);
+  process.exit(1);
+}
+
+const results = [];
+for (const testCase of cases) {
+  for (let attempt = 1; attempt <= repeat; attempt++) {
+    process.stdout.write(`▶ ${testCase.id} (attempt ${attempt}/${repeat}) … `);
+    const r = await runCase(testCase, attempt);
+    results.push(r);
+    const label = r.error ? `ERROR ${r.error.slice(0, 80)}` : `${r.caught}/${r.planted} caught · ${r.checks} checks · $${r.costUsd} · ${Math.round(r.durationMs / 1000)}s`;
+    console.log(label);
+    if (!flag("quiet") && r.scored) {
+      for (const s of r.scored) console.log(`    ${s.caught ? "✅" : "❌"} ${s.id} (${s.class})`);
+    }
+  }
+}
+
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+const outFile = path.join(outDir, `${arg("label", "run")}-${stamp}.json`);
+const totals = {
+  caught: results.reduce((s, r) => s + (r.caught ?? 0), 0),
+  planted: results.reduce((s, r) => s + (r.planted ?? 0), 0),
+  costUsd: Number(results.reduce((s, r) => s + (r.costUsd ?? 0), 0).toFixed(4)),
+  errors: results.filter((r) => r.error).length,
+};
+fs.writeFileSync(outFile, JSON.stringify({ label: arg("label", "run"), mode, models: MODELS, totals, results }, null, 2));
+
+console.log(`\n── TOTAL ${totals.caught}/${totals.planted} planted bugs caught · $${totals.costUsd} · ${totals.errors} errors`);
+console.log(`   ${outFile}`);
