@@ -577,6 +577,7 @@ RULES:
 - COVER EVERY CHANGED CONTROL: when the intent or context names specific controls (a toggle, a button, an input), exercise each named control directly at least once — do not substitute an alternative path (e.g. a dropdown) for the named control and count it as covered.
 - NO-EFFECT INTERACTIONS ARE FINDINGS: when clicking a link, button, or submit control produces no navigation and no DOM change, re-verify once, then report_bug — this matters most for primary CTAs (sign-up, checkout, create, save). Do not silently work around a dead control by navigating directly.
 - PLACEHOLDER vs VALUE: greyed example text in an empty input is a placeholder, not user data. Treat a field as prefilled only when the element list shows a non-empty "value".
+- REPLACING EXISTING VALUES: to change a field that already holds a value (a quantity of 1, a discount of 0, a pre-filled date), use "fill" with the COMPLETE new value. Do not type single characters into it — they append to or are rejected by the existing content, and the field silently keeps its old value.
 - QUANTITIES ARE EXACT: after any action that adds, moves, removes, or changes amounts of items, open the destination and record the exact resulting count/quantity/value in your observation — "increased" or "updated" is not evidence; the number is.
 - INPUT PROBES: for every search, filter, or matching input you test, probe beyond the happy case: try a different letter-case variant, a partial term, and any alternate identifier the UI implies it accepts; record what each probe returned.
 - AUTH TROUBLE: if login fails or you find yourself logged out, first try to recover once — use the "login" action, or navigate straight to the target/base URL (many test surfaces are public). Report the login failure with report_bug, then keep testing every surface that IS reachable logged-out. Only call done with result "blocked" when the intent's core surfaces truly require the failed login AND recovery did not help. Never speculate about screens behind a failed login.
@@ -1201,6 +1202,9 @@ async function fillAtCoordinates(page: Page, x: number, y: number, value: string
   const focused = await focusEditableNearPoint(page, px, py);
   if (focused) {
     try {
+      // Select whatever is already there first: number inputs pre-filled with
+      // "0" otherwise end up appended to rather than replaced.
+      await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A").catch(() => {});
       await page.locator(":focus").fill(value, { timeout: 5000 });
       return clickedElement;
     } catch {
