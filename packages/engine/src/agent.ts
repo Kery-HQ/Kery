@@ -1202,9 +1202,9 @@ async function fillAtCoordinates(page: Page, x: number, y: number, value: string
   const focused = await focusEditableNearPoint(page, px, py);
   if (focused) {
     try {
-      // Select whatever is already there first: number inputs pre-filled with
-      // "0" otherwise end up appended to rather than replaced.
-      await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A").catch(() => {});
+      // NOTE: do NOT select-all before filling. Playwright's fill() already
+      // clears the field, and a stray Ctrl+A escapes the input when focus is
+      // not firmly inside it — which sent values into the wrong field entirely.
       await page.locator(":focus").fill(value, { timeout: 5000 });
       return clickedElement;
     } catch {
