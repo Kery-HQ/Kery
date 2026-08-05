@@ -1,0 +1,188 @@
+{
+  "name": "Kery tester benchmark \u2014 complex UI, known planted bugs",
+  "note": "Each case runs the real engine against a locally served app. detect[] are regexes ALL of which must match one finding (or one contradicted verification) for the bug to count as caught. Keep them behaviour-based, not wording-specific.",
+  "cases": [
+    {
+      "id": "purchasify-estimate",
+      "app": "purchasify",
+      "port": 4101,
+      "path": "/estimate?subtotal=42",
+      "baseUrl": "http://localhost:4101/estimate?subtotal=42",
+      "intent": "This page estimates shipping and discounts for a $42.00 cart. Work through these checks in order and record exactly what you observe for each: 1. Read the Subtotal, Shipping and Order total, then confirm the arithmetic: order total must equal subtotal minus any discount plus shipping. 2. Apply the promo code SAVE10 and check the Discount line equals exactly 10% of the SUBTOTAL (not of subtotal plus shipping) \u2014 state both numbers. 3. With SAVE10 still applied, apply an obviously invalid code such as NOTREAL; confirm the invalid-code error appears AND that the previous discount is removed rather than silently kept. 4. Select the Express tier and re-check that the order total updates consistently with the shipping price shown on that row. 5. Compare the FREE badge shown on a shipping row against the Shipping amount used in the totals \u2014 they must agree.",
+      "context": "New shipping estimator with delivery tiers, free-shipping thresholds, promo codes and a totals rollup.",
+      "maxSteps": 34,
+      "plantedBugs": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "note": "discount = (subtotal + tier price) * pct instead of subtotal * pct",
+          "detect": [
+            "discount",
+            "(subtotal|10%|4\\.20|4\\.80|shipping)"
+          ],
+          "symptom": "The discount amount shown is larger than the stated percentage of the subtotal, because shipping was included in the discount base."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "note": "badge uses >= but totals use > for the free threshold",
+          "detect": [
+            "(free|shipping)",
+            "(badge|threshold|inconsist|mismatch|still charg|does not match|disagree)"
+          ],
+          "symptom": "A shipping row shows FREE while the totals still charge for that shipping (or vice versa) at exactly the threshold amount."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "note": "invalid code sets an error but leaves the previous promo applied",
+          "detect": [
+            "(invalid|notreal|error)",
+            "(still|remains|keeps|not removed|persist)"
+          ],
+          "symptom": "After applying an invalid promo code, an error appears but the previously applied discount is still shown/applied."
+        }
+      ],
+      "diffFile": "/tmp/diff-purchasify.patch",
+      "prTitle": "Feature: shipping and discount estimator",
+      "prBody": "Adds a public shipping estimator with delivery tiers, free-shipping thresholds, promo codes and a live totals rollup."
+    },
+    {
+      "id": "notedso-welcome",
+      "app": "noted-so",
+      "port": 4102,
+      "path": "/welcome",
+      "baseUrl": "http://localhost:4102/welcome",
+      "intent": "This is a 3-step onboarding wizard. Work through these checks in order and record exactly what you observe for each: 1. On step 1 press Continue with everything empty and confirm each required field shows an error. 2. Enter an email with NO dot in the domain, for example sam@example (plus a valid workspace name and display name), press Continue, and record whether the wizard accepts it \u2014 a malformed email must be rejected. 3. On step 2 pick a focus area, then set 'Max notes per day' to 25 and press Continue; the field states the allowed range is 1 to 20, so 25 must be rejected \u2014 record what happens. 4. On step 3 add three notes with DISTINCT text (for example 'alpha', 'beta', 'gamma'), then remove the SECOND one and record exactly which note text disappeared and which remain. 5. Finish and confirm the summary's note count matches the number of notes you actually left in the list.",
+      "context": "New public onboarding wizard collecting workspace profile, planning preferences and first notes, with per-step validation.",
+      "maxSteps": 40,
+      "plantedBugs": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "note": "regex dropped the dot requirement so sam@example passes",
+          "detect": [
+            "email",
+            "(accept|no dot|invalid|without a dot|malformed|passes|allowed)"
+          ],
+          "symptom": "An email address with no dot in the domain (e.g. sam@example) is accepted and the wizard advances, instead of showing a validation error."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "note": "range says 1-20 but only the lower bound is enforced",
+          "detect": [
+            "(25|limit|20)",
+            "(accept|allowed|no error|passes|not rejected|exceed)"
+          ],
+          "symptom": "A daily limit above the stated maximum of 20 (e.g. 25) is accepted and the wizard advances, despite the label saying 1-20."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "note": "remove uses slice(0,-1) so the last row goes, not the clicked one",
+          "detect": [
+            "(remove|delete)",
+            "(wrong|last|gamma|instead|different|not the)"
+          ],
+          "symptom": "Clicking remove on a specific note removes a different note (the last one) instead of the one clicked."
+        }
+      ],
+      "diffFile": "/tmp/diff-notedso.patch",
+      "prTitle": "Feature: onboarding wizard",
+      "prBody": "Adds a public three-step onboarding wizard collecting workspace profile, planning preferences and first notes, with per-step validation."
+    },
+    {
+      "id": "chatific-compare",
+      "app": "chatific",
+      "port": 4103,
+      "path": "/compare",
+      "baseUrl": "http://localhost:4103/compare",
+      "intent": "This page compares LLM models with filters, sortable columns and a monthly cost estimate. Work through these checks in order and record exactly what you observe for each: 1. Note the 'Showing N of M models' counter and count the visible table rows \u2014 they must agree. 2. Tick 'Vision only', then re-count the visible rows AND re-read the counter; they must still agree. 3. Click the 'Input $/1M' column header twice and record the first and last row each time \u2014 the second click must reverse the order. 4. Set 'Input M tokens / mo' to 10 and 'Output M tokens / mo' to 0, then verify one row's 'Est. monthly' by hand: it must equal the row's Input $/1M multiplied by 10. State the row, the input rate and the estimate. 5. Confirm the row tagged 'cheapest' really has the lowest Est. monthly of the visible rows.",
+      "context": "New public model comparison table with provider/vision filters, sortable price and context columns, and a usage-based monthly cost estimate.",
+      "maxSteps": 34,
+      "plantedBugs": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "note": "counter only accounts for the provider filter",
+          "detect": [
+            "(showing|counter|count)",
+            "(row|match|filter|vision|disagree|mismatch|still)"
+          ],
+          "symptom": "The 'Showing N of M models' counter does not match the number of table rows actually visible after filtering."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "note": "arrow toggles but numeric comparator never inverts",
+          "detect": [
+            "sort",
+            "(same|unchanged|not revers|does not|no change|still ascending)"
+          ],
+          "symptom": "Clicking a numeric column header a second time flips the arrow but the row order does not actually reverse."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "note": "monthly = outputRate*inM + outputRate*outM",
+          "detect": [
+            "(estimate|monthly|cost)",
+            "(input|rate|multipl|expect|incorrect|does not match|higher)"
+          ],
+          "symptom": "The estimated monthly cost is higher than input-rate x input-tokens, because the output rate is applied to input tokens."
+        }
+      ],
+      "diffFile": "/tmp/diff-chatific.patch",
+      "prTitle": "Feature: model comparison table",
+      "prBody": "Adds a public model comparison table with provider/vision filters, sortable columns and a usage-based monthly cost estimate."
+    },
+    {
+      "id": "purchasify-licences",
+      "app": "purchasify",
+      "port": 4101,
+      "path": "/licences",
+      "baseUrl": "http://localhost:4101/licences",
+      "heldOut": true,
+      "note": "HELD OUT. Never inspect per-bug results while tuning prompts \u2014 this case exists solely to detect overfitting to the other three. Run with --reveal only for final validation.",
+      "intent": "This page lists seat licence plans across multiple pages, lets you set a team size that can be remembered between visits, and lets you request a quote for a selected plan. Work through these checks in order and record exactly what you observe for each: 1. On page 1, note the name of every plan row. Click Next and note every plan row on page 2 \u2014 no plan may appear on both pages. 2. Tick 'Remember my team size', set the team size to 37, then reload the page and record whether the team size is still 37 and whether the checkbox is still ticked. 3. Without selecting any plan, check whether the 'Request quote' button is clickable; it must be disabled until a plan is chosen. If it is clickable, click it and record what the confirmation says. 4. Select a Business plan with a team size below its stated 'Seats from' minimum and record whether the warning appears and whether the button is disabled. 5. Select a plan and confirm 'Estimated monthly' equals that plan's per-seat price multiplied by the seat count \u2014 state all three numbers.",
+      "context": "New public seat licence planner with a paginated plan table, a remembered team size, and a quote request form.",
+      "maxSteps": 36,
+      "plantedBugs": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "note": "page 2 slice starts one row early so the last row of page 1 repeats",
+          "detect": [
+            "(page|pagination)",
+            "(repeat|duplicat|same|both|again)"
+          ],
+          "symptom": "A plan shown as the last row of page 1 appears again as the first row of page 2."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "note": "writes purchasify.licences.seats but reads purchasify.seats",
+          "detect": [
+            "(remember|saved|persist|reload)",
+            "(revert|lost|default|not|10)"
+          ],
+          "symptom": "After ticking remember and reloading, the team size reverts to the default instead of the saved value, and the checkbox is unticked."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "note": "disabled uses meetsMinimum which is true when nothing is selected",
+          "detect": [
+            "(request quote|button)",
+            "(enabled|clickable|no plan|without|not disabled)"
+          ],
+          "symptom": "The Request quote button is clickable with no plan selected and submits a quote with no plan."
+        }
+      ],
+      "diffFile": "/tmp/diff-licences.patch",
+      "prTitle": "Feature: seat licence planner",
+      "prBody": "Adds a public seat licence planner: paginated plan catalogue, team size that can be remembered between visits, and a quote request for the selected plan."
+    }
+  ]
+}
