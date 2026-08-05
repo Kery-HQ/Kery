@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 /** Keys for per-role model + optional custom $/1M token pricing (USD). */
 export const MODEL_CONFIG_KEYS = [
   "agentModel",
@@ -27,13 +28,29 @@ export type EngineConfig = {
 
 let _config: EngineConfig | null = null;
 
+/**
+ * Per-run config overlay. Workers process several runs concurrently in one
+ * process, so a run that wants different models (A/B model experiments,
+ * per-project overrides) cannot mutate the shared singleton. AsyncLocalStorage
+ * scopes the override to one job's async tree instead.
+ */
+const runScope = new AsyncLocalStorage<EngineConfig>();
+
 export function initEngineConfig(cfg: EngineConfig): void {
   _config = cfg;
 }
 
 export function getConfig(): EngineConfig {
+  const scoped = runScope.getStore();
+  if (scoped) return scoped;
   if (!_config) throw new Error("Engine config not initialized — call initEngineConfig() first");
   return _config;
+}
+
+/** Run `fn` with `overrides` merged over the current config, for this async tree only. */
+export function withEngineConfig<T>(overrides: Partial<EngineConfig>, fn: () => Promise<T>): Promise<T> {
+  if (Object.keys(overrides).length === 0) return fn();
+  return runScope.run({ ...getConfig(), ...overrides }, fn);
 }
 
 /** Merge partial overrides into the running config (e.g. from DB settings). */

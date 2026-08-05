@@ -10,7 +10,7 @@ import { chromium, type Page, type BrowserContext } from "playwright";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { getConfig } from "./config.js";
+import { getConfig, withEngineConfig, type EngineConfig, type ModelConfigKey } from "./config.js";
 import { logger, serializeError } from "./logger.js";
 import { runAgent, type RunStep, type LLMCallRecord, type LLMAgentType, type AgentPlanItem, type AgentResult } from "./agent.js";
 import type { AuthConfig } from "./types.js";
@@ -62,6 +62,11 @@ export type RunJob = {
   onLLMCall?: (call: LLMCallRecord) => void;
   /** Optional extra stop check (e.g. Redis-backed signal from API process). Combined with in-process isStopRequested. */
   shouldStop?: () => boolean;
+  /**
+   * Per-run model overrides (model A/B experiments, per-project tuning).
+   * Scoped to this job only — safe under worker concurrency.
+   */
+  modelOverrides?: Partial<Pick<EngineConfig, ModelConfigKey>>;
 };
 
 export type RunResult = {
@@ -81,6 +86,12 @@ export type RunResult = {
 };
 
 export async function runOrchestratedJob(storage: StorageAdapter, job: RunJob): Promise<RunResult> {
+  // Model overrides apply to every LLM call this job makes (navigator,
+  // reviewers, auxiliary) without touching other concurrent runs.
+  return withEngineConfig(job.modelOverrides ?? {}, () => runOrchestratedJobInner(storage, job));
+}
+
+async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Promise<RunResult> {
   const config = getConfig();
   const emitActivity = (text: string) => {
     job.onActivity?.({ kind: "observe", text, at: Date.now() });
