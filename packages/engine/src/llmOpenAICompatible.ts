@@ -37,10 +37,25 @@ export async function openAIStyleChat(
   if (opts.responseFormat) body.response_format = opts.responseFormat;
   if (extra?.bodyExtensions) Object.assign(body, extra.bodyExtensions);
 
-  const completion = await client.chat.completions.create(
-    body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
-    opts.signal ? { signal: opts.signal } : undefined
-  );
+  // Newer model families (gpt-5.6, reasoning models) accept only the default
+  // temperature and 400 on anything else. Retry once without it rather than
+  // maintaining a per-model capability list that rots.
+  let completion;
+  try {
+    completion = await client.chat.completions.create(
+      body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+      opts.signal ? { signal: opts.signal } : undefined
+    );
+  } catch (err) {
+    const message = String((err as Error)?.message ?? err);
+    if (!/temperature/i.test(message) || !("temperature" in body)) throw err;
+    logger.info({ model: wireModel }, "Model rejects custom temperature — retrying with the default");
+    delete body.temperature;
+    completion = await client.chat.completions.create(
+      body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+      opts.signal ? { signal: opts.signal } : undefined
+    );
+  }
 
   const choice = completion.choices?.[0];
   if (!choice) {
