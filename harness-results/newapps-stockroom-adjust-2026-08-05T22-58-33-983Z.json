@@ -1,0 +1,198 @@
+{
+  "label": "newapps-stockroom-adjust",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.4399,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 199430,
+      "status": "passed",
+      "steps": 18,
+      "findings": 4,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.3682,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "The run reports that after shipping 2 from Panel A3 and undoing, stock becomes 3 rather than returning to 7, meaning the undo decremented stock again instead of restoring it."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "The run reports Cable 2m at exactly its reorder point (25) is shown as OK rather than “Low — reorder,” directly surfacing the equality-boundary defect."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "The run reports that attempting to ship all 7 units on hand is rejected with “Only 7 of Panel A3 on hand,” rather than recording the shipment and reducing stock to zero."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Undoing a recorded shipment restores Panel A3 completely to its fresh baseline of 7 on hand and 0 movements, with the shipment removed from the log.",
+          "status": "contradicted",
+          "evidence": "The shipment was recorded as “Shipped 2 × Panel A3” with Panel A3 reduced to 5 and Movements 1 (step 8), but after Undo the log was empty and Movements was 0 while Panel A3 displayed 3 rather than its baseline 7 (step 9)."
+        },
+        {
+          "claim": "Recording a receipt of 7 for Cable 2m increases its on-hand quantity from 18 to 25 and adds a “Received 7 × Cable 2m” movement entry.",
+          "status": "verified",
+          "evidence": "Before recording, Cable 2m showed 18 on hand and the entered receipt quantity was 7 (steps 11-12); the resulting page showed 25 on hand, Movements 1, and “Received 7 × Cable 2m” in the log (step 13)."
+        },
+        {
+          "claim": "When Cable 2m reaches its reorder point of 25, it is displayed as “Low — reorder.”",
+          "status": "contradicted",
+          "evidence": "After the receipt, Cable 2m displayed on hand 25 and reorder at 25, but its status was observed as “OK,” not “Low — reorder” (step 13)."
+        },
+        {
+          "claim": "A shipment equal to all available Panel A3 stock (7 units) can be recorded, reducing Panel A3 to 0 and adding “Shipped 7 × Panel A3” to the log.",
+          "status": "contradicted",
+          "evidence": "With Panel A3 at 7 and Shipped quantity 7 entered (steps 15-17), the final page still showed Panel A3 on hand 7, Movements 0, and validation text “Only 7 of Panel A3 on hand.” rather than recording the boundary shipment (step 18)."
+        }
+      ],
+      "findingTexts": [
+        "Undo last did not restore Panel A3 to its fresh baseline. After recording Shipped 2 and then clicking Undo last, the displayed Panel A3 quantity is 3 (not 7), total units is 531, movements shows 0, an",
+        "Low-stock threshold does not flag Cable 2m as low when on-hand quantity equals its reorder point. After Received 7 × Cable 2m, on-hand is 25 and reorder at is 25, but status is OK and Items low is 0 i",
+        "The app rejects shipping the exact available quantity. On a fresh page, Panel A3 has on hand 7; selecting Shipped and entering 7 then clicking Record shows “Only 7 of Panel A3 on hand.” and does not r",
+        "Inventory table columns visibly reflow between states; On Hand, Reorder At, and Status shift right in frame 3."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Start fresh, select Panel A3, and note its displayed quantity of 7 and movement count of 0.",
+          "action": "Choose Shipped, enter 2, record it, then click Undo last.",
+          "expect": "Panel A3 must return to 7, movements to 0, and its shipment log entry must disappear.",
+          "priority": 3
+        },
+        {
+          "setup": "Start fresh, select Cable 2m, and note its displayed quantity of 18 and reorder point of 25.",
+          "action": "Choose Received, enter quantity 7, and click Record.",
+          "expect": "Cable 2m must show 25 and Low — reorder because its quantity equals its reorder point.",
+          "priority": 2
+        },
+        {
+          "setup": "Start fresh, select Panel A3, and note its displayed on-hand quantity of 7.",
+          "action": "Choose Shipped, enter quantity 7, and click Record.",
+          "expect": "Shipment must be recorded, Panel A3 must show 0, and the log must contain Shipped 7 × Panel A3.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Use a fresh Stockroom page for each check. Exercise both movement directions, boundary quantities, low-stock thresholds, totals, the movement log, and Undo; compare the displayed values precisely.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Start fresh, select Panel A3, and note its displayed quantity of 7 and movement count of 0. Then Choose Shipped, enter 2, record it, then click Undo last. — expect: Panel A3 must return to 7, movements to 0, and its shipment log entry must disappear.\n2. Start fresh, select Cable 2m, and note its displayed quantity of 18 and reorder point of 25. Then Choose Received, enter quantity 7, and click Record. — expect: Cable 2m must show 25 and Low — reorder because its quantity equals its reorder point.\n3. Start fresh, select Panel A3, and note its displayed on-hand quantity of 7. Then Choose Shipped, enter quantity 7, and click Record. — expect: Shipment must be recorded, Panel A3 must show 0, and the log must contain Shipped 7 × Panel A3."
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 2,
+      "durationMs": 58118,
+      "status": "failed",
+      "steps": 2,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.0717,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": false,
+          "why": "The run only found that /stockroom/ returns 404 and did not perform or describe an undo shipment changing stock in the wrong direction."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": false,
+          "why": "The run did not reach the inventory UI or test an item whose stock exactly equals its reorder point."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": false,
+          "why": "The run did not reach shipment controls or attempt to ship exactly the on-hand quantity."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Opening /stockroom/ displays the stockroom inventory adjustment page with item rows, movement controls, totals, and reorder warnings.",
+          "status": "contradicted",
+          "evidence": "Step 1 navigated to http://localhost:4106/stockroom/, and step 2 observed an 'Error response' page with 'Error code: 404; Message: File not found' rather than the stockroom UI."
+        },
+        {
+          "claim": "Recording a Received quantity of 3 for Panel A3 updates its on-hand count to 10, creates one movement, and logs 'Received 3 × Panel A3'.",
+          "status": "not_testable",
+          "evidence": "The required stockroom screen could not be reached because /stockroom/ returned a 404 at steps 1-2, so no item selection or movement recording was possible."
+        },
+        {
+          "claim": "Recording a Shipped quantity of 1 for Panel A3 and undoing it restores the prior on-hand value and OK status.",
+          "status": "not_testable",
+          "evidence": "The required stockroom screen could not be reached because /stockroom/ returned a 404 at steps 1-2, so shipment and undo controls were not exercised."
+        },
+        {
+          "claim": "A shipment of 140 Hex bolt M4 is accepted, reduces its on-hand quantity to 0, increases movement count, and logs 'Shipped 140'.",
+          "status": "not_testable",
+          "evidence": "The required stockroom screen could not be reached because /stockroom/ returned a 404 at steps 1-2, so the Hex bolt shipment was not exercised."
+        },
+        {
+          "claim": "Shipping 2 Panel A3 increases Items low by one and changes Panel A3 to 'Low — reorder'.",
+          "status": "not_testable",
+          "evidence": "The required stockroom screen could not be reached because /stockroom/ returned a 404 at steps 1-2, so neither the initial low-item count nor the reorder warning could be observed."
+        }
+      ],
+      "findingTexts": [
+        "Navigating to http://localhost:4106/stockroom/ consistently returns an Error response page with HTTP 404 and 'File not found', preventing all stockroom movement checks."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reload /stockroom/; select Panel A3, choose Received, and enter quantity 3.",
+          "action": "Record the movement.",
+          "expect": "Panel A3 must show 10, movement count 1, and log Received 3 × Panel A3.",
+          "priority": 4
+        },
+        {
+          "setup": "Reload /stockroom/; note Panel A3 on-hand, select it, choose Shipped, enter 1, and record.",
+          "action": "Click Undo last.",
+          "expect": "Panel A3 must return to noted on-hand and its status must be OK.",
+          "priority": 3
+        },
+        {
+          "setup": "Reload /stockroom/; select Hex bolt M4, choose Shipped, and enter quantity 140.",
+          "action": "Record the movement.",
+          "expect": "Must accept shipment: Hex bolt on hand 0, movement count increased, and log shows Shipped 140.",
+          "priority": 2
+        },
+        {
+          "setup": "Reload /stockroom/ and note Items low. Select Panel A3, choose Shipped, and enter quantity 2.",
+          "action": "Record the movement.",
+          "expect": "Items low must increase by one from noted count; Panel A3 must show Low — reorder.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the stockroom screen and execute the ranked checks, reloading between checks. Use exact boundary values and compare visible rows, totals, status, and movement logs.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reload /stockroom/; select Panel A3, choose Received, and enter quantity 3. Then Record the movement. — expect: Panel A3 must show 10, movement count 1, and log Received 3 × Panel A3.\n2. Reload /stockroom/; note Panel A3 on-hand, select it, choose Shipped, enter 1, and record. Then Click Undo last. — expect: Panel A3 must return to noted on-hand and its status must be OK.\n3. Reload /stockroom/; select Hex bolt M4, choose Shipped, and enter quantity 140. Then Record the movement. — expect: Must accept shipment: Hex bolt on hand 0, movement count increased, and log shows Shipped 140.\n4. Reload /stockroom/ and note Items low. Select Panel A3, choose Shipped, and enter quantity 2. Then Record the movement. — expect: Items low must increase by one from noted count; Panel A3 must show Low — reorder."
+    }
+  ]
+}

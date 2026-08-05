@@ -183,6 +183,141 @@
       "diffFile": "/tmp/diff-licences.patch",
       "prTitle": "Feature: seat licence planner",
       "prBody": "Adds a public seat licence planner: paginated plan catalogue, team size that can be remembered between visits, and a quote request for the selected plan."
+    },
+    {
+      "id": "bookflow-register",
+      "app": "bookflow",
+      "port": 4104,
+      "path": "/",
+      "baseUrl": "http://localhost:4104/",
+      "maxSteps": 48,
+      "intent": "",
+      "context": "New three-step event registration wizard: contact details, attendees with ticket types, then promo codes and totals.",
+      "prTitle": "Feature: event registration wizard",
+      "prBody": "Adds a three-step registration flow: contact details, attendee list with ticket types, promo codes and a totals summary.",
+      "diffFile": "/tmp/diff-bookflow.patch",
+      "plantedBugs": [
+        {
+          "id": "workshop-price-label-vs-charge",
+          "class": "label-vs-value",
+          "note": "option label advertises $260 but TICKET.workshop is 240",
+          "detect": [
+            "(260|240|workshop)",
+            "(mismatch|differ|charge|expect)"
+          ],
+          "symptom": "The Workshop ticket is advertised at $260 in the dropdown but the subtotal charges $240 for it."
+        },
+        {
+          "id": "back-discards-attendees",
+          "class": "navigation-data-loss",
+          "note": "stepping back from step 2 to step 1 clears state.attendees",
+          "detect": [
+            "(back|previous)",
+            "(lost|cleared|empty|gone|disappear)"
+          ],
+          "symptom": "Going back from the attendees step to contact details and returning shows an empty attendee list; the entered attendees are lost."
+        },
+        {
+          "id": "seats-input-has-no-effect",
+          "class": "dead-control",
+          "note": "seats is validated but never used in pricing or confirmation",
+          "detect": [
+            "(seat|seats)",
+            "(no effect|ignored|nothing|unused|does not)"
+          ],
+          "symptom": "The 'Seats reserved' field is required and validated but changing it never affects the totals or the confirmation message."
+        }
+      ]
+    },
+    {
+      "id": "gridworks-queue",
+      "app": "gridworks",
+      "port": 4105,
+      "path": "/",
+      "baseUrl": "http://localhost:4105/",
+      "maxSteps": 44,
+      "intent": "",
+      "context": "New support ticket queue with priority and text filters, an open-only toggle, row selection and a bulk close action.",
+      "prTitle": "Feature: support queue with bulk actions",
+      "prBody": "Adds a filterable support ticket queue with row selection and a bulk close action.",
+      "diffFile": "/tmp/diff-gridworks.patch",
+      "plantedBugs": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "note": "header checkbox selects every ticket, not just visible ones",
+          "detect": [
+            "(select all|selected)",
+            "(filter|hidden|visible|all 8|more than)"
+          ],
+          "symptom": "With a filter applied showing 3 rows, ticking the header select-all reports 8 selected \u2014 it selects rows that are filtered out."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "note": "closeSelected never clears state.selected",
+          "detect": [
+            "(selection|selected)",
+            "(still|persist|remain|not clear|after)"
+          ],
+          "symptom": "After closing the selected tickets the selection count stays the same instead of resetting to zero."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "note": "toast reports selected count including already-closed tickets",
+          "detect": [
+            "(closed|toast|message)",
+            "(count|overstat|already|wrong number)"
+          ],
+          "symptom": "The confirmation says it closed N tickets counting ones that were already closed, so the number exceeds what actually changed."
+        }
+      ]
+    },
+    {
+      "id": "stockroom-adjust",
+      "app": "stockroom",
+      "port": 4106,
+      "path": "/",
+      "baseUrl": "http://localhost:4106/",
+      "maxSteps": 44,
+      "intent": "",
+      "context": "New inventory movement screen: record received and shipped quantities, undo the last movement, with low-stock flagging against a reorder point.",
+      "prTitle": "Feature: inventory movements with undo",
+      "prBody": "Adds an inventory adjustment screen recording received and shipped stock, an undo for the last movement, and low-stock flagging against each item's reorder point.",
+      "diffFile": "/tmp/diff-stockroom.patch",
+      "plantedBugs": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "note": "undo always subtracts, so undoing a shipment decrements twice",
+          "detect": [
+            "(undo)",
+            "(wrong|subtract|decrease|not restor|double|lower)"
+          ],
+          "symptom": "Undoing a shipment lowers the stock again instead of restoring it; the quantity ends further from the original than before the undo."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "note": "isLow uses < though the page says 'at or below'",
+          "detect": [
+            "(reorder|low)",
+            "(equal|exactly|at the|60|not flagged|OK)"
+          ],
+          "symptom": "An item whose stock exactly equals its reorder point shows OK, though the page states items at or below the reorder point are flagged low."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "note": "guard uses >= so shipping the full on-hand amount is refused",
+          "detect": [
+            "(ship|out|quantity)",
+            "(refus|reject|error|cannot|blocked)"
+          ],
+          "symptom": "Shipping exactly the quantity on hand is refused with a message saying that many are on hand."
+        }
+      ]
     }
   ]
 }

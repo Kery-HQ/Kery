@@ -1,0 +1,105 @@
+{
+  "label": "newapps-stockroom-rerun",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.2446,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 154311,
+      "status": "passed",
+      "steps": 11,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.2446,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "Findings 1 and 4 describe undoing a shipment failing to restore stock, with BLT-04 remaining below its original quantity after undo."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "Finding 3 explicitly reports an item exactly at its reorder point (60 of 60) shown as OK instead of low."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "Findings 2 and 5 report that shipping exactly all 7 units on hand is rejected, leaving stock and movement history unchanged and showing the on-hand warning."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Recording a shipment of 1 for BLT-04 reduces its on-hand quantity from 140 to 139 and creates one shipped movement.",
+          "status": "verified",
+          "evidence": "After the Record attempt, the observation at step 3 states that shipping 1 × Hex bolt M4 changed BLT-04 from 140 to 139, total units to 534, Movements to 1, and added “Shipped 1 × Hex bolt M4” to the log."
+        },
+        {
+          "claim": "Clicking Undo last after shipping 1 BLT-04 restores BLT-04 to 140, returns Movements to 0, and removes the movement-log entry.",
+          "status": "contradicted",
+          "evidence": "Undo last was clicked at step 3, but the recorded observation still shows BLT-04 at 139, Movements at 1, and the shipped log entry present rather than the required restored/empty state."
+        },
+        {
+          "claim": "Shipping Panel A3 by exactly its 7 on-hand units leaves it at 0, creates one movement, and adds a shipped log entry.",
+          "status": "contradicted",
+          "evidence": "With Panel A3 selected, Shipped selected, and quantity visibly 7, Record was clicked at step 9 with domChanged=NO; the observation still reports Panel A3 at 7 on hand, Movements 0, and an empty log."
+        },
+        {
+          "claim": "Washer 11mm, with on-hand equal to its reorder point (60), is marked Low — reorder and the Items low total is 2.",
+          "status": "not_testable",
+          "evidence": "The page was reloaded at step 10, but the trace contains no subsequent observation of Washer 11mm’s status or the Items low total."
+        }
+      ],
+      "findingTexts": [
+        "Undo last removed the movement and cleared the log, but did not restore the shipped stock: BLT-04 is 138 on hand after undo (rather than its required 140).",
+        "Shipment equal to the available stock is rejected: recording Shipped quantity 7 for Panel A3 (7 on hand) leaves Panel A3 at 7, Movements at 0, and the log empty, while showing “Only 7 of Panel A3 on h",
+        "Washer 11mm at the reorder boundary is not flagged low: its on-hand quantity is 60 and reorder point is 60, but its status is “OK” and Items low is 1 rather than the expected 2."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reload the page, select BLT-04, choose Shipped, enter quantity 1, record it, and note its resulting quantity.",
+          "action": "Click Undo last and inspect BLT-04, Movements, and the movement log.",
+          "expect": "BLT-04 must return to 140, Movements must be 0, and the log must show no movements.",
+          "priority": 3
+        },
+        {
+          "setup": "Select Panel A3, whose on-hand quantity is 7, choose Shipped, and enter quantity 7.",
+          "action": "Record the shipment and inspect Panel A3, totals, and the movement log.",
+          "expect": "Panel A3 must show 0 on hand, one movement, and a shipped log entry.",
+          "priority": 2
+        },
+        {
+          "setup": "Load the page and inspect Washer 11mm, whose on-hand quantity and reorder point are both 60; note the Items low total.",
+          "action": "Read the Washer 11mm status and the Items low total.",
+          "expect": "Washer 11mm must be marked Low — reorder, and Items low must equal two.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the stockroom controls using boundary values that distinguish the stated rules from their implementations, especially equality at reorder and shipping limits, then verify shipped undo restoration.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reload the page, select BLT-04, choose Shipped, enter quantity 1, record it, and note its resulting quantity. Then Click Undo last and inspect BLT-04, Movements, and the movement log. — expect: BLT-04 must return to 140, Movements must be 0, and the log must show no movements.\n2. Select Panel A3, whose on-hand quantity is 7, choose Shipped, and enter quantity 7. Then Record the shipment and inspect Panel A3, totals, and the movement log. — expect: Panel A3 must show 0 on hand, one movement, and a shipped log entry.\n3. Load the page and inspect Washer 11mm, whose on-hand quantity and reorder point are both 60; note the Items low total. Then Read the Washer 11mm status and the Items low total. — expect: Washer 11mm must be marked Low — reorder, and Items low must equal two."
+    }
+  ]
+}
