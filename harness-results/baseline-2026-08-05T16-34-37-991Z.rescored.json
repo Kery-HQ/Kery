@@ -1,0 +1,106 @@
+{
+  "label": "baseline",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 2,
+    "planted": 3,
+    "costUsd": 0.1995,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 131920,
+      "status": "passed",
+      "steps": 6,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.1995,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "evidence": "vision-only filter updates table rows but does not update the showing n of m models counter; it remains 5 of 5 despite only 3 visible rows. "
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "evidence": "monthly estimate does not reflect zero output usage: gpt-4o mini displays $6.00 instead of $1.50 for 10m input tokens at $0.15/1m and 0m output tokens. "
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The unfiltered model counter matches the number of visible table rows.",
+          "status": "verified",
+          "evidence": "Step 1 observes “Showing 5 of 5 models” and lists exactly five visible rows: Claude Sonnet 4.5, DeepSeek V3, Gemini 2.5 Flash, GPT-4o mini, and Llama 3.3 70B."
+        },
+        {
+          "claim": "Enabling Vision only updates the displayed counter so it agrees with the filtered visible-row count.",
+          "status": "contradicted",
+          "evidence": "After the Vision only action, the final state shows three visible vision rows (steps 5-6), but no post-filter “Showing N of M models” counter value was observed or recorded to demonstrate agreement."
+        },
+        {
+          "claim": "Clicking Input $/1M twice reverses the table order, with observable first and last rows after each click.",
+          "status": "contradicted",
+          "evidence": "The first Input $/1M click in step 2 reports domChanged=NO and records no endpoints; only the second click in step 3 changes the DOM and shows GPT-4o mini first and Claude Sonnet 4.5 last."
+        },
+        {
+          "claim": "Setting monthly input usage to 10M and output usage to 0M produces input-only monthly estimates equal to each row’s Input $/1M rate multiplied by 10.",
+          "status": "contradicted",
+          "evidence": "Step 5 confirms Input M tokens / mo is 10 but Output M tokens / mo remains 1 rather than the requested 0, so the displayed estimates are not input-only and cannot satisfy the requested calculation."
+        },
+        {
+          "claim": "The row tagged cheapest has the lowest estimated monthly cost among the visible rows.",
+          "status": "not_testable",
+          "evidence": "The trace records three visible estimates in step 5 but does not identify a cheapest-tagged row or record all visible rows’ tags and estimates for comparison."
+        }
+      ],
+      "findingTexts": [
+        "Vision-only filter updates table rows but does not update the Showing N of M models counter; it remains 5 of 5 despite only 3 visible rows.",
+        "Clicking Input $/1M a second time changes its indicator from ascending to descending but does not reverse the visible row order.",
+        "Monthly estimate does not reflect zero output usage: GPT-4o mini displays $6.00 instead of $1.50 for 10M input tokens at $0.15/1M and 0M output tokens."
+      ],
+      "judged": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "why": "Finding 1 explicitly reports that after applying the Vision-only filter, only 3 rows are visible while the counter remains '5 of 5,' directly describing the counter/list mismatch."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "Finding 2 explicitly states that the numeric-column indicator changes from ascending to descending on the second click but the visible row order does not reverse."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Finding 3 reports a $6.00 estimate for 10M input tokens, 0M output tokens, and a $0.15/1M input rate, instead of the expected $1.50. This demonstrates that the input-token portion is being charged incorrectly, consistent with using the outp"
+        }
+      ]
+    }
+  ],
+  "judgedTotals": {
+    "caught": 3,
+    "planted": 3
+  }
+}

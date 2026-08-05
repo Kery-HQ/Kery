@@ -1,0 +1,234 @@
+{
+  "label": "review-v1",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 4,
+    "planted": 9,
+    "costUsd": 0.9282,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-estimate",
+      "attempt": 1,
+      "durationMs": 178482,
+      "status": "failed",
+      "steps": 14,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.3225,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "evidence": "save10 “10% off” discounts $5.70 from a $51 subtotal; it should be $5.10, making the total $45.90. "
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "evidence": "at subtotal $50.00, standard is displayed as free and the notice says “add $0.00 more for free standard shipping,” but the totals rollup still charges shipping (standard) $5.99 and shows an order total of $55.99 instead "
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting each delivery tier updates the rollup to the selected tier's shipping charge and a total consistent with the $42.00 subtotal.",
+          "status": "verified",
+          "evidence": "Steps 1-4 observe Express at $12.99 with $54.99 total, Overnight at $24.99 with $66.99 total, and Standard at $5.99 with $47.99 total; each total reconciles to $42.00 plus its displayed shipping charge."
+        },
+        {
+          "claim": "Standard shipping becomes free when the subtotal is above its free-shipping threshold.",
+          "status": "verified",
+          "evidence": "After navigating to subtotal $51, step 6 observes Standard displayed as FREE, Shipping (Standard) as FREE, and an order total of $51.00."
+        },
+        {
+          "claim": "The standard free-shipping boundary is correct at and below the threshold.",
+          "status": "not_testable",
+          "evidence": "The run navigated to $50 in step 4 and $49 in step 12, but recorded no resulting shipping/total observation for either boundary value."
+        },
+        {
+          "claim": "Applying SAVE10 gives an accurate 10% discount and recomputed order total.",
+          "status": "contradicted",
+          "evidence": "Steps 6-8 establish a $51.00 subtotal with free shipping, but after SAVE10 is applied the displayed discount is −$5.70 and total is $45.30; 10% of $51.00 is $5.10, which should produce a $45.90 total."
+        },
+        {
+          "claim": "Promo codes are accepted case-insensitively.",
+          "status": "verified",
+          "evidence": "After entering and submitting lowercase save10 in steps 8-10, the observation says it was accepted/normalized and retains the “SAVE10 applied — 10% off” confirmation and discount."
+        },
+        {
+          "claim": "Submitting an invalid promo code gives clear feedback and leaves the promotion state unambiguous.",
+          "status": "contradicted",
+          "evidence": "After NOTVALID was submitted, step 12 observes both conflicting status messages while the prior SAVE10 discount and $45.30 total remain displayed."
+        }
+      ],
+      "findingTexts": [
+        "At subtotal $50.00, Standard is displayed as FREE and the notice says “Add $0.00 more for free standard shipping,” but the totals rollup still charges Shipping (Standard) $5.99 and shows an Order tota",
+        "Submitting an invalid promo after a valid promo leaves both contradictory validation messages visible (invalid code error and prior SAVE10 applied confirmation), while retaining the old discount. This",
+        "SAVE10 “10% off” discounts $5.70 from a $51 subtotal; it should be $5.10, making the total $45.90.",
+        "At /estimate?subtotal=50, the rollup remains $42/$47.99 and says add $8 instead of estimating the requested $50."
+      ],
+      "mode": "review",
+      "plan": [],
+      "codeFindings": [],
+      "intentUsed": "Test the changes from the pull request \"Feature: shipping and discount estimator\". Changed files: src/app/estimate/page.tsx, src/components/ShippingCalculator.tsx. Exercise the affected pages and interactions and report any visual, functional, or UX issues."
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 201606,
+      "status": "passed",
+      "steps": 23,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.4319,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The onboarding wizard validates required workspace profile fields and email format before allowing Step 1 to continue.",
+          "status": "verified",
+          "evidence": "Steps 1-7 show empty submission remaining on Step 1 with required errors, an invalid email showing “Enter a valid email address,” cleared errors after valid values, and advancement to Step 2 only after the complete profile."
+        },
+        {
+          "claim": "Planning preferences require at least one focus area, support multiple focus areas, and retain configured selections and values when navigating back.",
+          "status": "verified",
+          "evidence": "Steps 8-15 show Step 2 blocking continuation with “Pick at least one focus area,” Work and Personal becoming selected with “2 selected,” Sunday/18:00/max-notes 7 being set, and those planning values restored after returning through Step 1."
+        },
+        {
+          "claim": "First notes require at least one non-empty note; the ready count accurately reflects non-empty notes and updates after adding and removing notes.",
+          "status": "verified",
+          "evidence": "Steps 16-21 show empty submission blocked with “Add at least one note to get started,” the count changing from 0 to 1 after one note, to 2 after a second non-empty note, and back to 1 after removing note 2."
+        },
+        {
+          "claim": "Creating a valid workspace completes onboarding with the entered workspace and retained note count.",
+          "status": "verified",
+          "evidence": "Step 22 shows the completion page after Create workspace with “You're all set” and “Acme Planning is ready with 1 note,” which reconciles with Step 21’s remaining single non-empty note."
+        },
+        {
+          "claim": "The completion CTA opens the user's board successfully.",
+          "status": "contradicted",
+          "evidence": "Step 22 clicked “Open my board,” and Step 23 observed the destination at localhost:4102 showing “Application error: a client-side exception has occurred.”"
+        }
+      ],
+      "findingTexts": [
+        "The onboarding completion CTA \"Open my board\" navigates to http://localhost:4102/ but the destination crashes, showing only \"Application error: a client-side exception has occurred while loading local"
+      ],
+      "mode": "review",
+      "plan": [],
+      "codeFindings": [],
+      "intentUsed": "Test the changes from the pull request \"Feature: onboarding wizard\". Changed files: src/app/welcome/page.tsx. Exercise the affected pages and interactions and report any visual, functional, or UX issues."
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 139609,
+      "status": "failed",
+      "steps": 9,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.1738,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "evidence": "with vision only checked and provider set to all, the table visibly contains 3 vision-capable rows (claude sonnet 4.5, gemini 2.5 flash, gpt-4o mini), but the summary incorrectly says “showing 5 of 5 models.” "
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "evidence": "monthly cost estimate is incorrect for claude sonnet 4.5 at the displayed default usage: 2m input × $3.00/1m plus 1m output × $15.00/1m should be $21.00, but the table displays $45.00. "
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting a provider limits the comparison table to that provider's models.",
+          "status": "verified",
+          "evidence": "After selecting Anthropic, the observation reports one visible model, Claude Sonnet 4.5 (step 2); Meta shows only Llama 3.3 70B (step 5), and DeepSeek shows only DeepSeek V3 (step 7)."
+        },
+        {
+          "claim": "The Vision only filter can restrict a selected provider to vision-capable models.",
+          "status": "verified",
+          "evidence": "With Anthropic selected and Vision only checked, the table shows Claude Sonnet 4.5 as the sole result and explicitly marks it \"Vision Yes\" (step 3)."
+        },
+        {
+          "claim": "The filtered-result summary accurately reports the number of currently visible models.",
+          "status": "contradicted",
+          "evidence": "With Provider set to All and Vision only checked, the observation lists three visible rows but says the summary reads \"Showing 5\" (step 4), so the displayed count does not reconcile with the visible filtered results."
+        },
+        {
+          "claim": "Clicking Vision only reliably toggles the filter state and updates the result set.",
+          "status": "contradicted",
+          "evidence": "On the DeepSeek provider, clicking Vision only left it unchecked with the same DeepSeek V3 row still visible (step 7), and the repeated click was recorded as an action with no page state change (step 8)."
+        },
+        {
+          "claim": "Users can sort the comparison table by its columns.",
+          "status": "not_testable",
+          "evidence": "No column header or sort control was clicked during the run; the run exited while testing filters (step 9)."
+        },
+        {
+          "claim": "The table displays a monthly cost estimate for each compared model.",
+          "status": "verified",
+          "evidence": "The DeepSeek-filtered table displayed DeepSeek V3 with a \"$0.84 estimate\" (step 7)."
+        }
+      ],
+      "findingTexts": [
+        "Monthly cost estimate is incorrect for Claude Sonnet 4.5 at the displayed default usage: 2M input × $3.00/1M plus 1M output × $15.00/1M should be $21.00, but the table displays $45.00.",
+        "With Vision only checked and Provider set to All, the table visibly contains 3 vision-capable rows (Claude Sonnet 4.5, Gemini 2.5 Flash, GPT-4o mini), but the summary incorrectly says “Showing 5 of 5 ",
+        "Intended context sorting is unavailable: “Context (K)” is a static header, unlike the sortable Model and Input price buttons."
+      ],
+      "mode": "review",
+      "plan": [],
+      "codeFindings": [],
+      "intentUsed": "Test the changes from the pull request \"Feature: model comparison table\". Changed files: src/app/compare/page.tsx. Exercise the affected pages and interactions and report any visual, functional, or UX issues."
+    }
+  ]
+}

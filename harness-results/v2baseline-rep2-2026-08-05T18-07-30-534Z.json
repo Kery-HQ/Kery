@@ -1,0 +1,632 @@
+{
+  "label": "v2baseline-rep2",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 6,
+    "planted": 18,
+    "costUsd": 2.3077,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-estimate",
+      "attempt": 1,
+      "durationMs": 167994,
+      "status": "passed",
+      "steps": 15,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.3618,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "evidence": "halfoff is labeled 50% off on a $42.00 subtotal, but the visible discount is −$24.00 and total is $23.99 with $5.99 standard shipping. a 50% subtotal discount would be $21.00 and produce $26.99, so the discount appears t"
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "evidence": "at the exact $150.00 express free-shipping threshold, express is selected and its tier card says free, but the totals show shipping (express) $12.99 and order total $162.99 instead of $0.00 shipping and $150.00 total. "
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Applying an unknown promo code shows a visible rejection and leaves the $42.00 Standard-shipping totals unchanged.",
+          "status": "verified",
+          "evidence": "After INVALID was applied, step 3 observed the red error “That promo code isn't valid.” with subtotal $42.00, Standard shipping $5.99, and total $47.99 unchanged."
+        },
+        {
+          "claim": "Applying HALFOFF gives a correct 50% discount and updates the total live.",
+          "status": "contradicted",
+          "evidence": "Step 5 shows HALFOFF labeled “50% off,” but its displayed discount is −$24.00 on a $42.00 subtotal; a 50% discount should be −$21.00, although the displayed $23.99 total reconciles to the incorrect −$24.00 discount."
+        },
+        {
+          "claim": "At /estimate?subtotal=42, SAVE10 applies as 10% off with a $4.20 discount and a $43.79 Standard-shipping total.",
+          "status": "contradicted",
+          "evidence": "Step 8 shows SAVE10 labeled 10% off but displays discount −$4.80 and total $43.19; 10% of the observed $42.00 subtotal is $4.20, which would produce $43.79 with $5.99 shipping."
+        },
+        {
+          "claim": "At a $42.00 subtotal, selecting Express and Overnight updates the selected delivery estimate, shipping price, and total live.",
+          "status": "verified",
+          "evidence": "Step 10 observed Express selected with “2-3 business days,” $12.99 shipping, and total $54.99; step 11 observed Overnight selected with “Next business day,” $24.99 shipping, and total $66.99, both reconciling to the $42.00 subtotal plus shipping."
+        },
+        {
+          "claim": "Express is free at the exact $150.00 threshold and Standard is free at the exact $50.00 threshold, with totals equal to their subtotals before promo.",
+          "status": "contradicted",
+          "evidence": "Step 13 observed the $150 Express card labeled FREE but totals still showed $12.99 shipping and $162.99 total; step 14 similarly observed the $50 Standard card marked FREE but totals showed $5.99 shipping and a $55.99 total."
+        },
+        {
+          "claim": "Opening /estimate without a query string shows the public default $42.00 cart with Standard selected, $5.99 shipping, and a consistent total.",
+          "status": "not_testable",
+          "evidence": "Step 14 navigated to /estimate, but its recorded observation still describes the preceding $50.00 state; no observation records the resulting no-query default page, authentication state, or totals."
+        }
+      ],
+      "findingTexts": [
+        "HALFOFF is labeled 50% off on a $42.00 subtotal, but the visible discount is −$24.00 and total is $23.99 with $5.99 Standard shipping. A 50% subtotal discount would be $21.00 and produce $26.99, so th",
+        "At the exact $150.00 Express free-shipping threshold, Express is selected and its tier card says FREE, but the totals show Shipping (Express) $12.99 and Order total $162.99 instead of $0.00 shipping a",
+        "At the $50 Standard threshold, Standard is marked FREE but totals charge $5.99 and show $55.99 instead of $50.00."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "action": "Replace the promo input with an unknown code such as INVALID and apply it, then try HALFOFF.",
+          "expect": "INVALID is rejected with a visible error and does not change the totals. HALFOFF is accepted as 50% off and updates the visible discount and total without requiring a page reload.",
+          "priority": 6
+        },
+        {
+          "action": "On /estimate?subtotal=42, enter SAVE10 in the promo field and apply it.",
+          "expect": "The valid promo is accepted and visibly labeled as 10% off; the discount is $4.20 on the $42.00 subtotal, and with Standard shipping the total is $43.79 ($42.00 + $5.99 - $4.20).",
+          "priority": 5
+        },
+        {
+          "action": "Navigate to /estimate?subtotal=42, select Express and then Overnight.",
+          "expect": "The selected tier, delivery estimate, shipping charge, and total update live: Express shows 2-3 business days and $12.99 shipping, while Overnight shows Next business day and $24.99 shipping. The total changes by the corresponding shipping difference.",
+          "priority": 4
+        },
+        {
+          "action": "Navigate to /estimate?subtotal=150, select Express, and inspect the totals.",
+          "expect": "The cart is shown as $150.00 and Express shipping is free at the exact $150.00 threshold; the shipping line is $0.00 and the total equals $150.00 before any promo.",
+          "priority": 3
+        },
+        {
+          "action": "Navigate to /estimate?subtotal=50, keep Standard selected, and inspect the totals.",
+          "expect": "The cart is shown as $50.00 and Standard shipping is free at the exact $50.00 threshold; the shipping line is $0.00 and the total equals $50.00 before any promo.",
+          "priority": 2
+        },
+        {
+          "action": "Navigate to /estimate with no query string.",
+          "expect": "The page loads without authentication, identifies the cart as $42.00, shows Standard selected, and displays the standard shipping charge of $5.99 with a consistent subtotal-plus-shipping total.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public shipping estimator, verify the default and query-string subtotal behavior, exercise each delivery tier at its free-shipping boundaries, and apply valid and invalid promo codes while checking that the live discount, shipping, and total roll up correctly.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Replace the promo input with an unknown code such as INVALID and apply it, then try HALFOFF. — expect: INVALID is rejected with a visible error and does not change the totals. HALFOFF is accepted as 50% off and updates the visible discount and total without requiring a page reload.\n2. On /estimate?subtotal=42, enter SAVE10 in the promo field and apply it. — expect: The valid promo is accepted and visibly labeled as 10% off; the discount is $4.20 on the $42.00 subtotal, and with Standard shipping the total is $43.79 ($42.00 + $5.99 - $4.20).\n3. Navigate to /estimate?subtotal=42, select Express and then Overnight. — expect: The selected tier, delivery estimate, shipping charge, and total update live: Express shows 2-3 business days and $12.99 shipping, while Overnight shows Next business day and $24.99 shipping. The total changes by the corresponding shipping difference.\n4. Navigate to /estimate?subtotal=150, select Express, and inspect the totals. — expect: The cart is shown as $150.00 and Express shipping is free at the exact $150.00 threshold; the shipping line is $0.00 and the total equals $150.00 before any promo.\n5. Navig"
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 2,
+      "durationMs": 102481,
+      "status": "failed",
+      "steps": 10,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.1911,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "evidence": "save10 incorrectly discounts shipping: at a $42.00 subtotal with $5.99 standard shipping, the ui shows discount −$4.80 and total $43.19. the specified behavior is a 10% subtotal-only discount of −$4.20 and total $43.79. "
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Applying an unsupported promo code shows a visible invalid-code error and leaves the $42.00 Standard estimate undiscounted at $47.99.",
+          "status": "verified",
+          "evidence": "After BADCODE was applied, step 3 recorded “That promo code isn't valid.” with subtotal $42.00, shipping $5.99, no discount, and total $47.99."
+        },
+        {
+          "claim": "Nonpositive or nonnumeric subtotal query values fall back to the complete $42.00 Standard estimate rather than showing malformed or negative values.",
+          "status": "verified",
+          "evidence": "Steps 4, 5, and 6 respectively observed the subtotal=0, subtotal=-5, and subtotal=abc pages showing a $42.00 subtotal, $5.99 shipping, no discount, and $47.99 total; $42.00 + $5.99 reconciles to $47.99."
+        },
+        {
+          "claim": "At a $42.00 Standard estimate, SAVE10 applies a $4.20 discount and updates the total to $43.79 without reloading.",
+          "status": "contradicted",
+          "evidence": "SAVE10 was entered and Apply was clicked in steps 7-8, but the trace recorded no resulting $4.20 discount or $43.79 total before the run failed."
+        },
+        {
+          "claim": "At a $42.00 Standard estimate, HALFOFF replaces the prior promo with a $21.00 discount and a $26.99 total.",
+          "status": "not_testable",
+          "evidence": "The run failed immediately after the SAVE10 attempt; HALFOFF was never entered or applied."
+        },
+        {
+          "claim": "Selecting Standard, Express, and Overnight shows the correct tier-specific shipping charges, and Standard/Express become free at their $50.00/$150.00 thresholds.",
+          "status": "not_testable",
+          "evidence": "No delivery-tier selection was recorded, and the $49.99, $50.00, $149.99, and $150.00 estimate URLs were never visited."
+        },
+        {
+          "claim": "Opening /estimate without a query string is publicly accessible and defaults to a $42.00 Standard estimate with $5.99 shipping, no discount, and a $47.99 total.",
+          "status": "not_testable",
+          "evidence": "The trace only navigated to query-string estimate URLs; /estimate without a query string was not visited."
+        }
+      ],
+      "findingTexts": [
+        "SAVE10 incorrectly discounts shipping: at a $42.00 subtotal with $5.99 Standard shipping, the UI shows discount −$4.80 and total $43.19. The specified behavior is a 10% subtotal-only discount of −$4.2"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "action": "Enter an unsupported code such as BADCODE and apply it, then navigate to /estimate?subtotal=0, /estimate?subtotal=-5, and /estimate?subtotal=abc.",
+          "expect": "The unsupported promo shows a visible invalid-code error and does not reduce the total. Each nonpositive or nonnumeric subtotal falls back to the displayed $42.00 estimate rather than producing a malformed or negative total.",
+          "priority": 6
+        },
+        {
+          "action": "At a $42.00 subtotal with Standard selected, enter SAVE10 and apply it, then replace it with HALFOFF and apply that. Check the discount and total after each application.",
+          "expect": "SAVE10 applies a 10% subtotal discount of $4.20 and produces a $43.79 total including $5.99 shipping; HALFOFF applies a 50% discount of $21.00 and produces a $26.99 total. The rollup updates without a page reload.",
+          "priority": 5
+        },
+        {
+          "action": "Navigate to /estimate?subtotal=42, select Overnight, then select Standard and Express in turn.",
+          "expect": "Overnight remains $24.99 even at this subtotal, Standard is $5.99, and Express is $12.99; each selection immediately updates the displayed delivery details and total.",
+          "priority": 4
+        },
+        {
+          "action": "Navigate to /estimate?subtotal=149.99, select Express, then navigate to /estimate?subtotal=150 and select Express again.",
+          "expect": "Express costs $12.99 below $150.00 and becomes free at exactly $150.00; the displayed totals reflect those shipping changes.",
+          "priority": 3
+        },
+        {
+          "action": "Navigate to /estimate?subtotal=49.99, then to /estimate?subtotal=50. Select Standard if needed and compare the shipping and total values at both subtotals.",
+          "expect": "At $49.99 Standard shipping costs $5.99 and the total is $55.98; at exactly $50.00 Standard shipping becomes free and the total is $50.00.",
+          "priority": 2
+        },
+        {
+          "action": "Navigate to /estimate without a query string. Record the displayed estimated subtotal, selected delivery tier, shipping charge, discount, and total.",
+          "expect": "The page loads without authentication, displays a $42.00 subtotal, selects Standard, charges $5.99 shipping, shows no discount, and displays a $47.99 total.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public shipping estimator, verify the default and query-string subtotal behavior, exercise every delivery tier at and below its free-shipping threshold, and apply both valid and invalid promo codes while checking that the live discount, shipping, and total values update correctly.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter an unsupported code such as BADCODE and apply it, then navigate to /estimate?subtotal=0, /estimate?subtotal=-5, and /estimate?subtotal=abc. — expect: The unsupported promo shows a visible invalid-code error and does not reduce the total. Each nonpositive or nonnumeric subtotal falls back to the displayed $42.00 estimate rather than producing a malformed or negative total.\n2. At a $42.00 subtotal with Standard selected, enter SAVE10 and apply it, then replace it with HALFOFF and apply that. Check the discount and total after each application. — expect: SAVE10 applies a 10% subtotal discount of $4.20 and produces a $43.79 total including $5.99 shipping; HALFOFF applies a 50% discount of $21.00 and produces a $26.99 total. The rollup updates without a page reload.\n3. Navigate to /estimate?subtotal=42, select Overnight, then select Standard and Express in turn. — expect: Overnight remains $24.99 even at this subtotal, Standard is $5.99, and Express is $12.99; each selection immediately updates the displayed delivery details and total.\n4. Navigate to /estimate?subtotal=149.99, select Express, then naviga"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 216302,
+      "status": "passed",
+      "steps": 27,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.4792,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting an empty profile keeps the user on step 1 and shows required-field feedback, while an invalid email shows an email-specific error and a corrected valid profile advances with entered workspa",
+          "status": "verified",
+          "evidence": "After the initial Continue, step 1 displayed required messages for workspace name, email, and display name (step 2); submitting not-an-email kept step 1 with “Enter a valid email address” (step 6), and alex@example.com advanced to step 2 with Atlas Planning and Alex retained (steps 7-8)."
+        },
+        {
+          "claim": "Step 2 rejects missing focus areas and a non-positive daily limit, then advances after correction while retaining changed week-start, reminder, limit, and focus selections when revisited.",
+          "status": "verified",
+          "evidence": "Step 2 remained displayed with “Pick at least one focus area” (step 9) and, after setting the limit to 0, also showed “Daily limit must be between 1 and 20” (step 14); after setting 5 and selecting Work, it advanced to step 3 (steps 17-19), and revisiting showed Work, Sunday, 18:00, and 5 still sele"
+        },
+        {
+          "claim": "Step 3 handles an empty initial note without crashing, and submitting two distinct notes completes onboarding with the configured workspace, focus area, and accurate two-note count.",
+          "status": "verified",
+          "evidence": "Empty submission stayed on step 3 with “Add at least one note to get started” and 0 notes (step 22); the two entered notes were visibly distinct and the UI showed “2 notes ready” before submission (step 25), while completion reported “Atlas Planning is ready with 2 notes” and “Focus areas: Work” (st"
+        },
+        {
+          "claim": "Using the completion UI’s Open my board action takes the user to a usable destination that reflects the configured workspace and initial note data rather than an empty or unrelated result.",
+          "status": "contradicted",
+          "evidence": "Although the completion UI provided Open my board (step 26), after clicking it the final destination was http://localhost:4102/ with only a visible client-side application error, so no configured workspace or notes were displayed (step 27)."
+        }
+      ],
+      "findingTexts": [
+        "The onboarding completion UI’s “Open my board” action navigates to the root board route, which crashes with a client-side application error instead of displaying the configured Atlas Planning workspac"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "action": "After successful completion, inspect the confirmation or destination UI and use any provided link or action to continue to the workspace/board.",
+          "expect": "The user can proceed from onboarding, and the destination reflects the configured workspace and initial onboarding data rather than showing an empty or unrelated result.",
+          "priority": 6
+        },
+        {
+          "action": "On step 3, leave the initial note empty and try to finish, then enter a first note, add another note, enter different text in the second note, and finish the wizard.",
+          "expect": "An empty note is handled according to the step validation without a crash; after entering notes, submission succeeds and the completion UI reports the entered workspace and the correct number of notes, including the non-first note.",
+          "priority": 5
+        },
+        {
+          "action": "On step 2, change the week-start and reminder-time controls from their defaults before continuing, then navigate back to step 2 if possible.",
+          "expect": "The selected week start and reminder time are visibly applied and remain selected when revisiting the step; changing controls does not unexpectedly reset other preference values.",
+          "priority": 4
+        },
+        {
+          "action": "On step 2, try to continue with no focus area selected and with the daily limit set to 0 or another invalid/non-positive value, then correct the limit to 5, select a focus area, and continue.",
+          "expect": "Invalid planning preferences keep the wizard on step 2 with visible errors; after correction, the wizard advances to step 3 and the selected focus and limit are retained.",
+          "priority": 3
+        },
+        {
+          "action": "On step 1, enter a workspace name and display name but type an obviously invalid email such as \"not-an-email\", then continue; afterward replace it with a valid address such as \"alex@example.com\" and continue.",
+          "expect": "The invalid email prevents progression and shows an email-specific error; the valid profile advances to step 2 while retaining the entered values.",
+          "priority": 2
+        },
+        {
+          "action": "Open /welcome and immediately try to continue or submit step 1 with workspace name, email, and display name all empty.",
+          "expect": "The wizard remains on step 1 and visibly shows validation feedback for the required profile fields rather than advancing.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public onboarding wizard at /welcome and exercise each step's validation, navigation, data entry, and final submission. Use both invalid and valid inputs, including multiple notes, and verify the resulting UI reflects the submitted workspace and note data.\n\nWork through these checks in order, and record what you actually observe for each:\n1. After successful completion, inspect the confirmation or destination UI and use any provided link or action to continue to the workspace/board. — expect: The user can proceed from onboarding, and the destination reflects the configured workspace and initial onboarding data rather than showing an empty or unrelated result.\n2. On step 3, leave the initial note empty and try to finish, then enter a first note, add another note, enter different text in the second note, and finish the wizard. — expect: An empty note is handled according to the step validation without a crash; after entering notes, submission succeeds and the completion UI reports the entered workspace and the correct number of notes, including the non-first note.\n3. On step 2, change the week-start and reminder-time controls from their defaults before continuing, then navigate back to step 2 if possible. — expect: The selected week start and reminder time are visibly applied and remain selected when revisiting the step; changing controls does not unexpectedly reset other preference values.\n4. On step 2, try to continue with no focus area selected and with the daily li"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 290127,
+      "status": "failed",
+      "steps": 40,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.6505,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Removing the first empty note row preserves the text entered in a later note row, and the remaining-note count stays accurate.",
+          "status": "contradicted",
+          "evidence": "After the second row showed \"Keep this second note\" and \"1 note ready\" (step 10), removing note 1 left the sole remaining input empty with \"0 notes ready\" (step 11), so the non-first note's content was lost."
+        },
+        {
+          "claim": "Profile details and changed planning preferences remain intact after navigating back from step 2 to step 1 and forward again.",
+          "status": "verified",
+          "evidence": "After returning, step 1 retained \"Notes Row Test\", \"notes@example.com\", and \"Nora\" (step 16), and revisiting step 2 retained Work, Sunday, 18:00, and daily limit 3 (step 17)."
+        },
+        {
+          "claim": "Submitting step 3 with no non-empty notes is blocked with validation feedback, while one entered note completes setup with a count of 1.",
+          "status": "verified",
+          "evidence": "The empty submission left the wizard on step 3 with \"Add at least one note to get started\" (step 19); after the visible single note \"Validated first note\" and count 1 (step 20), the completion view showed \"Notes Row Test\", \"1 note\", and Work (step 21)."
+        },
+        {
+          "claim": "A daily limit of 0 blocks step-2 continuation with a daily-limit error.",
+          "status": "verified",
+          "evidence": "After attempting to continue with value 0, the wizard remained on step 2 and displayed \"Daily limit must be between 1 and 20\" (step 28)."
+        },
+        {
+          "claim": "After replacing an invalid daily limit with 3 and selecting a focus area, continuing advances to step 3.",
+          "status": "contradicted",
+          "evidence": "The corrected value 3 and Work selection were visible (steps 29-30), but the recorded observation for the Continue attempt still says step 2 is visible and does not observe navigation to step 3 before the run navigates away (step 30-31)."
+        },
+        {
+          "claim": "Step 1 blocks continuation for missing required profile values and for a malformed email address.",
+          "status": "verified",
+          "evidence": "The empty-profile attempt produced missing-field messages without leaving step 1 (step 33), and the malformed-email attempt remained on step 1 with \"Enter a valid email address\" and \"Display name is required\" (step 36)."
+        }
+      ],
+      "findingTexts": [
+        "On step 3, after adding a second note row, entering \"Keep this second note\" in it, and removing the first empty row, the sole remaining note textbox is empty and the count changes from \"1 note ready\" "
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "action": "On step 3, add multiple note rows if the wizard provides an add-note control, fill a non-first note, and remove the first note row before submitting.",
+          "expect": "The non-first note remains correctly associated with its row after the first row is removed, and the final note count and displayed completion state reflect the remaining non-empty notes.",
+          "priority": 6
+        },
+        {
+          "action": "Enter valid values on step 1, advance to step 2, change the week start, reminder, focus selection, and daily limit, then go back to step 1 and forward again.",
+          "expect": "Previously entered profile and preference values remain intact, and the changed preferences are reflected when returning to step 2.",
+          "priority": 5
+        },
+        {
+          "action": "Complete steps 1 and 2, reach step 3, leave the notes empty and try to submit; then enter one non-empty note and submit.",
+          "expect": "Submission with no note is blocked with validation feedback. After entering a note, submission succeeds and the completion state reports a note count of 1.",
+          "priority": 4
+        },
+        {
+          "action": "Complete step 1 with valid values, advance to step 2, enter the smallest clearly invalid daily-limit value such as 0, and try to continue.",
+          "expect": "Step 2 does not advance and shows a daily-limit validation error. Replace it with a positive valid value such as 3 and verify that the wizard advances.",
+          "priority": 3
+        },
+        {
+          "action": "On step 1, leave the required profile fields empty and try to continue; then enter an invalid email format and try again.",
+          "expect": "The wizard remains on step 1 and displays validation feedback for missing required values and for the malformed email rather than advancing.",
+          "priority": 2
+        },
+        {
+          "action": "Navigate to /welcome. Fill in a workspace name, valid email, and display name, continue to step 2, select Work and Study as focus areas, choose a week start and reminder time, enter a daily limit of 3, continue to step 3, enter two non-empty notes, and submit.",
+          "expect": "The wizard advances through all three steps without validation errors and shows a completed state containing the entered workspace name, both selected focus areas, and a note count of 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the /welcome onboarding wizard end to end: verify valid completion, validation blocking, preference and note handling, and preservation of entered state while navigating between steps.\n\nWork through these checks in order, and record what you actually observe for each:\n1. On step 3, add multiple note rows if the wizard provides an add-note control, fill a non-first note, and remove the first note row before submitting. — expect: The non-first note remains correctly associated with its row after the first row is removed, and the final note count and displayed completion state reflect the remaining non-empty notes.\n2. Enter valid values on step 1, advance to step 2, change the week start, reminder, focus selection, and daily limit, then go back to step 1 and forward again. — expect: Previously entered profile and preference values remain intact, and the changed preferences are reflected when returning to step 2.\n3. Complete steps 1 and 2, reach step 3, leave the notes empty and try to submit; then enter one non-empty note and submit. — expect: Submission with no note is blocked with validation feedback. After entering a note, submission succeeds and the completion state reports a note count of 1.\n4. Complete step 1 with valid values, advance to step 2, enter the smallest clearly invalid daily-limit value such as 0, and try to continue. — expect: Step 2 does not advance and shows a daily-limit validation error. Replace it with a positive valid value such as 3 and verify that"
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 225210,
+      "status": "passed",
+      "steps": 16,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.3575,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": false,
+          "evidence": null
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": false,
+          "evidence": null
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting the OpenAI provider shows only GPT-4o mini, and clearing the provider filter restores all models.",
+          "status": "verified",
+          "evidence": "Step 15 observes Provider=OpenAI with 1 of 5 models, GPT-4o mini only; step 16 observes filters cleared and 5 of 5 models present."
+        },
+        {
+          "claim": "Setting both monthly input and output usage to zero produces a $0.00 monthly estimate.",
+          "status": "verified",
+          "evidence": "After both fields were set to 0, step 5 observes the filtered GPT-4o mini row displaying an estimated monthly cost of $0.00."
+        },
+        {
+          "claim": "Non-round input and output token usage is scaled correctly and combines both pricing components.",
+          "status": "contradicted",
+          "evidence": "Step 7 observes $0.12 for 0.123456M input and 0.078901M output on GPT-4o mini, but the recorded prices yield (0.123456×$0.15)+(0.078901×$0.60)=$0.06585, which rounds to $0.07 rather than $0.12."
+        },
+        {
+          "claim": "At 1,000,000 monthly input tokens and 1,000,000 monthly output tokens, each model displays the specified combined monthly estimate.",
+          "status": "not_testable",
+          "evidence": "Steps 9-10 establish that both inputs reached 1M and all rows were visible, but no full-price estimates for the required models were recorded, and the trace does not record the underlying input/output prices for all models to reconcile them."
+        },
+        {
+          "claim": "Context-window sorting correctly switches to descending order, beginning with Gemini 2.5 Flash at 1000K, and can be toggled back to ascending order.",
+          "status": "contradicted",
+          "evidence": "Step 11 observes ascending order beginning with DeepSeek V3 at 64K; after the subsequent action, step 12 observes a descending-arrow indicator but reports that the visible order remains headed by DeepSeek V3 rather than Gemini 2.5 Flash."
+        },
+        {
+          "claim": "Enabling the vision-only filter removes non-vision models, and disabling it restores them.",
+          "status": "contradicted",
+          "evidence": "The vision-only action was performed in step 12, but the observation reports the visible ordering still begins with DeepSeek V3, a non-vision model; the expected reduced vision-only result was not observed."
+        }
+      ],
+      "findingTexts": [
+        "Monthly estimator uses output $/1M for both token types: 1M+1M shows $30 for Claude, not intended $18.",
+        "Context sort toggles to ↓ but remains ascending (64K first); intended descending should start with 1000K Gemini.",
+        "Vision-only filtering does not reduce rows: after enabling it, DeepSeek and Llama remain despite being marked No."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "action": "Apply the OpenAI provider filter and sort by a pricing column, then enter zero in both usage fields and clear or replace the values with a small non-round amount such as 123,456 input and 78,901 output tokens.",
+          "expect": "Filtering and sorting continue to operate on the reduced row set, zero usage produces a zero estimate, and the non-round usage produces a correctly scaled estimate rather than treating the entries as millions of tokens or ignoring one of the token types.",
+          "priority": 6
+        },
+        {
+          "action": "In the monthly usage estimator, enter 1,000,000 monthly input tokens and 1,000,000 monthly output tokens.",
+          "expect": "The calculated monthly estimates match input plus output pricing for each model: Claude Sonnet 4.5 is $18.00, GPT-4o mini and Gemini 2.5 Flash are $0.75, Llama 3.3 70B is $0.63, and DeepSeek V3 is $0.42, subject to the page's displayed currency and rounding.",
+          "priority": 5
+        },
+        {
+          "action": "Sort the table by context window in descending order, then toggle the sort direction.",
+          "expect": "Descending order starts with Gemini 2.5 Flash at 1000K, followed by Claude Sonnet 4.5 at 200K; ascending order starts with DeepSeek V3 at 64K. The visible rows and values change consistently without disappearing.",
+          "priority": 4
+        },
+        {
+          "action": "Enable the vision-only filter.",
+          "expect": "Only models marked as vision-capable remain visible; GPT-4o mini, Gemini 2.5 Flash, and Claude Sonnet 4.5 are present, while Llama 3.3 70B is absent. Disable the filter and confirm non-vision models return.",
+          "priority": 3
+        },
+        {
+          "action": "Use the provider filter to select OpenAI.",
+          "expect": "Only GPT-4o mini remains visible, and rows from Anthropic, Google, Meta, and DeepSeek are hidden. Clear the filter and confirm all models return.",
+          "priority": 2
+        },
+        {
+          "action": "Navigate to /compare without signing in and inspect the table and controls.",
+          "expect": "The page loads publicly and displays the listed models, including Claude Sonnet 4.5, GPT-4o mini, Gemini 2.5 Flash, Llama 3.3 70B, and DeepSeek V3, with provider, pricing, context-window, and vision information.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public comparison page and verify the model rows, provider and vision filters, sorting controls, and monthly usage-cost estimator using values that make incorrect filtering, ordering, or arithmetic obvious.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Apply the OpenAI provider filter and sort by a pricing column, then enter zero in both usage fields and clear or replace the values with a small non-round amount such as 123,456 input and 78,901 output tokens. — expect: Filtering and sorting continue to operate on the reduced row set, zero usage produces a zero estimate, and the non-round usage produces a correctly scaled estimate rather than treating the entries as millions of tokens or ignoring one of the token types.\n2. In the monthly usage estimator, enter 1,000,000 monthly input tokens and 1,000,000 monthly output tokens. — expect: The calculated monthly estimates match input plus output pricing for each model: Claude Sonnet 4.5 is $18.00, GPT-4o mini and Gemini 2.5 Flash are $0.75, Llama 3.3 70B is $0.63, and DeepSeek V3 is $0.42, subject to the page's displayed currency and rounding.\n3. Sort the table by context window in descending order, then toggle the sort direction. — expect: Descending order starts with Gemini 2.5 Flash at 1000K, followed by Claude Sonnet 4.5 at 200K; ascending order starts with DeepSeek V3 at 64K. The visible rows and values change consistently without disappearing.\n4. Enable the vision-only filter"
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 2,
+      "durationMs": 175142,
+      "status": "passed",
+      "steps": 11,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.2676,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "evidence": "the vision filter can show only vision-capable models and only non-vision models. step 8 observed the checked view correctly showing the three vision models, but after it was unchecked, step 9 observed all 5 models rathe"
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "evidence": "price sorting changes direction consistently according to displayed input/output prices. step 4 showed correct ascending input-price order (deepseek, gpt-4o mini/gemini, llama, claude), but after the direction was change"
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "evidence": "monthly estimate ignores displayed input pricing: with input m tokens/mo = 1 and output m tokens/mo = 1, claude sonnet 4.5 displays $30.00 instead of $18.00 ($3.00 + $15.00), and gpt-4o mini displays $1.20 instead of $0."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Entering 1M input and 1M output tokens calculates estimates from both prices, showing $18.00 for Claude Sonnet 4.5 and $0.75 for GPT-4o mini.",
+          "status": "contradicted",
+          "evidence": "After both fields visibly contained 1, step 2 observed estimates of $30.00 for Claude Sonnet 4.5 and $1.20 for GPT-4o mini, not the expected combined-price totals."
+        },
+        {
+          "claim": "Price sorting changes direction consistently according to displayed input/output prices.",
+          "status": "contradicted",
+          "evidence": "Step 4 showed correct ascending input-price order (DeepSeek, GPT-4o mini/Gemini, Llama, Claude), but after the direction was changed, step 5 observed the input-price control showing ↓ while the table remained in the same ascending order."
+        },
+        {
+          "claim": "Context-window sorting orders models by their displayed context sizes in both ascending and descending directions.",
+          "status": "not_testable",
+          "evidence": "Step 6 verified ascending context order as DeepSeek 64K, the 128K models, Claude 200K, then Gemini 1000K, but no observed descending context-order result was recorded before the run moved to filtering."
+        },
+        {
+          "claim": "The vision filter can show only vision-capable models and only non-vision models.",
+          "status": "contradicted",
+          "evidence": "Step 8 observed the checked view correctly showing the three vision models, but after it was unchecked, step 9 observed all 5 models rather than a non-vision-only view containing just Llama 3.3 70B and DeepSeek V3."
+        },
+        {
+          "claim": "Selecting OpenAI in the provider filter leaves only GPT-4o mini visible, and resetting the filter restores the complete model list.",
+          "status": "verified",
+          "evidence": "Step 10 observed Provider OpenAI with 1 of 5 models, GPT-4o mini only, and step 11 observed Provider All with all five named model rows restored."
+        },
+        {
+          "claim": "The comparison table exposes the expected five model rows and interactive comparison controls.",
+          "status": "verified",
+          "evidence": "Step 2 observed all five models in the table, and steps 4, 6, 8, and 10 observed functioning price/context sorting, vision filtering, and provider filtering controls."
+        }
+      ],
+      "findingTexts": [
+        "Monthly estimate ignores displayed input pricing: with Input M tokens/mo = 1 and Output M tokens/mo = 1, Claude Sonnet 4.5 displays $30.00 instead of $18.00 ($3.00 + $15.00), and GPT-4o mini displays ",
+        "Input-price sort direction indicator changes to ↓, but the visible order remains ascending: DeepSeek V3 ($0.14), GPT-4o mini/Gemini 2.5 Flash ($0.15), Llama 3.3 70B ($0.23), Claude Sonnet 4.5 ($3.00),",
+        "Intended non-vision filter is absent: unchecking Vision only restores all 5 models rather than only two non-vision rows."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "action": "Enter 1000000 input tokens and 1000000 output tokens in the monthly usage estimator, and inspect the displayed estimate for Claude Sonnet 4.5 and a lower-priced model such as GPT-4o mini.",
+          "expect": "The estimate uses both input and output prices: Claude Sonnet 4.5 shows $18.00 for one million input plus one million output tokens, while GPT-4o mini shows $0.75. Changing either token input changes the estimate accordingly.",
+          "priority": 6
+        },
+        {
+          "action": "Use the price-related sort control and verify that the rows are ordered according to their displayed input/output pricing, including DeepSeek V3 (0.14/0.28), GPT-4o mini and Gemini 2.5 Flash (0.15/0.6), Llama 3.3 70B (0.23/0.4), and Claude Sonnet 4.5 (3/15).",
+          "expect": "Changing the sort direction changes the visible order consistently with the selected price metric, rather than sorting alphabetically or only by model name.",
+          "priority": 5
+        },
+        {
+          "action": "Click the context-window sort control and verify the ordering at both sort directions, using the visibly different values: Gemini 2.5 Flash at 1000K, Claude Sonnet 4.5 at 200K, GPT-4o mini and Llama 3.3 70B at 128K, and DeepSeek V3 at 64K.",
+          "expect": "Ascending order places DeepSeek V3 before the 128K models, then Claude Sonnet 4.5, then Gemini 2.5 Flash; descending order reverses that ordering, with ties handled consistently.",
+          "priority": 4
+        },
+        {
+          "action": "Set the vision filter to show models with vision capability, then set it to show models without vision capability.",
+          "expect": "The vision-enabled view contains Claude Sonnet 4.5, GPT-4o mini, and Gemini 2.5 Flash and excludes Llama 3.3 70B and DeepSeek V3; the non-vision view contains the latter two and excludes the vision-enabled models.",
+          "priority": 3
+        },
+        {
+          "action": "Use the provider filter to select OpenAI, then inspect the visible table rows.",
+          "expect": "Only GPT-4o mini remains visible; rows from Anthropic, Google, Meta, and DeepSeek are hidden. Resetting the provider filter restores the full list.",
+          "priority": 2
+        },
+        {
+          "action": "Navigate to /compare and inspect the comparison table and its controls.",
+          "expect": "The page loads without an error, shows the model rows including Claude Sonnet 4.5, GPT-4o mini, Gemini 2.5 Flash, Llama 3.3 70B, and DeepSeek V3, and exposes provider, vision, sorting, and usage-estimate controls.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public comparison page and verify that the model table, provider and vision filters, sorting controls, and monthly usage-cost estimator all produce the correct visible rows, ordering, and calculations.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter 1000000 input tokens and 1000000 output tokens in the monthly usage estimator, and inspect the displayed estimate for Claude Sonnet 4.5 and a lower-priced model such as GPT-4o mini. — expect: The estimate uses both input and output prices: Claude Sonnet 4.5 shows $18.00 for one million input plus one million output tokens, while GPT-4o mini shows $0.75. Changing either token input changes the estimate accordingly.\n2. Use the price-related sort control and verify that the rows are ordered according to their displayed input/output pricing, including DeepSeek V3 (0.14/0.28), GPT-4o mini and Gemini 2.5 Flash (0.15/0.6), Llama 3.3 70B (0.23/0.4), and Claude Sonnet 4.5 (3/15). — expect: Changing the sort direction changes the visible order consistently with the selected price metric, rather than sorting alphabetically or only by model name.\n3. Click the context-window sort control and verify the ordering at both sort directions, using the visibly different values: Gemini 2.5 Flash at 1000K, Claude Sonnet 4.5 at 200K, GPT-4o mini and Llama 3.3 70B at 128K, and DeepSeek V3 at 64K. — expect: Ascending order places DeepSeek V3 before the 128K models, then Claude Sonnet 4.5, then Gemini 2"
+    }
+  ]
+}
