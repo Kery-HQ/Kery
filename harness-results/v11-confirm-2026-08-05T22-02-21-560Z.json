@@ -1,0 +1,760 @@
+{
+  "label": "v11-confirm",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 12,
+    "planted": 18,
+    "heldOut": {
+      "caught": 6,
+      "planted": 6
+    },
+    "costUsd": 3.2697,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-estimate",
+      "attempt": 1,
+      "durationMs": 125589,
+      "status": "passed",
+      "steps": 8,
+      "findings": 3,
+      "checks": 3,
+      "contradicted": 3,
+      "costUsd": 0.2092,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 1 and 4 explicitly state that the SAVE10 discount is calculated from subtotal plus shipping ($66.99 × 10% = $6.70) rather than 10% of the $42.00 subtotal ($4.20)."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 2, 3, 5, and 6 describe the exact threshold inconsistency: shipping is advertised/shown as FREE at the $150 Express and $50 Standard thresholds, while the totals summary still charges shipping."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "why": "No finding describes applying an invalid promo code after a valid one and observing that the prior discount remains applied."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "For a $42.00 subtotal with Overnight selected, applying SAVE10 gives a $4.20 discount, retains $24.99 shipping, and produces a $62.79 total.",
+          "status": "contradicted",
+          "evidence": "Steps 2-4 show Overnight shipping is $24.99, but after Apply the page displays discount −$6.70 and order total $60.29; the discount is not the expected 10% of the $42.00 subtotal and the total does not match $42.00 − $4.20 + $24.99 = $62.79."
+        },
+        {
+          "claim": "At the stated $150.00 Express free-shipping threshold, selecting Express makes both the Express card and the Shipping (Express) summary line show FREE.",
+          "status": "contradicted",
+          "evidence": "Step 5 observes the Express card as FREE at $150.00, but step 6 observes that after Express was selected the summary displays Shipping (Express) $12.9, so the selected shipping charge disagrees with the stated free tier."
+        },
+        {
+          "claim": "At the stated $50.00 Standard free-shipping threshold, selecting Standard makes both the Standard card and the Shipping (Standard) summary line show FREE.",
+          "status": "contradicted",
+          "evidence": "Step 8's fresh snapshot shows the selected Standard card marked FREE at subtotal $50.00, while Shipping (Standard) is $5.99 and the order total is $55.99 rather than a free-shipping $50.00 total."
+        }
+      ],
+      "findingTexts": [
+        "SAVE10 discount is calculated from subtotal plus shipping ($66.99 × 10% = $6.70) instead of 10% of the $42.00 subtotal ($4.20), producing an incorrect total.",
+        "At the stated $150 free-express threshold, selecting Express charges $12.99 even though the Express tier card says FREE and the threshold message says $0.00 more is needed.",
+        "At the stated $50 free-standard threshold, Standard is advertised as FREE but the summary charges $5.99, so the total is $55.99 rather than $50.00."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the subtotal.",
+          "action": "Select Overnight, enter SAVE10, and click Apply.",
+          "expect": "Discount must be $4.20, shipping $24.99, and total $62.79.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 and note the Express tier card and Shipping (Express) line.",
+          "action": "Select the Express delivery option.",
+          "expect": "Express must say FREE and Shipping (Express) must say FREE at the stated $150 threshold.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 and note the Standard tier card and Shipping (Standard) line.",
+          "action": "Select the Standard delivery option.",
+          "expect": "Standard must say FREE and Shipping (Standard) must say FREE at the stated $50 threshold.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public estimator with the specified subtotals, exercise each delivery option and the promo form, and compare displayed shipping, discount, and total values.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42.00 and note the subtotal. Then Select Overnight, enter SAVE10, and click Apply. — expect: Discount must be $4.20, shipping $24.99, and total $62.79.\n2. Open /estimate?subtotal=150.00 and note the Express tier card and Shipping (Express) line. Then Select the Express delivery option. — expect: Express must say FREE and Shipping (Express) must say FREE at the stated $150 threshold.\n3. Open /estimate?subtotal=50.00 and note the Standard tier card and Shipping (Standard) line. Then Select the Standard delivery option. — expect: Standard must say FREE and Shipping (Standard) must say FREE at the stated $50 threshold."
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 2,
+      "durationMs": 131797,
+      "status": "passed",
+      "steps": 10,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.241,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": false,
+          "why": "Although a $6.70 SAVE10 discount is shown at a $42.00 subtotal with Overnight shipping, none of the findings identifies that this exceeds 10% of the subtotal or attributes the amount to shipping being included in the discount base."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports exact-threshold mismatches where a shipping tier badge says FREE but the selected shipping total still charges ($12.99 for Express at $150.00 and $5.99 for Standard at $50.00). This is the planted threshold inconsistency."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": true,
+          "why": "The run reports that after applying BADCODE, the invalid-code error appears while the previous SAVE10 applied message, discount line, and order total remain. This directly describes the prior promo remaining applied after an invalid code."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Applying SAVE10 to a $42.00 subtotal with Overnight shipping shows the applied confirmation and a correct 10% discount.",
+          "status": "verified",
+          "evidence": "Step 4 observes “SAVE10 applied — 10% off” and Discount (SAVE10) −$6.70; this reconciles to 10% of the recorded $42.00 subtotal plus $24.99 Overnight shipping ($66.99 × 10% = $6.699, rounded to $6.70)."
+        },
+        {
+          "claim": "Replacing an applied SAVE10 promo with BADCODE shows an invalid-code error and clears the prior applied promo message and discount.",
+          "status": "contradicted",
+          "evidence": "After the BADCODE Apply click in step 5, the observation still shows the prior SAVE10 applied message and Discount (SAVE10) −$6.70 line, with no invalid-code error observed."
+        },
+        {
+          "claim": "At the $150.00 threshold, selecting Express shows FREE both on the Express tier badge and on the Shipping (Express) totals line.",
+          "status": "contradicted",
+          "evidence": "Step 7 records the Express badge as FREE, but after the Express selection action the recorded totals still show Shipping (Standard) FREE rather than an observed Shipping (Express) FREE line."
+        },
+        {
+          "claim": "At the $50.00 threshold, selecting Standard shows FREE both on the Standard tier badge and on the Shipping (Standard) totals line.",
+          "status": "contradicted",
+          "evidence": "The final snapshot in step 10 shows Standard selected with a FREE tier badge but Shipping (Standard) $5.99 and Order total $55.99, so the selected totals contradict the displayed FREE badge."
+        }
+      ],
+      "findingTexts": [
+        "After applying BADCODE at subtotal $42.00 with Overnight selected, the invalid-code error appears but the prior “SAVE10 applied — 10% off” message and Discount (SAVE10) −$6.70 line remain visible; the",
+        "At subtotal $150.00, Express shows FREE on its tier badge, but after selecting Express the totals line reads Shipping (Express) $12.99 and Order total $162.99 rather than FREE/$150.00.",
+        "Intended browser-rendered threshold estimate should make $50 Standard free; totals still charge $5.99."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42.00, select Overnight, apply SAVE10, and note the applied message and discount line.",
+          "action": "Replace SAVE10 with BADCODE and apply the new code.",
+          "expect": "An invalid-code error must appear and the prior applied promo and discount must no longer be shown.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 and inspect the Express tier and totals.",
+          "action": "Select Express shipping and compare its tier badge with the Shipping (Express) totals line.",
+          "expect": "Both Express displays must show FREE at the stated $150.00 threshold.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 and inspect the Standard tier and totals.",
+          "action": "Select Standard shipping and compare its tier badge with the Shipping (Standard) totals line.",
+          "expect": "Both Standard displays must show FREE at the stated $50.00 threshold.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the threshold disagreements first, then exercise the tier selectors and promo input so stale or inconsistent totals are visible.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42.00, select Overnight, apply SAVE10, and note the applied message and discount line. Then Replace SAVE10 with BADCODE and apply the new code. — expect: An invalid-code error must appear and the prior applied promo and discount must no longer be shown.\n2. Open /estimate?subtotal=150.00 and inspect the Express tier and totals. Then Select Express shipping and compare its tier badge with the Shipping (Express) totals line. — expect: Both Express displays must show FREE at the stated $150.00 threshold.\n3. Open /estimate?subtotal=50.00 and inspect the Standard tier and totals. Then Select Standard shipping and compare its tier badge with the Shipping (Standard) totals line. — expect: Both Standard displays must show FREE at the stated $50.00 threshold."
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 309759,
+      "status": "passed",
+      "steps": 37,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 2,
+      "costUsd": 0.6654,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that entering 21 despite the stated 1–20 range allows Continue to advance to Step 3 without a validation error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove note 2 retains Note two and removes the last note, Note three, matching the incorrect last-row removal behavior."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Creating the workspace after entering Alpha with nonblank notes Launch plan and Review metrics shows a completion summary that preserves the workspace name and both notes.",
+          "status": "verified",
+          "evidence": "After Create workspace was clicked (step 10), the observed completion page states “You're all set” and “Alpha is ready with 2 notes” (step 11), reconciling with the two entered notes."
+        },
+        {
+          "claim": "After returning from step 3 and removing non-last note 2, Note one and Note three remain while Note two is removed.",
+          "status": "contradicted",
+          "evidence": "Remove note 2 was clicked (step 25), but the subsequent observed step-3 snapshot shows two inputs, “Note one” and “Note two,” with no “Note three” (step 26), demonstrating loss of the third note and retention of the removed note."
+        },
+        {
+          "claim": "With Work selected, Sunday and 21:00 chosen, entering 21 for Max notes per day is visibly rejected with an error and keeps the wizard on step 2 because the allowed range is 1–20.",
+          "status": "contradicted",
+          "evidence": "After the max-notes value visibly changed to 21, clicking Continue produced no DOM change and no validation error while step 2 remained visible (step 36); the final observation then shows step 3 with no validation error (step 37)."
+        }
+      ],
+      "findingTexts": [
+        "Removing the non-last second note fails: after three notes and returning to step 3, clicking Remove note 2 leaves Note two and drops Note three instead of retaining Note one and Note three.",
+        "The stated daily-limit range 1–20 is not enforced: with Work selected, Sunday, 21:00, and Max notes per day set to 21, Continue advanced to Step 3 rather than showing an error and remaining on Step 2."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reach step 3 with workspace Alpha, valid profile details, one focus area, valid preferences, and notes Launch plan and Review metrics.",
+          "action": "Click Create workspace.",
+          "expect": "Completion must show workspace Alpha and 2 notes, matching the entered workspace and nonblank notes.",
+          "priority": 3
+        },
+        {
+          "setup": "Reach step 3 with valid profile and preferences, add notes Note one, Note two, and Note three.",
+          "action": "Click Back, click Continue, then click Remove note 2.",
+          "expect": "Note one and Note three must remain while Note two is gone.",
+          "priority": 2
+        },
+        {
+          "setup": "At /welcome, enter workspace Alpha, email a@b.com, and display name Sam.",
+          "action": "Click Continue; select Work, choose Sunday and 21:00, enter 21 for Max notes per day, and click Continue.",
+          "expect": "A visible error must reject 21 and remain on step 2, because the stated range is 1–20.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the public onboarding wizard end to end, emphasizing the daily-limit upper boundary and removal of a non-last note before verifying one successful completion.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reach step 3 with workspace Alpha, valid profile details, one focus area, valid preferences, and notes Launch plan and Review metrics. Then Click Create workspace. — expect: Completion must show workspace Alpha and 2 notes, matching the entered workspace and nonblank notes.\n2. Reach step 3 with valid profile and preferences, add notes Note one, Note two, and Note three. Then Click Back, click Continue, then click Remove note 2. — expect: Note one and Note three must remain while Note two is gone.\n3. At /welcome, enter workspace Alpha, email a@b.com, and display name Sam. Then Click Continue; select Work, choose Sunday and 21:00, enter 21 for Max notes per day, and click Continue. — expect: A visible error must reject 21 and remain on step 2, because the stated range is 1–20."
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 266955,
+      "status": "passed",
+      "steps": 31,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.5814,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports that an email without a dot in the domain, such as sam@example, is accepted. The only email shown is sam@example.com."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 2 and 5 explicitly report that daily limit 21, above the displayed maximum of 20, is accepted and advances the wizard instead of showing the required range validation error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "Findings 1 and 4 report that removing the second note from A, B, C leaves A and B rather than A and C, meaning the last note was removed instead of the clicked note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking Back from step 3 returns to step 2 with all five focus areas, Sunday, 21:00, and daily limit 7 preserved.",
+          "status": "contradicted",
+          "evidence": "After Continue, the next Back click did not show step 2 or the preserved preferences; its observation says step 3 was visible with an empty note input (step 14)."
+        },
+        {
+          "claim": "Removing note 2 from notes A, B, and C leaves notes A and C.",
+          "status": "contradicted",
+          "evidence": "After clicking Remove note 2, the recorded observation at workspace creation states that the remaining inputs were A and B rather than A and C (step 22)."
+        },
+        {
+          "claim": "Creating the workspace after one note is removed reports the accurate remaining note count of 2.",
+          "status": "verified",
+          "evidence": "The post-removal state explicitly showed 2 notes ready (step 22), and the completion screen reported “Persistence Lab is ready with 2 notes” (step 23)."
+        },
+        {
+          "claim": "The completion summary retains the selected focus-area information rather than losing it.",
+          "status": "verified",
+          "evidence": "All five focus areas were visibly selected before completion (steps 9-12), and the completion screen listed all five focus areas (step 23)."
+        },
+        {
+          "claim": "Submitting a daily limit of 21 keeps step 2 visible and displays “Daily limit must be between 1 and 20”.",
+          "status": "contradicted",
+          "evidence": "Although step 2 was initially still displayed immediately after Continue (step 30), the final observation says the wizard advanced to step 3 after invalid limit 21 was accepted, and no required validation error was observed (step 31)."
+        }
+      ],
+      "findingTexts": [
+        "Removing the second note from A, B, C leaves A and B rather than the expected A and C, indicating the remove control removes the wrong note.",
+        "With Atlas, sam@example.com, Sam, and Work selected, entering daily limit 21 and clicking Continue advances from Step 2 to Step 3 instead of remaining on Step 2 and displaying “Daily limit must be bet"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter valid profile details and continue to step 2.",
+          "action": "Select all five focus areas, choose Sunday and 21:00, set limit 7, continue, then click Back.",
+          "expect": "After returning, all five areas, Sunday, 21:00, and 7 must still be selected.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, reach step 3, add two notes, and enter distinct notes A, B, and C in the three inputs.",
+          "action": "Click Remove note 2, verify the remaining inputs, then click Create workspace.",
+          "expect": "Remaining inputs must be A and C; completion must report 2 notes.",
+          "priority": 2
+        },
+        {
+          "setup": "At /welcome, enter workspace \"Atlas\", email \"sam@example.com\", and display name \"Sam\"; continue to step 2 and select Work.",
+          "action": "Replace daily limit with 21 and click Continue.",
+          "expect": "Step 2 must remain visible and show \"Daily limit must be between 1 and 20\".",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the public onboarding wizard at /welcome. Use boundary inputs and distinct non-first notes to expose mismatches, and operate the preference controls and navigation before completing the flow.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter valid profile details and continue to step 2. Then Select all five focus areas, choose Sunday and 21:00, set limit 7, continue, then click Back. — expect: After returning, all five areas, Sunday, 21:00, and 7 must still be selected.\n2. Complete steps 1 and 2 validly, reach step 3, add two notes, and enter distinct notes A, B, and C in the three inputs. Then Click Remove note 2, verify the remaining inputs, then click Create workspace. — expect: Remaining inputs must be A and C; completion must report 2 notes.\n3. At /welcome, enter workspace \"Atlas\", email \"sam@example.com\", and display name \"Sam\"; continue to step 2 and select Work. Then Replace daily limit with 21 and click Continue. — expect: Step 2 must remain visible and show \"Daily limit must be between 1 and 20\"."
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 322354,
+      "status": "passed",
+      "steps": 22,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.4991,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": false,
+          "why": "None of the findings mention filtering, visible-row counts, or a mismatch between the 'Showing N of M models' counter and the table rows."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "The run explicitly reports that a numeric column's arrow flips from ascending to descending on the second click while the displayed row order remains ascending."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "The run identifies that for 2M input and 1M output tokens, Claude's estimate is $45 instead of $21, consistent with applying the $15 output rate to both input and output tokens."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Setting both monthly token inputs to 0 makes every model's estimated monthly value $0.00 and does not designate one unique cheapest model.",
+          "status": "contradicted",
+          "evidence": "After the zero-input attempt, the observation reports output still at 1, nonzero estimates of $15.00, $0.28, $0.60, $0.60, and $0.40, and DeepSeek V3 still uniquely marked cheapest (step 2)."
+        },
+        {
+          "claim": "Negative monthly usage is rejected or constrained so that no displayed monthly estimate is negative.",
+          "status": "verified",
+          "evidence": "The page accepted an input of -1 but displayed $0.00 for every model, with none negative, while showing all five models (step 5)."
+        },
+        {
+          "claim": "Filtering Provider to OpenAI shows exactly 1 of 5 models, and that sole row is GPT-4o mini from OpenAI.",
+          "status": "verified",
+          "evidence": "With Provider set to OpenAI, the observation says “Showing 1 of 5 models” and identifies the sole row as GPT-4o mini (OpenAI) (step 7)."
+        },
+        {
+          "claim": "Clicking each sortable column twice reverses the first-click row order, including numeric price and context columns.",
+          "status": "contradicted",
+          "evidence": "For Input $/1M, the descending-header observation still reports the same ascending order—DeepSeek V3, GPT-4o mini, Gemini 2.5 Flash, Llama 3.3 70B, Claude Sonnet 4.5—rather than its reverse (steps 11-12)."
+        },
+        {
+          "claim": "Enabling Vision only shows exactly the three vision-capable models and the summary count matches the visible rows.",
+          "status": "verified",
+          "evidence": "With Vision only enabled, the page reports “Showing 3 of 5 models” and lists GPT-4o mini, Claude Sonnet 4.5, and Gemini 2.5 Flash as the three visible rows (step 19)."
+        },
+        {
+          "claim": "For Claude Sonnet 4.5 at 2M input and 1M output tokens, the estimate reconciles to its displayed $3.00 input and $15.00 output prices, or $21.00.",
+          "status": "not_testable",
+          "evidence": "The trace records Claude’s $3.00 and $15.00 prices with a displayed $45.00 estimate (step 20), but does not record setting the final Anthropic check's input to 2 and output to 1, so the displayed value cannot be evaluated against that requested usage."
+        }
+      ],
+      "findingTexts": [
+        "With both monthly token inputs set to 0, all five displayed estimates are $0.00 but Claude Sonnet 4.5 alone is highlighted as cheapest.",
+        "Input $/1M sorting does not reverse displayed rows on the second click: the header changes from ↑ to ↓, but the order remains DeepSeek V3, GPT-4o mini, Gemini 2.5 Flash, Llama 3.3 70B, Claude Sonnet 4",
+        "Claude Sonnet 4.5's monthly estimate is calculated incorrectly for 2M input and 1M output tokens: displayed prices are $3.00 input and $15.00 output, but the estimate is $45.00 instead of $21.00 (2×$3",
+        "Negative monthly-token input remains -1 instead of being rejected or constrained."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /compare and enter 0 for both input and output monthly tokens.",
+          "action": "Read every visible model's Est. monthly value and the cheapest highlight.",
+          "expect": "Every estimate must be $0.00, and the cheapest designation must not identify a unique model.",
+          "priority": 6
+        },
+        {
+          "setup": "Open /compare and note the five-model total; leave Vision only disabled.",
+          "action": "Enter -1 in Input M tokens / mo and read the displayed estimates.",
+          "expect": "Negative usage must be rejected or constrained; no displayed monthly estimate may become negative.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /compare and select OpenAI from Provider.",
+          "action": "Read the Showing summary and the visible model row.",
+          "expect": "The summary must say 1 of 5 models and the only row must be GPT-4o mini from OpenAI.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /compare with all providers visible and record the initial model order.",
+          "action": "Click Model, Input $/1M, Output $/1M, and Context (K) twice each, recording each resulting order.",
+          "expect": "Each second click must reverse its first-click order, including every numeric column.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /compare and note the five-model total and each visible model name.",
+          "action": "Enable Vision only and read the Showing summary and remaining rows.",
+          "expect": "The summary count must equal the visible rows: 3 of 5 models, with only vision-capable models shown.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /compare, select Anthropic, enter 2 for input tokens and 1 for output tokens.",
+          "action": "Read Claude Sonnet 4.5's displayed monthly estimate and both displayed per-million prices.",
+          "expect": "Estimate must equal 2 times input price plus 1 times output price; for $3 and $15, it must be $21.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the comparison page through its public route, using values that distinguish the buggy calculations, count summary, numeric sorting, and minimum-value handling from a correct implementation.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /compare and enter 0 for both input and output monthly tokens. Then Read every visible model's Est. monthly value and the cheapest highlight. — expect: Every estimate must be $0.00, and the cheapest designation must not identify a unique model.\n2. Open /compare and note the five-model total; leave Vision only disabled. Then Enter -1 in Input M tokens / mo and read the displayed estimates. — expect: Negative usage must be rejected or constrained; no displayed monthly estimate may become negative.\n3. Open /compare and select OpenAI from Provider. Then Read the Showing summary and the visible model row. — expect: The summary must say 1 of 5 models and the only row must be GPT-4o mini from OpenAI.\n4. Open /compare with all providers visible and record the initial model order. Then Click Model, Input $/1M, Output $/1M, and Context (K) twice each, recording each resulting order. — expect: Each second click must reverse its first-click order, including every numeric column.\n5. Open /compare and note the five-model total and each visible model name. Then Enable Vision only and read the Showing summary and remaining rows. — expect: The summary count must equal the visible rows: 3 of 5 models, with only "
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 2,
+      "durationMs": 257043,
+      "status": "passed",
+      "steps": 14,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.3614,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": false,
+          "why": "No finding checks or reports a mismatch between the 'Showing N of M models' counter and the visible filtered table rows."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "Findings 1 and 2 explicitly report that numeric-column headers show a descending arrow after a second click while the rows remain in ascending numeric order."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Finding 3 reports a monthly estimate of $45.00 for 2M input and 1M output tokens where the expected amount is $21.00, consistent with applying Claude's output rate to input tokens."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "After sorting by Model once and Context (K) twice, Gemini 2.5 Flash with 1000K context is the first row.",
+          "status": "not_testable",
+          "evidence": "The trace records the Model sort and the first Context click (ascending context order), but no observation records the table after the second Context click before navigation away."
+        },
+        {
+          "claim": "After sorting Output $/1M descending, Claude Sonnet 4.5 at $15.00 is the first row.",
+          "status": "not_testable",
+          "evidence": "The first Output $/1M click is observed to produce ascending order through Gemini, but the trace contains no post-second-click observation of the requested descending order."
+        },
+        {
+          "claim": "After sorting Input $/1M descending, Claude Sonnet 4.5 at $3.00 is the first row.",
+          "status": "not_testable",
+          "evidence": "The first Input $/1M click is observed to produce ascending order, but no observation captures the table after the second click that should request descending order."
+        },
+        {
+          "claim": "With the default All-provider filter, the comparison table retains all five model rows.",
+          "status": "verified",
+          "evidence": "Step 5 observes Provider All, Vision only unchecked, and \"Showing 5 of 5 models,\" while step 8 again records the five model rows on a fresh compare view."
+        },
+        {
+          "claim": "Enabling Vision only filters the original five models down to exactly three visible vision-capable models.",
+          "status": "verified",
+          "evidence": "Step 12 observes that enabling Vision only checked the control and reduced the table to exactly three rows: Claude Sonnet 4.5, Gemini 2.5 Flash, and GPT-4o mini."
+        },
+        {
+          "claim": "For Anthropic with 2M input and 1M output tokens per month, Claude Sonnet 4.5 displays an estimated monthly cost of $21.00, reconciling 2×$3.00 plus 1×$15.00.",
+          "status": "not_testable",
+          "evidence": "Step 14 confirms the Anthropic filter and usage inputs of 2 and 1, but the displayed estimated-cost value is truncated after \"$\", and the trace does not record the underlying Claude input and output prices needed to reconcile $21.00."
+        }
+      ],
+      "findingTexts": [
+        "After Model once and Context (K) twice, the Context header showed a descending arrow but the rows remained in ascending context order (DeepSeek V3 64K first through Gemini 2.5 Flash 1000K last), rathe",
+        "After Output $/1M was clicked twice, its header showed a descending arrow but rows remained ascending by output price: DeepSeek $0.28 first and Claude Sonnet 4.5 $15.00 last, instead of Claude first.",
+        "Monthly-cost calculation is incorrect for Claude Sonnet 4.5: at 2M input and 1M output tokens per month, UI displays $45.00 rather than $21.00."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /compare with default filters.",
+          "action": "Click Model once, then click Context (K) twice.",
+          "expect": "Gemini 2.5 Flash at 1000K must be the first row.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /compare with default filters.",
+          "action": "Click Output $/1M twice to request descending order.",
+          "expect": "Claude Sonnet 4.5 at $15.00 must be the first row.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /compare with default filters.",
+          "action": "Click Input $/1M twice to request descending order.",
+          "expect": "Claude Sonnet 4.5 at $3.00 must be the first row.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /compare with the default All provider filter and note the five model rows.",
+          "action": "Enable Vision only.",
+          "expect": "Exactly three rows must remain, and the summary must say Showing 3 of 5 models.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /compare, select Anthropic, set input usage to 2 and output usage to 1.",
+          "action": "Read the Claude Sonnet 4.5 estimated monthly cost.",
+          "expect": "The estimate must be $21.00, equal to 2×$3.00 plus 1×$15.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open /compare and exercise the filters, usage inputs, and every sortable column. Use boundary-diverging values and verify displayed totals, counts, and sort order.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /compare with default filters. Then Click Model once, then click Context (K) twice. — expect: Gemini 2.5 Flash at 1000K must be the first row.\n2. Open /compare with default filters. Then Click Output $/1M twice to request descending order. — expect: Claude Sonnet 4.5 at $15.00 must be the first row.\n3. Open /compare with default filters. Then Click Input $/1M twice to request descending order. — expect: Claude Sonnet 4.5 at $3.00 must be the first row.\n4. Open /compare with the default All provider filter and note the five model rows. Then Enable Vision only. — expect: Exactly three rows must remain, and the summary must say Showing 3 of 5 models.\n5. Open /compare, select Anthropic, set input usage to 2 and output usage to 1. Then Read the Claude Sonnet 4.5 estimated monthly cost. — expect: The estimate must be $21.00, equal to 2×$3.00 plus 1×$15.00."
+    },
+    {
+      "case": "purchasify-licences",
+      "attempt": 1,
+      "durationMs": 266836,
+      "status": "passed",
+      "steps": 13,
+      "findings": 5,
+      "checks": 6,
+      "contradicted": 4,
+      "costUsd": 0.3841,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "The run explicitly reports that page 2 repeats Team Annual from page 1, including as a failed pagination check."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": true,
+          "why": "The run reports that after saving 23 seats with Remember enabled and reloading, the size returns to 10 and the checkbox becomes unchecked."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": true,
+          "why": "The run reports that Request quote can be clicked with no plan selected and 0 seats, and no minimum-seat enforcement/blocking occurs."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting Team Annual with 6 seats and requesting a quote shows Team Annual, 6 seats, and a $90.00 monthly total in the confirmation.",
+          "status": "contradicted",
+          "evidence": "After the attempted fourth-row selection and Request quote, step 3 observed Team Monthly still selected with 6 seats and estimated monthly $108.00; step 4 showed the confirmation “Quote requested: Team Monthly for 6 seats.”"
+        },
+        {
+          "claim": "With 4 seats, selecting Team Monthly displays a five-seat minimum warning and disables Request quote.",
+          "status": "verified",
+          "evidence": "Step 5 observed team size 4 with Team Monthly selected, its warning visible, and the Request quote button disabled."
+        },
+        {
+          "claim": "With no plan selected and 0 seats, requesting a quote is blocked with visible enforcement of the one-seat minimum.",
+          "status": "contradicted",
+          "evidence": "Step 7 directly clicked Request quote at 0 seats and no selection, but the recorded result only showed None selected, Seats 0, and $0.00, with no visible minimum-seat enforcement or blocked-request message observed."
+        },
+        {
+          "claim": "Page 2 contains four plan names absent from page 1, so pagination does not duplicate catalogue entries across those pages.",
+          "status": "contradicted",
+          "evidence": "Step 8 recorded page 1 as Starter Monthly, Starter Annual, Team Monthly, and Team Annual, while step 9 recorded page 2 including Team Annual, which duplicates a page-1 name."
+        },
+        {
+          "claim": "Clicking Previous after viewing page 2 restores the original four page-1 plan rows.",
+          "status": "verified",
+          "evidence": "Step 10 observed Page 1 of 3 with Starter Monthly, Starter Annual, Team Monthly, and Team Annual after clicking Previous, matching the page-1 rows recorded in step 8."
+        },
+        {
+          "claim": "Enabling Remember my team size with 23 seats preserves both the 23-seat input and checked preference after reload.",
+          "status": "contradicted",
+          "evidence": "Step 12 observed the checkbox checked with team size 23 before reload, but step 13's fresh page showed team size 10 and Remember my team size unchecked."
+        }
+      ],
+      "findingTexts": [
+        "Selecting the fourth row (Team Annual) instead selected Team Monthly. With 6 seats, quote shows Selected plan Team Monthly and estimated monthly $108.00 rather than Team Annual and $90.00.",
+        "Request quote is not blocked when no plan is selected and team size is 0. The UI displays “Quote requested for 0 seats.” instead of enforcing a minimum of one seat.",
+        "Remembered team-size preference does not persist across reload. After setting Team size to 23, enabling “Remember my team size,” and reloading /licences, the input restored to 10 and the checkbox was ",
+        "Quote confirmation remains for 6 seats after team size changes to 4, showing stale contradictory state.",
+        "Page 2 repeats Team Annual from page 1; intended pagination requires four names absent from page 1."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter 6 seats and identify the fourth plan row, Team Annual.",
+          "action": "Select Team Annual and click Request quote.",
+          "expect": "Selected plan must be Team Annual, seats 6, monthly total $90.00, and confirmation must name both.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter 4 seats on page 1.",
+          "action": "Select Team Monthly and inspect its warning and Request quote button.",
+          "expect": "Warning must state five seats minimum, and Request quote must be disabled.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave no plan selected and enter 0 seats.",
+          "action": "Click Request quote.",
+          "expect": "The request must be blocked with visible enforcement of the minimum one-seat rule.",
+          "priority": 3
+        },
+        {
+          "setup": "Record the four plan names shown on page 1.",
+          "action": "Click Next, compare the four names, then click Previous.",
+          "expect": "Page 2 must contain four names absent from page 1; Previous must restore the recorded names.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Enter 23 seats, enable Remember my team size, reload the page, and read the restored input and checkbox.",
+          "expect": "The input must show 23 and the checkbox must remain checked after reload.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the public licence planner, prioritizing persistence-key and pagination disagreements, then verify seat minimum enforcement and quote calculations.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter 6 seats and identify the fourth plan row, Team Annual. Then Select Team Annual and click Request quote. — expect: Selected plan must be Team Annual, seats 6, monthly total $90.00, and confirmation must name both.\n2. Enter 4 seats on page 1. Then Select Team Monthly and inspect its warning and Request quote button. — expect: Warning must state five seats minimum, and Request quote must be disabled.\n3. Leave no plan selected and enter 0 seats. Then Click Request quote. — expect: The request must be blocked with visible enforcement of the minimum one-seat rule.\n4. Record the four plan names shown on page 1. Then Click Next, compare the four names, then click Previous. — expect: Page 2 must contain four names absent from page 1; Previous must restore the recorded names.\n5. Enter 23 seats, enable Remember my team size, reload the page, and read the restored input and checkbox. — expect: The input must show 23 and the checkbox must remain checked after reload."
+    },
+    {
+      "case": "purchasify-licences",
+      "attempt": 2,
+      "durationMs": 185862,
+      "status": "passed",
+      "steps": 15,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.3281,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "The run explicitly reports that page 2 repeats Team Annual from page 1, matching the boundary-row repetition defect."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": true,
+          "why": "The run reports that after enabling Remember and saving 23 seats, reload resets the value to 10 and unchecks Remember, matching the persistence symptom."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": true,
+          "why": "The run reports that a quote can be submitted with no plan selected and receives a successful confirmation, matching the missing-plan guard defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting Starter Annual at 10 seats and requesting a quote shows Starter Annual, a $70.00 estimate (10×$7), and a confirmation naming Starter Annual.",
+          "status": "verified",
+          "evidence": "Steps 5-6 observe Starter Annual selected with 10 seats and $70.00, followed by “Quote requested: Starter Annual for 10 seats.”"
+        },
+        {
+          "claim": "Requesting a quote with 0 seats is rejected and does not show a successful quote message.",
+          "status": "contradicted",
+          "evidence": "Steps 8-9 submit 0 seats and observe the successful message “Quote requested for 0 seats.”"
+        },
+        {
+          "claim": "The paginated catalogue preserves complete plan information: page 2 shows plans 5–8, page 3 shows only plan 9, and Previous returns to page 2.",
+          "status": "contradicted",
+          "evidence": "Steps 10-12 show page 2 with four plans and Previous restoring it, but step 11 shows page 3 has two plans (Enterprise Annual and Enterprise Custom), not only plan 9."
+        },
+        {
+          "claim": "With Remember enabled, changing team size to 23 persists both the 23-seat value and checked Remember state after reload.",
+          "status": "contradicted",
+          "evidence": "Step 14 records 23 seats and Remember checked before reload, while step 15's fresh post-reload snapshot shows Team size 10 and Remember unchecked."
+        }
+      ],
+      "findingTexts": [
+        "Request quote accepts a team size of 0 with no plan selected and shows the successful confirmation “Quote requested for 0 seats.”",
+        "The remembered team-size preference does not persist: after enabling Remember and setting seats to 23, reloading /licences resets seats to 10 and the checkbox to unchecked.",
+        "Catalogue pagination is off by one: page 2 repeats Team Annual from page 1; page 3 contains 2 plans despite “9 plans.”"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /licences with the default 10 seats.",
+          "action": "Select Starter Annual, click Request quote, and read the selected plan, estimate, and confirmation.",
+          "expect": "Plan must be Starter Annual; estimate must equal 10×$7=$70.00; confirmation must name it.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /licences with no plan selected.",
+          "action": "Enter 0 seats and click Request quote.",
+          "expect": "Zero seats must be rejected; no successful quote message may appear.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /licences and record the four plan names on page 1.",
+          "action": "Click Next twice, record pages 2–3, then click Previous once.",
+          "expect": "Page 2 must show plans 5–8, page 3 only plan 9, and Previous must restore page 2.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /licences, clear site storage, and note the initial team-size value and remember-checkbox state.",
+          "action": "Enable Remember, replace seats with 23, reload, and read the seats value and checkbox state.",
+          "expect": "Seats must remain 23 and Remember must remain checked after reload.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the public licence planner at /licences, prioritising persistence and pagination discrepancies, then verify zero-seat rejection and one valid quote flow.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /licences with the default 10 seats. Then Select Starter Annual, click Request quote, and read the selected plan, estimate, and confirmation. — expect: Plan must be Starter Annual; estimate must equal 10×$7=$70.00; confirmation must name it.\n2. Open /licences with no plan selected. Then Enter 0 seats and click Request quote. — expect: Zero seats must be rejected; no successful quote message may appear.\n3. Open /licences and record the four plan names on page 1. Then Click Next twice, record pages 2–3, then click Previous once. — expect: Page 2 must show plans 5–8, page 3 only plan 9, and Previous must restore page 2.\n4. Open /licences, clear site storage, and note the initial team-size value and remember-checkbox state. Then Enable Remember, replace seats with 23, reload, and read the seats value and checkbox state. — expect: Seats must remain 23 and Remember must remain checked after reload."
+    }
+  ]
+}
