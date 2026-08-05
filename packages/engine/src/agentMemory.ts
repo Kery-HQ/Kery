@@ -3,7 +3,7 @@ import type { StorageAdapter } from "./storage.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type MemoryEntryType = "learned_path" | "ignore_region" | "avoid_region" | "bug_pattern" | "tip";
+export type MemoryEntryType = "learned_path" | "ignore_region" | "avoid_region" | "bug_pattern" | "tip" | "reachability" | "convention";
 export type MemorySource = "agent" | "user";
 
 export type MemoryEntry = {
@@ -69,6 +69,8 @@ const TYPE_LABELS: Record<MemoryEntryType, string> = {
   avoid_region:  "Regions/elements to AVOID (caused failures before)",
   bug_pattern:   "Known bug patterns (watch for / work around these)",
   tip:           "Tips and hints",
+  reachability:  "How to reach surfaces (routes, auth state, seed data, flags)",
+  convention:    "Repo conventions (intentional patterns — not defects)",
 };
 
 /** Compute a human-readable temporal label for a memory entry. */
