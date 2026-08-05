@@ -26,14 +26,17 @@ const docs = fs
   .filter((f) => f.endsWith(".json"))
   .map((f) => {
     try {
-      return { file: f, doc: JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) };
+      // Sort by mtime, not filename: "v11" sorts before "v6" alphabetically, which
+      // silently made an older config look like the newest and inverted the
+      // regression report.
+      return { file: f, mtime: fs.statSync(path.join(dir, f)).mtimeMs, doc: JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) };
     } catch {
       return null;
     }
   })
   .filter(Boolean)
   .filter(({ doc }) => (wanted.length ? wanted.some((w) => (doc.label ?? "").includes(w)) : true))
-  .sort((a, b) => a.file.localeCompare(b.file));
+  .sort((a, b) => a.mtime - b.mtime);
 
 // A run exists twice once it has been rescored: the original regex-scored file
 // and the .rescored.json the judge wrote. Keep only the judged copy, otherwise
@@ -45,7 +48,7 @@ for (const entry of docs) {
   if (!existing || entry.file.includes(".rescored.")) byRun.set(key, entry);
 }
 docs.length = 0;
-docs.push(...[...byRun.values()].sort((a, b) => a.file.localeCompare(b.file)));
+docs.push(...[...byRun.values()].sort((a, b) => a.mtime - b.mtime));
 
 // A bug's score for a config: how many of its attempts caught it.
 const table = [];

@@ -93,6 +93,34 @@ Grounded in measurement and literature rather than intuition:
 - **Per-bug regression detection** (`compare.mjs`), compared only against
   same-mode configs. The headline total is what hid the v3 regression.
 
+## End-to-end confirmation
+
+Plan exposure predicted the outcome. Running v11 end to end, n=2 per case:
+
+| config | tuning set |
+|---|---|
+| v4 | 9/18 (50%) |
+| v6 | 8/18 (44%) |
+| v7 | 8/18 (44%) |
+| **v11** | **14/18 (78%)** |
+| scripted ceiling | 17/18 (94%) |
+
+Per case: purchasify 5/6, noted-so 4/6, chatific 5/6. noted-so had never
+exceeded 1/6 under any earlier configuration.
+
+Five bugs improved; one regressed (`email-regex` 1/2 -> 0/2). The stated gate
+was "total up AND no per-bug regression", so strictly v11 does not pass it. The
+trade is recommended anyway — five gains against one loss, on the single bug
+that plan scoring independently shows at 0/5 — but that is a judgement call,
+not the rule being met.
+
+**Held-out: 4/6 (67%)**, revealed only after prompt changes stopped. Its bug
+shapes — pagination, localStorage persistence, a wrong disabled-guard — appear
+nowhere in the tuning set, and one of the two runs caught all three. Held-out
+slightly below tuning is the healthy pattern; it indicates generalisation
+rather than fitting to three apps. One held-out run ended `failed` at 11 steps,
+so its 1/3 is an early abort rather than a fair score.
+
 ## Open
 
 - `email-regex-accepts-no-tld` is still 0/5 at plan level — the only planted bug
