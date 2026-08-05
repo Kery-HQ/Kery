@@ -96,8 +96,13 @@ if (table.length >= 2) {
   for (const bug of allBugs) {
     const now = latest.perBug.get(bug);
     if (!now) continue;
+    // Only compare against configs of the SAME mode. The scripted ceiling uses
+    // hand-written plans, so treating it as a baseline reports every gap to the
+    // ceiling as a "regression" and buries real ones.
+    const peers = table.slice(0, -1).filter((t) => t.mode === latest.mode);
+    if (peers.length === 0) continue;
     const bestBefore = Math.max(
-      ...table.slice(0, -1).map((t) => {
+      ...peers.map((t) => {
         const v = t.perBug.get(bug);
         return v && v.of ? v.hit / v.of : 0;
       }),
