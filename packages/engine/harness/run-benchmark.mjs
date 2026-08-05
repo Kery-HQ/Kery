@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createMemoryStorage } from "./memoryStorage.mjs";
+import { judgeCase } from "./judge.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { initEngineConfig, runOrchestratedJob } = await import(path.join(here, "../dist/index.js"));
@@ -140,7 +141,16 @@ async function runCase(testCase, attempt) {
   }
 
   const costUsd = (result.llmCalls ?? []).reduce((s, c) => s + (c.costUsd ?? 0), 0);
-  const scored = scoreCase(testCase, result);
+  // Semantic judging: regex matching produced false negatives (the run said
+  // "remains", the pattern wanted "unchanged") which silently distorted every
+  // comparison between iterations.
+  let scored;
+  try {
+    scored = await judgeCase(testCase, result, process.env.OPENAI_API_KEY);
+  } catch (err) {
+    console.warn(`  judge failed, falling back to regex: ${String(err).slice(0, 120)}`);
+    scored = scoreCase(testCase, result);
+  }
   return {
     case: testCase.id,
     attempt,
@@ -175,9 +185,18 @@ for (const testCase of cases) {
     process.stdout.write(`▶ ${testCase.id} (attempt ${attempt}/${repeat}) … `);
     const r = await runCase(testCase, attempt);
     results.push(r);
-    const label = r.error ? `ERROR ${r.error.slice(0, 80)}` : `${r.caught}/${r.planted} caught · ${r.checks} checks · $${r.costUsd} · ${Math.round(r.durationMs / 1000)}s`;
+    // Held-out cases exist to catch overfitting, which only works if the person
+    // tuning the prompt cannot see WHICH bugs they miss. Scores are still
+    // written to the result file; the per-bug breakdown stays hidden until
+    // --reveal, so iteration cannot quietly target this case.
+    const hidden = testCase.heldOut && !flag("reveal");
+    const label = r.error
+      ? `ERROR ${r.error.slice(0, 80)}`
+      : hidden
+        ? `[held-out — score hidden] · ${r.checks} checks · $${r.costUsd} · ${Math.round(r.durationMs / 1000)}s`
+        : `${r.caught}/${r.planted} caught · ${r.checks} checks · $${r.costUsd} · ${Math.round(r.durationMs / 1000)}s`;
     console.log(label);
-    if (!flag("quiet") && r.scored) {
+    if (!flag("quiet") && r.scored && !hidden) {
       for (const s of r.scored) console.log(`    ${s.caught ? "✅" : "❌"} ${s.id} (${s.class})`);
     }
   }
@@ -185,13 +204,22 @@ for (const testCase of cases) {
 
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outFile = path.join(outDir, `${arg("label", "run")}-${stamp}.json`);
+const heldOutIds = new Set(suite.cases.filter((c) => c.heldOut).map((c) => c.id));
+const tuning = results.filter((r) => !heldOutIds.has(r.case));
 const totals = {
-  caught: results.reduce((s, r) => s + (r.caught ?? 0), 0),
-  planted: results.reduce((s, r) => s + (r.planted ?? 0), 0),
+  caught: tuning.reduce((s, r) => s + (r.caught ?? 0), 0),
+  planted: tuning.reduce((s, r) => s + (r.planted ?? 0), 0),
+  heldOut: {
+    caught: results.filter((r) => heldOutIds.has(r.case)).reduce((s, r) => s + (r.caught ?? 0), 0),
+    planted: results.filter((r) => heldOutIds.has(r.case)).reduce((s, r) => s + (r.planted ?? 0), 0),
+  },
   costUsd: Number(results.reduce((s, r) => s + (r.costUsd ?? 0), 0).toFixed(4)),
   errors: results.filter((r) => r.error).length,
 };
 fs.writeFileSync(outFile, JSON.stringify({ label: arg("label", "run"), mode, models: MODELS, totals, results }, null, 2));
 
-console.log(`\n── TOTAL ${totals.caught}/${totals.planted} planted bugs caught · $${totals.costUsd} · ${totals.errors} errors`);
+console.log(`\n── TUNING SET ${totals.caught}/${totals.planted} planted bugs caught · $${totals.costUsd} · ${totals.errors} errors`);
+if (totals.heldOut.planted > 0) {
+  console.log(`   held-out: ${flag("reveal") ? `${totals.heldOut.caught}/${totals.heldOut.planted}` : `${totals.heldOut.planted} bugs, score hidden (rerun with --reveal)`}`);
+}
 console.log(`   ${outFile}`);
