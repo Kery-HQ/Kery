@@ -40,7 +40,12 @@ const outDir = path.resolve(arg("out", path.join(here, "../../../harness-results
  * as the ceiling — what the agent achieves when the plan is already perfect.
  */
 const mode = arg("mode", "scripted");
-const PR_REVIEW_PATH = "/Users/kevalshah/Documents/repo/Kery-Cloud/apps/worker/dist/prReview.js";
+/**
+ * "review" mode needs the cloud worker's compiled review pass, which lives in a
+ * separate repo. Point KERY_PR_REVIEW_PATH at its built prReview.js; without it
+ * only "scripted" mode (the ceiling) can run.
+ */
+const PR_REVIEW_PATH = process.env.KERY_PR_REVIEW_PATH ?? "";
 fs.mkdirSync(outDir, { recursive: true });
 
 const MODELS = {
@@ -98,6 +103,7 @@ function parseDiff(patchText) {
 async function intentForCase(testCase) {
   if (mode !== "review") return { intent: testCase.intent, context: testCase.context ?? "", plan: null };
   if (!testCase.diffFile) throw new Error(`case ${testCase.id} has no diffFile for review mode`);
+  if (!PR_REVIEW_PATH) throw new Error("review mode needs KERY_PR_REVIEW_PATH set to the worker's built prReview.js");
   const { reviewPullRequest, intentWithPlan } = await import(PR_REVIEW_PATH);
   const files = parseDiff(fs.readFileSync(testCase.diffFile, "utf8"));
   const review = await reviewPullRequest(

@@ -34,6 +34,25 @@ the generated plan, cost, steps and the verification record.
 
 - `--mode scripted` — uses the suite's hand-written intent. Measures the
   **agent's ceiling**: what it catches when the plan is already perfect.
+## Environment
+
+- `OPENAI_API_KEY` — required.
+- `KERY_PR_REVIEW_PATH` — required for `--mode review` only: absolute path to the
+  cloud worker's built `prReview.js`. The review pass lives in the Kery-Cloud
+  repo, so this loop can only measure plan quality when that repo is present and
+  built. Without it, `--mode scripted` (the ceiling) still runs.
+- Apps must be served first — see `serve-apps.sh`. Note purchasify needs a
+  `.env.local`, since its middleware builds a Supabase client on every request
+  and returns 500 on all routes without one.
+
+## Held-out case
+
+`purchasify-licences` is flagged `heldOut` in `suite.json`. Its per-bug results
+and score are hidden unless `--reveal` is passed, and it is excluded from the
+headline total. This is mechanical on purpose: a held-out case only detects
+overfitting while the person tuning the prompt cannot see which of its bugs are
+missed. Reveal it only when you have stopped changing the prompt.
+
 - `--mode review` — calls the same `reviewPullRequest` the cloud CI uses to turn
   a diff into a test plan. Measures the **real pipeline**, and is what you
   iterate against when improving plan generation.
