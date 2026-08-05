@@ -111,7 +111,34 @@ npm run dev:api   # API + Dashboard → http://localhost:11111
 
 ## MCP — Run Kery from Your IDE
 
-Install the MCP server and run tests without leaving your editor.
+Connect your editor and run tests without leaving it. Which server you want
+depends on where Kery runs.
+
+### Kery Cloud (hosted) — remote MCP
+
+Nothing to install. One command, browser auth, no API keys to paste:
+
+```bash
+claude mcp add --transport http kery https://api.kery.dev/mcp
+```
+
+For `mcp.json` clients (Cursor, Windsurf, and friends):
+
+```json
+{
+  "mcpServers": {
+    "kery": { "url": "https://api.kery.dev/mcp" }
+  }
+}
+```
+
+Your client registers itself over OAuth and gets its own scoped token, which you
+can revoke any time from Settings.
+
+### Self-hosted OSS — stdio MCP
+
+Running Kery yourself with Docker? Use the `@keryai/mcp` package. The setup
+wizard writes the config for you:
 
 ```bash
 npx keryai   # select "Install MCP" during setup
@@ -125,7 +152,10 @@ Or add it manually to your MCP config:
     "kery": {
       "command": "npx",
       "args": ["-y", "@keryai/mcp"],
-      "env": { "KERY_BASE_URL": "http://localhost:11111" }
+      "env": {
+        "KERY_API_URL": "http://localhost:11111",
+        "KERY_WEB_URL": "http://localhost:11111"
+      }
     }
   }
 }
