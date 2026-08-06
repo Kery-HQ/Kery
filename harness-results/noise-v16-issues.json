@@ -1,0 +1,255 @@
+{
+  "label": "noise-v16",
+  "runs": 16,
+  "cleanRuns": 2,
+  "raw": 41,
+  "deduped": 41,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Entered TEAM15 promo has no visible applied/error feedback, while the summary still shows a $0.00 discount."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Contact inputs lack accessible names: Organisation and Phone are exposed as unnamed textboxes."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Attendee name and Seats reserved controls are exposed as unnamed textbox/spinbutton."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Contact accepted the punctuation-only phone value '-------' and navigated to Attendees; no visible invalid-phone error was shown on Contact."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Attendees accepted fractional Seats reserved value 1.5 and navigated to Payment instead of remaining on Attendees with a whole-seat validation error."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Payment summary displays an invalid negative-zero discount value (“−$0.00”), which is misleading financial formatting."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A punctuation-only phone value such as ------- is rejected on Contact rather than allowing progression. — After submitting `-------` in step 46, the run proceeds to attendee entry: step 48 observes the Attendees controls (attendee name field and Standard ticket selector), demonstrating that the invalid phone did not keep the user on Contact."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Validation error insertion shifts the Notifications card downward after submitting blank required fields, contrary to the required stable layout."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Account settings save confirmation is shown, but all five settings revert to defaults after reloading: profile and delivery-note fields are blank and email digest resets from Weekly to Daily."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Validation error for Full name is placed below the unrelated Company field, disconnecting it from its input."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After Full name is populated, its “Full name is required.” validation error remains visible."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "All entered settings persist after reloading: Full name Avery Chen, email avery.chen@example.test, company Northstar Logistics, Weekly digest, and delivery notes “Leave packages at the north reception — The fields were populated before saving (steps 3-7), but the fresh post-reload observation reports blank Full name, Email address, Company, and Delivery notes fields and Email digest reset to Daily rather than the selected Weekly value (step 9)."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Saved account settings are lost on page reload. After saving name \"Ada Lovelace\", email \"ada@example.com\", company \"Analytical Engines\", digest \"Weekly\", and notes \"Call before delivery\", reloading re"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Valid email value still displays an invalid-email error, leaving stale validation feedback."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Saved confirmation remains visible while later edits are unsaved, misleading users about current state."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After saving the entered name, email, company, Weekly digest, and delivery notes, all five saved settings remain unchanged after reload. — Before save, step 10 observed the requested five values in the controls, but step 12 observed that after reload all saved persistence-test fields were reset and the digest was Daily rather than Weekly."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Card validation error remains visible after the card field shows a valid 16-digit number, creating stale feedback."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Rapid double-click created two orders (BK-1001 and BK-1002); intended behavior is exactly one receipt/confirmation."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Repeated rapid activation of Place order creates exactly one order confirmation and one receipt, with no duplicate order. — The first valid order was BK-1001 (Step 4), but Step 6 reports the prior status as “Order BK-1002 confirmed.” and the final observation in Step 11 confirms exactly two receipts, BK-1001 and BK-1002."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The immediate second Place order click created a second buyer receipt: the status changed to “Order BK-1003 confirmed.” and Orders placed lists both BK-1002 — $1002.90 to buyer@example.com and BK-1003"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Invalid billing email “@” is visibly accepted: green confirmation is shown instead of invalid-email feedback."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Intended visible Processing feedback never appears; submission transitions directly to “Order BK-1001 confirmed.”"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Place order twice immediately for buyer@example.com with card 4111 1111 1111 1111 creates exactly one receipt and one confirmation. — After the first click, step 5 observes “Order BK-1002 confirmed.” and two receipts; after the second click, step 6 observes a second new confirmation, “Order BK-1003 confirmed.”, and three receipts total."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Submitting an unchanged order with billing email exactly “@” shows invalid-email feedback and creates no receipt. — After entering “@” and clicking Place order, step 7 observes that the prior “Order BK-1003 confirmed.” remains and the receipt list remains at three, but records no invalid-email feedback in the status area."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying High priority, Open only, and an “invoice” subject search leaves only “Invoice total looks wrong” and reports “Showing 1 of 8 tickets.” — After the search-fill action in step 7, the recorded table still has two visible open rows, “Cannot reset password” and “Invoice total looks wrong,” rather than only the invoice ticket."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After a filter change, the old bulk-close success toast remains instead of clearing as intended."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Clicking the primary fixed-bar Send to stakeholders button leaves the report unchanged and shows no visible confirmation that the report was sent."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Clicking Export CSV leaves the weekly report at the same URL with no visible browser download indication, CSV result, alert, confirmation, or other export feedback."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking “Send to stakeholders” shows a visible confirmation that the report was sent while leaving the page usable. — Step 1 performed the Send to stakeholders click, but the trace records no resulting confirmation, navigation, DOM change, or other observed feedback."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking “Export CSV” produces a CSV download or another visible export result rather than only a generic alert. — Step 2 clicked Export CSV and recorded domChanged=NO, with no download or browser export response observed."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Export CSV and Send to stakeholders did not present observable required confirmations after direct clicks: expected “Export queued.” and “Report sent.” respectively."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV displays the confirmation “Export queued.” — Step 2 clicked Export CSV with domChanged=NO, and Step 3 explicitly observed that no Export CSV confirmation was visible."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders displays the confirmation “Report sent.” — Step 3 clicked Send to stakeholders with domChanged=NO and recorded no observed confirmation or other effect from the click."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Stale insufficient-stock error remains visible after a successful Cable shipment is logged."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Quantity control has no accessible name; navigator exposes it as an unnamed spinbutton despite visible label."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "For Washer 11mm, entering the requested received quantity of 3 works before recording the adjustment. — Step 12 directly fills the quantity spinbutton after Washer 11mm becomes selected, but records domChanged=NO and observes that Quantity still shows 1 rather than 3."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Reset counts resets the audit without incorrectly submitting it or opening a submission confirmation dialog. — Step 8 directly clicked Reset counts and observed that it visibly opened an “Audit submitted” dialog, despite Reset counts being the action invoked."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Submission dialog is present in page content but not visually rendered, leaving its message and Close button inaccessible by pointer."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking the dialog's Close button hides the submission dialog without changing table counts. — Step 1's Close-button click failed, with no recorded dismissal or resulting table state."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Pressing Escape hides the submission dialog without changing table counts. — Step 3 records that Escape produced no visible change and the dialog continued to be exposed, while counts remained 140, 60, 18, and 7."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Washer 11mm's plus stepper once changes its Counted value from 60 to 61 and its Variance from an em dash to +1. — Steps 6, 8, and 11 all record Washer remaining at Counted 60 with an em-dash variance; steps 8 and 11 instead changed Hex bolt M4 to 141 with +1."
+    }
+  ]
+}

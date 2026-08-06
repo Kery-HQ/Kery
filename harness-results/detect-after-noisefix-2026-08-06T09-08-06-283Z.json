@@ -1,0 +1,807 @@
+{
+  "label": "detect-after-noisefix",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 22,
+    "planted": 33,
+    "heldOut": {
+      "caught": 3,
+      "planted": 3
+    },
+    "costUsd": 2.6743,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-estimate",
+      "attempt": 1,
+      "durationMs": 85176,
+      "status": "passed",
+      "steps": 6,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.1886,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 2 and 3 explicitly report that SAVE10 is calculated from subtotal plus shipping ($4.80/$5.50) instead of 10% of the $42.00 subtotal ($4.20)."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": false,
+          "why": "None of the findings tests or reports a mismatch between the free-shipping badge and charged shipping at exactly the threshold."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": true,
+          "why": "Findings 1 and 4 explicitly report that entering invalid code NOTREAL shows an error while the previously applied SAVE10 discount remains applied."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The initial totals reconcile for the $42.00 cart: order total equals subtotal minus discount plus shipping.",
+          "status": "verified",
+          "evidence": "Step 1 records Subtotal $42.00, Shipping (Standard) $5.99, and Order total $47.99, explicitly confirming $42.00 − $0.00 + $5.99 = $47.99."
+        },
+        {
+          "claim": "Applying SAVE10 gives a discount exactly equal to 10% of the $42.00 subtotal ($4.20), rather than a percentage of subtotal plus shipping.",
+          "status": "contradicted",
+          "evidence": "Step 3 observes “SAVE10 applied — 10% off” but shows Discount (SAVE10) −$4.80; 10% of the recorded $42.00 subtotal is $4.20, not $4.80."
+        },
+        {
+          "claim": "Applying an invalid promo after SAVE10 shows an invalid-code error and removes the previously applied SAVE10 discount.",
+          "status": "contradicted",
+          "evidence": "Step 6 freshly observes the NOTREAL invalid-code error while the SAVE10 confirmation and discount are retained, so the prior discount was not removed."
+        },
+        {
+          "claim": "Selecting Express updates the totals so the Shipping amount and Order total consistently use the Express price.",
+          "status": "not_testable",
+          "evidence": "Step 6 confirms Express is selected, but the trace does not record the resulting Shipping amount or Order total needed to verify the recalculation against the Express $12.99 price noted in Step 5."
+        },
+        {
+          "claim": "Any FREE badge on a shipping tier agrees with the Shipping amount used in the totals.",
+          "status": "not_testable",
+          "evidence": "No step records a FREE badge or compares one to a corresponding totals Shipping amount."
+        }
+      ],
+      "findingTexts": [
+        "Submitting invalid promo code NOTREAL shows an invalid-code error but does not remove the previously applied SAVE10 discount; Discount (SAVE10) remains −$4.80 and the previous success confirmation rem",
+        "SAVE10 is calculated from subtotal plus the selected shipping price rather than exactly 10% of the $42.00 subtotal. It displayed −$4.80 with $5.99 Standard shipping and changes to −$5.50 with $12.99 E"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This page estimates shipping and discounts for a $42.00 cart. Work through these checks in order and record exactly what you observe for each: 1. Read the Subtotal, Shipping and Order total, then confirm the arithmetic: order total must equal subtotal minus any discount plus shipping. 2. Apply the promo code SAVE10 and check the Discount line equals exactly 10% of the SUBTOTAL (not of subtotal plus shipping) — state both numbers. 3. With SAVE10 still applied, apply an obviously invalid code such as NOTREAL; confirm the invalid-code error appears AND that the previous discount is removed rather than silently kept. 4. Select the Express tier and re-check that the order total updates consistently with the shipping price shown on that row. 5. Compare the FREE badge shown on a shipping row against the Shipping amount used in the totals — they must agree."
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 121304,
+      "status": "passed",
+      "steps": 16,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.3293,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": true,
+          "why": "The run explicitly reports that sam@example, a dotless-domain email, was accepted and advanced the wizard to Step 2 instead of showing validation."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run explicitly reports that a daily limit of 25 was accepted and advanced to Step 3 despite the stated 1-20 range."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run explicitly reports that clicking Remove note 2 removed gamma, the last note, rather than beta, the clicked second note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Continuing from step 1 with all fields empty keeps the user on step 1 and shows required errors for workspace name, email, and display name.",
+          "status": "verified",
+          "evidence": "After the empty Continue submission (step 1), the recorded observation at step 2 says Step 1 remained displayed with “Workspace name is required,” “Email is required,” and “Display name is required.”"
+        },
+        {
+          "claim": "A dotless-domain email such as sam@example is rejected and prevents advancing past step 1.",
+          "status": "contradicted",
+          "evidence": "The user entered sam@example with valid workspace and display names and clicked Continue (step 5); the subsequent step-2 interaction selects the Work focus area (step 6), demonstrating the wizard advanced instead of rejecting the malformed email."
+        },
+        {
+          "claim": "Step 2 rejects Max notes per day values above the stated maximum of 20, including 25.",
+          "status": "contradicted",
+          "evidence": "Max notes per day visibly contained 25 when Continue was submitted (step 8), and the next recorded interaction is on step 3 entering a note (step 9), demonstrating that the out-of-range value was accepted."
+        },
+        {
+          "claim": "Removing the second of three distinct notes removes the second note text (beta) while leaving alpha and gamma.",
+          "status": "contradicted",
+          "evidence": "After alpha, beta, and gamma were present and “Remove note 2” was clicked (step 14), the subsequent observation reports exactly alpha and beta remaining and gamma absent (step 15), so the third note was removed instead of beta."
+        },
+        {
+          "claim": "The completion summary note count matches the number of notes remaining after note removal.",
+          "status": "verified",
+          "evidence": "The post-removal observation records exactly 2 notes remaining, alpha and beta (step 15), and the final completion page says “Weekly planning is ready with 2 notes” (step 16)."
+        }
+      ],
+      "findingTexts": [
+        "Step 1 accepted the malformed dotless-domain email \"sam@example\" and advanced to Step 2 instead of rejecting it.",
+        "Step 2 accepted Max notes per day value 25 and advanced to Step 3 even though the field's allowed range is 1 to 20.",
+        "On Step 3, after adding notes \"alpha\", \"beta\", and \"gamma\", clicking \"Remove note 2\" removed \"gamma\" instead of \"beta\". The remaining list is alpha and beta."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a 3-step onboarding wizard. Work through these checks in order and record exactly what you observe for each: 1. On step 1 press Continue with everything empty and confirm each required field shows an error. 2. Enter an email with NO dot in the domain, for example sam@example (plus a valid workspace name and display name), press Continue, and record whether the wizard accepts it — a malformed email must be rejected. 3. On step 2 pick a focus area, then set 'Max notes per day' to 25 and press Continue; the field states the allowed range is 1 to 20, so 25 must be rejected — record what happens. 4. On step 3 add three notes with DISTINCT text (for example 'alpha', 'beta', 'gamma'), then remove the SECOND one and record exactly which note text disappeared and which remain. 5. Finish and confirm the summary's note count matches the number of notes you actually left in the list."
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 95945,
+      "status": "passed",
+      "steps": 6,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.1728,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "why": "The run explicitly reports that Vision-only filtering leaves 3 visible rows while the counter remains “Showing 5 of 5 models,” demonstrating the counter does not reflect the filtered list."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "The run reports that the second click changes the numeric-sort arrow from ↑ to ↓ but leaves the visible row order unchanged, exactly matching the direction-ignoring sort defect."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "With 10 input M tokens and 0 output M tokens, GPT-4o mini displays $6.00 instead of input rate $0.15 × 10 = $1.50, demonstrating that input usage is being priced incorrectly using the output rate."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The model counter matches the number of visible table rows before filtering.",
+          "status": "verified",
+          "evidence": "Step 1 records “Showing 5 of 5 models” and names five visible rows."
+        },
+        {
+          "claim": "Enabling the Vision only filter updates the counter to match the filtered visible rows.",
+          "status": "contradicted",
+          "evidence": "After Vision only was checked, step 2 observed the counter still at “Showing 5 of 5 models” while only three rows were visible: Claude Sonnet 4.5, Gemini 2.5 Flash, and GPT-4o mini."
+        },
+        {
+          "claim": "Clicking Input $/1M twice reverses the visible model order.",
+          "status": "contradicted",
+          "evidence": "Step 3 observed the first sort with GPT-4o mini first and Claude Sonnet 4.5 last; step 4 observed the second click changed the header to ↓ but the visible order remained GPT-4o mini, Gemini 2.5 Flash, Claude Sonnet 4.5."
+        },
+        {
+          "claim": "With 10 input M tokens/month and 0 output M tokens/month, each row’s Est. monthly equals its Input $/1M rate multiplied by 10.",
+          "status": "contradicted",
+          "evidence": "GPT-4o mini’s recorded Input $/1M rate was $0.15 in step 3, so 10 input million tokens and zero output should estimate $1.50, but step 6 recorded its estimate as $6.00."
+        },
+        {
+          "claim": "The row tagged cheapest has the lowest Est. monthly estimate among visible rows.",
+          "status": "not_testable",
+          "evidence": "Step 6 records visible estimates of $6.00, $6.00, and $150, but no step records which row, if any, carried the cheapest tag."
+        }
+      ],
+      "findingTexts": [
+        "With Vision only enabled, the second click on Input $/1M changes the header from ↑ to ↓ but does not reverse the visible table: GPT-4o mini ($0.15) remains first and Claude Sonnet 4.5 ($3.00) remains ",
+        "Monthly estimates are incorrect when Input M tokens / mo is 10 and Output M tokens / mo is 0: GPT-4o mini has an input rate of $0.15 per 1M but displays Est. monthly $6.00 instead of the expected $1.5",
+        "Vision-only filter shows 3 rows but counter remains “Showing 5 of 5 models” instead of filtered count."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This page compares LLM models with filters, sortable columns and a monthly cost estimate. Work through these checks in order and record exactly what you observe for each: 1. Note the 'Showing N of M models' counter and count the visible table rows — they must agree. 2. Tick 'Vision only', then re-count the visible rows AND re-read the counter; they must still agree. 3. Click the 'Input $/1M' column header twice and record the first and last row each time — the second click must reverse the order. 4. Set 'Input M tokens / mo' to 10 and 'Output M tokens / mo' to 0, then verify one row's 'Est. monthly' by hand: it must equal the row's Input $/1M multiplied by 10. State the row, the input rate and the estimate. 5. Confirm the row tagged 'cheapest' really has the lowest Est. monthly of the visible rows."
+    },
+    {
+      "case": "purchasify-licences",
+      "attempt": 1,
+      "durationMs": 145302,
+      "status": "passed",
+      "steps": 11,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.35,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "The run explicitly reports that \"Team Annual\" appears on both page 1 and page 2, matching the repeated boundary-row symptom."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": true,
+          "why": "The run reports that after remembering 37 seats and reloading, the value returns to 10 and the checkbox is unchecked, matching the persistence failure."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": true,
+          "why": "The run reports that Request quote is enabled and submits while no plan is selected, with the summary showing \"None selected,\" matching the missing-plan guard defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The paginated table shows all plan rows on page 1 and a distinct, non-overlapping set of plan rows on page 2.",
+          "status": "not_testable",
+          "evidence": "Step 1 records page-1 rows (Starter Monthly, Starter Annual, Team Monthly, Team Annual), but no step records the rows displayed on page 2, so completeness and non-overlap cannot be checked."
+        },
+        {
+          "claim": "After opting to remember a 37-seat team size, reloading the planner retains both the value 37 and the checked Remember my team size setting.",
+          "status": "not_testable",
+          "evidence": "Steps 2-4 show the checkbox checked and the field updated to 37, but the reload key action failed and the subsequent navigation records no post-reload state; no persistence result was observed."
+        },
+        {
+          "claim": "Request quote is disabled until the user selects a plan.",
+          "status": "contradicted",
+          "evidence": "Step 6 records that Request quote was enabled and clickable with no plan selected, and clicking it produced a DOM change."
+        },
+        {
+          "claim": "Selecting a Business plan below its stated Seats from minimum shows a minimum-seat warning and disables Request quote.",
+          "status": "verified",
+          "evidence": "Step 11 freshly observes Business Monthly selected at 10 seats against its 20-seat minimum, with its warning visible and Request quote disabled."
+        },
+        {
+          "claim": "For a selected plan, Estimated monthly equals the plan's per-seat price multiplied by the selected seat count.",
+          "status": "not_testable",
+          "evidence": "Step 11 records 10 seats and Estimated monthly $320.00, but the Business Monthly per-seat price is never recorded in the trace, so the total cannot be independently reconciled."
+        }
+      ],
+      "findingTexts": [
+        "Pagination duplicates the plan row \"Team Annual\": it appears on page 1 and again on page 2, despite the requirement that no plan appear on both pages.",
+        "Remembered team size does not persist across reload: after ticking \"Remember my team size\" and setting 37, reload shows team size 10 and the checkbox unchecked.",
+        "Request quote is clickable with no plan selected. Clicking it confirms \"Quote requested for 10 seats.\" even though the quote summary still shows \"Selected plan None selected\"."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This page lists seat licence plans across multiple pages, lets you set a team size that can be remembered between visits, and lets you request a quote for a selected plan. Work through these checks in order and record exactly what you observe for each: 1. On page 1, note the name of every plan row. Click Next and note every plan row on page 2 — no plan may appear on both pages. 2. Tick 'Remember my team size', set the team size to 37, then reload the page and record whether the team size is still 37 and whether the checkbox is still ticked. 3. Without selecting any plan, check whether the 'Request quote' button is clickable; it must be disabled until a plan is chosen. If it is clickable, click it and record what the confirmation says. 4. Select a Business plan with a team size below its stated 'Seats from' minimum and record whether the warning appears and whether the button is disabled. 5. Select a plan and confirm 'Estimated monthly' equals that plan's per-seat price multiplied by the seat count — state all three numbers."
+    },
+    {
+      "case": "bookflow-register",
+      "attempt": 1,
+      "durationMs": 169257,
+      "status": "passed",
+      "steps": 19,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.3963,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "workshop-price-label-vs-charge",
+          "class": "label-vs-value",
+          "caught": true,
+          "why": "The run explicitly reports that the selected ticket labels total $425 ($120 + $260 + $45) while the payment subtotal is $405, which surfaces that the Workshop option advertised as $260 is charged as $240."
+        },
+        {
+          "id": "back-discards-attendees",
+          "class": "navigation-data-loss",
+          "caught": false,
+          "why": "No finding describes navigating back from attendees to contact details and returning, or attendees being cleared/lost."
+        },
+        {
+          "id": "seats-input-has-no-effect",
+          "class": "dead-control",
+          "caught": false,
+          "why": "No finding describes changing the Seats reserved field or shows that it fails to affect pricing or confirmation."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Users can configure three attendees across Standard ($120), Workshop ($260), and Student ($45) ticket types, with seats reserved set to 3.",
+          "status": "verified",
+          "evidence": "Steps 7, 10, and 13 record Alice as standard, Bob as workshop, and Cara as student; step 14 observes Seats reserved = 3 matching those three attendees."
+        },
+        {
+          "claim": "The payment subtotal, discount, and total accurately reconcile with the selected ticket prices and the 15% promo.",
+          "status": "contradicted",
+          "evidence": "The three selected ticket prices recorded in steps 7, 10, and 13 total $425.00 ($120 + $260 + $45), but step 15 displays a $405.00 subtotal; consequently the displayed 15% discount of $60.75 and $344.25 total in steps 18-19 do not reconcile with the selected tickets (which would yield $63.75 discoun"
+        },
+        {
+          "claim": "Applying the valid promo code gives the registration a 15% discount before confirmation.",
+          "status": "verified",
+          "evidence": "Step 18 observes TEAM15 applied at 15% off with discount −$60.75 and total due $344.25, after the Apply action sequence."
+        },
+        {
+          "claim": "Confirming a completed registration reaches a final confirmation showing the organization, attendee count, and charged total.",
+          "status": "verified",
+          "evidence": "After the Confirm registration action in step 18, step 19 observes the green banner “Registration confirmed. 3 attendee(s) for Acme Events. Total charged $344.25.”"
+        }
+      ],
+      "findingTexts": [
+        "Confirmation screen still marks “3 · Payment” as the active step, making the completed state ambiguous.",
+        "Ticket prices total $425 ($120+$260+$45), but payment shows a $405 subtotal and calculates the charge from it.",
+        "Contact fields' visible labels are not programmatically associated: Organisation and Phone are exposed as unnamed textboxes."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": ""
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 1,
+      "durationMs": 66582,
+      "status": "failed",
+      "steps": 9,
+      "findings": 0,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.1664,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": false,
+          "why": "The run found that the Open only filter itself did not hide closed tickets; it did not exercise or report header select-all selecting filtered-out rows or an inflated selected count."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": false,
+          "why": "No finding reports closing selected tickets or the selection count remaining nonzero afterward."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "No finding reports a close confirmation toast or compares its reported count with the number of tickets actually closed."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting High priority restricts the queue to the High-priority tickets without losing matching ticket information.",
+          "status": "verified",
+          "evidence": "Steps 2 and 5 record that High priority displays exactly 3 of 8 tickets—Cannot reset password, Invoice total looks wrong, and Export never finishes—and restoring the cleared text filter returns those same three rows."
+        },
+        {
+          "claim": "The text filter narrows tickets by partial subject text and matches case-insensitively.",
+          "status": "verified",
+          "evidence": "Step 3 shows that filtering High-priority tickets by \"reset\" leaves 1 of 8, Cannot reset password (Open); step 4 shows uppercase \"RESET\" returns the same single ticket."
+        },
+        {
+          "claim": "Enabling Open only hides closed tickets from the full queue.",
+          "status": "contradicted",
+          "evidence": "After clicking Open only in step 6, the recorded observation says the table still lists all 8 tickets, including 6 Open and 2 Closed, rather than excluding the closed rows."
+        },
+        {
+          "claim": "Selecting an individual ticket row changes its selection state.",
+          "status": "verified",
+          "evidence": "Step 7 clicks the first visible row checkbox and records domChanged=yes, showing the row-selection control produced a page-state change."
+        },
+        {
+          "claim": "Bulk close closes all selected tickets.",
+          "status": "not_testable",
+          "evidence": "No bulk-close action was reached or observed before the run exited in step 9."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": ""
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 159445,
+      "status": "passed",
+      "steps": 12,
+      "findings": 4,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.3078,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "Finding 2 reports that undoing a shipment of 3 changes Cable 2m from the pre-shipment 28 to 22 rather than restoring 28, i.e. the shipment quantity is subtracted again."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "Finding 1 explicitly reports that stock exactly at the reorder point (25) is shown as OK with zero low items despite the stated 'at or below' rule."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": false,
+          "why": "No finding tests or reports refusal to ship exactly the full on-hand quantity. The reported shipment and undo issues involve shipping 3 units, not the entire available stock."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Recording a received quantity increases the selected item's on-hand inventory by that quantity and records the movement.",
+          "status": "verified",
+          "evidence": "Before recording, Cable 2m was observed at 18 on hand; after recording Received quantity 10, step 7 observed Cable 2m at 28 on hand with one received log entry, reconciling 18 + 10 = 28."
+        },
+        {
+          "claim": "Recording a shipped quantity decreases the selected item's on-hand inventory by that quantity and preserves the movement history.",
+          "status": "verified",
+          "evidence": "Step 9 observed Cable 2m at 28 before shipping quantity 3, and step 11 observed it at 25 with the movement log showing the shipped 3 entry followed by the received entry, reconciling 28 - 3 = 25."
+        },
+        {
+          "claim": "Low-stock status is determined against the reorder point without losing threshold information: stock below the point is Low, while stock at or above it is OK.",
+          "status": "verified",
+          "evidence": "Cable 2m was observed as 18 versus reorder 25 and marked Low before receipt (step 6), then as 28 versus 25 and OK after receipt (step 7), and as exactly 25 versus 25 and still OK after shipment (step 11)."
+        },
+        {
+          "claim": "Undo last reverses the most recent inventory movement and restores the prior on-hand quantity.",
+          "status": "contradicted",
+          "evidence": "After the shipped movement reduced Cable 2m from 28 to 25, clicking Undo last produced domChanged=NO and the post-click observation in step 11 still showed 25 on hand with the shipped 3 entry present, rather than restoring 28 and removing/reversing that movement."
+        }
+      ],
+      "findingTexts": [
+        "At the reorder threshold, low-stock flagging is incorrect: after shipping Cable 2m from 28 to 25, the item row still shows status \"OK\" and the \"Items low\" summary remains 0, although the page states i",
+        "Undo last produces an incorrect inventory quantity: after undoing the last shipped quantity of 3 from Cable 2m, the log retains only “Received 10 × Cable 2m” and movement count becomes 1, but Cable 2m",
+        "Inventory table columns shift noticeably after recording, making the layout jump between states.",
+        "Shipped 3 from 28 records as 22 (subtracts 6) and leaves movement count/log at 1 instead of adding shipment."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": ""
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 1,
+      "durationMs": 78620,
+      "status": "passed",
+      "steps": 5,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.1539,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run explicitly reports that submitting the empty form leaves the visible screen unchanged with no validation message or other feedback, matching the off-screen validation-message defect."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run states that profile inputs rely on disappearing placeholders rather than persistent visible labels after entry, matching the missing labels/accessibility naming defect."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The findings concern empty-form validation feedback. They do not describe a save operation taking about three seconds without spinner, disabled state, or status feedback."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting the account settings form with all fields empty visibly shows validation feedback to the user.",
+          "status": "contradicted",
+          "evidence": "Step 1 clicked “Save changes” on the empty form, but the trace records no DOM change or visible validation observation; the directly attempted submission produced no recorded visible effect."
+        },
+        {
+          "claim": "Text inputs retain persistent visible labels rather than relying only on placeholders that disappear when typing.",
+          "status": "not_testable",
+          "evidence": "Step 3 confirms that the Full name placeholder disappears after typing, but the trace never records whether persistent visible labels are present for Full name, Email address, or the other text inputs."
+        },
+        {
+          "claim": "Entering text into the Full name field replaces its placeholder with the entered name.",
+          "status": "verified",
+          "evidence": "Step 3 observed that the Full name field visibly contains “Alex Morgan” and that its placeholder is no longer shown."
+        },
+        {
+          "claim": "Saving valid profile details completes successfully and shows a saved confirmation.",
+          "status": "verified",
+          "evidence": "After valid values were entered and Save changes was clicked in step 4, step 5 recorded the retained Full name and Email address values and a green saved confirmation."
+        },
+        {
+          "claim": "While a valid save is in progress, the interface provides observable progress feedback such as a changed or disabled Save changes button.",
+          "status": "not_testable",
+          "evidence": "Step 4 observed the button enabled with its normal “Save changes” text, and step 5 observed the completed state, but no observation was recorded during any in-progress interval; a brief loading state could have been missed and no wait duration was recorded."
+        }
+      ],
+      "findingTexts": [
+        "Submitting the account settings form with all fields empty leaves the visible screen unchanged: no validation message, error styling, or focus movement is shown to a sighted user.",
+        "Profile inputs rely on disappearing placeholders rather than persistent visible labels after entry."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is an account settings form. Work through these checks and record exactly what you observe: 1. Press 'Save changes' with every field empty and describe what visibly happens on screen — any validation message must be VISIBLE to a sighted user, not merely present in the DOM. 2. Describe how each text input is labelled: state whether a persistent visible label exists, or only placeholder text that disappears once you type. 3. Fill in a valid name and email, press Save, and describe what the interface shows between the click and the confirmation — state whether the button changes, disables, or gives any progress feedback, and roughly how long the wait is."
+    },
+    {
+      "case": "gridworks-report-ui",
+      "attempt": 1,
+      "durationMs": 43492,
+      "status": "passed",
+      "steps": 2,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 0,
+      "costUsd": 0.0797,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "delta-text-too-faint",
+          "class": "contrast",
+          "caught": true,
+          "why": "The run explicitly reports that the small comparison text below each headline metric has insufficient contrast against the white cards and is too faint to read."
+        },
+        {
+          "id": "summary-text-clipped",
+          "class": "overflow",
+          "caught": true,
+          "why": "The run explicitly reports that the agent summary is cut off mid-sentence without an ellipsis or a way to expand/read the remaining text."
+        },
+        {
+          "id": "actionbar-covers-last-row",
+          "class": "occlusion",
+          "caught": false,
+          "why": "No finding describes the fixed bottom action bar overlapping or hiding part of the final table row."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The small comparison text beneath each weekly headline statistic is comfortably legible against the white card.",
+          "status": "not_testable",
+          "evidence": "The trace contains no recorded on-screen observation of any comparison-text line, its contrast, or its readability."
+        },
+        {
+          "claim": "The first agent's “Summary of the week” displays the full sentence without being cut off, with any truncation clearly indicated or expandable.",
+          "status": "not_testable",
+          "evidence": "The trace does not record the first agent's summary text or whether an ellipsis, truncation, or expand control was visible."
+        },
+        {
+          "claim": "At the bottom of the report, the fixed bar containing “Export CSV” and “Send to stakeholders” does not cover table content.",
+          "status": "verified",
+          "evidence": "Step 1 scrolls to the bottom specifically to inspect the fixed bar, and step 2 records the observed result that the fixed action bar does not obscure the table."
+        }
+      ],
+      "findingTexts": [
+        "The small comparison text below each headline metric has insufficient contrast against the white cards and is too faint to read comfortably.",
+        "The first agent’s “Summary of the week” text is cut off mid-sentence without an ellipsis or an expand/read-more control."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a weekly report page. Work through these checks and record exactly what you observe: 1. Read the small comparison text under each headline number (for example the '+12% vs last week' line) and state whether it is comfortably legible against the white card, or too faint to read. 2. Read the 'Summary of the week' cell for the first agent and state whether the full sentence is readable or visibly cut off mid-sentence, and whether any indication such as an ellipsis or expand control is offered. 3. Scroll to the very bottom of the page and state whether the fixed bar holding 'Export CSV' and 'Send to stakeholders' covers any table content."
+    },
+    {
+      "case": "stockroom-audit-ui",
+      "attempt": 1,
+      "durationMs": 89732,
+      "status": "passed",
+      "steps": 7,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.1458,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "caught": true,
+          "why": "The run explicitly reports the +/- steppers are approximately 16×16 px and too small for comfortable/accurate touch use."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "caught": true,
+          "why": "The run reports that Tab traversal shows no visible focus indicator or outline, matching the missing focus indication defect."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "caught": true,
+          "why": "The run reports the confirmation dialog has no close button and remains open after Escape and backdrop clicks, matching the undismissable modal defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The plus and minus count steppers are comfortably large enough for accurate touch use.",
+          "status": "contradicted",
+          "evidence": "Step 7 records that the steppers appear approximately 16×16 px and are not comfortably large for accurate touch use."
+        },
+        {
+          "claim": "Tab-only navigation visibly indicates which audit control currently has focus.",
+          "status": "contradicted",
+          "evidence": "After the Tab traversal in steps 1–2, step 3 observes that no control has an apparent visible focus outline."
+        },
+        {
+          "claim": "Pressing Submit audit opens an Audit submitted confirmation dialog.",
+          "status": "verified",
+          "evidence": "Step 4 records that submitting opened the “Audit submitted” dialog with the recorded-counts and variance-report message."
+        },
+        {
+          "claim": "The submission confirmation dialog can be dismissed using a close control, Escape, or a click outside the dialog.",
+          "status": "contradicted",
+          "evidence": "The close-area click left the dialog open (step 5), Escape left the same dialog visibly present (step 6), and the backdrop click produced no DOM change (step 6)."
+        }
+      ],
+      "findingTexts": [
+        "The submission confirmation dialog cannot be dismissed by any tested method: it has no visible close button, pressing Escape leaves it open, and clicking the backdrop outside it leaves it open.",
+        "Per-item +/- steppers are ~16px, not comfortably touch-target sized for accurate stock counts.",
+        "Tab traversal reaches steppers but shows no visible focus indicator, preventing keyboard users from locating focus."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a stock audit screen. Work through these checks and record exactly what you observe: 1. Describe the size of the plus and minus stepper controls next to each count and state whether they are comfortably large enough to hit accurately, especially on a touch screen. 2. Move focus between the controls using the Tab key only and state whether the currently focused control is visibly indicated on screen. 3. Press 'Submit audit' to open the confirmation dialog, then try to close it — try a close button, the Escape key, and clicking outside the dialog — and state whether any of these dismiss it."
+    },
+    {
+      "case": "bookflow-checkout",
+      "attempt": 1,
+      "durationMs": 79350,
+      "status": "failed",
+      "steps": 7,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.1441,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "total-does-not-reconcile",
+          "class": "currency-rounding",
+          "caught": true,
+          "why": "The run explicitly reports that Subtotal $926.47 plus Tax $76.43 equals $1002.90 while the displayed Total is $1002.89, a one-cent reconciliation mismatch."
+        },
+        {
+          "id": "double-submit-duplicates-order",
+          "class": "async-guard",
+          "caught": true,
+          "why": "The run reports that two rapid Place order presses created two distinct orders, BK-1001 and BK-1002, rather than blocking the second submission."
+        },
+        {
+          "id": "failed-payment-shows-nothing",
+          "class": "silent-error",
+          "caught": true,
+          "why": "The run reports that a billing email without @ leaves checkout in Processing with no validation/error feedback and no order recorded."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The item line totals add up to the displayed Subtotal.",
+          "status": "verified",
+          "evidence": "Step 1 records Standard seat ×3 $360.02, Workshop seat ×2 $521.11, and Student seat ×1 $45.34; these sum to the displayed Subtotal of $926.47."
+        },
+        {
+          "claim": "The displayed Total accurately equals Subtotal plus Tax.",
+          "status": "contradicted",
+          "evidence": "Step 1 records Subtotal $926.47 and Tax $76.43, which calculate to $1002.90, while the displayed Total is $1002.89."
+        },
+        {
+          "claim": "Pressing Place order twice quickly records only one order and prevents duplicate submission.",
+          "status": "contradicted",
+          "evidence": "After the first submission, Step 2 observes confirmed order BK-1001 and one order entry; after the immediate second submission, Step 3 observes confirmation for BK-1002 and exactly two entries."
+        },
+        {
+          "claim": "Submitting with a billing email that lacks an @ sign gives the user error feedback rather than silently doing nothing.",
+          "status": "contradicted",
+          "evidence": "Step 5 confirms the visible billing email is \"invalidemail\" and no orders are present; the subsequent Place order action produced no page-state change (Step 6: repeated action with no page state change), with no error feedback observed."
+        }
+      ],
+      "findingTexts": [
+        "Duplicate order submission: two rapid presses of Place order created two orders, BK-1001 and BK-1002, instead of preventing the second submission.",
+        "Submitting a billing email without an @ sign leaves checkout indefinitely in \"Processing...\" with no validation or error feedback and no order recorded.",
+        "Displayed total is wrong: $926.47 subtotal + $76.43 tax = $1002.90, not $1002.89."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a checkout screen. Work through these checks and record exactly what you observe: 1. Read every line total, the Subtotal, the Tax and the Total. State whether the line totals add up to the Subtotal, and whether Subtotal plus Tax equals the Total, giving every figure. 2. Press 'Place order' twice in quick succession. A second press must NOT create a second order — read the 'Orders placed' list and state how many orders were recorded and whether that is correct. 3. Reload, replace the billing email with a value containing no @ sign, press 'Place order', wait several seconds, and state exactly what the screen shows afterwards and whether the user is told anything went wrong."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 1,
+      "durationMs": 117456,
+      "status": "failed",
+      "steps": 12,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.2396,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run explicitly observed that a shift booked for 15/08/2026 was displayed as 14 Aug 2026, i.e. the previous day."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "The finding concerns inability to clear/backspace the search field while it remains \"A\"; it does not describe a later query showing stale results from an earlier query."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "No finding reports HTML-containing search text being rendered as formatting rather than displayed literally."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Booking a shift preserves the selected calendar date on the booked-shift line, without losing or changing the date during display formatting.",
+          "status": "not_testable",
+          "evidence": "Step 3 records the form date as 15/08/2026 with underlying value 2026-08-15 after clicking Book shift, but it does not record the originally selected date or a resulting booked-shift line to compare against it."
+        },
+        {
+          "claim": "Searching the Team directory for “Am” lists Amara Osei and identifies the results as being for “Am”.",
+          "status": "verified",
+          "evidence": "Step 5 observed that after the required two-second wait, Amara Osei was the only listed name and the status said the results were for “Am”."
+        },
+        {
+          "claim": "The Team directory search can be cleared before entering a new query.",
+          "status": "contradicted",
+          "evidence": "After the clearing attempts, step 9 observed that the Search field still displayed “A” with the results/status unchanged, and step 10 likewise recorded that the attempted Backspace produced no visible change."
+        },
+        {
+          "claim": "Entering the text <b>zz</b> in Team search displays it literally rather than interpreting it as HTML formatting.",
+          "status": "not_testable",
+          "evidence": "The run became stuck while attempting to clear the existing “A” query and never entered <b>zz</b> or observed its rendered search text/results."
+        }
+      ],
+      "findingTexts": [
+        "Booking a shift for 15/08/2026 displays the booked shift as Fri, 14 Aug 2026, one day earlier than the selected date."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a shift scheduling screen. Work through these checks and record exactly what you observe: 1. Book a shift for a specific date, then read the booked shift line and state whether the date shown is the same date you selected. 2. In the Team directory search, type the two letters 'Am' at a normal typing speed, wait two seconds, then state which names are listed and which search term the results claim to be for. 3. Clear the search and type the text <b>zz</b> into it, then state whether that text appears literally on screen or is interpreted as formatting."
+    }
+  ]
+}

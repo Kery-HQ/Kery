@@ -1,0 +1,177 @@
+{
+  "label": "noise-v17",
+  "runs": 16,
+  "cleanRuns": 1,
+  "raw": 28,
+  "deduped": 28,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A user can select the Workshop ticket type for attendee Alex. — Steps 5-13 repeatedly attempt to select Workshop directly, by keyboard, and by clicking dropdown coordinates; every recorded observation still shows “Standard — $120” and no relevant DOM change."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Valid promo code TEAM15 is rejected. Applying the displayed TEAM15 produces “That promo code is not recognised.” and leaves discount at −$0.00 instead of the expected $63.75 discount and $361.25 total"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 gives the required 15% discount ($63.75) and total ($361.25) for the three attendees totaling $425.00. — The attendee rows recorded in steps 46 and 50 are Workshop ($260), Student ($45), and Standard ($120), reconciling to the Payment subtotal of $425.00 in step 51, but step 52 records TEAM15 as “That promo code is not recognised.” with Discount −$0.00 and Total $425.00 instead of −$63.75 and $361.25."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Required-name validation pushes the Notifications card downward by approximately 16px (top around y459 before validation and around y475 after the \"Full name is required.\" error appears), contrary to "
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Saved account settings do not fully persist after reload. After saving Full name “Persistence Quinn”, email “persistence.quinn@example.com”, company “Quinn Logistics”, digest “Daily”, and delivery not"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Every saved profile and notification value survives reloading the account settings page without loss or reset. — The final dataset saved Persistence Quinn, persistence.quinn@example.com, Quinn Logistics, Daily, and “Call the front desk before delivery.” (steps 14-18), but after reloading, step 20 records empty Full name, Email address, Company, and Delivery notes fields; only Daily remained selected."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended invalid-card rejection is absent: 0000 0000 0000 0000 creates confirmed receipt BK-1002."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting an invalid card number such as 0000 0000 0000 0000 visibly explains the card failure and places no order. — The invalid card is visible in Step 10, but the subsequent Place order attempt produced no recorded result, and Step 11 records a repeated Place order action with no page state change; no card-validation feedback was observed."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Clicking Place order twice immediately with the default valid values created two orders. Orders placed shows “BK-1001 — $1002.90 to finance@northwind.test” and “BK-1002 — $1002.90 to finance@northwind"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Place order twice immediately creates only one receipt and shows only one confirmation reference. — After the second immediate click, Step 8 observed “Order BK-1002 confirmed.” and exactly two receipts, BK-1001 and BK-1002; Step 7 also noted the button remained enabled after the first submission."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Changing Priority to Low cleared the selected hidden High-priority ticket. Clicking Close selected then produced the visible toast “Closed 0 ticket(s).”; toolbar shows 0 selected and button disabled, "
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Changing Priority from Low to All clears the existing “tYpO” subject search instead of preserving filters independently."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Header and row selection checkboxes have no accessible names, appearing as “unnamed checkbox” in the control inventory."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV displays the confirmation “Export queued.” — Step 2 clicked Export CSV with domChanged=NO, and step 3 immediately observed no visible alert or confirmation while the report and both buttons remained unchanged."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders displays the confirmation “Report sent.” — Step 3 clicked Send to stakeholders with domChanged=NO and records no resulting confirmation or other observed effect."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders displays visible confirmation that the report was sent rather than leaving the page unchanged. — Step 2 clicked Send to stakeholders and immediately inspected feedback, but recorded domChanged=NO and no resulting confirmation or other observed effect."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Booking an assignee value of <b>Unsafe Name</b> creates a booked-shift row showing “Unsafe Name” in bold, with the angle-bracket markup absent. The input itself retains the literal markup, so the rend"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Recording a receipt of 3 Cable 2m units updates Cable, totals, movement count, and the movement log. — Immediately after the Record action in step 9, the observation still reports Cable at 18, totals at 535, 0 movements, and the movement log unchanged; no receipt effect was observed from that action."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Undo last after a 3-unit Cable receipt restores Cable, totals, movement count, and the log exactly to their initial state. — The Undo last action in step 10 instead left the visible state at Cable 21, 538 total units, 2 low items, 1 movement, with a visible “Received” log entry rather than restoring the initial 18/535/0/empty state."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Quantity spinbutton has no accessible name in the interactive-element trace."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Confirmation modal does not trap keyboard focus: pressing Tab while it is open moves focus to background stepper controls."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Required standalone route /stockroom/audit.html is unavailable: it returns HTTP 404 File not found, preventing verification of its Washer 11mm and Panel A3 system/counted values and required stepper a"
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Keyboard traversal keeps every reachable stepper, Reset, Submit, and modal Close control visibly focused. — After Shift+Tab in the open dialog, step 5 records that no visible focus ring or modal panel was discernible; the modal Close control also could not be operated in step 6."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The confirmation dialog remains fully legible and unclipped, including its title, message, and Close button, at desktop and narrow mobile widths. — The desktop dialog content was recorded with a truncated message in step 6, and no narrow/mobile viewport observation was performed."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The confirmation dialog can be closed by its Close button, backdrop, and Escape after submission. — The named Close control failed to close in steps 3 and 6 (failed with no DOM change), and after Escape the dialog title, truncated message, and Close button remained exposed in page content in step 6."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Washer 11mm decrement control updates the wrong row: clicking its minus button decrements Hex bolt M4 instead of Washer 11mm."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Each stock item’s increment and decrement steppers update that item’s counted quantity and its variance accurately. — After the initial Hex bolt controls worked (steps 1-3), attempts to operate Washer, Cable, and Panel controls instead changed earlier rows: Washer actions changed Hex bolt (steps 4-6), Cable minus changed Washer (step 7), and Panel A3 decrement changed Cable (step 10)."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "The audit confirmation dialog is visibly presented and can be dismissed by the user. — A dialog named “Audit submitted” remained in the interactive-element list after the Close attempt failed (steps 8-9) and after Escape (steps 12-13), while the screenshots showed no visible dialog overlay."
+    }
+  ]
+}

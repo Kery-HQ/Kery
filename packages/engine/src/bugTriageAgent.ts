@@ -26,6 +26,11 @@ Rules:
 - If two new bugs are duplicates, keep the clearer one and set the duplicate to keep=false.
 - Match open issues semantically (not exact text only).
 - Keep output deterministic and concise.
+- NEGATIVE CLAIMS NEED A QUOTED OBSERVATION: a bug asserting that something did NOT happen — no error appeared, a value never updated, a control did nothing, a code was not applied, a confirmation was missing — must quote the concrete text or value seen in its place. Drop it when it does not. Measured against pages verified correct beforehand, unquoted negative claims were the single largest source of false reports: promos that had in fact applied, validation errors that were in fact displayed, buttons that had in fact disabled.
+- BRIEF STATES ARE NOT ABSENT: drop bugs asserting that a spinner, disabled button, "Processing"/"Saving" label or toast never appeared, unless the bug states the observation was taken WHILE the operation was still running. These states last a moment; observing afterwards misses them and proves nothing.
+- THE TESTER'S OWN FAILURE IS NOT A PRODUCT BUG: drop bugs whose evidence is that the agent could not enter a value, could not find a control, or had its input land somewhere unexpected, unless the report shows the control itself is genuinely unusable — for example it is disabled, absent, or rejects a value the page states is valid.
+- INVENTED ADDRESSES: drop bugs whose evidence is that a URL returned 404 or was unavailable, when that URL looks assembled from a source file path rather than followed from a link in the app. Source layout is not routing.
+- UNREPEATED CONTROL CLAIMS: drop bugs asserting a control acted on the wrong element or did nothing, unless the report states the interaction was repeated and behaved the same way. A single mis-aimed click is the usual cause.
 - Date/year bugs: before flagging a displayed year as "wrong" or "future", check it against the current date provided in the system prompt. A year that equals the current year is NOT a bug.
 - Placeholder text: drop bugs that describe placeholder/example text in empty inputs as "prefilled data" — that is styling, not state.
 - Blocked runs: if the run was blocked before reaching a surface, drop bugs that speculate about that unreached surface; keep the blocker bug itself.

@@ -1,0 +1,351 @@
+{
+  "label": "noise-v15",
+  "runs": 16,
+  "cleanRuns": 1,
+  "raw": 57,
+  "deduped": 57,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Attendee name <strong>MARKUP</strong> is rendered as bold MARKUP in the newly added row instead of being displayed literally; this demonstrates unsanitized markup rendering."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Contact validation accepts punctuation-only phone input (-------) and advances to Attendees instead of showing a visible phone validation error and remaining on Contact."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "TEAM15 is rejected as unrecognised and leaves discount at −$0.00 rather than applying its promo discount."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "An attendee name containing <strong>MARKUP</strong> is displayed literally rather than interpreted as HTML markup. — Step 28 observes the new row as bold \"MARKUP · workshop\", explicitly not the literal string, showing the markup was rendered."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A punctuation-only phone number is rejected with a visible phone error and Contact remains the active step. — Step 37 submits phone value \"-------\" without observing a phone error, and step 38 records the final state as step 2 Attendees, so the invalid input advanced the wizard."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "On Attendees, clicking “Add attendee” with the required Attendee name empty leaves “No attendees yet.” and provides no visible message explaining that an attendee name is required."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Applying the stated TEAM15 promo code displays “That promo code is not recognised.” and leaves discount at −$0.00 and total at $305.00, rather than applying the expected promotion."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Changing Seats reserved from 1 to 2 does not affect Payment: the Payment screen still shows Attendees 1, Subtotal $120.00, Discount −$0.00, and Total due $120.00 rather than charging two reserved Stan"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Discount renders as a confusing negative zero amount (“−$0.00”) after an invalid promo code."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Add attendee with an empty attendee name displays a visible required-name message rather than silently leaving the list unchanged. — After Add attendee was clicked with an empty name in step 24, the subsequent observation in step 25 still showed an empty name, “No attendees yet,” and no validation message."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Payment recalculates for changed reserved seats and correctly handles promo replacement, including applying TEAM15 and clearing its discount when BADCODE is applied. — TEAM15 produced a visible “not recognised” error with $0.00 discount in steps 35-36, and after seats were changed from 1 to 2 in step 49, step 50 still showed the one-standard-ticket subtotal and total of $120.00 rather than the expected $240.00."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Email validation error does not clear when invalid email ada@example is replaced with valid ada@example.com before resubmission."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Invalid-email error expands the Profile card and shifts Notifications and Save changes downward."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "With Full name empty and valid email, Save changes has no effect; required-name error is never shown."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After clearing Full name, prior “Your changes have been saved.” confirmation remains despite invalid unsaved form."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Editing an invalid email to a valid email clears the email validation error before the next submission. — After the email was changed to ada@example.com in step 8, step 9 observed that the stale \"Enter a valid email address.\" message remained displayed."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "With valid values \"Grace Hopper\" and \"grace@example.com\", clicking Save changes left the button enabled and labeled \"Save changes\" immediately; it never visibly entered a disabled Saving state. A sing"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Submitting with Full name empty and Email address \"grace@example.com\" displayed \"Full name is required.\" but expanded the Profile card from approximately y=121–442 to y=121–456 and moved Save changes "
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Correcting Full name to Ada Lovelace leaves the stale “Full name is required.” error visible."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Submitting malformed ada@example shows no intended valid-email error; only stale name error remains."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Save changes with valid name and email disables the button while it shows Saving, and rapid double-clicking produces exactly one saved confirmation. — At steps 3–4, Save changes was clicked twice; after the first click the recorded observation says the button was still enabled and labeled \"Save changes\" rather than disabled with \"Saving\" (step 4), although one truncated confirmation beginning \"Your cha\" was visible."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The checkout accepted an empty Card number: it visibly shows \"Order BK-1001 confirmed.\" and one receipt, \"BK-1001 — $1002.90 to valid@example.test\", rather than a card error and no receipt."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Invalid email '@' is accepted: intended rejection/no receipt, but BK-1001 confirmation and receipt are created."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "After clicking Place order with valid billing details, the checkout visibly shows “Processing…” and disables Place order during the 1.2-second processing delay. — Step 1 clicked Place order, and the subsequent observation in step 2 reports that the order had completed with “Order BK-1001 confirmed.” and one receipt, with “no in-progress st[ate]” observed; no processing message or disabled button state was recorded."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting valid@example.test with an empty Card number rejects the order with a visible card error and leaves no receipt. — Steps 5-7 set the email, cleared the card, and clicked Place order, but the only recorded post-click observation still showed the pre-submit state (“No orders yet”) and no visible card error; the page was then reloaded in step 8 without a processing result being observed."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting billing email “@” with the default card shows an invalid-email error and keeps Orders placed at “No orders yet.” — After steps 9-10 submitted “@” with card “4242 4242 4242 4242,” step 11 observed “Order BK-1001 confirmed.” and exactly one receipt, “BK-1001 — $1002.90 to @,” rather than an invalid-email error and no orders."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Checkout accepts the incomplete 15-digit card number \"4242 4242 4242 424\" and creates a receipt instead of visibly rejecting it. Status: \"Order BK-1002 confirmed.\"; receipt BK-1002 — $1002.90 to finan"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Invalid email `finance@` is accepted: UI confirms BK-1001 and adds a $1002.90 receipt instead of showing an email error."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Submitting card number \"4242 4242 4242 424\" visibly rejects the card and does not add a receipt. — After the incomplete-card submission in step 3, step 4 observes two visible receipts and confirmation \"Order BK-1002 confirmed.\", demonstrating that an additional order was accepted rather than rejected."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Submitting billing email \"finance@\" with the default card visibly shows an invalid-email error and leaves the receipt list at zero orders. — The invalid-email submission was performed in step 6, but step 7 reports a final visible receipt count of one; no invalid-email error message is recorded."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After closing \"Invoice total looks wrong\" in check 1, enabling Open only shows five open rows (Cannot reset password, Feature request: dark mode, Typo on pricing page, SSO login loop, Billing address "
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "High priority filtering after the earlier bulk close displays only one High Open ticket (Cannot reset password), so select-all selects one row rather than the expected three visible High-priority rows"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Success toast remains visible while later searches and priority filters are changed, leaving stale feedback on screen."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Table columns reflow horizontally when filters reduce rows, causing headers and values to jump between states."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "With Open only enabled, empty search, and Priority All, the queue shows exactly six open tickets and the status says “Showing 6 of 8 tickets.” — With Open only enabled, Priority All, and an empty search field, the trace observes only five visible rows (step 6), not the expected six."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "With Priority High selected, select-all checks all three visible High-priority rows, checks the header checkbox, and reports “3 selected.” — After setting Priority to High with Open only enabled and search empty, the trace observes only one visible High-priority row, “Cannot reset password,” rather than three; no observed selection state or “3 selected” summary is recorded after the attempted select-all click (step 11)."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Unchecking the header select-all checkbox under the High priority filter clears the previously selected hidden SSO login loop ticket as well as the three visible tickets. The footer shows “Showing 3 o"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Disabled “Close selected” label has extremely low contrast against the white background, reducing readability."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Header and ticket-row selection checkboxes have no accessible names, so assistive tech cannot identify them."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After selecting SSO login loop, selecting all visible High-priority rows and then unchecking header select-all leaves only SSO selected with a status of 1 selected. — Step 16 directly attempts to uncheck header select-all but records domChanged=NO and observes the header checkbox and all three visible High rows still checked, rather than leaving only the hidden SSO selection."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Headline Resolved is 128, but the nine visible agent rows are Amara Osei 34, Kai Lindqvist 29, Sena Vural 26, Rui Tavares 21, Mira Halden 18, Otto Brandt 17, Ines Duarte 15, Tomas Nagy 14, and Lena Ma"
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The headline Resolved statistic equals the sum of the Resolved values across all nine agent rows. — Step 4 states that the headline-to-table total mismatch was recorded; no matching headline and nine-row totals are observed in the trace."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Send to stakeholders produces no visible browser alert saying “Report sent.” after activation."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Resolved headline is 128, but the nine displayed agent values total 186; intended headline must equal agent sum."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders displays a browser alert saying “Report sent.” — Step 6 clicked Send to stakeholders, and step 7 explicitly observed that Send had previously been clicked but no alert was visible."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV displays a browser alert saying “Export queued.” — Step 7 clicked Export CSV, while the final verification in step 9 reports that neither required alert appeared."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "The Resolved headline reconciles with the nine agent Resolved values, whose total is 186 rather than 128. — Step 8's recorded observation states that the headline total disagrees with the agent details, and step 9 confirms the run found a headline/detail mismatch; the specified nine agent values sum to 186."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Clicking \"Book shift\" with an empty Shift date and Assign to \"Amara Osei\" leaves \"No shifts booked.\" visible but displays no visible date error."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Item selection control timed out during mobile control reachability testing; selection could not be operated."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended reset=1 fresh screen does not reset inventory: Cable receipt persists (19 units, 536 total, 1 movement)."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Cable’s on-hand error remains after changing the form to a valid Panel A3 receipt; it should clear on correction."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Quantity input is exposed as an unnamed spinbutton despite the visible “Quantity” label."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "When counted equals system, Variance renders as “—” rather than the required zero value."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Stepper controls expose only repeated “−”/“+” names, not their inventory row, so non-first items are not identifiable."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Keyboard Tab traversal gives every audit stepper and action a visible, identifiable focus indicator. — Steps 2 and 3 attempted continued Tab traversal with domChanged=NO, and step 7 records a repeated Tab action with no page state change; no focus indicator or focused control was observed."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Keyboard Tab traversal reaches every stepper and bottom action control with a visible focus indication, including controls reached after rendering changes. — Steps 4-7 observed visible blue focus outlines for Hex bolt and Washer steppers, but the traversal produced no observed focus result at the Cable controls (step 8), repeated without page state change (step 9), and the run was forced to exit before Reset or Submit could be reached (step 10)."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "The confirmation dialog Close control dismisses the dialog and returns the user to the audit table. — The attempted click to dismiss the visible confirmation dialog failed with domChanged=NO in step 2; no return to the audit table was observed."
+    }
+  ]
+}
