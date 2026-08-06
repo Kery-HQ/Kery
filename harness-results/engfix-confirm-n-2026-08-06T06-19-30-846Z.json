@@ -1,0 +1,161 @@
+{
+  "label": "engfix-confirm-n",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 6,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.6591,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 147675,
+      "status": "passed",
+      "steps": 16,
+      "findings": 4,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.3343,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": true,
+          "why": "The run explicitly reports that sam@example, whose domain has no dot, was accepted and advanced from Step 1 to Step 2 instead of showing validation."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run explicitly reports that value 25 was accepted despite the stated 1–20 range and advanced from Step 2 to Step 3 without a validation error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove note 2 removed gamma, the last note, rather than beta, the clicked second note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting Step 1 empty shows required-field errors for Workspace name, Email, and Display name.",
+          "status": "verified",
+          "evidence": "After the empty Continue submission, Step 2 records that Step 1 remained visible with “Workspace name is required”, “Email is required”, and “Display name is required” all shown."
+        },
+        {
+          "claim": "Step 1 rejects an email address whose domain has no dot, such as sam@example.",
+          "status": "contradicted",
+          "evidence": "After entering “sam@example” with valid workspace and display names and clicking Continue, Step 6 observed navigation to “How do you plan?” (Step 2 of 3), explicitly confirming the malformed address was accepted."
+        },
+        {
+          "claim": "Step 2 rejects a Max notes per day value of 25 because the permitted range is 1 through 20.",
+          "status": "contradicted",
+          "evidence": "After selecting Work and setting the value to 25, the subsequent submission advanced to “Add your first notes” (Step 3 of 3) with no range-validation error displayed (Step 9)."
+        },
+        {
+          "claim": "Removing the second of three distinct notes removes the second note’s text while preserving the first and third notes.",
+          "status": "not_testable",
+          "evidence": "Remove note 2 was clicked with a DOM change (Step 14), but the trace contains no post-removal observation of which note text disappeared or which texts remained."
+        },
+        {
+          "claim": "The final summary note count matches the notes actually remaining after removal.",
+          "status": "not_testable",
+          "evidence": "The final snapshot says “Test Workspace is ready with 2 notes” (Step 16), but the trace never records the post-removal note list needed to reconcile that derived count with the remaining note texts."
+        }
+      ],
+      "findingTexts": [
+        "Step 1 accepts malformed email \"sam@example\" (domain has no dot) and advances to Step 2 instead of rejecting it.",
+        "Step 2 accepts Max notes per day value 25 despite the stated allowed range of 1 to 20, and advances to Step 3.",
+        "On Step 3, after adding notes \"alpha\", \"beta\", and \"gamma\", clicking \"Remove note 2\" removed \"gamma\" (the third note) instead of \"beta\" (the second note). The remaining notes are \"alpha\" and \"beta\".",
+        "Max notes per day spinbutton has no accessible name in the interactive-elements trace."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a 3-step onboarding wizard. Work through these checks in order and record exactly what you observe for each: 1. On step 1 press Continue with everything empty and confirm each required field shows an error. 2. Enter an email with NO dot in the domain, for example sam@example (plus a valid workspace name and display name), press Continue, and record whether the wizard accepts it — a malformed email must be rejected. 3. On step 2 pick a focus area, then set 'Max notes per day' to 25 and press Continue; the field states the allowed range is 1 to 20, so 25 must be rejected — record what happens. 4. On step 3 add three notes with DISTINCT text (for example 'alpha', 'beta', 'gamma'), then remove the SECOND one and record exactly which note text disappeared and which remain. 5. Finish and confirm the summary's note count matches the number of notes you actually left in the list."
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 136167,
+      "status": "passed",
+      "steps": 16,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.3248,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": true,
+          "why": "The run explicitly reports that sam@example, whose domain has no dot, was accepted and advanced to Step 2 instead of producing a validation error."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that value 25 was accepted despite the stated 1–20 range and that the wizard advanced to Step 3."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove note 2 removed the third note, gamma, while beta remained, matching removal of the last row rather than the clicked row."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting Step 1 empty shows required-field errors for Workspace name, Email, and Display name.",
+          "status": "verified",
+          "evidence": "After the empty Continue submission (step 1), the next observation reports the wizard remained on Step 1 and displayed “Workspace name is required,” “Email is required,” and “Display name is required” (step 2)."
+        },
+        {
+          "claim": "Step 1 rejects an email whose domain has no dot, such as sam@example.",
+          "status": "contradicted",
+          "evidence": "The malformed email sam@example was entered and Continue was clicked (steps 3-5); the next action successfully selected the Step 2 focus area Work (step 6), showing the wizard advanced instead of rejecting the email."
+        },
+        {
+          "claim": "Step 2 rejects Max notes per day values outside its stated 1–20 range, including 25.",
+          "status": "contradicted",
+          "evidence": "Max notes per day displayed 25 when Continue was submitted (step 8), and the subsequent actions entered notes on Step 3 (steps 9-14), demonstrating that the out-of-range value was accepted and the wizard advanced."
+        },
+        {
+          "claim": "Removing the second of three notes removes the second note’s text and preserves the first and third notes.",
+          "status": "contradicted",
+          "evidence": "Before removal, the three notes were alpha, beta, and gamma (step 14); after clicking “Remove note 2,” the remaining notes were alpha and beta (step 15), so gamma/the third note disappeared rather than beta/the second note."
+        },
+        {
+          "claim": "Finishing onboarding shows a summary note count matching the notes left in the list.",
+          "status": "verified",
+          "evidence": "After the list showed exactly two remaining notes, alpha and beta (step 15), the final view stated “Weekly planning is ready with 2 notes” (step 16)."
+        }
+      ],
+      "findingTexts": [
+        "Step 1 accepted the malformed email “sam@example” (domain has no dot) and advanced to Step 2 instead of rejecting it.",
+        "Step 2 accepted Max notes per day value 25 despite the UI stating the allowed range is 1 to 20, and advanced to Step 3.",
+        "Removing the second note deleted the third note text “gamma” instead of the second note text “beta.”"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a 3-step onboarding wizard. Work through these checks in order and record exactly what you observe for each: 1. On step 1 press Continue with everything empty and confirm each required field shows an error. 2. Enter an email with NO dot in the domain, for example sam@example (plus a valid workspace name and display name), press Continue, and record whether the wizard accepts it — a malformed email must be rejected. 3. On step 2 pick a focus area, then set 'Max notes per day' to 25 and press Continue; the field states the allowed range is 1 to 20, so 25 must be rejected — record what happens. 4. On step 3 add three notes with DISTINCT text (for example 'alpha', 'beta', 'gamma'), then remove the SECOND one and record exactly which note text disappeared and which remain. 5. Finish and confirm the summary's note count matches the number of notes you actually left in the list."
+    }
+  ]
+}

@@ -1193,6 +1193,60 @@ async function focusEditableNearPoint(page: Page, px: number, py: number): Promi
   }, { cx: px, cy: py });
 }
 
+
+/**
+ * Native date/time inputs cannot be typed into: keyboard entry fills segments in
+ * locale order and produces garbage ("12/31/2026" became "12026-03-12", ISO text
+ * produced an empty field), and Playwright's fill() rejects anything that is not
+ * the exact wire format. Every value bound for one of these inputs is therefore
+ * normalised to its wire format first.
+ */
+const pad = (n: number) => String(n).padStart(2, "0");
+/**
+ * Formats from LOCAL date parts, never toISOString(): a date parsed as local
+ * midnight shifts to the previous day when converted to UTC in any negative
+ * offset, so "December 31, 2026" became 2026-12-30.
+ */
+const DATE_INPUT_WIRE: Record<string, (d: Date) => string> = {
+  date: (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+  "datetime-local": (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  month: (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`,
+  week: (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+  time: (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+};
+
+export function normalizeDateValue(inputType: string, value: string): string {
+  const fmt = DATE_INPUT_WIRE[inputType];
+  if (!fmt) return value;
+  const trimmed = value.trim();
+  // Already in wire format for this type.
+  if (inputType === "date" && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (inputType === "time" && /^\d{2}:\d{2}/.test(trimmed)) return trimmed.slice(0, 5);
+  if (inputType === "month" && /^\d{4}-\d{2}$/.test(trimmed)) return trimmed;
+  if (inputType === "datetime-local" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) return trimmed.slice(0, 16);
+  // US-style and dotted/slashed European forms the model commonly emits.
+  const mdy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(trimmed);
+  if (mdy) {
+    const [, a, b2, y] = mdy;
+    // Ambiguous: treat >12 in the first slot as day-first, otherwise month-first.
+    const month = Number(a) > 12 ? b2 : a;
+    const day = Number(a) > 12 ? a : b2;
+    const d = new Date(Number(y), Number(month) - 1, Number(day));
+    if (!Number.isNaN(d.getTime())) return fmt(d);
+  }
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) return fmt(parsed);
+  return trimmed;
+}
+
+/** Reads an input's `type` so a value can be normalised before filling. */
+async function inputTypeOf(page: Page, selector: ":focus"): Promise<string> {
+  return await page.evaluate((sel) => {
+    const el = document.querySelector(sel) as HTMLInputElement | null;
+    return el && el.tagName === "INPUT" ? (el.type || "") : "";
+  }, selector).catch(() => "");
+}
+
 async function fillAtCoordinates(page: Page, x: number, y: number, value: string): Promise<string> {
   const { px, py } = toPixel(x, y);
   const clickedElement = await describeElementAtPoint(page, px, py);
@@ -1205,7 +1259,8 @@ async function fillAtCoordinates(page: Page, x: number, y: number, value: string
       // NOTE: do NOT select-all before filling. Playwright's fill() already
       // clears the field, and a stray Ctrl+A escapes the input when focus is
       // not firmly inside it — which sent values into the wrong field entirely.
-      await page.locator(":focus").fill(value, { timeout: 5000 });
+      const t = await inputTypeOf(page, ":focus");
+      await page.locator(":focus").fill(normalizeDateValue(t, value), { timeout: 5000 });
       return clickedElement;
     } catch {
       /* fall through to legacy paths */
@@ -1394,7 +1449,14 @@ export async function executeAction(page: Page, action: AgentAction): Promise<Ex
         if (action.target) await clickInPage(page, action.target);
       }
       await page.keyboard.press("Control+a");
-      await page.keyboard.type(action.value, { delay: 30 });
+      const focusType = await inputTypeOf(page, ":focus");
+      if (DATE_INPUT_WIRE[focusType]) {
+        // Typing into a native date/time control fills segments in locale order
+        // and yields malformed values; fill with the wire format instead.
+        await page.locator(":focus").fill(normalizeDateValue(focusType, action.value), { timeout: 5000 });
+      } else {
+        await page.keyboard.type(action.value, { delay: 30 });
+      }
       await page.keyboard.press("Enter");
       await waitForPageStable(page, 2000);
       break;
@@ -2354,7 +2416,9 @@ export async function runAgent(
                 await locator.click({ timeout: 5000 });
                 await waitForPageStable(page, 4000);
               } else if (action.action === "fill" && action.value !== undefined) {
-                await locator.fill(action.value, { timeout: 5000 });
+                const inputType = await locator.evaluate((el) =>
+                  el instanceof HTMLInputElement ? (el.type || "") : "").catch(() => "");
+                await locator.fill(normalizeDateValue(inputType, action.value), { timeout: 5000 });
               } else if (action.action === "selectOption" && action.value) {
                 await locator.selectOption({ label: action.value }, { timeout: 5000 }).catch(async () => {
                   await locator.click({ timeout: 3000 });
