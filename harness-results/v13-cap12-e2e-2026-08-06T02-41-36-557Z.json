@@ -1,0 +1,1391 @@
+{
+  "label": "v13-cap12-e2e",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 25,
+    "planted": 36,
+    "heldOut": {
+      "caught": 2,
+      "planted": 6
+    },
+    "costUsd": 7.9374,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-estimate",
+      "attempt": 1,
+      "durationMs": 830967,
+      "status": "failed",
+      "steps": 6,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.6313,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 2 and 4 explicitly report that SAVE10 gives a $6.70 discount on a $42.00 subtotal rather than the expected 10% ($4.20), matching a discount base that improperly includes shipping/tier price."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 1, 3, and 5 report that shipping is labeled FREE at exact threshold subtotals ($50 Standard and $150 Express) while the order breakdown still charges shipping, which is the stated threshold inconsistency."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "why": "No finding applies an invalid promo code or reports that a prior discount remains after an invalid-code error."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "For a $42.00 subtotal, selecting Overnight displays $24.99 shipping.",
+          "status": "verified",
+          "evidence": "Step 2 observes Overnight selected with Subtotal $42.00 and Shipping (Overnight) $24.99."
+        },
+        {
+          "claim": "Applying SAVE10 to a $42.00 subtotal discounts exactly 10% ($4.20).",
+          "status": "contradicted",
+          "evidence": "After SAVE10 is applied, step 4 records Discount (SAVE10) −$6.70, rather than the required 10% of the recorded $42.00 subtotal ($4.20)."
+        },
+        {
+          "claim": "After the observed SAVE10 application, the $42.00 Overnight order total reconciles as subtotal minus displayed discount plus displayed shipping.",
+          "status": "verified",
+          "evidence": "Step 4 records $42.00 subtotal, −$6.70 discount, $24.99 shipping, and $60.29 total; $42.00 − $6.70 + $24.99 = $60.29."
+        },
+        {
+          "claim": "For a $150.00 subtotal, selecting Express provides free shipping and an order total equal to the subtotal.",
+          "status": "contradicted",
+          "evidence": "Step 6 observes Express selected and labeled FREE, but the actual summary shows Shipping (Express) $12.99 and Order total $162, not free shipping and not the $150.00 subtotal."
+        },
+        {
+          "claim": "For a $50.00 subtotal, selecting Standard provides free shipping and an order total equal to the subtotal.",
+          "status": "not_testable",
+          "evidence": "Step 6 navigates to the $50.00 estimator, but the trace contains no subsequent Standard selection or displayed shipping/total observation."
+        }
+      ],
+      "findingTexts": [
+        "At subtotal $150.00, Express is labeled FREE but selecting it displays Shipping (Express) $12.99 and Order total $162.99 instead of $150.00.",
+        "SAVE10 discounts $6.70 on a $42 subtotal; intended 10% is $4.20, so the $60.29 total is incorrect.",
+        "At $50, Standard is labeled FREE but the breakdown charges $5.99 and total is $55.99 instead of $50.00."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the displayed subtotal and Overnight shipping amount.",
+          "action": "Select Overnight, enter SAVE10, click Apply, and read Discount and Order total.",
+          "expect": "Discount must equal 10% of subtotal, and total must equal subtotal minus discount plus shipping.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 so the displayed subtotal is $150.00.",
+          "action": "Select Express and read its displayed shipping label and the Order total breakdown.",
+          "expect": "Express shipping must be FREE, and Order total must equal the displayed subtotal.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 so the displayed subtotal is $50.00.",
+          "action": "Select Standard and read its displayed shipping label and the Order total breakdown.",
+          "expect": "Standard shipping must be FREE, and Order total must equal the displayed subtotal.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public estimator and execute the ranked boundary and promo checks. Record the displayed subtotal, shipping, discount, and order total so each expected relationship can be verified precisely.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42.00 and note the displayed subtotal and Overnight shipping amount. Then Select Overnight, enter SAVE10, click Apply, and read Discount and Order total. — expect: Discount must equal 10% of subtotal, and total must equal subtotal minus discount plus shipping.\n2. Open /estimate?subtotal=150.00 so the displayed subtotal is $150.00. Then Select Express and read its displayed shipping label and the Order total breakdown. — expect: Express shipping must be FREE, and Order total must equal the displayed subtotal.\n3. Open /estimate?subtotal=50.00 so the displayed subtotal is $50.00. Then Select Standard and read its displayed shipping label and the Order total breakdown. — expect: Standard shipping must be FREE, and Order total must equal the displayed subtotal."
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 2,
+      "durationMs": 531703,
+      "status": "passed",
+      "steps": 13,
+      "findings": 4,
+      "checks": 4,
+      "contradicted": 4,
+      "costUsd": 0.4689,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 2 and 6 explicitly show SAVE10 discounting $6.70 on a $42.00 subtotal with $24.99 shipping, rather than $4.20 (10% of subtotal), and identify shipping as being included in the discount base."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 3, 4, 7, and 8 report that shipping is labeled FREE exactly at the $150 Express and $50 Standard thresholds while the order summary still charges shipping, matching the threshold badge/totals mismatch."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": true,
+          "why": "Findings 1 and 5 report that applying BADCODE after SAVE10 leaves the SAVE10 status, discount, and discounted total in place rather than clearing them."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Replacing an applied SAVE10 code with an invalid code shows an invalid-code error and clears the previous discount and discounted total.",
+          "status": "contradicted",
+          "evidence": "After clicking Apply with BADCODE, the trace reports that BADCODE is in the field while the prior “SAVE10 applied” status, −$4.80 discount, and $43.19 total remain displayed (step 4); no invalid-code error is observed."
+        },
+        {
+          "claim": "For a $42.00 subtotal with Overnight shipping, SAVE10 discounts exactly 10% of the subtotal and the total equals subtotal minus that discount plus the displayed $24.99 shipping.",
+          "status": "contradicted",
+          "evidence": "With $42.00 subtotal and Overnight $24.99 selected, applying SAVE10 shows a −$6.70 discount and $60.29 total (step 9), but 10% of $42.00 is $4.20 and the expected total is $42.00 − $4.20 + $24.99 = $62.79."
+        },
+        {
+          "claim": "At the $150.00 Express threshold, Express is labeled FREE and selecting it makes the Shipping summary FREE.",
+          "status": "contradicted",
+          "evidence": "Express is visibly labeled FREE at $150.00 (step 10), but after selecting it the summary shows Shipping (Express) $12.99 and Order total $162.99 (step 11)."
+        },
+        {
+          "claim": "At the $50.00 Standard threshold, Standard is labeled FREE and selecting it makes the Shipping summary FREE.",
+          "status": "contradicted",
+          "evidence": "At $50.00, Standard is selected and labeled FREE, but the summary displays Shipping (Standard) $5.99 and Order total $55.99 (steps 12-13)."
+        }
+      ],
+      "findingTexts": [
+        "Applying BADCODE after SAVE10 shows the invalid-code error but does not clear the prior applied discount: “SAVE10 applied — 10% off,” Discount (SAVE10) −$4.80, and Order total $43.19 remain visible in",
+        "With subtotal $42.00 and Overnight shipping $24.99 selected, SAVE10 applies a −$6.70 discount and produces a $60.29 total. The discount should be 10% of the subtotal only ($4.20), yielding $62.79; the",
+        "At the $150.00 Express threshold, the Express option badge displays FREE, but after selecting it the Shipping (Express) summary is $12.99 and Order total is $162.99 instead of FREE shipping and a $150",
+        "Standard is labeled FREE at $50, but the order summary still shows $5.99 shipping."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42.00, apply SAVE10, and record the applied status and order total.",
+          "action": "Replace the code with BADCODE and click Apply.",
+          "expect": "Invalid-code error must appear and the previous applied discount and altered total must be cleared.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the displayed subtotal and Overnight shipping price.",
+          "action": "Select Overnight, enter SAVE10, and click Apply.",
+          "expect": "Discount must equal 10% of subtotal; total must equal subtotal minus discount plus displayed shipping.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 and note the Express tier badge and Shipping line.",
+          "action": "Select Express shipping.",
+          "expect": "At the $150 threshold, Express must show FREE both in its option and in the Shipping summary.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 and note the Standard tier badge and Shipping line.",
+          "action": "Select Standard shipping.",
+          "expect": "At the $50 threshold, Standard must show FREE both in its option and in the Shipping summary.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the estimator at exact free-shipping boundaries and through promo-code state changes, then compare the visible tier labels, shipping amounts, discounts, and totals.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42.00, apply SAVE10, and record the applied status and order total. Then Replace the code with BADCODE and click Apply. — expect: Invalid-code error must appear and the previous applied discount and altered total must be cleared.\n2. Open /estimate?subtotal=42.00 and note the displayed subtotal and Overnight shipping price. Then Select Overnight, enter SAVE10, and click Apply. — expect: Discount must equal 10% of subtotal; total must equal subtotal minus discount plus displayed shipping.\n3. Open /estimate?subtotal=150.00 and note the Express tier badge and Shipping line. Then Select Express shipping. — expect: At the $150 threshold, Express must show FREE both in its option and in the Shipping summary.\n4. Open /estimate?subtotal=50.00 and note the Standard tier badge and Shipping line. Then Select Standard shipping. — expect: At the $50 threshold, Standard must show FREE both in its option and in the Shipping summary."
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 505351,
+      "status": "passed",
+      "steps": 70,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 1.1088,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "None of the findings test or report acceptance of an email address without a dot in the domain, such as sam@example."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that a daily limit of 21 advances to step 3 without the stated range validation error, despite the displayed maximum being 20."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove note 2 with Alpha, Beta, and Gamma removes Gamma (the last note) rather than Beta, the clicked note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Creating a workspace with Alpha plus a blank second note reports one note, and Open my board navigates to the root board route.",
+          "status": "contradicted",
+          "evidence": "Step 10 shows the completion text “Workspace One is ready with 1 note,” but after Open my board, step 11 reports that the root route shows a client-side application exception rather than a working board."
+        },
+        {
+          "claim": "Required validation prevents continuing without either a note or a selected focus area, and clears the note error after a valid note is entered.",
+          "status": "verified",
+          "evidence": "After empty note submission, step 19 shows the wizard still on step 3 with “Add at least one note to get started”; after entering Alpha, step 20 reports that error is gone and step 21 reports completion with 1 note. After continuing with zero focus areas, step 33 shows the wizard remains on step 2 w"
+        },
+        {
+          "claim": "Workspace name, email, and display name remain populated after moving from step 1 to step 2 and returning with Back.",
+          "status": "verified",
+          "evidence": "After Back in step 26, step 27 records that step 1 retains Preserve Workspace, preserve@example.com, and Preserve Person in their respective fields."
+        },
+        {
+          "claim": "The completion screen visibly preserves all collected preferences and profile data, including week start, reminder, daily limit, email, and display name.",
+          "status": "not_testable",
+          "evidence": "The run set Sunday, 21:00, Work, daily limit 20, email, and display name (steps 34-45), but no completion-screen observation records those values before the run navigates to a fresh /welcome session in step 46."
+        },
+        {
+          "claim": "Removing note 2 from Alpha, Beta, and Gamma removes only Beta and retains Alpha and Gamma.",
+          "status": "contradicted",
+          "evidence": "Following the Remove note 2 action, step 59 records Alpha and Beta still present while Gamma was removed, the opposite of the required retention behavior."
+        },
+        {
+          "claim": "A daily limit of 21 is rejected with the range error, while 20 advances to step 3 without that error.",
+          "status": "contradicted",
+          "evidence": "After submitting 21, step 67 records that the wizard advanced to step 3 with no validation error, so the out-of-range value was accepted; 20 later advances, but the required rejection of 21 failed."
+        }
+      ],
+      "findingTexts": [
+        "Open my board navigates to http://localhost:4102/, where a client-side application exception is displayed instead of a board.",
+        "Completion for a workspace created with Sunday, 21:00, daily limit 20, a distinct email, and display name shows only workspace name, one-note count, and focus area. It does not visibly preserve or dis",
+        "Clicking Remove note 2 after entering Alpha, Beta, and Gamma removes Gamma instead of Beta. The remaining fields are Alpha and Beta (2 notes ready), so the requested middle item is not removed.",
+        "With Work selected and Max notes per day set to 21, clicking Continue advances from step 2 to step 3 instead of remaining on step 2 and showing the stated range validation error."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete all required fields, add a second note, and leave it blank while the first note is Alpha.",
+          "action": "Create the workspace, then click Open my board.",
+          "expect": "The confirmation must report one note, and Open my board must navigate to the root board route.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete steps 1 and 2 with one focus area selected and reach step 3.",
+          "action": "Click Create workspace with the note field empty, then enter Alpha and create again.",
+          "expect": "The empty submission must show an error; after Alpha, the error must clear and completion must report one note.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter distinct workspace, email, and display-name values on step 1.",
+          "action": "Continue to step 2, click Back, and reread all step-1 fields.",
+          "expect": "All three previously entered values must still be present.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete step 1 with valid values and reach step 2 without selecting any focus area.",
+          "action": "Click Continue without selecting a focus area.",
+          "expect": "The wizard must remain on step 2 and show the required-focus error.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete step 1 with distinct workspace, email, and display-name values.",
+          "action": "Choose Sunday, 21:00, Work, and daily limit 20; add one note and create the workspace.",
+          "expect": "Completion must visibly preserve the selected week start, reminder, daily limit, email, and display name.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2, then add notes Alpha, Beta, and Gamma.",
+          "action": "Click Remove note 2 and read the remaining note fields.",
+          "expect": "Alpha and Gamma must remain; Beta must be removed.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter a valid workspace profile and continue to step 2; select Work.",
+          "action": "Enter 21 as the daily limit, continue, replace it with 20, and continue again.",
+          "expect": "21 must be rejected with the stated range error; 20 must advance to step 3 without that error.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the onboarding wizard at /welcome, prioritizing boundary validation, incorrect item removal, state preservation, and whether every collected value reaches the completion result.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete all required fields, add a second note, and leave it blank while the first note is Alpha. Then Create the workspace, then click Open my board. — expect: The confirmation must report one note, and Open my board must navigate to the root board route.\n2. Complete steps 1 and 2 with one focus area selected and reach step 3. Then Click Create workspace with the note field empty, then enter Alpha and create again. — expect: The empty submission must show an error; after Alpha, the error must clear and completion must report one note.\n3. Enter distinct workspace, email, and display-name values on step 1. Then Continue to step 2, click Back, and reread all step-1 fields. — expect: All three previously entered values must still be present.\n4. Complete step 1 with valid values and reach step 2 without selecting any focus area. Then Click Continue without selecting a focus area. — expect: The wizard must remain on step 2 and show the required-focus error.\n5. Complete step 1 with distinct workspace, email, and display-name values. Then Choose Sunday, 21:00, Work, and daily limit 20; add one note and create the workspace. — expect: Completion must visibly preserve the selected week start, reminder, daily limit,"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 569552,
+      "status": "passed",
+      "steps": 75,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 1.2629,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that daily limits of 21 advanced to step 3 instead of showing the stated 1–20 validation error, directly surfacing the missing upper-bound enforcement."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove on the first of two notes removed the other, last note instead, directly matching the defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Creating a workspace with its only note blank keeps the user on step 3 and shows “Add at least one note to get started.”",
+          "status": "verified",
+          "evidence": "After Create workspace was clicked with the sole note empty, the recorded observation states that the wizard remained on Step 3 and displayed “Add at least one note to get started” (step 9)."
+        },
+        {
+          "claim": "A focus area is required to continue, and toggling Work off after selecting all five areas leaves exactly four selected areas.",
+          "status": "verified",
+          "evidence": "The step-2 validation message “Pick at least one focus area” was visibly shown with 0 selected (step 6), and after selecting five areas then toggling Work off, the UI showed exactly Personal, Study, Health, and Side project with “4 selected” (step 20)."
+        },
+        {
+          "claim": "Selected Sunday week start, 21:00 reminder, Work focus area, and daily limit 7 remain set when continuing from step 2 to step 3.",
+          "status": "verified",
+          "evidence": "Immediately before continuing, Step 2 visibly showed Sunday, 21:00, Work as the sole selected area, and max notes per day 7 (step 48); the subsequent observation confirms Step 3 was reached after that Continue action with those values selected (step 49)."
+        },
+        {
+          "claim": "The completion screen exposes the selected week start, reminder time, and daily limit without losing those scheduling details.",
+          "status": "not_testable",
+          "evidence": "The run set Sunday, 21:00, and 7 and clicked Create workspace, but no completion-screen observation was recorded before navigating away (steps 21-28); the separately observed two-note completion only records workspace, note count, and focus areas (step 39)."
+        },
+        {
+          "claim": "Creating a workspace with distinct notes Alpha and Beta reports exactly 2 notes on success.",
+          "status": "verified",
+          "evidence": "Both note fields visibly contained Alpha and Beta with “2 notes ready” before creation (step 38), and the completion screen then stated “Acme is ready with 2 notes” (step 39)."
+        },
+        {
+          "claim": "Entering a daily limit of 21 prevents continuing from step 2 and shows “Daily limit must be between 1 and 20.”",
+          "status": "contradicted",
+          "evidence": "After the daily-limit field visibly showed 21 and Continue was clicked (step 74), the final observation states that the wizard advanced to Step 3 with 0 notes ready, meaning the out-of-range value was accepted instead of blocked (step 75)."
+        }
+      ],
+      "findingTexts": [
+        "Completion omits the selected week start, reminder time, and daily limit.",
+        "Removing the first of two notes leaves 'Keep launch scope small' as the sole remaining note and removes 'Review metrics'. The removed collection item is not the one whose Remove button was clicked.",
+        "With a valid step 1, Work selected, and Max notes per day entered as 21, clicking Continue advanced to step 3 instead of remaining on step 2 and displaying 'Daily limit must be between 1 and 20'."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete steps 1 and 2 with valid values and reach step 3.",
+          "action": "Leave the only note blank and click Create workspace.",
+          "expect": "Must remain on step 3 and show 'Add at least one note to get started'.",
+          "priority": 10
+        },
+        {
+          "setup": "Complete step 1 and reach step 2 without selecting any focus area.",
+          "action": "Click Continue.",
+          "expect": "Must remain on step 2 and show 'Pick at least one focus area'.",
+          "priority": 9
+        },
+        {
+          "setup": "Complete step 1 and reach step 2.",
+          "action": "Click Work, Personal, Study, Health, and Side project, then click Work again.",
+          "expect": "Exactly 4 areas must be selected and the counter must read '4 selected'.",
+          "priority": 8
+        },
+        {
+          "setup": "Enter workspace 'Acme', email 'a@b.com', and display name 'Sam' on step 1.",
+          "action": "Continue to step 2, then click Back and reread all three step-one fields.",
+          "expect": "Workspace, email, and display name must retain their entered values.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete steps 1 and 2 with valid values and choose Sunday, 21:00, Work, and daily limit 7.",
+          "action": "Enter note 'Alpha' and create the workspace.",
+          "expect": "Completion must expose the selected week start, reminder time, and daily limit rather than only workspace, notes, and focus.",
+          "priority": 6
+        },
+        {
+          "setup": "Complete steps 1 and 2 with valid values, then reach step 3.",
+          "action": "Add a second note, enter distinct notes 'Alpha' and 'Beta', and click Create workspace.",
+          "expect": "Success must report the workspace with exactly 2 notes.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete step 1 with valid values and reach step 2.",
+          "action": "Choose Sunday, choose 21:00, select Work, enter daily limit 7, and continue.",
+          "expect": "Must advance to step 3 with Sunday, 21:00, and 7 still selected or entered.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /welcome and enter workspace 'AB', email 'a@b.com', and display name 'Sam'.",
+          "action": "Click Continue.",
+          "expect": "Must remain on step 1 and show 'Use at least 3 characters'.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /welcome and complete steps 1 and 2 with valid values and one selected focus area.",
+          "action": "Enter notes 'Keep launch scope small' and 'Review metrics', then remove the first note.",
+          "expect": "The first note must disappear and the second note must remain.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /welcome and enter workspace 'Acme', email 'a@b.com', and display name 'Sam'. Continue to step 2.",
+          "action": "Select Work and enter 21 for Max notes per day, then click Continue.",
+          "expect": "Must remain on step 2 and show 'Daily limit must be between 1 and 20'.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every changed interaction and use boundary or distinct inputs that expose disagreements, stale state, incorrect collection handling, or missing output.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete steps 1 and 2 with valid values and reach step 3. Then Leave the only note blank and click Create workspace. — expect: Must remain on step 3 and show 'Add at least one note to get started'.\n2. Complete step 1 and reach step 2 without selecting any focus area. Then Click Continue. — expect: Must remain on step 2 and show 'Pick at least one focus area'.\n3. Complete step 1 and reach step 2. Then Click Work, Personal, Study, Health, and Side project, then click Work again. — expect: Exactly 4 areas must be selected and the counter must read '4 selected'.\n4. Enter workspace 'Acme', email 'a@b.com', and display name 'Sam' on step 1. Then Continue to step 2, then click Back and reread all three step-one fields. — expect: Workspace, email, and display name must retain their entered values.\n5. Complete steps 1 and 2 with valid values and choose Sunday, 21:00, Work, and daily limit 7. Then Enter note 'Alpha' and create the workspace. — expect: Completion must expose the selected week start, reminder time, and daily limit rather than only workspace, notes, and focus.\n6. Complete steps 1 and 2 with valid values, then reach step 3. Then Add a second note, enter distinct notes 'Alpha' and 'Beta', and click Create workspace. — expect: Suc"
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 253369,
+      "status": "passed",
+      "steps": 14,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.3694,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": false,
+          "why": "None of the findings report a mismatch between the 'Showing N of M models' counter and the visible table rows after applying a vision filter."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "The run reports that after numeric-column sort toggles, the descending arrow is shown while rows remain in ascending order, including Context (64K to 1000K) and Output ($/1M low to high)."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "The run reports Claude Sonnet 4.5 costs $45.00 for 2M input and 1M output tokens instead of $21.00, matching application of the output rate to input tokens."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking Context twice sorts the five-model table in descending context order, with Gemini 2.5 Flash first and DeepSeek V3 last.",
+          "status": "contradicted",
+          "evidence": "After the Context clicks, step 2 observed the Context header as ↑ with DeepSeek V3 first (64K) and Gemini 2.5 Flash last (1000K), the ascending order rather than the required descending result."
+        },
+        {
+          "claim": "After toggling Model, Input, and Output twice, Output descending places Claude Sonnet 4.5 first and DeepSeek V3 last.",
+          "status": "contradicted",
+          "evidence": "Step 9, after the required Output interaction, observed Output $/1M as ↑ and listed DeepSeek V3 first and Claude Sonnet 4.5 last, the reverse of the required descending order."
+        },
+        {
+          "claim": "Selecting Meta and enabling Vision only produces an empty table and reports Showing 0 of 5 models.",
+          "status": "verified",
+          "evidence": "Step 12 observed Provider Meta with Vision only checked, no model rows, the message “No models match these filters.”, and the summary “Showing 0 of 5 model[s].”"
+        },
+        {
+          "claim": "With All providers and Vision only enabled, exactly three of the five baseline models remain visible and the summary reports Showing 3 of 5 models.",
+          "status": "verified",
+          "evidence": "Step 13 observed Provider All with Vision only checked, exactly three rows (GPT-4o mini, Gemini 2.5 Flash, and Claude Sonnet 4.5), and “Showing 3 of 5” in the summary; step 10 recorded the five-model All-provider baseline."
+        },
+        {
+          "claim": "For 2M input tokens and 1M output tokens, Claude Sonnet 4.5's monthly estimate is $21.00.",
+          "status": "contradicted",
+          "evidence": "Step 14 observed usage input values 2 and 1 but Claude Sonnet 4.5's estimated monthly cost was $45.00, not the required $21.00."
+        }
+      ],
+      "findingTexts": [
+        "Context descending sort indicator does not match displayed row ordering: after two clicks it shows ↓ but lists 64K-to-1000K ascending.",
+        "Monthly estimate calculation is incorrect for Claude Sonnet 4.5: with 2M input tokens and 1M output tokens, it displays $45.00 instead of $21.00."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Start from a fresh page with all five models visible.",
+          "action": "Click Context (K) twice and read the first and last rows.",
+          "expect": "Context descending order must put Gemini 2.5 Flash first and DeepSeek V3 last.",
+          "priority": 5
+        },
+        {
+          "setup": "Start from a fresh page with all five models visible.",
+          "action": "Click Model twice, Input twice, then Output twice; read the first and last rows.",
+          "expect": "Output descending order must put Claude Sonnet 4.5 first and DeepSeek V3 last.",
+          "priority": 4
+        },
+        {
+          "setup": "Start with All providers and Vision only unchecked.",
+          "action": "Select Meta, check Vision only, and read the table and Showing summary.",
+          "expect": "The table must show no models and the summary must say Showing 0 of 5 models.",
+          "priority": 3
+        },
+        {
+          "setup": "Leave the provider filter set to All and note the five-model baseline.",
+          "action": "Check Vision only and count the displayed rows and the Showing summary.",
+          "expect": "Exactly three rows must remain, and the summary must say Showing 3 of 5 models.",
+          "priority": 2
+        },
+        {
+          "setup": "Use all models with input usage 2 M tokens and output usage 1 M token.",
+          "action": "Enter 2 for input usage and 1 for output usage, then read Claude Sonnet 4.5's estimate.",
+          "expect": "Claude's estimate must be $21.00, equal to 2×$3.00 plus 1×$15.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open /compare and run the ranked checks, using distinct visible row values and comparing displayed totals, counts, ordering, and empty states precisely.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Start from a fresh page with all five models visible. Then Click Context (K) twice and read the first and last rows. — expect: Context descending order must put Gemini 2.5 Flash first and DeepSeek V3 last.\n2. Start from a fresh page with all five models visible. Then Click Model twice, Input twice, then Output twice; read the first and last rows. — expect: Output descending order must put Claude Sonnet 4.5 first and DeepSeek V3 last.\n3. Start with All providers and Vision only unchecked. Then Select Meta, check Vision only, and read the table and Showing summary. — expect: The table must show no models and the summary must say Showing 0 of 5 models.\n4. Leave the provider filter set to All and note the five-model baseline. Then Check Vision only and count the displayed rows and the Showing summary. — expect: Exactly three rows must remain, and the summary must say Showing 3 of 5 models.\n5. Use all models with input usage 2 M tokens and output usage 1 M token. Then Enter 2 for input usage and 1 for output usage, then read Claude Sonnet 4.5's estimate. — expect: Claude's estimate must be $21.00, equal to 2×$3.00 plus 1×$15.00."
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 2,
+      "durationMs": 399992,
+      "status": "passed",
+      "steps": 29,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.6157,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": false,
+          "why": "No finding reports a mismatch between the 'Showing N of M models' counter and the visible table rows after applying a filter."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "The run explicitly reports that second clicks show descending arrows while numeric rows remain in ascending order for Input, Output, and Context."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "The run explicitly identifies that estimated monthly costs use each model's output price for both input and output tokens, with calculations demonstrating the resulting inflated totals."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "On the default compare view, Claude Sonnet 4.5 is highlighted as the cheapest model.",
+          "status": "contradicted",
+          "evidence": "Step 1 observed the default five-row table with DeepSeek V3, not Claude, carrying the cheapest badge."
+        },
+        {
+          "claim": "Selecting a provider limits the table to that provider's model, and selecting All restores the complete five-model comparison without losing rows.",
+          "status": "verified",
+          "evidence": "Step 2 observed Anthropic showing 1 of 5 and only Claude Sonnet 4.5; step 3 observed All restored with Showing 5 of 5 and Claude, DeepSeek, Gemini, GPT-4o mini, and Llama visible; step 12 likewise observed DeepSeek as the sole row with Showing 1 of 5."
+        },
+        {
+          "claim": "Each sortable column can produce the requested ascending order: Model reverse-alphabetical, Context ascending, Output price ascending, and Input price ascending with an up arrow.",
+          "status": "verified",
+          "evidence": "Steps 4-7 observed Model descending from Llama to Claude, Context ascending from DeepSeek 64K to Gemini 1000K, Output ascending from DeepSeek $0.28 to Claude $15, and Input ascending beginning DeepSeek $0.14 then GPT-4o mini/Gemini $0.15 with an up arrow."
+        },
+        {
+          "claim": "Enabling Vision only shows exactly the three vision-capable models and disabling it restores all five original models.",
+          "status": "verified",
+          "evidence": "Step 8 observed Showing 3 of 5 with GPT-4o mini, Gemini, and Claude all marked Vision Yes, while step 9 observed the filter disabled with Showing 5 of 5 and all five original rows restored; steps 23-25 repeat the same result."
+        },
+        {
+          "claim": "After two clicks on each sortable header, every column ends in descending order, including Context starting Gemini 1000K and ending DeepSeek 64K.",
+          "status": "contradicted",
+          "evidence": "Step 17 observed Input $/1M showing a down arrow after its second click but rows still ascending from DeepSeek upward, and steps 18-20 similarly observed Output rows remaining ascending despite the required descending sequence; Context received only its first click at step 21 before navigation away "
+        },
+        {
+          "claim": "Estimated monthly costs reconcile with the displayed input and output prices and entered usage values, including Claude costing $21.00 for 2M input and 1M output.",
+          "status": "contradicted",
+          "evidence": "The requested 2M input/1M output Claude calculation was never entered; with the observed 4M input and 3M output, step 11 reported Claude $105.00 although visible prices $3.00 and $15.00 imply $3×4 + $15×3 = $57.00, and step 28 again reported $105.00."
+        }
+      ],
+      "findingTexts": [
+        "With default usage values (input 2M, output 1M) and all providers visible, DeepSeek V3 is highlighted cheapest at $0.84 rather than Claude Sonnet 4.5 as expected. Claude is $45.00.",
+        "Sorting does not honor descending direction: after the required second clicks on Input $/1M, Output $/1M, and Context (K), each header shows a down arrow but the rows remain ascending. For Context, do",
+        "Estimated monthly costs are calculated using each model's output price for both input and output usage across all visible models. At 4M/3M, DeepSeek shows $1.96 rather than $1.40; Gemini and GPT-4o mi"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /compare with the default usage values and note that Claude is highlighted as cheapest.",
+          "action": "Select Anthropic, then select All again.",
+          "expect": "The table must first contain only Claude, then restore all five models and recompute the cheapest highlight.",
+          "priority": 11
+        },
+        {
+          "setup": "Open /compare with all five models visible.",
+          "action": "Click Model once and read the first and last rows.",
+          "expect": "Rows must be reverse alphabetical, starting Llama 3.3 70B and ending Claude Sonnet 4.5.",
+          "priority": 10
+        },
+        {
+          "setup": "Open /compare with all five models visible.",
+          "action": "Click Context (K) once and read the first and last rows.",
+          "expect": "Rows must be ascending by context, starting DeepSeek 64K and ending Gemini 1000K.",
+          "priority": 9
+        },
+        {
+          "setup": "Open /compare with all five models visible.",
+          "action": "Click Output $/1M once and read the first and last rows.",
+          "expect": "Rows must be ascending by output price, starting DeepSeek $0.28 and ending Claude $15.00.",
+          "priority": 8
+        },
+        {
+          "setup": "Open /compare with all five models visible.",
+          "action": "Click Input $/1M once and read the first two rows and sort arrow.",
+          "expect": "Rows must be ascending by input price, starting DeepSeek $0.14 then GPT-4o mini or Gemini $0.15, with an up arrow.",
+          "priority": 7
+        },
+        {
+          "setup": "Open /compare with all five models visible.",
+          "action": "Enable Vision only, then disable it.",
+          "expect": "Three vision rows must appear while enabled, and all five original rows must return after disabling.",
+          "priority": 6
+        },
+        {
+          "setup": "Open /compare and record the default estimated costs for at least Claude, GPT-4o mini, and Gemini.",
+          "action": "Change input usage to 4 and output usage to 3.",
+          "expect": "Each recorded model's new cost must equal its input price×4 plus output price×3.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /compare and select DeepSeek as the provider.",
+          "action": "Read the summary and the remaining table row.",
+          "expect": "Summary must say Showing 1 of 5 models, and the only row must be DeepSeek V3.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /compare with the default alphabetical order.",
+          "action": "Click Model, Input $/1M, Output $/1M, and Context (K) headers twice each.",
+          "expect": "Each column must end descending; the final Context order must start Gemini 1000K and end DeepSeek 64K.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /compare with provider set to All and note the five model rows.",
+          "action": "Enable Vision only and reread the summary and visible rows.",
+          "expect": "Summary must say Showing 3 of 5 models, and every visible row must say Vision Yes.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /compare, select Anthropic, enter 2 for input tokens and 1 for output tokens, and note Claude's displayed prices.",
+          "action": "Read Claude Sonnet 4.5's estimated monthly cost.",
+          "expect": "Cost must equal 3×2 + 15×1 = $21.00, not a calculation using the output price for both inputs.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test /compare by using every added control and compare visible totals, counts, row contents, and ordering against the source prices and capabilities.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /compare with the default usage values and note that Claude is highlighted as cheapest. Then Select Anthropic, then select All again. — expect: The table must first contain only Claude, then restore all five models and recompute the cheapest highlight.\n2. Open /compare with all five models visible. Then Click Model once and read the first and last rows. — expect: Rows must be reverse alphabetical, starting Llama 3.3 70B and ending Claude Sonnet 4.5.\n3. Open /compare with all five models visible. Then Click Context (K) once and read the first and last rows. — expect: Rows must be ascending by context, starting DeepSeek 64K and ending Gemini 1000K.\n4. Open /compare with all five models visible. Then Click Output $/1M once and read the first and last rows. — expect: Rows must be ascending by output price, starting DeepSeek $0.28 and ending Claude $15.00.\n5. Open /compare with all five models visible. Then Click Input $/1M once and read the first two rows and sort arrow. — expect: Rows must be ascending by input price, starting DeepSeek $0.14 then GPT-4o mini or Gemini $0.15, with an up arrow.\n6. Open /compare with all five models visible. Then Enable Vision only, then disable it. — expect: Three vision rows must appear while enabled, and all"
+    },
+    {
+      "case": "purchasify-licences",
+      "attempt": 1,
+      "durationMs": 137715,
+      "status": "failed",
+      "steps": 12,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.2193,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "The run explicitly reports that Team Annual is the last row on page 1 and appears again on page 2, matching the boundary-row repetition defect."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": false,
+          "why": "No finding covers remembering a team size, reloading, or the remember checkbox state."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": false,
+          "why": "No finding covers requesting a quote with no plan selected or the button's enabled state."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking the purchasify header link reaches the storefront at /, and returning reaches the licence planner at /licences.",
+          "status": "verified",
+          "evidence": "Step 2 records the storefront displayed at http://localhost:4101/, and step 3 records that returning reached /licences."
+        },
+        {
+          "claim": "Selecting Business Monthly and entering 19 seats displays its 20-seat minimum warning.",
+          "status": "verified",
+          "evidence": "Step 10 observes Business Monthly with team size 19 and states that the minimum-20 warning remains visible."
+        },
+        {
+          "claim": "Business Monthly cannot request a quote at 19 seats, while at 20 seats the warning disappears and a quote identifies Business Monthly for 20 seats.",
+          "status": "not_testable",
+          "evidence": "The trace records the 19-seat state but contains no logged Request quote attempt and never records a 20-seat state or generated quote before the forced exit."
+        },
+        {
+          "claim": "After opting to remember a 23-seat team size, the saved seat count and checked Remember option persist after shipping-estimate navigation and reload.",
+          "status": "not_testable",
+          "evidence": "The run ended during the Business Monthly validation flow; it never cleared planner data, enabled Remember my team size, visited Shipping estimate, or reloaded."
+        },
+        {
+          "claim": "The full catalogue pagination shows exactly 9 distinct plan rows with no repeated plan.",
+          "status": "contradicted",
+          "evidence": "Step 3 lists Team Annual on page 1, while step 4 lists Team Annual again on page 2, demonstrating overlapping pagination and a repeated plan."
+        }
+      ],
+      "findingTexts": [
+        "Pagination overlaps: Team Annual appears on pages 1 and 2, despite intent that all 9 plan names be distinct."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Click the purchasify header link and verify the destination, then return to the planner.",
+          "expect": "The link must reach / and returning must reach /licences.",
+          "priority": 4
+        },
+        {
+          "setup": "Navigate to page 2, select Business Monthly, and set team size to 19.",
+          "action": "Observe the warning, try Request quote, change seats to 20, then request the quote.",
+          "expect": "At 19 the button must be disabled; at 20 the warning must vanish and quote must state Business Monthly for 20 seats.",
+          "priority": 3
+        },
+        {
+          "setup": "Clear saved planner data, enter 23 seats, and enable Remember my team size.",
+          "action": "Click Shipping estimate, return to the planner, reload, and reread the seats field and checkbox.",
+          "expect": "Seats must still be 23 and Remember must remain checked after navigation and reload.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Use Next through every catalogue page, record each displayed plan name, and count all displayed rows.",
+          "expect": "Exactly 9 rows and 9 distinct plan names must appear; no plan may repeat.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "On /licences, exercise pagination, remembered team size, plan selection, minimum-seat validation, quote generation, and the header navigation. Record displayed values and compare them with the required relationships.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Click the purchasify header link and verify the destination, then return to the planner. — expect: The link must reach / and returning must reach /licences.\n2. Navigate to page 2, select Business Monthly, and set team size to 19. Then Observe the warning, try Request quote, change seats to 20, then request the quote. — expect: At 19 the button must be disabled; at 20 the warning must vanish and quote must state Business Monthly for 20 seats.\n3. Clear saved planner data, enter 23 seats, and enable Remember my team size. Then Click Shipping estimate, return to the planner, reload, and reread the seats field and checkbox. — expect: Seats must still be 23 and Remember must remain checked after navigation and reload.\n4. Use Next through every catalogue page, record each displayed plan name, and count all displayed rows. — expect: Exactly 9 rows and 9 distinct plan names must appear; no plan may repeat."
+    },
+    {
+      "case": "purchasify-licences",
+      "attempt": 2,
+      "durationMs": 86627,
+      "status": "failed",
+      "steps": 6,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 2,
+      "costUsd": 0.1197,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "Finding 2 explicitly reports that page 1's last row, Team Annual, repeats as page 2's first row instead of showing Business Monthly."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": false,
+          "why": "None of the findings test remembering a seat count followed by reload, or report the saved value reverting and the checkbox becoming unticked."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": false,
+          "why": "The findings concern failure to select Starter Annual and pagination behavior. They do not report Request quote being clickable or submitting when no plan is selected."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting the second visible plan, Starter Annual, and requesting a quote shows Starter Annual with 10 seats, a $70.00 monthly price, and a matching success message.",
+          "status": "contradicted",
+          "evidence": "Steps 2-3 show the first row remained selected as Starter Monthly while Starter Annual remained the second row with an available Select button; the attempted Starter Annual selection had domChanged=NO, and no quote success, 10-seat value, or $70.00 value was observed."
+        },
+        {
+          "claim": "Clicking Next from page 1 advances to page 2, whose first plan is the fifth catalogue entry rather than a repeat of page 1's fourth plan.",
+          "status": "contradicted",
+          "evidence": "Step 4 clicked Next specifically to perform the page-boundary comparison, but recorded domChanged=NO and no page-2 rows or changed first plan were observed."
+        },
+        {
+          "claim": "A team size of 23 persists after reload when Remember my team size is enabled, with the remember checkbox still checked.",
+          "status": "not_testable",
+          "evidence": "The run exited at step 6 after selection and pagination failures; it never entered 23 seats, enabled Remember my team size, or reloaded the page."
+        }
+      ],
+      "findingTexts": [
+        "Selecting the second-row Starter Annual plan has no effect. After two clicks and a fresh observation, Starter Monthly remains selected and the quote remains 10 seats at $90.00.",
+        "Pagination has an overlap at the page boundary: page 1's fourth plan is Team Annual, and after Next, page 2's first row is again Team Annual instead of the fifth plan, Business Monthly."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Set seats to 10 and leave no plan selected.",
+          "action": "Select the second visible plan, Starter Annual, then click Request quote.",
+          "expect": "Quote must show Starter Annual, 10 seats, $70.00 monthly, and a matching success message.",
+          "priority": 3
+        },
+        {
+          "setup": "On page 1, write down all four plan names, especially the fourth row.",
+          "action": "Click Next and compare page 2's first row with page 1's fourth row.",
+          "expect": "Page 2 must start with the fifth plan, not repeat page 1's fourth plan.",
+          "priority": 2
+        },
+        {
+          "setup": "At /licences, enter 23 seats, enable Remember my team size, and confirm the field shows 23.",
+          "action": "Reload the page and read the team-size field and remember checkbox.",
+          "expect": "Team size must still be 23 and Remember must remain checked.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public licence planner and prioritize persistence and pagination boundary checks, then verify one complete quote request using a non-first plan.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Set seats to 10 and leave no plan selected. Then Select the second visible plan, Starter Annual, then click Request quote. — expect: Quote must show Starter Annual, 10 seats, $70.00 monthly, and a matching success message.\n2. On page 1, write down all four plan names, especially the fourth row. Then Click Next and compare page 2's first row with page 1's fourth row. — expect: Page 2 must start with the fifth plan, not repeat page 1's fourth plan.\n3. At /licences, enter 23 seats, enable Remember my team size, and confirm the field shows 23. Then Reload the page and read the team-size field and remember checkbox. — expect: Team size must still be 23 and Remember must remain checked."
+    },
+    {
+      "case": "bookflow-register",
+      "attempt": 1,
+      "durationMs": 511575,
+      "status": "passed",
+      "steps": 52,
+      "findings": 6,
+      "checks": 5,
+      "contradicted": 4,
+      "costUsd": 1.0165,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "workshop-price-label-vs-charge",
+          "class": "label-vs-value",
+          "caught": true,
+          "why": "The run explicitly reports that Workshop is advertised/selected as $260 but the payment subtotal and total are $240."
+        },
+        {
+          "id": "back-discards-attendees",
+          "class": "navigation-data-loss",
+          "caught": true,
+          "why": "The run reports that attendees are lost after navigating back from Attendees to Contact and then returning to Attendees."
+        },
+        {
+          "id": "seats-input-has-no-effect",
+          "class": "dead-control",
+          "caught": true,
+          "why": "The run reports that changing Seats reserved from 1 to 3 does not change the payment summary, attendee count, subtotal, total, or rendered confirmation use."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "After adding A as Standard, removing B as Student, and applying EARLY, confirmation shows one attendee charged $108.00 (10% off the $120 Standard ticket).",
+          "status": "verified",
+          "evidence": "Steps 23-28 show B removed so only “A · standard” remained; Payment displayed subtotal $120.00, discount −$12.00, total $108.00, and the confirmation stated “1 attendee(s) ... Total charged $108.00.”"
+        },
+        {
+          "claim": "An added attendee and selected ticket persist when navigating from Attendees back to Contact and then forward to Attendees.",
+          "status": "contradicted",
+          "evidence": "Alice · standard was rendered before Back (step 34), but after returning through Contact the Attendees screen showed “no attendees yet” at step 36."
+        },
+        {
+          "claim": "Changing Seats reserved from 1 to 3 is reflected or used in the Payment registration summary.",
+          "status": "contradicted",
+          "evidence": "The seat field visibly changed from 1 to 3 with one Standard attendee (step 39), but the subsequent Payment observations reported 1 attendee, $120.00 subtotal, and $120.00 total with no rendered use of three seats (steps 41-43)."
+        },
+        {
+          "claim": "TEAM15 establishes a discount, and applying BADCODE afterward clears the prior promo note and discount while leaving only an invalid-code error.",
+          "status": "contradicted",
+          "evidence": "The attempted TEAM15 application displayed “That promo code is not recognised.” and retained a $120.00 subtotal, −$0.00 discount, and $120.00 total (step 41), so the required prior active TEAM15 discount was never established."
+        },
+        {
+          "claim": "For one Workshop attendee, the displayed Workshop price and Payment subtotal are both $260.00.",
+          "status": "contradicted",
+          "evidence": "Workshop — $260 was selected and one attendee “W · workshop” was added (steps 49-51), but the final Payment screen showed an incorrect $240.00 Workshop subtotal/total (step 52)."
+        }
+      ],
+      "findingTexts": [
+        "Attendee data is discarded when navigating from Attendees back to Contact and then continuing to Attendees again.",
+        "Seats reserved is ignored when rendering payment registration data: changing it from 1 to 3 leaves the payment summary at one attendee and $120.00.",
+        "TEAM15 is rejected as an unrecognised promo code instead of applying the expected 15% discount.",
+        "Workshop ticket price is miscalculated: selecting Workshop — $260 for one attendee renders a $240.00 subtotal and total due rather than $260.00.",
+        "Stale invalid promo code BADCODE and its error remain visible on the later Workshop payment screen.",
+        "Seats reserved remains at 3 after the prior attendee is removed and during a new Workshop registration."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter contact details including a valid phone number; add A as Standard and B as Student.",
+          "action": "Remove B, apply EARLY on Payment, then confirm registration.",
+          "expect": "Confirmation must show 1 attendee and total charged $108.00 after the 10% discount on A's $120 ticket.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter valid contact details and advance to Attendees.",
+          "action": "Add attendee Alice, go back to Contact, then continue to Attendees again.",
+          "expect": "Alice and her selected ticket must still be present after returning to Attendees.",
+          "priority": 4
+        },
+        {
+          "setup": "Create one attendee, set Seats reserved to 3, and advance to Payment.",
+          "action": "Read the payment summary and compare it with the entered seat count.",
+          "expect": "The summary must show or use 3 seats; changing seats from 1 to 3 must change rendered registration data.",
+          "priority": 3
+        },
+        {
+          "setup": "Create one standard attendee and advance to Payment.",
+          "action": "Apply TEAM15, replace it with BADCODE, and apply the invalid code.",
+          "expect": "Invalid application must clear the prior promo note and discount; only an error may remain.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter valid contact details and advance to Attendees.",
+          "action": "Choose Workshop — $260, add attendee W, then advance to Payment.",
+          "expect": "Workshop price and subtotal must both be $260.00 for one workshop attendee.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the registration wizard with boundary and state-transition inputs, prioritizing mismatched prices, stale promo state, ignored seat counts, and navigation data loss.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter contact details including a valid phone number; add A as Standard and B as Student. Then Remove B, apply EARLY on Payment, then confirm registration. — expect: Confirmation must show 1 attendee and total charged $108.00 after the 10% discount on A's $120 ticket.\n2. Enter valid contact details and advance to Attendees. Then Add attendee Alice, go back to Contact, then continue to Attendees again. — expect: Alice and her selected ticket must still be present after returning to Attendees.\n3. Create one attendee, set Seats reserved to 3, and advance to Payment. Then Read the payment summary and compare it with the entered seat count. — expect: The summary must show or use 3 seats; changing seats from 1 to 3 must change rendered registration data.\n4. Create one standard attendee and advance to Payment. Then Apply TEAM15, replace it with BADCODE, and apply the invalid code. — expect: Invalid application must clear the prior promo note and discount; only an error may remain.\n5. Enter valid contact details and advance to Attendees. Then Choose Workshop — $260, add attendee W, then advance to Payment. — expect: Workshop price and subtotal must both be $260.00 for one workshop attendee."
+    },
+    {
+      "case": "bookflow-register",
+      "attempt": 2,
+      "durationMs": 221920,
+      "status": "failed",
+      "steps": 27,
+      "findings": 0,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.4258,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "workshop-price-label-vs-charge",
+          "class": "label-vs-value",
+          "caught": false,
+          "why": "The run only exercised a one-attendee Standard registration at $120 and did not report the Workshop option's advertised $260 price versus a $240 charge."
+        },
+        {
+          "id": "back-discards-attendees",
+          "class": "navigation-data-loss",
+          "caught": false,
+          "why": "The run did not navigate back from the attendees step and return, nor report that attendee entries were cleared."
+        },
+        {
+          "id": "seats-input-has-no-effect",
+          "class": "dead-control",
+          "caught": false,
+          "why": "The run did not change the Seats reserved field or report that it failed to affect totals or confirmation."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Confirming a one-attendee Standard registration opens a confirmation that reports one attendee and a charged total of $120.00.",
+          "status": "contradicted",
+          "evidence": "At step 8, Confirm registration was clicked, but the recorded observation remained the Payment screen (Attendees 1, Subtotal $120.00, Total due $120.00) and no confirmation message was observed."
+        },
+        {
+          "claim": "Removing Bob from a three-attendee list leaves Alice and Carol while Bob disappears.",
+          "status": "not_testable",
+          "evidence": "The run added Alice and Bob but became stuck while attempting to choose Carol's ticket type (steps 25-27), so Carol was not added and no Remove action was attempted."
+        },
+        {
+          "claim": "Attendees and their original ticket types persist after navigating from Payment back to Contact and forward to Attendees.",
+          "status": "not_testable",
+          "evidence": "The run never completed a two-attendee flow to Payment or navigated back through Contact for this scenario."
+        },
+        {
+          "claim": "Payment visibly reports Seats reserved as 3 when one attendee reserves three seats.",
+          "status": "not_testable",
+          "evidence": "Seats reserved remained at 1 in the exercised flow (steps 5 and 7); no value of 3 was set and no corresponding Payment summary was reached."
+        },
+        {
+          "claim": "Replacing an applied valid TEAM15 promo with INVALID shows an error and clears the prior promo note and discount.",
+          "status": "not_testable",
+          "evidence": "No Apply action was performed for TEAM15 or INVALID; step 8 only observed a prefilled TEAM15 input with no applied note."
+        },
+        {
+          "claim": "For a Workshop attendee, the Payment subtotal equals the displayed Workshop price of $260.00.",
+          "status": "not_testable",
+          "evidence": "Although the ticket selector eventually displayed Workshop — $260 for Bob (step 23), the run never reached Payment with that attendee, so no Workshop subtotal was observed for comparison."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter valid organisation, email, and optional phone details; add attendee Alice with Standard ticket and continue to Payment.",
+          "action": "Click Confirm registration and read the confirmation message.",
+          "expect": "Confirmation must show one attendee and a charged total equal to the displayed $120.00 subtotal.",
+          "priority": 6
+        },
+        {
+          "setup": "Create attendees Alice, Bob, and Carol with distinct ticket types and remain on the Attendees step.",
+          "action": "Click Remove on the second attendee, Bob.",
+          "expect": "Bob must disappear while Alice and Carol remain.",
+          "priority": 5
+        },
+        {
+          "setup": "Create attendees Alice and Bob, continue to Payment, then return to Contact and continue back to Attendees.",
+          "action": "Read the attendee list after navigating back through the earlier step.",
+          "expect": "Alice and Bob must still be present with their original ticket types.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter valid contact details, add attendee Alice, set Seats reserved to 3, and continue to Payment.",
+          "action": "Read the Payment summary after reserving three seats.",
+          "expect": "Summary must visibly report the reserved-seat value of 3 rather than only showing attendee count 1.",
+          "priority": 3
+        },
+        {
+          "setup": "Reach Payment with one attendee and apply the valid TEAM15 promo; record the applied note, discount, and total.",
+          "action": "Replace TEAM15 with INVALID and click Apply.",
+          "expect": "Invalid-code error must show, and the old applied promo and discount must be cleared.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter valid contact details, choose Workshop, add attendee Alice, set seats to 1, and continue to Payment.",
+          "action": "Read the Workshop option price and compare it with the Payment subtotal for Alice.",
+          "expect": "Subtotal must equal the displayed Workshop price of $260.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the registration wizard end to end, prioritizing mismatches in ticket pricing, promo state, seat propagation, and navigation persistence. Use distinct attendee names and record displayed totals before and after each relevant action.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter valid organisation, email, and optional phone details; add attendee Alice with Standard ticket and continue to Payment. Then Click Confirm registration and read the confirmation message. — expect: Confirmation must show one attendee and a charged total equal to the displayed $120.00 subtotal.\n2. Create attendees Alice, Bob, and Carol with distinct ticket types and remain on the Attendees step. Then Click Remove on the second attendee, Bob. — expect: Bob must disappear while Alice and Carol remain.\n3. Create attendees Alice and Bob, continue to Payment, then return to Contact and continue back to Attendees. Then Read the attendee list after navigating back through the earlier step. — expect: Alice and Bob must still be present with their original ticket types.\n4. Enter valid contact details, add attendee Alice, set Seats reserved to 3, and continue to Payment. Then Read the Payment summary after reserving three seats. — expect: Summary must visibly report the reserved-seat value of 3 rather than only showing attendee count 1.\n5. Reach Payment with one attendee and apply the valid TEAM15 promo; record the applied note, discount, and total. Then Repl"
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 1,
+      "durationMs": 99355,
+      "status": "failed",
+      "steps": 11,
+      "findings": 1,
+      "checks": 3,
+      "contradicted": 0,
+      "costUsd": 0.185,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": true,
+          "why": "The finding explicitly says select-all on 3 visible filtered rows reports 8 selected, indicating filtered-out tickets were selected."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": false,
+          "why": "No finding describes closing selected tickets and the selection count failing to reset."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "No finding describes the close confirmation toast or a mismatch between reported closed tickets and tickets actually changed."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "With High priority, search “Invoice,” and Open only enabled, the queue shows only “Invoice total looks wrong” and reports Showing 1 of 8 tickets.",
+          "status": "verified",
+          "evidence": "Step 3 records that the search value is Invoice, the table contains only “Invoice total looks wrong,” and the status is “Showing 1 of 8 tickets · 0 selected.”"
+        },
+        {
+          "claim": "Clicking the table header checkbox while High priority is filtered selects exactly the three visible High tickets and updates the status to 3 selected.",
+          "status": "not_testable",
+          "evidence": "Step 9 shows the three expected High rows and a DOM change after clicking the unnamed header checkbox, but the recorded status observation is truncated at “Showing 3 of 8 ti” and does not show checkbox states or “3 selected.”"
+        },
+        {
+          "claim": "Selecting the non-first “Invoice total looks wrong” ticket and using Close selected changes it to Closed, clears selection, and disables Close selected.",
+          "status": "not_testable",
+          "evidence": "The run exited after step 10 and never reloaded for check 3, selected the ticket, or invoked Close selected."
+        }
+      ],
+      "findingTexts": [
+        "Select-all intended to select 3 visible High rows, but status reports 8 selected despite only 3 checked."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reload the queue.",
+          "action": "Choose High, search “Invoice”, enable Open only, and read the table and status.",
+          "expect": "Only Invoice total looks wrong must appear, and status must say Showing 1 of 8 tickets.",
+          "priority": 3
+        },
+        {
+          "setup": "Reload the queue so no tickets are selected.",
+          "action": "Choose High priority, then click the table header checkbox.",
+          "expect": "Exactly 3 visible High rows must be selected, and status must say 3 selected.",
+          "priority": 2
+        },
+        {
+          "setup": "Reload the queue and identify the non-first ticket “Invoice total looks wrong.”",
+          "action": "Select “Invoice total looks wrong” and click “Close selected.”",
+          "expect": "The ticket must read Closed; status must say 0 selected and the close button must be disabled.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the support queue filters, row selection, select-all behavior, and bulk close action, focusing on selection state and visible counts after actions.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reload the queue. Then Choose High, search “Invoice”, enable Open only, and read the table and status. — expect: Only Invoice total looks wrong must appear, and status must say Showing 1 of 8 tickets.\n2. Reload the queue so no tickets are selected. Then Choose High priority, then click the table header checkbox. — expect: Exactly 3 visible High rows must be selected, and status must say 3 selected.\n3. Reload the queue and identify the non-first ticket “Invoice total looks wrong.” Then Select “Invoice total looks wrong” and click “Close selected.” — expect: The ticket must read Closed; status must say 0 selected and the close button must be disabled."
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 2,
+      "durationMs": 148763,
+      "status": "passed",
+      "steps": 12,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 2,
+      "costUsd": 0.2508,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": true,
+          "why": "The run explicitly reports that with the High filter showing 3 rows, header select-all selected 8 and the bulk close affected hidden Low- and Normal-priority tickets."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "The run repeatedly observes that after closing selected tickets, checkboxes remain checked, the selected count remains nonzero, and Close selected stays enabled instead of selection clearing."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "Although the run reports a toast saying “Closed 8 ticket(s).”, it does not establish that any of those selected tickets were already closed or that fewer than 8 tickets actually changed state. The reported issue is the filter-ignoring selec"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Applying High priority, subject search “Invoice,” and Open only leaves exactly one displayed ticket, “Invoice total looks wrong,” and it is Open.",
+          "status": "verified",
+          "evidence": "Step 3 records that with Priority High, subject Invoice, and Open only enabled, exactly one row remains—“Invoice total looks wrong” with status Open—and the count is Showing 1 of 8 tickets."
+        },
+        {
+          "claim": "Closing the individually selected “Invoice total looks wrong” ticket changes it to Closed and clears selection, disables Close selected, and unchecks its checkbox.",
+          "status": "contradicted",
+          "evidence": "After Close selected was clicked in step 7, the observation still says the Invoice ticket checkbox is checked, the footer reports 1 selected, and Close selected is enabled; later step 9 shows the ticket as Closed but still checked, so the required selection clearing and disabled control did not occu"
+        },
+        {
+          "claim": "Selecting all visible High-priority tickets and closing them affects only those High tickets; hidden Low- and Normal-priority Open tickets remain Open, and selection clears afterward.",
+          "status": "contradicted",
+          "evidence": "Step 10 shows header selection in the High-filtered view resulted in 8 selected rather than the 3 visible High rows, and step 12 confirms all eight tickets are Closed, every checkbox is checked, and 8 remain selected, including the previously Open Low- and Normal-priority tickets noted in step 8."
+        }
+      ],
+      "findingTexts": [
+        "After closing the selected Invoice total looks wrong ticket, its status becomes Closed and toast says “Closed 1 ticket(s).”, but selection does not clear: its checkbox remains checked, footer still re",
+        "With Priority filtered to High, clicking the header checkbox reports 8 selected although only 3 High rows are displayed; Close selected then closes all 8 tickets (toast: “Closed 8 ticket(s).”), so the"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Select High priority, type “Invoice” in Search subject, and enable Open only.",
+          "expect": "Exactly one displayed row must remain: “Invoice total looks wrong.”",
+          "priority": 3
+        },
+        {
+          "setup": "Reload the page with filters clear and identify the second row, “Invoice total looks wrong.”",
+          "action": "Select the second row, click Close selected, then inspect its checkbox, button, status count, and toast.",
+          "expect": "The ticket must become Closed; selection must be zero, the button disabled, and the checkbox unchecked.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave filters clear and note that Low- and Normal-priority tickets are initially Open.",
+          "action": "Filter Priority to High, click the header checkbox, close selected, then clear the priority filter.",
+          "expect": "Only High-priority tickets must be Closed; Low and Normal tickets must remain Open, and selection must clear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the support queue filters, visible-row selection, and bulk close behavior. Pay particular attention to whether bulk actions affect hidden rows and whether selection state is cleared afterward.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Select High priority, type “Invoice” in Search subject, and enable Open only. — expect: Exactly one displayed row must remain: “Invoice total looks wrong.”\n2. Reload the page with filters clear and identify the second row, “Invoice total looks wrong.” Then Select the second row, click Close selected, then inspect its checkbox, button, status count, and toast. — expect: The ticket must become Closed; selection must be zero, the button disabled, and the checkbox unchecked.\n3. Leave filters clear and note that Low- and Normal-priority tickets are initially Open. Then Filter Priority to High, click the header checkbox, close selected, then clear the priority filter. — expect: Only High-priority tickets must be Closed; Low and Normal tickets must remain Open, and selection must clear."
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 336371,
+      "status": "failed",
+      "steps": 30,
+      "findings": 3,
+      "checks": 3,
+      "contradicted": 3,
+      "costUsd": 0.5891,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "Findings 1 and 4 explicitly report that undoing a shipment changes Panel A3 from 6 to 5 rather than restoring it to the original 7."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "Findings 3 and 6 report that Washer 11mm at exactly its reorder point, 60 of 60, is shown OK rather than Low."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "Findings 2 and 5 report that attempting to ship exactly the 7 units on hand is refused with an 'Only 7 ... on hand' message and no state change."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Undoing a shipped quantity of 1 for Panel A3 restores the complete fresh state: Panel A3 returns to 7, Movements returns to 0, the log is empty, and Undo is disabled.",
+          "status": "contradicted",
+          "evidence": "After the one-unit shipment, the trace observed Panel A3 at 6, Movements 1, an enabled Undo button, and a shipped log entry (step 12); Undo then cleared Movements and the log and disabled Undo, but Panel A3 became 5 and Total units 533 instead of restoring Panel A3 to 7 (step 13)."
+        },
+        {
+          "claim": "Recording a shipment of the exact on-hand quantity 7 for Panel A3 succeeds, leaving Panel A3 at 0 with Movements 1 and a shipped history entry.",
+          "status": "contradicted",
+          "evidence": "The Record action was attempted after quantity was visibly set to 7 (steps 17-18), but the subsequent observed state still showed quantity 7, Panel A3 on hand 7, Movements 0, an empty log, and disabled Undo (step 20)."
+        },
+        {
+          "claim": "Washer 11mm at 60 on hand and reorder point 60 is flagged Low — reorder, and the visible Items low total is 2.",
+          "status": "contradicted",
+          "evidence": "The fresh-state observations showed Washer 11mm at 60 on hand (step 15), while the visible total was reported as only 1 item low (step 3), not the expected 2."
+        }
+      ],
+      "findingTexts": [
+        "Undo last does not restore the original Panel A3 quantity: shipment from 7 to 6 followed by Undo results in 5 instead of 7.",
+        "Record rejects a shipped quantity equal to the available on-hand quantity: shipping 7 from Panel A3 with 7 on hand displays “Only 7 of Panel A3 on hand” and leaves the quantity, Movements, history, an",
+        "Washer 11mm at its reorder point (60 of 60) is shown OK; intended status is Low — reorder, so Items low is 1 not 2."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Select Panel A3 and note its initial on-hand quantity of 7.",
+          "action": "Choose Shipped, enter 1, click Record, note 6, then click Undo.",
+          "expect": "Panel A3 must return to 7, Movements 0, log empty, and Undo disabled.",
+          "priority": 3
+        },
+        {
+          "setup": "Select Panel A3 and note its initial on-hand quantity of 7.",
+          "action": "Choose Shipped, enter quantity 7, and click Record.",
+          "expect": "Record must succeed: Panel A3 must become 0, Movements 1, with a shipped log entry.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Read the Washer 11mm row, its reorder point, and the visible Items low total.",
+          "expect": "Washer at 60 with reorder point 60 must say Low — reorder; Items low must be 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Run the ranked checks on a fresh page where needed, using the exact boundary values and comparing the visible table, totals, log, and button state.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Select Panel A3 and note its initial on-hand quantity of 7. Then Choose Shipped, enter 1, click Record, note 6, then click Undo. — expect: Panel A3 must return to 7, Movements 0, log empty, and Undo disabled.\n2. Select Panel A3 and note its initial on-hand quantity of 7. Then Choose Shipped, enter quantity 7, and click Record. — expect: Record must succeed: Panel A3 must become 0, Movements 1, with a shipped log entry.\n3. Read the Washer 11mm row, its reorder point, and the visible Items low total. — expect: Washer at 60 with reorder point 60 must say Low — reorder; Items low must be 2."
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 2,
+      "durationMs": 390234,
+      "status": "passed",
+      "steps": 41,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.6742,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "Finding 2 describes undoing a Washer shipment causing stock to go from 61 to 60 instead of restoring 62, explicitly matching the defect that undo subtracts again."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "Findings 2, 3, and 5 state that Washer 11mm at stock 60 with reorder point 60 is shown as OK rather than Low — reorder despite the at-or-below rule."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "Findings 1 and 4 report that shipping Panel A3's exact on-hand quantity of 7 is rejected with “Only 7 ... on hand,” rather than being accepted and reducing stock to zero."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Shipping Panel A3's full on-hand quantity of 7 is accepted, reduces Panel A3 to 0, and creates one shipped movement.",
+          "status": "contradicted",
+          "evidence": "After Record was clicked for Panel A3 with Shipped quantity 7, step 20 observed the error “Only 7 of Panel A3 on hand,” while Panel A3 remained at 7 and movements remained 0."
+        },
+        {
+          "claim": "Washer 11mm at exactly its reorder point of 60 is marked Low — reorder and is included in the Items low total.",
+          "status": "contradicted",
+          "evidence": "Steps 20 and 30 observed Washer 11mm at 60 on hand with reorder 60 but status OK; step 30 further observed Items low was 1 due only to Cable 2m."
+        },
+        {
+          "claim": "Recording a received movement for 2 Washer 11mm units increases its on-hand quantity and reconciles displayed totals and movement history.",
+          "status": "verified",
+          "evidence": "Step 37 observed the accepted receipt change Washer from 60 to 62, total units from 535 to 537 (a matching +2), movements from 0 to 1, and a “Received 2 × Washer 11mm” log entry."
+        },
+        {
+          "claim": "Recording a shipped movement for 1 Washer 11mm unit decreases its on-hand quantity and reconciles displayed totals and movement history.",
+          "status": "verified",
+          "evidence": "Step 40 observed the accepted shipment change Washer from 62 to 61, total units from 537 to 536 (a matching -1), and movements from 1 to 2 with a shipped log entry."
+        },
+        {
+          "claim": "Undo last reverses the latest Washer shipment, restoring Washer to 62, reducing movement count by one, and leaving only the received movement in the log.",
+          "status": "contradicted",
+          "evidence": "Undo last was directly clicked in step 40, but the action recorded domChanged=NO and no post-undo restoration of quantity, totals, movement count, or log was observed."
+        }
+      ],
+      "findingTexts": [
+        "Panel A3 shipped quantity 7 (its full on-hand amount) is rejected with the error “Only 7 of Panel A3 on hand.” The row remains 7, movements remains 0, and the log remains empty.",
+        "Washer 11mm low-stock threshold and undo behavior are incorrect. At on-hand 60 with reorder at 60, the row displays “OK” and Items low remains 1 instead of displaying “Low — reorder” and including Was",
+        "Washer 11mm is at its reorder point (60) but is labeled OK, contradicting the page's at-or-below low-stock rule."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Select Panel A3, choose Shipped, and enter its full on-hand quantity of 7.",
+          "action": "Click Record and read the error area, Panel A3 row, movement count, and log.",
+          "expect": "The shipment must be accepted, Panel A3 must show 0, and one shipped movement must appear.",
+          "priority": 3
+        },
+        {
+          "setup": "",
+          "action": "Read the Washer 11mm row and the Items low total.",
+          "expect": "Washer at exactly its reorder point must show Low — reorder and be included in Items low.",
+          "priority": 2
+        },
+        {
+          "setup": "Select Washer 11mm, record Received quantity 2, then record Shipped quantity 1; note the displayed on-hand quantity and movement count.",
+          "action": "Click Undo last and reread the Washer row, totals, movement count, and movement log.",
+          "expect": "On hand must return to 62, movements must decrease by one, and only the received movement must remain in the log.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Verify the inventory movement boundaries, low-stock threshold, totals, movement log, and undo behavior. Use distinct items and compare displayed quantities before and after actions.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Select Panel A3, choose Shipped, and enter its full on-hand quantity of 7. Then Click Record and read the error area, Panel A3 row, movement count, and log. — expect: The shipment must be accepted, Panel A3 must show 0, and one shipped movement must appear.\n2. Read the Washer 11mm row and the Items low total. — expect: Washer at exactly its reorder point must show Low — reorder and be included in Items low.\n3. Select Washer 11mm, record Received quantity 2, then record Shipped quantity 1; note the displayed on-hand quantity and movement count. Then Click Undo last and reread the Washer row, totals, movement count, and movement log. — expect: On hand must return to 62, movements must decrease by one, and only the received movement must remain in the log."
+    }
+  ]
+}

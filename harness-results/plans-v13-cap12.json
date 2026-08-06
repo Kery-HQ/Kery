@@ -1,0 +1,86 @@
+{
+  "label": "v13-cap12",
+  "repeat": 4,
+  "tuning": {
+    "hit": 56,
+    "of": 72
+  },
+  "heldOut": {
+    "hit": 7,
+    "of": 12
+  },
+  "perBug": {
+    "discount-base-includes-shipping": {
+      "hit": 1,
+      "of": 4
+    },
+    "free-shipping-threshold-off-by-one": {
+      "hit": 4,
+      "of": 4
+    },
+    "invalid-promo-keeps-discount": {
+      "hit": 4,
+      "of": 4
+    },
+    "email-regex-accepts-no-tld": {
+      "hit": 0,
+      "of": 4
+    },
+    "daily-limit-upper-bound-missing": {
+      "hit": 4,
+      "of": 4
+    },
+    "remove-note-drops-last": {
+      "hit": 4,
+      "of": 4
+    },
+    "counter-ignores-vision-filter": {
+      "hit": 4,
+      "of": 4
+    },
+    "numeric-sort-ignores-direction": {
+      "hit": 3,
+      "of": 4
+    },
+    "estimate-uses-output-rate-for-input": {
+      "hit": 4,
+      "of": 4
+    },
+    "workshop-price-label-vs-charge": {
+      "hit": 4,
+      "of": 4
+    },
+    "back-discards-attendees": {
+      "hit": 1,
+      "of": 4
+    },
+    "seats-input-has-no-effect": {
+      "hit": 3,
+      "of": 4
+    },
+    "select-all-ignores-filter": {
+      "hit": 4,
+      "of": 4
+    },
+    "selection-persists-after-close": {
+      "hit": 4,
+      "of": 4
+    },
+    "close-toast-overstates-count": {
+      "hit": 0,
+      "of": 4
+    },
+    "undo-ignores-direction": {
+      "hit": 4,
+      "of": 4
+    },
+    "reorder-equality-not-flagged": {
+      "hit": 4,
+      "of": 4
+    },
+    "cannot-ship-entire-stock": {
+      "hit": 4,
+      "of": 4
+    }
+  }
+}

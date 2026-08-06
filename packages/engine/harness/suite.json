@@ -10,7 +10,7 @@
       "baseUrl": "http://localhost:4101/estimate?subtotal=42",
       "intent": "This page estimates shipping and discounts for a $42.00 cart. Work through these checks in order and record exactly what you observe for each: 1. Read the Subtotal, Shipping and Order total, then confirm the arithmetic: order total must equal subtotal minus any discount plus shipping. 2. Apply the promo code SAVE10 and check the Discount line equals exactly 10% of the SUBTOTAL (not of subtotal plus shipping) \u2014 state both numbers. 3. With SAVE10 still applied, apply an obviously invalid code such as NOTREAL; confirm the invalid-code error appears AND that the previous discount is removed rather than silently kept. 4. Select the Express tier and re-check that the order total updates consistently with the shipping price shown on that row. 5. Compare the FREE badge shown on a shipping row against the Shipping amount used in the totals \u2014 they must agree.",
       "context": "New shipping estimator with delivery tiers, free-shipping thresholds, promo codes and a totals rollup.",
-      "maxSteps": 48,
+      "maxSteps": 72,
       "plantedBugs": [
         {
           "id": "discount-base-includes-shipping",
@@ -55,7 +55,7 @@
       "baseUrl": "http://localhost:4102/welcome",
       "intent": "This is a 3-step onboarding wizard. Work through these checks in order and record exactly what you observe for each: 1. On step 1 press Continue with everything empty and confirm each required field shows an error. 2. Enter an email with NO dot in the domain, for example sam@example (plus a valid workspace name and display name), press Continue, and record whether the wizard accepts it \u2014 a malformed email must be rejected. 3. On step 2 pick a focus area, then set 'Max notes per day' to 25 and press Continue; the field states the allowed range is 1 to 20, so 25 must be rejected \u2014 record what happens. 4. On step 3 add three notes with DISTINCT text (for example 'alpha', 'beta', 'gamma'), then remove the SECOND one and record exactly which note text disappeared and which remain. 5. Finish and confirm the summary's note count matches the number of notes you actually left in the list.",
       "context": "New public onboarding wizard collecting workspace profile, planning preferences and first notes, with per-step validation.",
-      "maxSteps": 64,
+      "maxSteps": 92,
       "plantedBugs": [
         {
           "id": "email-regex-accepts-no-tld",
@@ -100,7 +100,7 @@
       "baseUrl": "http://localhost:4103/compare",
       "intent": "This page compares LLM models with filters, sortable columns and a monthly cost estimate. Work through these checks in order and record exactly what you observe for each: 1. Note the 'Showing N of M models' counter and count the visible table rows \u2014 they must agree. 2. Tick 'Vision only', then re-count the visible rows AND re-read the counter; they must still agree. 3. Click the 'Input $/1M' column header twice and record the first and last row each time \u2014 the second click must reverse the order. 4. Set 'Input M tokens / mo' to 10 and 'Output M tokens / mo' to 0, then verify one row's 'Est. monthly' by hand: it must equal the row's Input $/1M multiplied by 10. State the row, the input rate and the estimate. 5. Confirm the row tagged 'cheapest' really has the lowest Est. monthly of the visible rows.",
       "context": "New public model comparison table with provider/vision filters, sortable price and context columns, and a usage-based monthly cost estimate.",
-      "maxSteps": 48,
+      "maxSteps": 72,
       "plantedBugs": [
         {
           "id": "counter-ignores-vision-filter",
@@ -147,7 +147,7 @@
       "note": "HELD OUT. Never inspect per-bug results while tuning prompts \u2014 this case exists solely to detect overfitting to the other three. Run with --reveal only for final validation.",
       "intent": "This page lists seat licence plans across multiple pages, lets you set a team size that can be remembered between visits, and lets you request a quote for a selected plan. Work through these checks in order and record exactly what you observe for each: 1. On page 1, note the name of every plan row. Click Next and note every plan row on page 2 \u2014 no plan may appear on both pages. 2. Tick 'Remember my team size', set the team size to 37, then reload the page and record whether the team size is still 37 and whether the checkbox is still ticked. 3. Without selecting any plan, check whether the 'Request quote' button is clickable; it must be disabled until a plan is chosen. If it is clickable, click it and record what the confirmation says. 4. Select a Business plan with a team size below its stated 'Seats from' minimum and record whether the warning appears and whether the button is disabled. 5. Select a plan and confirm 'Estimated monthly' equals that plan's per-seat price multiplied by the seat count \u2014 state all three numbers.",
       "context": "New public seat licence planner with a paginated plan table, a remembered team size, and a quote request form.",
-      "maxSteps": 48,
+      "maxSteps": 72,
       "plantedBugs": [
         {
           "id": "pagination-repeats-boundary-row",
@@ -190,7 +190,7 @@
       "port": 4104,
       "path": "/",
       "baseUrl": "http://localhost:4104/",
-      "maxSteps": 48,
+      "maxSteps": 76,
       "intent": "",
       "context": "New three-step event registration wizard: contact details, attendees with ticket types, then promo codes and totals.",
       "prTitle": "Feature: event registration wizard",
@@ -235,7 +235,7 @@
       "port": 4105,
       "path": "/",
       "baseUrl": "http://localhost:4105/",
-      "maxSteps": 44,
+      "maxSteps": 64,
       "intent": "",
       "context": "New support ticket queue with priority and text filters, an open-only toggle, row selection and a bulk close action.",
       "prTitle": "Feature: support queue with bulk actions",
@@ -280,7 +280,7 @@
       "port": 4106,
       "path": "/",
       "baseUrl": "http://localhost:4106/",
-      "maxSteps": 44,
+      "maxSteps": 64,
       "intent": "",
       "context": "New inventory movement screen: record received and shipped quantities, undo the last movement, with low-stock flagging against a reorder point.",
       "prTitle": "Feature: inventory movements with undo",
