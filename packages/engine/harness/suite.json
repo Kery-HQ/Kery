@@ -456,6 +456,96 @@
           "symptom": "The confirmation dialog has no close button and ignores both the Escape key and clicks outside it, leaving the user stuck with no way back to the page."
         }
       ]
+    },
+    {
+      "id": "bookflow-checkout",
+      "app": "bookflow",
+      "port": 4104,
+      "path": "/checkout.html",
+      "baseUrl": "http://localhost:4104/checkout.html",
+      "maxSteps": 48,
+      "intent": "This is a checkout screen. Work through these checks and record exactly what you observe: 1. Read every line total, the Subtotal, the Tax and the Total. State whether the line totals add up to the Subtotal, and whether Subtotal plus Tax equals the Total, giving every figure. 2. Press 'Place order' twice in quick succession. A second press must NOT create a second order \u2014 read the 'Orders placed' list and state how many orders were recorded and whether that is correct. 3. Reload, replace the billing email with a value containing no @ sign, press 'Place order', wait several seconds, and state exactly what the screen shows afterwards and whether the user is told anything went wrong.",
+      "context": "New checkout screen showing an itemised order, tax, and a place-order action that contacts a payment provider.",
+      "prTitle": "Feature: checkout and order placement",
+      "prBody": "Adds a checkout screen with an itemised order summary, tax calculation and order placement.",
+      "diffFile": "/tmp/diff-r2-bookflow.patch",
+      "plantedBugs": [
+        {
+          "id": "total-does-not-reconcile",
+          "class": "currency-rounding",
+          "note": "subtotal sums rounded line totals while the total derives from raw unrounded figures",
+          "detect": [
+            "(total|subtotal|tax)",
+            "(mismatch|does not|differ|cent|off by|not equal)"
+          ],
+          "symptom": "Subtotal plus Tax does not equal the displayed Total; they differ by one cent because the total is computed from unrounded figures."
+        },
+        {
+          "id": "double-submit-duplicates-order",
+          "class": "async-guard",
+          "note": "no in-flight guard and the button is never disabled",
+          "detect": [
+            "(twice|double|two|second click)",
+            "(duplicate|two orders|twice|second order)"
+          ],
+          "symptom": "Clicking Place order twice quickly records two separate orders instead of one."
+        },
+        {
+          "id": "failed-payment-shows-nothing",
+          "class": "silent-error",
+          "note": "submission with a malformed billing email returns without rendering an error, leaving Processing on screen",
+          "detect": [
+            "(processing|error|failure|stuck)",
+            "(no error|nothing|stuck|never|forever|silent)"
+          ],
+          "symptom": "Placing an order with a billing email that has no @ sign leaves the screen showing 'Processing\u2026' indefinitely: no order is recorded, no error is shown, and the user is never told the submission failed."
+        }
+      ]
+    },
+    {
+      "id": "gridworks-schedule",
+      "app": "gridworks",
+      "port": 4105,
+      "path": "/schedule.html",
+      "baseUrl": "http://localhost:4105/schedule.html",
+      "maxSteps": 48,
+      "intent": "This is a shift scheduling screen. Work through these checks and record exactly what you observe: 1. Book a shift for a specific date, then read the booked shift line and state whether the date shown is the same date you selected. 2. In the Team directory search, type the two letters 'Am' at a normal typing speed, wait two seconds, then state which names are listed and which search term the results claim to be for. 3. Clear the search and type the text <b>zz</b> into it, then state whether that text appears literally on screen or is interpreted as formatting.",
+      "context": "New shift scheduling screen with a date-based booking form and a live team directory search.",
+      "prTitle": "Feature: shift scheduling and directory search",
+      "prBody": "Adds shift booking against a date and a live-search team directory.",
+      "diffFile": "/tmp/diff-r2-gridworks.patch",
+      "plantedBugs": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "note": "date parsed as UTC midnight then rendered in a western timezone",
+          "detect": [
+            "(date|shift|booked)",
+            "(off by|previous|day before|wrong|different|earlier)"
+          ],
+          "symptom": "A shift booked for one date is displayed as the previous day."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "note": "no request ordering guard; slower earlier query resolves last",
+          "detect": [
+            "(search|result)",
+            "(stale|wrong|previous|older|not match|all|outdated)"
+          ],
+          "symptom": "After typing a two-letter search the results shown are those of the earlier one-letter query, listing names that do not match what was typed."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "note": "user input interpolated into innerHTML",
+          "detect": [
+            "(escap|html|markup|bold|tag)",
+            "(render|interpret|not escaped|raw|executed)"
+          ],
+          "symptom": "Text typed into search containing HTML tags is rendered as formatting instead of being shown literally."
+        }
+      ]
     }
   ]
 }

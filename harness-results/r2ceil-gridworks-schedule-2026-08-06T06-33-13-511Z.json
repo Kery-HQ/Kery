@@ -1,0 +1,80 @@
+{
+  "label": "r2ceil-gridworks-schedule",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 2,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.2347,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "gridworks-schedule",
+      "attempt": 1,
+      "durationMs": 127111,
+      "status": "passed",
+      "steps": 7,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 1,
+      "costUsd": 0.2347,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run explicitly shows a shift selected for 20/08/2026 being rendered as Wed, 19 Aug 2026, the previous day."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "No finding reports a two-letter search displaying results from an earlier one-letter query or names mismatching the typed query."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": true,
+          "why": "The run reports that the status renders markup and displays only “zz” while the input contains “<b>zz</b>”, showing the HTML tags were interpreted instead of rendered literally."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Booking a shift for the selected date shows that same date in the booked shift line.",
+          "status": "contradicted",
+          "evidence": "Steps 2-4 show the selected Shift date as 20/08/2026 (underlying 2026-08-20), but the booked line observed after clicking Book shift is “Wed, 19 Aug 2026 — Amara Osei,” one day earlier."
+        },
+        {
+          "claim": "Typing “Am” in the Team directory search shows the matching name(s) and accurately labels the results as being for “Am.”",
+          "status": "verified",
+          "evidence": "Step 5 observes the two-second search state with one listed name, “Amara Osei,” and the label “Showing results for \"Am\".”"
+        },
+        {
+          "claim": "Entering the text <b>zz</b> in Team directory search displays the markup literally rather than interpreting it as formatting.",
+          "status": "verified",
+          "evidence": "Step 6 observes that the search input literally displays “<b>zz</b>”; no formatted bold text is reported, and the page shows the corresponding no-match message."
+        }
+      ],
+      "findingTexts": [
+        "Search status renders markup and reports only “zz”, while the input visibly contains “<b>zz</b>”.",
+        "Date booking delta: selected 20/08/2026, but booked shift is rendered as Wed, 19 Aug 2026."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a shift scheduling screen. Work through these checks and record exactly what you observe: 1. Book a shift for a specific date, then read the booked shift line and state whether the date shown is the same date you selected. 2. In the Team directory search, type the two letters 'Am' at a normal typing speed, wait two seconds, then state which names are listed and which search term the results claim to be for. 3. Clear the search and type the text <b>zz</b> into it, then state whether that text appears literally on screen or is interpreted as formatting."
+    }
+  ]
+}

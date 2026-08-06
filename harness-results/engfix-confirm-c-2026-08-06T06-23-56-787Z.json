@@ -1,0 +1,154 @@
+{
+  "label": "engfix-confirm-c",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 6,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.416,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 150704,
+      "status": "passed",
+      "steps": 6,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.2393,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "why": "Findings 2 and 4 explicitly report that Vision-only filtering leaves the counter at 5 while only 3 vision rows are visible, matching the counter/list mismatch caused by ignoring the vision filter."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "Finding 3 states that the second click changes the numeric-sort arrow to descending while the rows remain in ascending order, exactly matching a direction toggle without comparator reversal."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Finding 1 reports that 10M GPT-4o mini input tokens with zero output are priced at $6.00 instead of the expected $1.50, demonstrating that the output rate is incorrectly being applied to input tokens."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The model counter matches the number of visible table rows before and after applying filters.",
+          "status": "contradicted",
+          "evidence": "After Vision only was enabled, step 2 observed \"Showing 3 of 5 models\" and three visible rows, but final step 6 observed Vision only still checked with \"Showing 5 of 5 models\" and only three visible rows."
+        },
+        {
+          "claim": "Enabling Vision only limits the table to vision-capable models.",
+          "status": "verified",
+          "evidence": "Step 2 observed Vision only checked and exactly three visible rows: Claude Sonnet 4.5, Gemini 2.5 Flash, and GPT-4o mini."
+        },
+        {
+          "claim": "Clicking Input $/1M twice sorts the table and the second click reverses the row order.",
+          "status": "contradicted",
+          "evidence": "The first Input $/1M click in step 2 recorded domChanged=NO and did not record the first or last row, so the required initial sort effect was not observed; step 3 changed the DOM but likewise recorded no edge-row evidence showing reversal."
+        },
+        {
+          "claim": "With 10 input M tokens/mo and 0 output M tokens/mo, a visible row’s Est. monthly equals its Input $/1M rate multiplied by 10.",
+          "status": "not_testable",
+          "evidence": "Steps 4-6 set the usage values to 10 and 0 and showed estimates, but the trace does not record any row name together with its Input $/1M rate and final estimate needed to recompute and reconcile the cost."
+        },
+        {
+          "claim": "The row tagged cheapest has the lowest Est. monthly value among visible rows.",
+          "status": "not_testable",
+          "evidence": "The trace does not identify the row tagged cheapest or provide a complete set of visible final monthly estimates for comparison."
+        }
+      ],
+      "findingTexts": [
+        "Monthly cost estimate is incorrect when output usage is zero: for GPT-4o mini, 10M input tokens at $0.15/1M and 0M output tokens should estimate $1.50, but the table displays $6.00.",
+        "With Vision only selected, UI says Showing 5 of 5 while exactly 3 vision rows are displayed.",
+        "Second Input $/1M click changes arrow to ↓ but keeps ascending order; intended order must reverse."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This page compares LLM models with filters, sortable columns and a monthly cost estimate. Work through these checks in order and record exactly what you observe for each: 1. Note the 'Showing N of M models' counter and count the visible table rows — they must agree. 2. Tick 'Vision only', then re-count the visible rows AND re-read the counter; they must still agree. 3. Click the 'Input $/1M' column header twice and record the first and last row each time — the second click must reverse the order. 4. Set 'Input M tokens / mo' to 10 and 'Output M tokens / mo' to 0, then verify one row's 'Est. monthly' by hand: it must equal the row's Input $/1M multiplied by 10. State the row, the input rate and the estimate. 5. Confirm the row tagged 'cheapest' really has the lowest Est. monthly of the visible rows."
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 2,
+      "durationMs": 113565,
+      "status": "passed",
+      "steps": 6,
+      "findings": 2,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.1767,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "why": "The run explicitly observed that enabling Vision only leaves the counter at “Showing 5 of 5 models” while only 3 rows are visible."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": true,
+          "why": "The run observed that the second Input $/1M click changes the sort arrow to descending but leaves GPT-4o mini first and Claude Sonnet 4.5 last, rather than reversing the numeric order."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "With 10M input tokens and 0 output tokens, models display estimates based on their output rates (for example, $6.00 instead of $1.50 for a $0.15 input-rate model), matching the described defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The model counter matches the number of visible table rows before and after applying the Vision only filter.",
+          "status": "contradicted",
+          "evidence": "Step 1 observed 5 visible rows and “Showing 5 of 5 models,” but after Vision only was checked, step 2 observed only 3 visible rows while the counter still said “Showing 5 of 5 models.”"
+        },
+        {
+          "claim": "Clicking the Input $/1M header twice reverses the visible row order.",
+          "status": "contradicted",
+          "evidence": "Step 3 observed the first sort result as ascending, with GPT-4o mini ($0.15) first and Claude Sonnet 4.5 ($3.00) last, but the second header click has no recorded post-click first/last-row observation showing a reversed order."
+        },
+        {
+          "claim": "With 10 input M tokens/mo and 0 output M tokens/mo, each row’s Est. monthly equals its Input $/1M rate multiplied by 10.",
+          "status": "contradicted",
+          "evidence": "GPT-4o mini’s observed input rate was $0.15/1M in step 3, so 10M input and zero output should yield $1.50/month, but step 5 recorded a $6.60 estimate and step 6 said the estimates remained unchanged after output was set to 0."
+        },
+        {
+          "claim": "The row tagged cheapest has the lowest Est. monthly among all visible rows.",
+          "status": "not_testable",
+          "evidence": "The trace does not record which row carries the cheapest tag or the complete final set of visible monthly estimates after output usage was set to 0."
+        }
+      ],
+      "findingTexts": [
+        "With Vision only enabled, the counter reads “Showing 5 of 5 models” while 3 rows are visible. Also, after the second Input $/1M click, the header changes to ↓ but the order remains first GPT-4o mini (",
+        "Monthly cost estimate calculation is incorrect when input usage is 10M and output usage is 0M. GPT-4o mini and Gemini 2.5 Flash, each priced at $0.15 input per 1M, display $6.00 rather than $1.50; Cla"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This page compares LLM models with filters, sortable columns and a monthly cost estimate. Work through these checks in order and record exactly what you observe for each: 1. Note the 'Showing N of M models' counter and count the visible table rows — they must agree. 2. Tick 'Vision only', then re-count the visible rows AND re-read the counter; they must still agree. 3. Click the 'Input $/1M' column header twice and record the first and last row each time — the second click must reverse the order. 4. Set 'Input M tokens / mo' to 10 and 'Output M tokens / mo' to 0, then verify one row's 'Est. monthly' by hand: it must equal the row's Input $/1M multiplied by 10. State the row, the input rate and the estimate. 5. Confirm the row tagged 'cheapest' really has the lowest Est. monthly of the visible rows."
+    }
+  ]
+}

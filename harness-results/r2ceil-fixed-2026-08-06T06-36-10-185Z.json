@@ -1,0 +1,86 @@
+{
+  "label": "r2ceil-fixed",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.1536,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-checkout",
+      "attempt": 1,
+      "durationMs": 85225,
+      "status": "passed",
+      "steps": 6,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.1536,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "total-does-not-reconcile",
+          "class": "currency-rounding",
+          "caught": true,
+          "why": "Findings 3 and 4 explicitly report that displayed Subtotal ($926.47) plus Tax ($76.43) equals $1002.90 while the displayed/recorded Total is $1002.89, a one-cent reconciliation mismatch."
+        },
+        {
+          "id": "double-submit-duplicates-order",
+          "class": "async-guard",
+          "caught": true,
+          "why": "Finding 1 states that pressing Place order twice created two distinct orders, BK-1001 and BK-1002, when the second press should not have created a duplicate."
+        },
+        {
+          "id": "failed-payment-shows-nothing",
+          "class": "silent-error",
+          "caught": true,
+          "why": "Findings 2 and 5 report that submitting a billing email without an @ leaves the UI on Processing with no order recorded and no validation or error message."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The itemized line totals add up to the displayed Subtotal.",
+          "status": "verified",
+          "evidence": "Step 1 records Standard seat × 3 at $360.02, Workshop seat × 2 at $521.11, and Student seat × 1 at $45.34; these sum to $926.47, matching the displayed Subtotal of $926.47."
+        },
+        {
+          "claim": "The checkout amount is accurate: Subtotal plus Tax equals the amount recorded for the order.",
+          "status": "contradicted",
+          "evidence": "Step 1 records Subtotal $926.47 and Tax $76.43, which calculate to $1002.90, while the order created after the first press in Step 2 is recorded as $1002.89."
+        },
+        {
+          "claim": "Pressing Place order twice quickly creates only one order.",
+          "status": "verified",
+          "evidence": "Step 2 observes that the first press created one confirmed order, BK-1001, and its second Place order click had domChanged=NO with no additional Orders placed entry observed."
+        },
+        {
+          "claim": "Submitting a billing email without an @ sign tells the user that validation or ordering failed instead of leaving the checkout pending.",
+          "status": "contradicted",
+          "evidence": "Steps 5-6 submit invalidemail and, after waiting, the screen still shows “Processing...” and “No orders yet” with no user-facing error visible."
+        }
+      ],
+      "findingTexts": [
+        "Pressing Place order twice created two orders: BK-1001 and BK-1002, both for $1002.89 to finance@northwind.test. The second press should not create a duplicate order.",
+        "Submitting billing email “invalidemail” (no @ sign) leaves the checkout indefinitely showing “Processing...” with no order recorded and no error or validation message displayed.",
+        "Displayed Total is incorrect: Subtotal $926.47 plus Tax $76.43 equals $1002.90, not $1002.89."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a checkout screen. Work through these checks and record exactly what you observe: 1. Read every line total, the Subtotal, the Tax and the Total. State whether the line totals add up to the Subtotal, and whether Subtotal plus Tax equals the Total, giving every figure. 2. Press 'Place order' twice in quick succession. A second press must NOT create a second order — read the 'Orders placed' list and state how many orders were recorded and whether that is correct. 3. Reload, replace the billing email with a value containing no @ sign, press 'Place order', wait several seconds, and state exactly what the screen shows afterwards and whether the user is told anything went wrong."
+    }
+  ]
+}

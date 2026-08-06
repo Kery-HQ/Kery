@@ -1,0 +1,132 @@
+{
+  "label": "r2review-fixed",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 1,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.1291,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-checkout",
+      "attempt": 1,
+      "durationMs": 92903,
+      "status": "failed",
+      "steps": 8,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.1291,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "total-does-not-reconcile",
+          "class": "currency-rounding",
+          "caught": true,
+          "why": "Finding 2 explicitly reports that the displayed subtotal plus tax ($926.47 + $76.43 = $1002.90) differs by one cent from the displayed total ($1002.89)."
+        },
+        {
+          "id": "double-submit-duplicates-order",
+          "class": "async-guard",
+          "caught": false,
+          "why": "The findings show an order being accepted with a blank card number and mention a repeated click with no page state change, but do not show two rapid Place order clicks creating two separate orders."
+        },
+        {
+          "id": "failed-payment-shows-nothing",
+          "class": "silent-error",
+          "caught": false,
+          "why": "The invalid-email finding reports no validation feedback, but it does not establish the specific defect behavior: the screen remaining on “Processing…” indefinitely with no order recorded. It instead says the repeated click had no page stat"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting valid billing and card details creates one readable confirmation and a matching receipt row.",
+          "status": "verified",
+          "evidence": "Step 1 observed 0 receipts (“No orders yet”); step 2 observed “Order BK-1001 confirmed.” and one receipt row, “BK-1001 — $1002.89 to finance@northwind.test”."
+        },
+        {
+          "claim": "A valid submission visibly shows Processing feedback before confirmation.",
+          "status": "contradicted",
+          "evidence": "Step 2 reports that the valid submission reached confirmation and explicitly notes “No Proc”, with no Processing feedback observed."
+        },
+        {
+          "claim": "Two rapid Place order clicks create at most one receipt for that submission.",
+          "status": "not_testable",
+          "evidence": "The attempted repeat probe was serialized: step 3 says the prior click completed before the second click could be issued, and subsequent actions produced separate confirmed orders BK-1002 and BK-1003 rather than a tested rapid double-click result."
+        },
+        {
+          "claim": "Submitting with an empty required Card number does not confirm an order or add a receipt.",
+          "status": "contradicted",
+          "evidence": "Step 5 submitted while the Card number was observed empty, and step 6 observed confirmation “Order BK-1004 confirmed.” with four receipt rows, including the new BK-1004 receipt."
+        },
+        {
+          "claim": "Submitting an invalid billing email shows visible validation feedback rather than silently remaining unchanged or processing indefinitely.",
+          "status": "contradicted",
+          "evidence": "After the invalid-email setup in step 6, the Place order action was attempted in step 7 and recorded as a repeated click with no page state change; no validation feedback was observed."
+        },
+        {
+          "claim": "Displayed line amounts, Subtotal, Tax, and Total reconcile so that Total equals Subtotal plus Tax.",
+          "status": "not_testable",
+          "evidence": "The run never loaded or recorded the checkout line amounts, Subtotal, Tax, or Total, so the arithmetic could not be recomputed."
+        }
+      ],
+      "findingTexts": [
+        "Submitting with a blank required Card number confirmed Order BK-1004 and added receipt BK-1004 — $1002.89 to finance@northwind.test, increasing the receipt count from 3 to 4.",
+        "Total is $1002.89, but displayed subtotal $926.47 + tax $76.43 = $1002.90 (one-cent short)."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Use a valid email and card number, then note the initial Orders placed state.",
+          "action": "Click Place order and observe the page during processing and after confirmation.",
+          "expect": "Processing feedback must be visible, followed by one readable confirmation and a matching receipt.",
+          "priority": 6
+        },
+        {
+          "setup": "Restore a valid email and card number; note the receipt count before submission.",
+          "action": "Click Place order twice quickly, then wait 2 seconds.",
+          "expect": "Must create at most one receipt for the submission; state the resulting receipt count.",
+          "priority": 5
+        },
+        {
+          "setup": "Keep a valid billing email and clear the Card number field.",
+          "action": "Click Place order and wait for the result.",
+          "expect": "Must not confirm an order when the required card field is empty.",
+          "priority": 4
+        },
+        {
+          "setup": "Replace the billing email with invalid-email and note that no receipt exists.",
+          "action": "Click Place order and wait 2 seconds.",
+          "expect": "Must show a visible validation error instead of leaving Processing… displayed indefinitely.",
+          "priority": 3
+        },
+        {
+          "setup": "Leave the card valid and replace the billing email with finance@northwind.",
+          "action": "Click Place order and wait until processing finishes.",
+          "expect": "Must reject the malformed email with visible feedback and add no receipt.",
+          "priority": 2
+        },
+        {
+          "setup": "Load checkout.html and write down each displayed line amount, Subtotal, Tax, and Total.",
+          "action": "Add the displayed line amounts and compare that sum plus displayed tax with the displayed Total.",
+          "expect": "Total must equal displayed subtotal plus displayed tax; state all three figures and any discrepancy.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test checkout arithmetic, email and card handling, processing failures, and repeated submission. Report the exact displayed totals, statuses, and receipt rows.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use a valid email and card number, then note the initial Orders placed state. Then Click Place order and observe the page during processing and after confirmation. — expect: Processing feedback must be visible, followed by one readable confirmation and a matching receipt.\n2. Restore a valid email and card number; note the receipt count before submission. Then Click Place order twice quickly, then wait 2 seconds. — expect: Must create at most one receipt for the submission; state the resulting receipt count.\n3. Keep a valid billing email and clear the Card number field. Then Click Place order and wait for the result. — expect: Must not confirm an order when the required card field is empty.\n4. Replace the billing email with invalid-email and note that no receipt exists. Then Click Place order and wait 2 seconds. — expect: Must show a visible validation error instead of leaving Processing… displayed indefinitely.\n5. Leave the card valid and replace the billing email with finance@northwind. Then Click Place order and wait until processing finishes. — expect: Must reject the malformed email with visible feedback and add no receipt.\n6. Load checkout.html and write down each displayed line amount, Subtotal, Tax, and Total. Then Add the dis"
+    }
+  ]
+}
