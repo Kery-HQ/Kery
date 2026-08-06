@@ -1,0 +1,628 @@
+{
+  "label": "fewshot6-det-bookflow-account-ui",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 12,
+    "planted": 18,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 2.7847,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 1,
+      "durationMs": 244085,
+      "status": "passed",
+      "steps": 30,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 4,
+      "costUsd": 0.6317,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run reports that submitting with an empty Full name or invalid email shows no readable validation message anywhere in or around the visible Profile card, matching validation feedback being present but off-screen/invisible."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly finds that after typing, placeholders disappear and there is no persistent visible identifying text for the Full name and Email address inputs, matching inputs that have only placeholders and no labels."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The findings mention no save confirmation and non-persistent saved data, but do not describe the approximately three-second save period lacking a spinner, disabled state, or progress feedback."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Saving valid profile and notification settings retains every submitted value while a readable save confirmation is displayed.",
+          "status": "verified",
+          "evidence": "After Save changes, step 7 observes the green confirmation \"Your changes have been saved.\" and retained values Grace Hopper, grace@example.com, COBOL Systems, and Weekly; step 6 records delivery notes \"Ring bell twice\" before submission."
+        },
+        {
+          "claim": "Each Profile input remains visibly identifiable after its placeholder disappears.",
+          "status": "contradicted",
+          "evidence": "Step 12 records that after entering a full name its placeholder disappeared and there was no persistent visible Full name label or equivalent nearby; step 13 similarly records no visible identifying text for Email address after entry."
+        },
+        {
+          "claim": "Selecting Never and saving valid settings shows a readable saved confirmation without leaving the account page.",
+          "status": "verified",
+          "evidence": "Steps 14-16 set Email digest to Never and notes to \"Never delivery notes\" and submit; step 17, after at least three seconds, observes the page still at /account.html with \"Your changes have been saved.\" visible beneath the button."
+        },
+        {
+          "claim": "All five submitted values—Ada Lovelace, ada@example.com, Analytical Engines, Weekly, and Call after 3pm—remain after reloading the account page.",
+          "status": "contradicted",
+          "evidence": "Step 22 records all five exact values before submission and step 23 records the save confirmation, but after navigation/reload step 24 observes Full name and Email address empty and Email digest reset to Daily, proving the submitted state was not retained."
+        },
+        {
+          "claim": "Submitting with Full name empty and a valid email displays a readable Full name required error in or around the Profile card.",
+          "status": "contradicted",
+          "evidence": "After submitting the empty-name case, step 9 observes the fully visible Profile card and no required-name error near Full name or elsewhere; the final repeated case likewise ends at step 30 with no readable message after submission."
+        },
+        {
+          "claim": "Submitting person@example displays readable email validation feedback that identifies the Email address field.",
+          "status": "contradicted",
+          "evidence": "The invalid email is entered in steps 24-25 and submitted in step 26; step 27 then observes the fully visible Profile card with person@example present and no email validation feedback."
+        }
+      ],
+      "findingTexts": [
+        "Settings do not persist after reloading /account.html. After saving Ada Lovelace, ada@example.com, Analytical Engines, Weekly, and Call after 3pm, a fresh reload shows empty Full name, Email address, "
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Fill valid name and email, set Company, digest, and notes to distinct values.",
+          "action": "Submit, wait for confirmation, and compare every displayed field with the values entered before submission.",
+          "expect": "The form must retain the submitted values while the save confirmation is displayed.",
+          "priority": 7
+        },
+        {
+          "setup": "Submit once with Full name empty and valid email, then scroll through the Profile card.",
+          "action": "Look for the validation message in and around the card after submission.",
+          "expect": "The required-name error must be visible near the relevant field and not clipped or positioned off-screen.",
+          "priority": 6
+        },
+        {
+          "setup": "Use the Profile fields with their placeholders visible, then type into Full name, Email address, and Company.",
+          "action": "Read each field's identifying text after its placeholder disappears.",
+          "expect": "Each profile input must remain identifiable by a persistent visible label or equivalent text.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter valid name and email, then choose `Never` and type distinct delivery notes.",
+          "action": "Submit and wait at least three seconds for the result.",
+          "expect": "A readable confirmation must say the changes were saved and appear without leaving the page.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter distinct values: name `Ada Lovelace`, email `ada@example.com`, company `Analytical Engines`, digest `Weekly`, and notes `Call after 3pm`.",
+          "action": "Submit the form, wait for the save result, then reload the page.",
+          "expect": "All five entered values must remain after reload; state each value found or missing.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter a name and enter email `person@example`.",
+          "action": "Submit the form and inspect the Profile card for email validation feedback.",
+          "expect": "A readable visible message must reject the email and identify the email field.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /account.html and leave Full name empty; enter a syntactically valid email address.",
+          "action": "Submit the form and inspect the Profile card for the required-name message.",
+          "expect": "A readable visible message must state that Full name is required; state where it appears.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise profile and notification settings, submit valid and invalid values, reload, and inspect all visible feedback and field identification.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Fill valid name and email, set Company, digest, and notes to distinct values. Then Submit, wait for confirmation, and compare every displayed field with the values entered before submission. — expect: The form must retain the submitted values while the save confirmation is displayed.\n2. Submit once with Full name empty and valid email, then scroll through the Profile card. Then Look for the validation message in and around the card after submission. — expect: The required-name error must be visible near the relevant field and not clipped or positioned off-screen.\n3. Use the Profile fields with their placeholders visible, then type into Full name, Email address, and Company. Then Read each field's identifying text after its placeholder disappears. — expect: Each profile input must remain identifiable by a persistent visible label or equivalent text.\n4. Enter valid name and email, then choose `Never` and type distinct delivery notes. Then Submit and wait at least three seconds for the result. — expect: A readable confirmation must say the changes were saved and appear without leaving the page.\n5. Enter distinct values: name `Ada Lovelace`, email `ada@example.com`, company `Analytical Engines`, digest `Weekly`, and notes `Call after 3pm`. Then Submit t"
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 2,
+      "durationMs": 185209,
+      "status": "passed",
+      "steps": 17,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.4284,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The run reports no visible validation error for a malformed email, but it does not establish that the required-fields validation message exists and is off-screen, nor does it describe empty-required-field submission appearing to do nothing."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly observes that after typing, profile inputs have no separate visible identifying labels and rely on placeholders that disappear."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The run reports lost saved values after reload, not the absence of spinner, disabled state, or progress/message feedback during the roughly 2.6-second save operation."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "After typing, each profile input retains a visible identifying label rather than relying only on its placeholder.",
+          "status": "contradicted",
+          "evidence": "After Full name was filled, step 2 observed that no separate visible Full name label was shown; after Email address was filled, step 3 likewise observed no separate visible Email address label."
+        },
+        {
+          "claim": "Saving settings shows a delayed saved confirmation.",
+          "status": "verified",
+          "evidence": "After Save changes was clicked in step 9, step 10 observed that after three seconds the page still displayed “Your changes have been saved.”"
+        },
+        {
+          "claim": "All five saved settings values—full name, email, company, email digest, and delivery notes—remain unchanged after reloading account.html.",
+          "status": "contradicted",
+          "evidence": "Step 9 recorded the five distinct entered values, but after reload step 11 observed Full name, Email address, Company, and Delivery notes empty and Email digest reset to Daily."
+        },
+        {
+          "claim": "Submitting Alex with the malformed address user@example shows a visible valid-email error and does not show saved confirmation.",
+          "status": "contradicted",
+          "evidence": "The invalid-email submission was clicked in step 13, and step 14 observed Alex and user@example with no visible validation error and no saved confirmation."
+        },
+        {
+          "claim": "Submitting an empty Full name with user@example.com shows “Full name is required.” and does not show saved confirmation.",
+          "status": "not_testable",
+          "evidence": "The required-name submission was attempted in step 16, but the trace does not record the post-submit validation/error state needed to establish whether the required-name message appeared."
+        },
+        {
+          "claim": "All account-settings controls are visible: Full name, Email address, Company, Email digest, Delivery notes, and Save changes.",
+          "status": "verified",
+          "evidence": "Step 17's final observation explicitly confirmed visibility of Full name, Email address, Company (optional), Email digest, Delivery notes, and Save changes."
+        }
+      ],
+      "findingTexts": [
+        "After filling Full name, Email address, and Company, no visible identifying labels remain for those profile inputs; only the typed values are visible. The requirement is that each input retain a visib",
+        "Settings save confirmation appears, but after waiting three seconds and reloading account.html, all five saved values are lost: name/email/company/delivery notes are blank and Email digest reverts fro"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Type into Full name, Email address, and Company until each placeholder disappears.",
+          "expect": "Each input must retain a visible identifying label after typing.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter distinct values for name, email, company, digest, and delivery notes, and write them down.",
+          "action": "Save changes, wait three seconds, reload, and reread every field.",
+          "expect": "A saved confirmation must appear; after reload, all five values must remain unchanged.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter Alex in Full name and user@example in Email address.",
+          "action": "Submit the settings form.",
+          "expect": "A visible valid-email error must appear, with no saved confirmation.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave Full name empty and enter user@example.com in Email address.",
+          "action": "Submit the settings form.",
+          "expect": "A visible “Full name is required.” error must appear, with no saved confirmation.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [
+        {
+          "title": "Save has no in-flight submission guard",
+          "detail": "Each submit schedules an independent delayed callback, and the Save button is never disabled while saving. Rapid submissions can therefore trigger multiple save completions.",
+          "file": "bookflow/account.html",
+          "line": 87,
+          "notVerifiableBecause": "The callbacks overwrite the same confirmation element, so the current page exposes only one indistinguishable confirmation and performs no observable backend operation.",
+          "severity": "medium"
+        }
+      ],
+      "intentUsed": "Exercise profile fields, notification preferences, saving, validation failures, reload behavior, and the visibility and identification of all controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Type into Full name, Email address, and Company until each placeholder disappears. — expect: Each input must retain a visible identifying label after typing.\n2. Enter distinct values for name, email, company, digest, and delivery notes, and write them down. Then Save changes, wait three seconds, reload, and reread every field. — expect: A saved confirmation must appear; after reload, all five values must remain unchanged.\n3. Enter Alex in Full name and user@example in Email address. Then Submit the settings form. — expect: A visible valid-email error must appear, with no saved confirmation.\n4. Leave Full name empty and enter user@example.com in Email address. Then Submit the settings form. — expect: A visible “Full name is required.” error must appear, with no saved confirmation."
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 3,
+      "durationMs": 126432,
+      "status": "passed",
+      "steps": 12,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.2824,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run reports that submitting an invalid email produced no visible email validation error, which surfaces the missing user-visible validation feedback caused by the error message being off-screen."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly found that after text was entered, the placeholder labels \"Full name\" and \"Email address\" were no longer visibly present and no persistent adjacent label existed."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The findings discuss post-save persistence and validation behavior, but do not report the approximately three-second save delay lacking a spinner, disabled button, or progress/status message."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Filled profile inputs remain visibly identifiable by a persistent label or equivalent text.",
+          "status": "contradicted",
+          "evidence": "After filling Full name, step 2 observed that \"Full name\" was no longer visibly present beside or above the field; after filling Email address, step 3 likewise observed no visible adjacent \"Email address\" label."
+        },
+        {
+          "claim": "Saving valid account settings shows a success confirmation after entering Ava Stone, ava@example.com, Northstar, Weekly, and Call after 3pm.",
+          "status": "verified",
+          "evidence": "Step 7 observed immediately after Save changes a green confirmation reading \"Your changes have been saved.\" while all five entered control values remained visible."
+        },
+        {
+          "claim": "All five saved account settings values persist after reloading the account page.",
+          "status": "contradicted",
+          "evidence": "Step 9 observed after navigating again to the account page that all target fields were empty and Email digest had reset to its Daily default, rather than retaining Ava Stone, ava@example.com, Northstar, Weekly, and Call after 3pm."
+        },
+        {
+          "claim": "Submitting an email without a top-level domain displays a visible email validation error and does not show saved confirmation.",
+          "status": "contradicted",
+          "evidence": "After Save changes with ava@example, step 12's final page snapshot recorded no visible email error and no success message."
+        }
+      ],
+      "findingTexts": [
+        "Saved account settings do not persist across reload. After success feedback for Ava Stone, ava@example.com, Northstar, Weekly, and Call after 3pm, reloading resets the three profile fields and notes t"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Type distinct values into Full name, Email address, and Company inputs.",
+          "expect": "Each input must remain identifiable after typing through a persistent visible label or equivalent text.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter name `Ava Stone`, email `ava@example.com`, company `Northstar`, choose `Weekly`, and enter notes `Call after 3pm`.",
+          "action": "Save changes, wait for confirmation, reload, and reread every field.",
+          "expect": "A success message must appear; after reload, all five entered values must remain.",
+          "priority": 2
+        },
+        {
+          "setup": "Open `/bookflow/account.html`; enter name `Ava Stone` and email `ava@example` (missing the required top-level domain).",
+          "action": "Submit the form.",
+          "expect": "A visible email error must appear, and no saved confirmation must appear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the account settings form with boundary-invalid input, distinct profile and notification values, save behavior, reload persistence, and visible field identification.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Type distinct values into Full name, Email address, and Company inputs. — expect: Each input must remain identifiable after typing through a persistent visible label or equivalent text.\n2. Enter name `Ava Stone`, email `ava@example.com`, company `Northstar`, choose `Weekly`, and enter notes `Call after 3pm`. Then Save changes, wait for confirmation, reload, and reread every field. — expect: A success message must appear; after reload, all five entered values must remain.\n3. Open `/bookflow/account.html`; enter name `Ava Stone` and email `ava@example` (missing the required top-level domain). Then Submit the form. — expect: A visible email error must appear, and no saved confirmation must appear."
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 4,
+      "durationMs": 171220,
+      "status": "passed",
+      "steps": 14,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.3752,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run submitted an empty required Full name and reported that no validation error or success message was visible, matching the defect's user-visible symptom of missing validation feedback."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly found that Full name, Email address, and Company lack visible persistent labels once populated, matching placeholder-only unlabeled inputs."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The findings report persistence failures and labeling/validation issues, but do not describe a save delay with no spinner, disabled state, or progress/status feedback."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting valid profile details visibly shows in-flight save progress or disables the Save changes control before the delayed confirmation.",
+          "status": "not_testable",
+          "evidence": "Step 3 submits valid details, but the subsequent observation records field values and labels rather than the Save changes control's immediate enabled/disabled or progress state."
+        },
+        {
+          "claim": "A successful valid save eventually displays a confirmation.",
+          "status": "verified",
+          "evidence": "After the valid submission in step 3, step 6 records that an existing saved confirmation is displayed, and step 8 records that the success confirmation remains visible after waiting."
+        },
+        {
+          "claim": "Every populated profile input remains identifiable by a visible persistent label after its placeholder disappears.",
+          "status": "contradicted",
+          "evidence": "Steps 2, 4, and 5 explicitly observe that Full name, Email address, and Company have no visible persistent labels once populated."
+        },
+        {
+          "claim": "Saving Email digest as Never and delivery notes, then reloading, retains both saved notification values.",
+          "status": "verified",
+          "evidence": "Step 7 saves Email digest set to \"Never\" and delivery notes \"Leave parcel at side entrance.\", and the post-navigation observation in step 8 shows both values still displayed."
+        },
+        {
+          "claim": "Submitting with an empty Full name and a valid email shows a required-name error and does not show success.",
+          "status": "contradicted",
+          "evidence": "Following the submission in step 10, step 11 records that Full name remains empty with person@example.com entered and that no validation error or success message is visible."
+        },
+        {
+          "claim": "Submitting a valid Full name with person@example shows an invalid-email error and does not show success.",
+          "status": "not_testable",
+          "evidence": "Step 13 performs the invalid-email submission, but no post-submission observation records whether an invalid-email error or success message appears; step 14 only lists field values and button state."
+        }
+      ],
+      "findingTexts": [
+        "Profile inputs lack visible persistent labels after being filled: Full name shows \"Alex Stone\", Email address shows \"alex@example.com\", and Company shows \"Northstar Logistics\", but their identifying t",
+        "Notification settings did not persist after reload: the Email digest control reverted to \"Daily\" and Delivery notes reverted to the empty placeholder \"Anything we should know\" instead of the saved \"Ne"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter `Alex Stone` and `alex@example.com` so submission passes validation.",
+          "action": "Submit and inspect the form immediately before the delayed confirmation appears.",
+          "expect": "The save control must visibly indicate in-flight progress or become disabled.",
+          "priority": 5
+        },
+        {
+          "setup": "",
+          "action": "Type distinct values into each profile input and inspect each field after its placeholder disappears.",
+          "expect": "Every profile input must remain identifiable by a visible persistent label.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter name `Alex Stone` and email `alex@example.com`.",
+          "action": "Choose Never, enter distinct delivery notes, save, wait for confirmation, reload, and reread both controls.",
+          "expect": "Digest and delivery notes must retain their saved values after reload.",
+          "priority": 3
+        },
+        {
+          "setup": "Leave Full name empty and enter `person@example.com` as the email address.",
+          "action": "Submit the form.",
+          "expect": "A visible required-name error must appear, and the success message must not appear.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter a valid full name and `person@example` as the email address.",
+          "action": "Submit the form.",
+          "expect": "A visible invalid-email error must appear, and the success message must not appear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise profile validation, notification controls, saving, reload behavior, and the legibility and identifiability of the form.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter `Alex Stone` and `alex@example.com` so submission passes validation. Then Submit and inspect the form immediately before the delayed confirmation appears. — expect: The save control must visibly indicate in-flight progress or become disabled.\n2. Type distinct values into each profile input and inspect each field after its placeholder disappears. — expect: Every profile input must remain identifiable by a visible persistent label.\n3. Enter name `Alex Stone` and email `alex@example.com`. Then Choose Never, enter distinct delivery notes, save, wait for confirmation, reload, and reread both controls. — expect: Digest and delivery notes must retain their saved values after reload.\n4. Leave Full name empty and enter `person@example.com` as the email address. Then Submit the form. — expect: A visible required-name error must appear, and the success message must not appear.\n5. Enter a valid full name and `person@example` as the email address. Then Submit the form. — expect: A visible invalid-email error must appear, and the success message must not appear."
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 5,
+      "durationMs": 216256,
+      "status": "passed",
+      "steps": 23,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 4,
+      "costUsd": 0.513,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "Submitting an empty required Full name produced no visible required-field error or save confirmation, matching the defect's user-visible symptom of validation feedback not being visible."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly found that once fields were populated, their placeholder text disappeared and no visible labels identified Full name, Email address, or Company."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The findings do not report the absence of a spinner, disabled Save button, or progress/status message during the approximately three-second save delay."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Saving valid account settings shows a visible saved confirmation without changing the entered name, email, digest, or delivery notes.",
+          "status": "verified",
+          "evidence": "After the valid save and a wait of at least three seconds, step 6 observed the green “Your changes have been saved.” confirmation still visible and the first-check values unchanged."
+        },
+        {
+          "claim": "After users type into Full name, Email address, and Company, each populated profile field retains a visible label identifying its purpose.",
+          "status": "contradicted",
+          "evidence": "Step 9's fresh snapshot found all three profile fields populated but explicitly observed that no visible labels identified them."
+        },
+        {
+          "claim": "All five saved settings—name, email, company, Weekly digest, and delivery notes—remain unchanged after reloading the account settings page.",
+          "status": "contradicted",
+          "evidence": "Step 15 observed all five persistence-test values before reload, while step 16 observed that after reload all fields were empty and digest had reverted from Weekly to Daily."
+        },
+        {
+          "claim": "Submitting valid name with the invalid email address “a@b” shows a visible email validation error and does not show a save confirmation.",
+          "status": "contradicted",
+          "evidence": "The invalid-email submission was performed in step 18, and step 19 observed both values still present with neither a validation error nor a saved confirmation visible."
+        },
+        {
+          "claim": "Submitting an empty Full name with a valid email shows “Full name is required.” and does not show a save confirmation.",
+          "status": "contradicted",
+          "evidence": "The required-name case was submitted in step 22 with empty Full name and valid@example.com; step 23 observed neither the required-name error nor a saved confirmation."
+        }
+      ],
+      "findingTexts": [
+        "Profile inputs do not retain visible labels after typing. With values entered in Full name, Email address, and Company, the rendered Profile section shows only the values in the inputs and no visible ",
+        "Saved account settings do not persist after reload. After saving Persist Name, persist.email@example.com, Persist Company, Weekly, and Persist delivery note: ring side bell, then waiting more than thr",
+        "“Your changes have been saved” remains visible while subsequent unsaved field edits are being made."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter valid name and email, select Never, and enter distinct delivery notes.",
+          "action": "Save changes and wait at least three seconds.",
+          "expect": "A visible saved confirmation must appear without altering the entered settings.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter distinct text into Full name, Email address, and Company.",
+          "action": "Inspect each profile field after its placeholder disappears.",
+          "expect": "Each field must retain a visible label identifying what value it accepts.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter distinct values for name, email, company, digest Weekly, and delivery notes, then save and wait for confirmation.",
+          "action": "Reload the account settings page and reread every field.",
+          "expect": "All five entered values must remain unchanged after reload.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter a valid name and email address “a@b”.",
+          "action": "Submit the form.",
+          "expect": "A visible email validation error must appear and no save confirmation must appear.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave Full name empty and enter a valid email address.",
+          "action": "Submit the form.",
+          "expect": "A visible “Full name is required.” error must appear and no save confirmation must appear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test validation feedback, save behavior, persistence of every setting, and whether profile fields remain identifiable after typing.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter valid name and email, select Never, and enter distinct delivery notes. Then Save changes and wait at least three seconds. — expect: A visible saved confirmation must appear without altering the entered settings.\n2. Enter distinct text into Full name, Email address, and Company. Then Inspect each profile field after its placeholder disappears. — expect: Each field must retain a visible label identifying what value it accepts.\n3. Enter distinct values for name, email, company, digest Weekly, and delivery notes, then save and wait for confirmation. Then Reload the account settings page and reread every field. — expect: All five entered values must remain unchanged after reload.\n4. Enter a valid name and email address “a@b”. Then Submit the form. — expect: A visible email validation error must appear and no save confirmation must appear.\n5. Leave Full name empty and enter a valid email address. Then Submit the form. — expect: A visible “Full name is required.” error must appear and no save confirmation must appear."
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 6,
+      "durationMs": 253368,
+      "status": "passed",
+      "steps": 25,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 4,
+      "costUsd": 0.554,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run reports that submitting the empty form produced no visible validation or saved-feedback text, matching the defect where validation exists but is off-screen and provides no visible feedback."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly found that populated Email address and Company fields had no separate visible labels after placeholders disappeared, identifying the placeholder-only labeling defect."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run found that immediately after Save changes the button remained enabled and unchanged, with no saving/processing state, allowing a rapid duplicate submission. This surfaces the absence of save-progress feedback and disabled state."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting completed valid settings shows the visible success message \"Your changes have been saved.\" after the delayed save.",
+          "status": "verified",
+          "evidence": "After the valid Save changes submission (step 6), the three-second observation in step 7 records a visible green confirmation reading exactly \"Your changes have been saved.\" while all five entered values remain present."
+        },
+        {
+          "claim": "Full name, Email address, and Company inputs retain visible identifying labels after their placeholders disappear.",
+          "status": "contradicted",
+          "evidence": "With populated values, step 3 records that Email address has no separate visible label above or beside it, and step 4 records that Company has no separate visible label; therefore the required label usability is not present for every input."
+        },
+        {
+          "claim": "Once Save changes is clicked, the form enters a saving state that prevents a rapid duplicate submission.",
+          "status": "contradicted",
+          "evidence": "Immediately after the first save click, step 13 records that Save changes is still enabled and still labeled \"Save changes,\" with no saving/processing state, before the rapid second click was attempted."
+        },
+        {
+          "claim": "Saving Ada Lovelace, ada@example.com, Analytical Engines, Weekly, and Deliver before noon preserves all five values unchanged after reload.",
+          "status": "contradicted",
+          "evidence": "Before saving, step 19 records the five required values; after reload, step 21 records that Full name, Email address, Company, and Delivery notes are empty with placeholders and Email digest has reverted to \"Daily,\" so none of the saved state persisted."
+        },
+        {
+          "claim": "Submitting an empty form or a form with email person@example shows a visible validation error near the form and does not show saved feedback.",
+          "status": "contradicted",
+          "evidence": "After the empty submission, step 22 records no visible validation or saved-feedback text; after submitting the visible invalid email \"person@example,\" step 24 again records no feedback text while Save changes remains enabled."
+        }
+      ],
+      "findingTexts": [
+        "Duplicate submission is not prevented: immediately after the first valid Save changes click, the button remained enabled and labeled \"Save changes\", and a rapid second click was accepted rather than b",
+        "Saved account settings do not persist after reload: after confirmed save of Ada Lovelace, ada@example.com, Analytical Engines, Weekly, and Deliver before noon, reloading showed empty Full name, Email "
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter distinct valid values in all profile and notification controls.",
+          "action": "Submit the completed settings form and wait 3 seconds.",
+          "expect": "A clearly visible success message must state that the changes were saved.",
+          "priority": 5
+        },
+        {
+          "setup": "",
+          "action": "Type values into Full name, Email address, and Company, then inspect each input after its placeholder disappears.",
+          "expect": "Each input must retain a visible identifying label independent of its placeholder.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter valid distinct profile and notification values so saving is enabled.",
+          "action": "Click Save changes twice quickly before the delayed confirmation appears.",
+          "expect": "The second submission must be prevented while saving, with only one save confirmation produced.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter name Ada Lovelace, email ada@example.com, company Analytical Engines, choose Weekly, and enter Deliver before noon.",
+          "action": "Save changes, wait for confirmation, reload the page, and reread every field.",
+          "expect": "The confirmation must appear, and all five entered values must survive reload unchanged.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Submit with all fields empty, then enter a name and submit with email person@example.",
+          "expect": "Each invalid submission must show its error visibly near the form and must not show saved feedback.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every account-settings control, especially validation failures, saving, reload persistence, duplicate submission, and field usability. Report the exact visible messages, control states, and values before and after reload.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter distinct valid values in all profile and notification controls. Then Submit the completed settings form and wait 3 seconds. — expect: A clearly visible success message must state that the changes were saved.\n2. Type values into Full name, Email address, and Company, then inspect each input after its placeholder disappears. — expect: Each input must retain a visible identifying label independent of its placeholder.\n3. Enter valid distinct profile and notification values so saving is enabled. Then Click Save changes twice quickly before the delayed confirmation appears. — expect: The second submission must be prevented while saving, with only one save confirmation produced.\n4. Enter name Ada Lovelace, email ada@example.com, company Analytical Engines, choose Weekly, and enter Deliver before noon. Then Save changes, wait for confirmation, reload the page, and reread every field. — expect: The confirmation must appear, and all five entered values must survive reload unchanged.\n5. Submit with all fields empty, then enter a name and submit with email person@example. — expect: Each invalid submission must show its error visibly near the form and must not show saved"
+    }
+  ]
+}
