@@ -1,0 +1,80 @@
+{
+  "label": "uiceil-bookflow-account-ui",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 2,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.1208,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 1,
+      "durationMs": 63861,
+      "status": "passed",
+      "steps": 5,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 3,
+      "costUsd": 0.1208,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run explicitly reports that submitting the empty required form produces no visible validation message, error styling, or other on-screen feedback, matching the off-screen validation-message symptom."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run reports that Full name, email, and company rely only on placeholders and that populated fields have no persistent visible labels, matching the missing-label defect."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "Although the save-feedback check failed, the recorded observation does not establish the planted defect's behavior: it contains no observed ~2.6-second wait, no evidence that the button remained enabled, and no concrete observation that pro"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting the empty account settings form shows visible validation feedback to the user.",
+          "status": "contradicted",
+          "evidence": "Step 1 clicked “Save changes” with every field empty, and the subsequent observation in step 2 says the screen appeared unchanged with the fields still empty and showing placeholders; no visible validation message or other feedback was observed."
+        },
+        {
+          "claim": "Text inputs have persistent visible labels that remain available after a value is entered.",
+          "status": "contradicted",
+          "evidence": "Step 3 observed that after entering “Taylor Morgan,” the “Full name” placeholder disappeared, and step 4 explicitly observed that Full name and Email address had no persistent visible label after values were entered."
+        },
+        {
+          "claim": "Saving valid profile details provides observable in-progress feedback (such as a changed or disabled button) and then a visible save confirmation.",
+          "status": "contradicted",
+          "evidence": "Step 4 clicked “Save changes” after valid name and email were filled, but the only recorded observation describes the entered email and lack of labels; it records no button state change, disablement, progress feedback, wait duration, or concrete visible confirmation."
+        }
+      ],
+      "findingTexts": [
+        "Submitting the account settings form with every field empty produces no visible validation feedback: no error message, error styling, or other on-screen indication is shown to a sighted user.",
+        "Full name, email, and company rely only on disappearing placeholders; populated name/email have no persistent visible labels."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is an account settings form. Work through these checks and record exactly what you observe: 1. Press 'Save changes' with every field empty and describe what visibly happens on screen — any validation message must be VISIBLE to a sighted user, not merely present in the DOM. 2. Describe how each text input is labelled: state whether a persistent visible label exists, or only placeholder text that disappears once you type. 3. Fill in a valid name and email, press Save, and describe what the interface shows between the click and the confirmation — state whether the button changes, disables, or gives any progress feedback, and roughly how long the wait is."
+    }
+  ]
+}

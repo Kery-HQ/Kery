@@ -318,6 +318,144 @@
           "symptom": "Shipping exactly the quantity on hand is refused with a message saying that many are on hand."
         }
       ]
+    },
+    {
+      "id": "bookflow-account-ui",
+      "app": "bookflow",
+      "port": 4104,
+      "path": "/account.html",
+      "baseUrl": "http://localhost:4104/account.html",
+      "uiux": true,
+      "maxSteps": 48,
+      "intent": "This is an account settings form. Work through these checks and record exactly what you observe: 1. Press 'Save changes' with every field empty and describe what visibly happens on screen \u2014 any validation message must be VISIBLE to a sighted user, not merely present in the DOM. 2. Describe how each text input is labelled: state whether a persistent visible label exists, or only placeholder text that disappears once you type. 3. Fill in a valid name and email, press Save, and describe what the interface shows between the click and the confirmation \u2014 state whether the button changes, disables, or gives any progress feedback, and roughly how long the wait is.",
+      "context": "New account settings screen with profile fields, notification preferences and a save action.",
+      "prTitle": "Feature: account settings screen",
+      "prBody": "Adds an account settings screen where users update their profile and notification preferences.",
+      "diffFile": "/tmp/diff-ui-bookflow.patch",
+      "plantedBugs": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "note": "validation message positioned at left:-9999px so it is never visible",
+          "detect": [
+            "(error|validation|message)",
+            "(not visible|offscreen|hidden|invisible|no.*shown)"
+          ],
+          "symptom": "Submitting with empty required fields appears to do nothing: the validation message exists but is positioned off-screen so the user sees no feedback at all."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "note": "inputs use placeholder only, no label or aria-label",
+          "detect": [
+            "(label|placeholder)",
+            "(missing|no label|only placeholder|not labelled|accessib)"
+          ],
+          "symptom": "The profile inputs have no visible or accessible label, only placeholder text that vanishes once the user types, leaving fields unidentifiable."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "note": "save takes ~2.6s with no spinner, no disabled state, no message",
+          "detect": [
+            "(save|saving|submit)",
+            "(no feedback|no indicat|nothing happens|no spinner|no loading|delay)"
+          ],
+          "symptom": "After pressing Save the interface shows nothing at all for around three seconds \u2014 no spinner, no disabled button, no message \u2014 so the action appears to have failed."
+        }
+      ]
+    },
+    {
+      "id": "gridworks-report-ui",
+      "app": "gridworks",
+      "port": 4105,
+      "path": "/report.html",
+      "baseUrl": "http://localhost:4105/report.html",
+      "uiux": true,
+      "maxSteps": 44,
+      "intent": "This is a weekly report page. Work through these checks and record exactly what you observe: 1. Read the small comparison text under each headline number (for example the '+12% vs last week' line) and state whether it is comfortably legible against the white card, or too faint to read. 2. Read the 'Summary of the week' cell for the first agent and state whether the full sentence is readable or visibly cut off mid-sentence, and whether any indication such as an ellipsis or expand control is offered. 3. Scroll to the very bottom of the page and state whether the fixed bar holding 'Export CSV' and 'Send to stakeholders' covers any table content.",
+      "context": "New weekly report screen with summary statistics, a per-agent table and export actions.",
+      "prTitle": "Feature: weekly report screen",
+      "prBody": "Adds a weekly report with headline statistics, a per-agent summary table and export actions.",
+      "diffFile": "/tmp/diff-ui-gridworks.patch",
+      "plantedBugs": [
+        {
+          "id": "delta-text-too-faint",
+          "class": "contrast",
+          "note": "#d8d8dc on white is a 1.42:1 contrast ratio",
+          "detect": [
+            "(faint|contrast|light|grey|gray|legib|readab)",
+            "(hard|difficult|low|cannot|barely|too)"
+          ],
+          "symptom": "The comparison text under each statistic is so light against the white card that it is effectively unreadable; contrast is far below the accessible minimum."
+        },
+        {
+          "id": "summary-text-clipped",
+          "class": "overflow",
+          "note": "fixed 34px height clips ~217 chars with no ellipsis",
+          "detect": [
+            "(summary|text|sentence)",
+            "(cut off|clip|truncat|hidden|incomplete|cannot read)"
+          ],
+          "symptom": "The per-agent summary text is cut off mid-sentence by a fixed row height, with no ellipsis or way to read the rest."
+        },
+        {
+          "id": "actionbar-covers-last-row",
+          "class": "occlusion",
+          "note": "fixed bar overlaps the last table row by ~27px at the bottom of the scroll",
+          "detect": [
+            "(bar|footer|button|export)",
+            "(cover|overlap|hides|obscur|behind|on top)"
+          ],
+          "symptom": "The fixed action bar at the bottom sits on top of the final table row, hiding part of the last agent's data."
+        }
+      ]
+    },
+    {
+      "id": "stockroom-audit-ui",
+      "app": "stockroom",
+      "port": 4106,
+      "path": "/audit.html",
+      "baseUrl": "http://localhost:4106/audit.html",
+      "uiux": true,
+      "maxSteps": 44,
+      "intent": "This is a stock audit screen. Work through these checks and record exactly what you observe: 1. Describe the size of the plus and minus stepper controls next to each count and state whether they are comfortably large enough to hit accurately, especially on a touch screen. 2. Move focus between the controls using the Tab key only and state whether the currently focused control is visibly indicated on screen. 3. Press 'Submit audit' to open the confirmation dialog, then try to close it \u2014 try a close button, the Escape key, and clicking outside the dialog \u2014 and state whether any of these dismiss it.",
+      "context": "New stock audit screen with per-item count steppers, a reset action and a submission confirmation dialog.",
+      "prTitle": "Feature: stock audit screen",
+      "prBody": "Adds a stock audit screen for counting items against system quantities, with a confirmation dialog on submit.",
+      "diffFile": "/tmp/diff-ui-stockroom.patch",
+      "plantedBugs": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "note": "16x16px controls, below the 24x24 minimum",
+          "detect": [
+            "(stepper|button|control|target|plus|minus)",
+            "(small|tiny|hard to|difficult|16|touch)"
+          ],
+          "symptom": "The plus and minus stepper controls are only about 16 pixels square, well below the minimum comfortable or accessible tap target size."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "note": "outline:none on all focusable controls",
+          "detect": [
+            "(focus|keyboard|tab)",
+            "(no indicat|not visible|invisible|removed|cannot tell|no outline|no ring)"
+          ],
+          "symptom": "Tabbing through the page gives no visible indication of which control has focus, making keyboard navigation impossible to follow."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "note": "no close control, no Escape handler, no backdrop dismiss",
+          "detect": [
+            "(dialog|modal|popup)",
+            "(cannot close|no close|stuck|trap|not dismiss|unable)"
+          ],
+          "symptom": "The confirmation dialog has no close button and ignores both the Escape key and clicks outside it, leaving the user stuck with no way back to the page."
+        }
+      ]
     }
   ]
 }

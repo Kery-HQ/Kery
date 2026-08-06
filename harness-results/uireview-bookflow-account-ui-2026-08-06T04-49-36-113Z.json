@@ -1,0 +1,100 @@
+{
+  "label": "uireview-bookflow-account-ui",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 1,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.2848,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 1,
+      "durationMs": 134473,
+      "status": "passed",
+      "steps": 14,
+      "findings": 3,
+      "checks": 3,
+      "contradicted": 2,
+      "costUsd": 0.2848,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run explicitly reports that submitting with an empty Full name shows no visible required-name error, matching the planted defect's missing visible validation feedback. It also observed no visible invalid-email validation message."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": false,
+          "why": "None of the findings report missing visible labels, missing accessible names, placeholder-only inputs, or fields becoming unidentifiable after typing."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "The findings report persistence and validation issues, but do not describe the approximately three-second save delay lacking a spinner, disabled state, or progress/status feedback."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Saving Full name, email, company, Weekly email digest, and delivery notes preserves all five values after reloading the account settings page.",
+          "status": "contradicted",
+          "evidence": "Steps 1-6 entered all five values and showed the save confirmation, but after direct navigation back to account.html, step 9 observed Full name, Email address, Company, and Delivery notes empty and Email digest reset to Daily."
+        },
+        {
+          "claim": "Submitting Alex Rivera with invalid email alex@example shows a visible invalid-email error and does not show success.",
+          "status": "contradicted",
+          "evidence": "Steps 9-11 entered Alex Rivera and alex@example and clicked Save changes; step 11 observed no validation or success message."
+        },
+        {
+          "claim": "Submitting with Full name empty and a valid email shows a visible required-full-name error and does not show success.",
+          "status": "not_testable",
+          "evidence": "The run cleared Full name in step 12 but retained the previously invalid email alex@example; step 13 therefore did not exercise the required-name check with a valid email, although it observed no validation or success message."
+        }
+      ],
+      "findingTexts": [
+        "Saved account settings do not persist after reload: Full name, Email address, Company, and Delivery notes are blank and Email digest has reverted from Weekly to Daily, despite the visible \"Your change",
+        "Submitting Alex Rivera with malformed email alex@example shows neither a visible invalid-email error nor a success message.",
+        "Empty Full name is submitted with no visible required-name error, contrary to intended validation."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter Full name Alex Rivera, email alex@example.com, company Northwind, choose Weekly, and enter Leave at reception.",
+          "action": "Save changes, wait for the confirmation, reload the page, and reread every field.",
+          "expect": "All five entered values must remain unchanged after reload.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter Full name Alex Rivera and email alex@example without changing other fields.",
+          "action": "Submit the account settings form.",
+          "expect": "A visible error must state that the email address is invalid; the form must not show success.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave Full name empty and enter a valid email such as alex@example.com.",
+          "action": "Submit the account settings form.",
+          "expect": "A visible error must state that full name is required; the form must not show success.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open account.html and run the ranked checks, focusing first on validation visibility and then on whether every saved setting survives reload.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter Full name Alex Rivera, email alex@example.com, company Northwind, choose Weekly, and enter Leave at reception. Then Save changes, wait for the confirmation, reload the page, and reread every field. — expect: All five entered values must remain unchanged after reload.\n2. Enter Full name Alex Rivera and email alex@example without changing other fields. Then Submit the account settings form. — expect: A visible error must state that the email address is invalid; the form must not show success.\n3. Leave Full name empty and enter a valid email such as alex@example.com. Then Submit the account settings form. — expect: A visible error must state that full name is required; the form must not show success."
+    }
+  ]
+}

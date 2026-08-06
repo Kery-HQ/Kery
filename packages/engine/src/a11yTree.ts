@@ -14,6 +14,9 @@ export type A11yElement = {
   id: number;
   role: string;
   name: string;
+  /** Visible label text for elements with no accessible name. Display only —
+   *  never used for Playwright resolution, which needs the real a11y name. */
+  label?: string;
   state: string[];
   value?: string;
   bbox?: { x: number; y: number; width: number; height: number };
@@ -169,10 +172,35 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     return "";
   }
 
+  function getVisibleLabel(el) {
+    if (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" && el.tagName !== "SELECT") return "";
+    var sib = el.previousElementSibling;
+    while (sib) {
+      if (sib.tagName === "LABEL" || sib.tagName === "SPAN" || sib.tagName === "DIV") {
+        var t = (sib.textContent || "").trim();
+        if (t && t.length <= 40) return t;
+      }
+      sib = sib.previousElementSibling;
+    }
+    var anc = el.parentElement;
+    for (var d = 0; d < 2 && anc; d++, anc = anc.parentElement) {
+      var lbl = anc.querySelector("label");
+      if (lbl && !lbl.contains(el)) {
+        var lt = (lbl.textContent || "").trim();
+        if (lt && lt.length <= 40) return lt;
+      }
+    }
+    return "";
+  }
+
   function buildTree(el) {
     var role = getImplicitRole(el);
     var name = getAccessibleName(el);
     var node = { role: role, name: name };
+    if (!name) {
+      var vl = getVisibleLabel(el);
+      if (vl) node.label = vl;
+    }
 
     if (el.disabled || el.getAttribute("aria-disabled") === "true") node.disabled = true;
     if (el.required || el.getAttribute("aria-required") === "true") node.required = true;
@@ -264,7 +292,12 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
 
     if (!snapshot && iframeSnapshots.length === 0) return { elements, textNodes, tree: [] };
 
-    const ALLOW_UNNAMED = new Set(["button", "link", "textbox", "checkbox", "radio", "switch", "slider", "tab"]);
+    // Roles kept even without an accessible name. spinbutton and combobox belong
+    // here: a number input or a select whose <label> is a plain sibling (no
+    // for/id) computes no name, and dropping it made the field invisible to the
+    // agent — quantity, unit price and discount fields vanished from forms, so
+    // the only way to reach them was raw coordinates. They resolve by bbox.
+    const ALLOW_UNNAMED = new Set(["button", "link", "textbox", "checkbox", "radio", "switch", "slider", "tab", "spinbutton", "combobox", "searchbox"]);
 
     const walk = (node: any) => {
       if (!node) return;
@@ -287,6 +320,7 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
           id: nextId++,
           role,
           name: name || `(unnamed ${role})`,
+          label: typeof node.label === "string" && node.label ? node.label : undefined,
           state,
           value: node.valuetext ?? node.valuestring ?? node.value ?? undefined,
           bbox: node.bbox ?? undefined,
@@ -425,6 +459,7 @@ export function formatA11yForLLM(elements: A11yElement[], textNodes?: A11yTextNo
   if (elements.length > 0) {
     const lines = elements.map(el => {
       const parts = [`[${el.id}] ${el.role} "${sanitizeForPrompt(el.name)}"`];
+      if (el.label && el.name.startsWith("(unnamed ")) parts.push(`labelled "${sanitizeForPrompt(el.label)}"`);
       if (el.state.length > 0) parts.push(`- ${el.state.join(", ")}`);
       if (el.value) parts.push(`value="${sanitizeForPrompt(el.value)}"`);
       const hint = getInteractionHint(el);

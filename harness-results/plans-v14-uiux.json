@@ -1,0 +1,122 @@
+{
+  "label": "v14-uiux",
+  "repeat": 3,
+  "tuning": {
+    "hit": 68,
+    "of": 81
+  },
+  "heldOut": {
+    "hit": 9,
+    "of": 9
+  },
+  "perBug": {
+    "discount-base-includes-shipping": {
+      "hit": 2,
+      "of": 3
+    },
+    "free-shipping-threshold-off-by-one": {
+      "hit": 3,
+      "of": 3
+    },
+    "invalid-promo-keeps-discount": {
+      "hit": 2,
+      "of": 3
+    },
+    "email-regex-accepts-no-tld": {
+      "hit": 0,
+      "of": 3
+    },
+    "daily-limit-upper-bound-missing": {
+      "hit": 3,
+      "of": 3
+    },
+    "remove-note-drops-last": {
+      "hit": 3,
+      "of": 3
+    },
+    "counter-ignores-vision-filter": {
+      "hit": 3,
+      "of": 3
+    },
+    "numeric-sort-ignores-direction": {
+      "hit": 3,
+      "of": 3
+    },
+    "estimate-uses-output-rate-for-input": {
+      "hit": 3,
+      "of": 3
+    },
+    "workshop-price-label-vs-charge": {
+      "hit": 3,
+      "of": 3
+    },
+    "back-discards-attendees": {
+      "hit": 2,
+      "of": 3
+    },
+    "seats-input-has-no-effect": {
+      "hit": 3,
+      "of": 3
+    },
+    "select-all-ignores-filter": {
+      "hit": 3,
+      "of": 3
+    },
+    "selection-persists-after-close": {
+      "hit": 3,
+      "of": 3
+    },
+    "close-toast-overstates-count": {
+      "hit": 0,
+      "of": 3
+    },
+    "undo-ignores-direction": {
+      "hit": 3,
+      "of": 3
+    },
+    "reorder-equality-not-flagged": {
+      "hit": 3,
+      "of": 3
+    },
+    "cannot-ship-entire-stock": {
+      "hit": 3,
+      "of": 3
+    },
+    "error-rendered-offscreen": {
+      "hit": 3,
+      "of": 3
+    },
+    "inputs-have-no-labels": {
+      "hit": 3,
+      "of": 3
+    },
+    "no-save-progress-feedback": {
+      "hit": 2,
+      "of": 3
+    },
+    "delta-text-too-faint": {
+      "hit": 3,
+      "of": 3
+    },
+    "summary-text-clipped": {
+      "hit": 3,
+      "of": 3
+    },
+    "actionbar-covers-last-row": {
+      "hit": 3,
+      "of": 3
+    },
+    "stepper-targets-too-small": {
+      "hit": 0,
+      "of": 3
+    },
+    "focus-indicator-removed": {
+      "hit": 3,
+      "of": 3
+    },
+    "modal-cannot-be-dismissed": {
+      "hit": 3,
+      "of": 3
+    }
+  }
+}

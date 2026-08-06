@@ -1,0 +1,96 @@
+{
+  "label": "uiceil-stockroom-audit-ui",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 3,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.223,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-audit-ui",
+      "attempt": 1,
+      "durationMs": 123673,
+      "status": "passed",
+      "steps": 9,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.223,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "caught": true,
+          "why": "Finding 1 explicitly reports the stepper hit targets are about 15px square, below the intended accessible touch-target size."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "caught": true,
+          "why": "Findings 2 and 4 report that Tab advances focus but no visible focus ring, outline, or highlight appears."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "caught": true,
+          "why": "Findings 3 and 5 explicitly report no close button and that both Escape and outside-overlay clicks fail to dismiss the confirmation dialog."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Each item’s minus stepper changes the recorded count when activated.",
+          "status": "verified",
+          "evidence": "Step 1 clicked the first item’s minus control, and subsequent observations in steps 3-5 show Hex bolt M4 at 139 with variance -1, demonstrating the count was reduced."
+        },
+        {
+          "claim": "The plus and minus count steppers are comfortably large enough for accurate touch use.",
+          "status": "not_testable",
+          "evidence": "The trace exercised a minus control but records no dimensions, screenshot measurement, or observation of the controls’ physical target size or touch usability."
+        },
+        {
+          "claim": "Tab-only keyboard navigation visibly indicates which stock-audit control has focus.",
+          "status": "contradicted",
+          "evidence": "After Tab presses in steps 3 and 4, the recorded observations explicitly state that no focus ring, outline, or highlight was visible, despite focus being advanced with Tab."
+        },
+        {
+          "claim": "Clicking Submit audit opens an Audit submitted confirmation dialog.",
+          "status": "verified",
+          "evidence": "Following the Submit audit click in step 5, step 6 observes an 'Audit submitted' dialog centered over a dimmed overlay."
+        },
+        {
+          "claim": "The submission confirmation dialog can be dismissed using a close button, Escape, or an outside-overlay click.",
+          "status": "contradicted",
+          "evidence": "Step 6 found no visible close button, step 7 recorded that Escape left the dialog unchanged, and steps 8-9 show the dialog still open after an outside-overlay click."
+        },
+        {
+          "claim": "The stock-audit reset action works for the per-item counts.",
+          "status": "not_testable",
+          "evidence": "Although a reset action is part of the change background, the trace never attempted it or observed any reset result."
+        }
+      ],
+      "findingTexts": [
+        "Stepper hit targets are only about 15px square, not comfortably touch-sized for accurate stock counts.",
+        "Tab moves between stepper controls with no visible focus indicator, leaving keyboard users unable to locate focus.",
+        "Intended dismissible confirmation dialog cannot be closed: no close button, Escape, or backdrop click dismisses it."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "This is a stock audit screen. Work through these checks and record exactly what you observe: 1. Describe the size of the plus and minus stepper controls next to each count and state whether they are comfortably large enough to hit accurately, especially on a touch screen. 2. Move focus between the controls using the Tab key only and state whether the currently focused control is visibly indicated on screen. 3. Press 'Submit audit' to open the confirmation dialog, then try to close it — try a close button, the Escape key, and clicking outside the dialog — and state whether any of these dismiss it."
+    }
+  ]
+}
