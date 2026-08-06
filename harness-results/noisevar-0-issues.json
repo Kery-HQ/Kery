@@ -1,0 +1,159 @@
+{
+  "label": "noisevar-0",
+  "runs": 16,
+  "cleanRuns": 3,
+  "raw": 25,
+  "deduped": 25,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Applying the visibly entered valid promo code TEAM15 at Payment shows the error “That promo code is not recognised.” and leaves Discount −$0.00 and Total due $380.00 instead of applying the expected 1"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The Attendees ticket combobox cannot be changed from Standard to Workshop through the available interaction mechanisms: repeated focused ArrowDown/type-ahead and direct clicks left the visible value a"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "“Full name is required.” remains visible even after the Full name field contains Grace Hopper."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Save feedback does not enter the required visible 2.6-second saving state after submitting changed valid values: immediately after click and on a fresh re-check, the button remained enabled as “Save c"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Validation errors push the Notifications card and Save changes button downward versus the empty-form layout."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "“Full name is required.” remains visible beneath a populated Full name field, showing stale/contradictory validation."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Saving displays a visible in-progress state: Save changes disables and reads “Saving…” during the 2.6-second delay, then re-enables with confirmation. — Immediately after submitting the valid five-value form, step 21 observed a saved confirmation while the button remained enabled as “Save changes,” with no visible “Saving…” state."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Receipt BK-1002 rendered the supplied email markup instead of displaying it literally: the receipt visibly shows bold \"probe@example.test\" and does not show the literal <b> and </b> characters."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The literal-markup email test did not reach receipt rendering: with billing email \"buyer@<b>example</b>\" and populated card, submission displayed \"That billing email is not valid. No order was placed."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Table columns shift horizontally when filtering to one result, causing unstable header and cell alignment."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Requested /gridworks/report.html route returns a 404 File not found error instead of the weekly report."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows a visible export confirmation alert. — Step 2 directly clicked Export CSV and recorded domChanged=NO with no observed confirmation."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows a visible stakeholder-send confirmation alert. — Immediately after the Step 3 click, the observation says, “No visible alert is currently shown,” while both action-bar buttons remained visible."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The requested /gridworks/report.html report URL opens the report so its headline and per-agent Resolved values can be reviewed. — Step 6 records that /gridworks/report.html displayed “Error response,” “Error code: 404,” and “Message: File not found.”"
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders provides its corresponding visible confirmation message. — Send to stakeholders was clicked in Steps 2 and 4, but the subsequent checks record no visible confirmation (Step 3) and no DOM change for either action; no stakeholder-send confirmation was observed."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Booking a shift with assignee `<b>Injected</b>` renders the assignee as bold `Injected` rather than displaying the literal text `<b>Injected</b>`. The rendered row is `Thu, 31 Dec 2026 — Injected`, wi"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Item, Movement, and Quantity labels are not programmatically associated; Quantity is an unnamed spinbutton."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "After the later Panel shipment is undone, the movement history is empty and the movement count is 0. — The post-undo observation in step 13 shows Panel A3 restored to 7 but Movements remains 1 and the movement log still contains the Cable receipt, rather than being empty."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "At the 320px responsive check, the movement form remains a wide single row and would overflow rather than reflow."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Quantity spinbutton has no accessible name despite the visible Quantity label."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Undo last removes the most recent shipped movement, leaving only the Received 5 entry and one movement with Cable 2m at 23 units. — Step 7 directly clicks Undo last and records domChanged=NO with no observed stock, total, movement-count, or log update, so the undo control produced no observed effect."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The Audit submitted dialog remains exposed in the accessibility tree but is visually absent, and its Close button times out on click, preventing reliable dismissal."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended Panel A3 − should change Panel; clicking it repeatedly decremented Cable 2m while Panel stayed 7."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The required route /stockroom/audit.html is unavailable: it returns 'Error response', Error code 404, 'File not found' rather than the audit page."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "The /stockroom/audit.html route opens the audit controls so Washer 11mm can be decremented from 60 to 58 with variance -2. — Step 10 records that /stockroom/audit.html visibly remained a 404 Error response page with no audit controls, so the required Washer interactions were unavailable."
+    }
+  ]
+}

@@ -1,0 +1,265 @@
+{
+  "label": "blind-det-notedso-welcome",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 1,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.5616,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 768345,
+      "status": "passed",
+      "steps": 57,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.9671,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that entering 21 for a field labeled 1–20 advances to Step 3 instead of showing validation, directly surfacing the missing upper-bound enforcement."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "why": "No finding reports removing a note or a different/last note being removed instead of the clicked one."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Each populated note input remains identifiable, and clicking “Remove note 2” removes only the second note while retaining First and Third.",
+          "status": "not_testable",
+          "evidence": "Steps 25-27 show separately labeled remove controls and distinct populated fields, but after the Step 31 “Remove note 2” action, Step 53 still shows notes named “First” and “Second” rather than First and Third. A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "Step 2 visibly distinguishes selected focus areas, shows the correct selected count, and keeps the week-start and reminder selections readable.",
+          "status": "verified",
+          "evidence": "Step 13 records Work and Health visibly selected with “2 selected,” Sunday readable as the week start, and 18:00 visibly displayed as the daily reminder."
+        },
+        {
+          "claim": "Profile values Persist, persist@example.com, and Pat remain unchanged after continuing to Step 2, going back, and returning to Step 1.",
+          "status": "verified",
+          "evidence": "Step 44 records that after returning from Step 2, Step 1 still visibly shows workspace Persist, email persist@example.com, and display name Pat unchanged."
+        },
+        {
+          "claim": "Attempting to continue with no focus area selected displays a focus-area error and keeps the wizard on Step 2.",
+          "status": "verified",
+          "evidence": "Step 37 observes that clicking Continue with zero selected focus areas left the wizard on Step 2 and showed the red error “Pick at least one focus area.”"
+        },
+        {
+          "claim": "Setting Max notes per day to 21 shows the stated 1–20 validation error and prevents advancement from Step 2.",
+          "status": "not_testable",
+          "evidence": "After Step 23 submitted the visible value 21 with Work selected, Step 24 successfully added a note input on Step 3, demonstrating that the out-of-range value did not block advancement or show the required validation state. A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "Completing the wizard shows a success summary for the workspace and one note, propagates Sunday, 21:00, and limit 7 to completion or the board, and Open my board reaches a usable board.",
+          "status": "not_testable",
+          "evidence": "The success portion is observed at Step 56 as “Alpha is ready with 1 note” and “Focus areas: Work,” but the same observation says Sunday and 21:00 are not displayed despite Step 52 showing Sunday, 21:00, and limit 7; after Open my board, Step 57 records an application error rather than a usable boar A re-check of this interaction did not reproduce the failure."
+        }
+      ],
+      "findingTexts": [
+        "On Step 2, with Work selected and Max notes per day entered as 21, clicking Continue advances to Step 3 instead of displaying the stated 1–20 validation error and remaining on Step 2.",
+        "Clicking “Open my board” navigates from the success summary to http://localhost:4102/, which displays “Application error: a client-side exception has occurred while loading localhost.” The board does "
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reach step 3 with valid data and add a second note so both note inputs are visible.",
+          "action": "Type distinct values into both inputs and inspect their labels or surrounding context while typing.",
+          "expect": "Each input must remain identifiable after its placeholder disappears.",
+          "priority": 8
+        },
+        {
+          "setup": "Use valid distinct profile values, select Work, set daily limit 5, and enter Launch plan as the first note.",
+          "action": "Complete the wizard, verify the success summary, and click Open my board.",
+          "expect": "A success summary must show the workspace and one note, then navigation must reach the board.",
+          "priority": 7
+        },
+        {
+          "setup": "Reach step 2 with valid profile data.",
+          "action": "Select Work and Health, change week start to Sunday and reminder to 18:00, and inspect the controls.",
+          "expect": "Selected buttons must be visibly distinct and the count must read 2; both select values must remain readable.",
+          "priority": 6
+        },
+        {
+          "setup": "Reach step 2 with valid profile data and leave all focus areas unselected.",
+          "action": "Click Continue without selecting a focus area.",
+          "expect": "A visible focus-area error must appear and the wizard must remain on step 2.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter workspace Persist, email persist@example.com, and display name Pat on step 1.",
+          "action": "Continue, select Personal, click Back, reread step 1, then continue again.",
+          "expect": "Persist, persist@example.com, and Pat must remain unchanged after navigation.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete steps 1 and 2 with workspace Alpha, focus Work, week Sunday, reminder 21:00, and daily limit 7.",
+          "action": "Enter Launch plan on step 3, create the workspace, and inspect completion or the board.",
+          "expect": "Completion or board must visibly reflect Sunday, 21:00, and limit 7; state each.",
+          "priority": 3
+        },
+        {
+          "setup": "Reach step 3 with valid profile and preferences, then create three notes named First, Second, and Third.",
+          "action": "Click the remove control labeled Remove note 2.",
+          "expect": "Second must disappear while First and Third remain.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete step 1 with workspace Alpha, email a@example.com, and display name Alex; choose Work on step 2.",
+          "action": "Set Max notes per day to 21 and click Continue.",
+          "expect": "Must show the stated 1–20 validation error and remain on step 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the three-step wizard with boundary values, non-first note removal, navigation, preference propagation, and visible usability checks.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reach step 3 with valid data and add a second note so both note inputs are visible. Then Type distinct values into both inputs and inspect their labels or surrounding context while typing. — expect: Each input must remain identifiable after its placeholder disappears.\n2. Use valid distinct profile values, select Work, set daily limit 5, and enter Launch plan as the first note. Then Complete the wizard, verify the success summary, and click Open my board. — expect: A success summary must show the workspace and one note, then navigation must reach the board.\n3. Reach step 2 with valid profile data. Then Select Work and Health, change week start to Sunday and reminder to 18:00, and inspect the controls. — expect: Selected buttons must be visibly distinct and the count must read 2; both select values must remain readable.\n4. Reach step 2 with valid profile data and leave all focus areas unselected. Then Click Continue without selecting a focus area. — expect: A visible focus-area error must appear and the wizard must remain on step 2.\n5. Enter workspace Persist, email persist@example.com, and display name Pat on step 1. Then Continue, select Personal, click Back, reread step 1, then continue again. — expect: Persist, persist@example.com, and Pat must rem"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 379914,
+      "status": "passed",
+      "steps": 29,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.5945,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "The run did not test or report acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": false,
+          "why": "The run only reports that daily limit 7 could not be verified because the board crashed. It does not test or report that a value above 20 is accepted."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "why": "The run did not click Remove on a note or report removal of the wrong note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting a daily limit of 21 keeps the user on planning step 2 and shows a legible adjacent range error stating that the limit must be between 1 and 20.",
+          "status": "not_testable",
+          "evidence": "After entering 21 and clicking Continue (steps 6-7), the next recorded screen is Step 3 with note controls (step 8), rather than step 2 with validation feedback. A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "At a narrow viewport, all three note rows, their individually associated remove controls, the note count, and bottom navigation remain readable and reachable.",
+          "status": "verified",
+          "evidence": "With Alpha, Beta, and Gamma entered, the recorded narrow-layout inspection says all three textboxes, three separately labelled remove buttons, the “3 notes ready” count, and navigation controls were visible (step 13)."
+        },
+        {
+          "claim": "Toggling Personal off after selecting Work, Personal, and Study leaves only Work and Study selected and updates the selected count to 2.",
+          "status": "verified",
+          "evidence": "The post-toggle observation records Work and Study with selected styling, Personal without selected styling, and “2 selected” on step 2 (step 18)."
+        },
+        {
+          "claim": "Profile and planning choices survive backward and forward wizard navigation.",
+          "status": "verified",
+          "evidence": "Step 21 records that Step 1 retained Acme, sam@example.com, and Sam; on returning to planning, Work, Personal, and Study plus Sunday were retained (step 22)."
+        },
+        {
+          "claim": "Removing note 2 removes Beta while preserving Alpha and Gamma.",
+          "status": "not_testable",
+          "evidence": "Before removal, the three notes were Alpha, Beta, and Gamma (step 13); the subsequent Step-3 snapshot instead contains Alpha and Beta as the two remaining notes (step 14), showing Gamma was removed rather than Beta. A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "After workspace creation, opening the board takes the user from the completion flow to a usable board where collected preferences remain usable.",
+          "status": "not_testable",
+          "evidence": "A completion screen was observed at /welcome before opening the board (step 28), but after Open my board the root URL displays “Application error: a client-side exception has occurred” rather than a usable board (step 29). A re-check of this interaction did not reproduce the failure."
+        }
+      ],
+      "findingTexts": [
+        "After successful workspace creation, clicking Open my board navigates from /welcome to http://localhost:4102/, but the destination displays only “Application error: a client-side exception has occurre"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reach step 2 and enter 21 in the daily-limit field.",
+          "action": "Click Continue and inspect the validation feedback.",
+          "expect": "The range error must be legible, adjacent to the field, and not clipped or covered.",
+          "priority": 8
+        },
+        {
+          "setup": "Reach step 3, add two additional note rows, and enter distinct text in all three rows.",
+          "action": "Inspect the note inputs, remove controls, count, and bottom navigation at a narrow viewport.",
+          "expect": "Every note and control must remain readable, reachable, and visibly associated with its row.",
+          "priority": 7
+        },
+        {
+          "setup": "Reach step 2 with valid profile data and select Work, Personal, and Study.",
+          "action": "Toggle Personal off and inspect the focus controls and selected count.",
+          "expect": "Only Work and Study must appear selected, and the count must read 2.",
+          "priority": 6
+        },
+        {
+          "setup": "At step 1, enter valid distinct profile values and continue to step 2; select Personal and set Sunday.",
+          "action": "Click Back, verify the profile, then continue and re-read the selected planning values.",
+          "expect": "The profile, Personal selection, and Sunday choice must survive backward and forward navigation.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete all required fields with valid values and reach the final step with note 'Launch plan'.",
+          "action": "Click Create workspace, then click Open my board.",
+          "expect": "A completion screen must appear first, and Open my board must navigate away from /welcome.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete profile validation, choose Work and Study, set Sunday, 21:00, and daily limit 7, then enter note 'Launch plan'.",
+          "action": "Create the workspace and inspect the completion screen and resulting board.",
+          "expect": "Sunday, 21:00, and limit 7 must visibly affect the completion summary or board; state where each appears.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 with valid values, add notes 'Alpha', 'Beta', and 'Gamma' on step 3.",
+          "action": "Click Remove note 2.",
+          "expect": "Beta must disappear while Alpha and Gamma remain; state the remaining note texts.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /welcome, enter workspace 'Acme', email 'sam@example.com', and display name 'Sam'; continue, select Work, and note the step-two controls.",
+          "action": "Enter 21 in Max notes per day and click Continue.",
+          "expect": "Must remain on step 2 with a visible error saying the daily limit must be between 1 and 20.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise each wizard step, especially boundary values and non-first note removal, then verify that collected preferences remain visible and usable.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reach step 2 and enter 21 in the daily-limit field. Then Click Continue and inspect the validation feedback. — expect: The range error must be legible, adjacent to the field, and not clipped or covered.\n2. Reach step 3, add two additional note rows, and enter distinct text in all three rows. Then Inspect the note inputs, remove controls, count, and bottom navigation at a narrow viewport. — expect: Every note and control must remain readable, reachable, and visibly associated with its row.\n3. Reach step 2 with valid profile data and select Work, Personal, and Study. Then Toggle Personal off and inspect the focus controls and selected count. — expect: Only Work and Study must appear selected, and the count must read 2.\n4. At step 1, enter valid distinct profile values and continue to step 2; select Personal and set Sunday. Then Click Back, verify the profile, then continue and re-read the selected planning values. — expect: The profile, Personal selection, and Sunday choice must survive backward and forward navigation.\n5. Complete all required fields with valid values and reach the final step with note 'Launch plan'. Then Click Create workspace, then click Open my board. — expect: A completion screen must appear first, and Open my board must navig"
+    }
+  ]
+}

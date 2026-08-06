@@ -17,6 +17,8 @@ import type { AuthConfig } from "./types.js";
 import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { runHolisticFlowReview } from "./holisticReviewAgent.js";
 import { runVerificationReview, type RunVerification } from "./verificationAgent.js";
+import { confirmFindings } from "./findingConfirmer.js";
+import { dropUngroundedFindings } from "./claimGrounding.js";
 import { isStopRequested } from "./runEvents.js";
 import type { ReviewBug } from "./types.js";
 import {
@@ -422,6 +424,57 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
       }
       logger.info({ count: netBugs.length }, "Network monitor: action-correlated bugs merged");
     }
+    // Re-drive each candidate finding before it reaches triage. OFF by default,
+    // opt in with KERY_CONFIRM=1.
+    //
+    // Measured twice and rejected both times. Primed (told the agent what was
+    // claimed) it agreed with itself and changed nothing: 1.56/1.88 against a
+    // 1.56-1.88 band. Blind (verdict stripped from the claim) it cost 16 points
+    // of detection, 58% -> 42%, because removing the verdict also removes the
+    // SETUP: "an invalid promo keeps the previous discount" needs a valid promo
+    // applied first, the re-check never reproduces it, and a real bug is
+    // deleted. State-dependent defects are precisely what this must not drop.
+    const confirmCalls: LLMCallRecord[] = [];
+    if (!isVerificationRun && bugsFound.length > 0 && process.env.KERY_CONFIRM === "1") {
+      emitActivity("Re-checking reported problems...");
+      try {
+        // Failed checks reach the user exactly like findings do, so they get the
+        // same re-drive. Previously they bypassed every gate in the pipeline.
+        const contradicted = verifications.filter((v) => v.status === "contradicted");
+        const outcome = await confirmFindings(page, bugsFound, job.baseUrl, {
+          extraClaims: contradicted.map((v) => String(v.claim ?? "")),
+        });
+        outcome.extraReproduced.forEach((reproduced, i) => {
+          if (reproduced) return;
+          const v = contradicted[i];
+          if (!v) return;
+          // Could not be reproduced on a second attempt: downgrade rather than
+          // publish it as a proven failure.
+          v.status = "not_testable";
+          v.evidence = `${v.evidence ?? ""} A re-check of this interaction did not reproduce the failure.`.trim();
+        });
+        if (outcome.dropped.length > 0) {
+          logger.info(
+            { dropped: outcome.dropped.length, kept: outcome.kept.length },
+            "Confirmation pass discarded findings the re-check could not reproduce",
+          );
+        }
+        bugsFound = outcome.kept;
+        for (const c of outcome.llmCalls) confirmCalls.push({ ...c, seq: 0 });
+      } catch (err) {
+        logger.warn({ err: String(err).slice(0, 200) }, "Confirmation pass errored — findings kept as reported");
+      }
+    }
+
+    // Deterministic grounding check: a finding citing figures or quoted text
+    // that appear nowhere in the run's own observations is describing something
+    // the run never saw. No model call, no browser pass — it cannot invent a
+    // verdict, and it stays silent on reports that cite nothing specific.
+    if (!isVerificationRun && bugsFound.length > 0 && process.env.KERY_GROUNDING !== "0") {
+      const g = dropUngroundedFindings(bugsFound, agentResult.stepsDetail);
+      bugsFound = g.kept;
+    }
+
     const triageCalls: LLMCallRecord[] = [];
     let triageResult: Awaited<ReturnType<typeof runBugTriageAgent>>;
     if (isVerificationRun) {

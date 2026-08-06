@@ -1,0 +1,240 @@
+{
+  "label": "sweep2-stockroom-adjust",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 6,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.4385,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 258537,
+      "status": "passed",
+      "steps": 23,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.5589,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "Finding 3 explicitly reports that undoing a shipment of 5 decreases Hex bolt M4 from 135 to 130 rather than restoring it toward 140."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "Finding 1 explicitly reports that Washer 11mm exactly at its reorder point (60 on hand / 60 reorder) displays OK despite the at-or-below rule."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "Findings 2 and 6 report that shipping Panel A3's exact on-hand quantity of 7 is refused with “Only 7 ... on hand” and leaves inventory unchanged."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "All adjustment controls show a visible focus indicator when reached by keyboard navigation.",
+          "status": "verified",
+          "evidence": "Steps 4, 5, 7, 9, and 11 record visible blue focus outlines on the Item, Movement, Quantity, Record, and Undo last controls respectively."
+        },
+        {
+          "claim": "Every adjustment control is keyboard-operable when activated.",
+          "status": "contradicted",
+          "evidence": "Step 4 records that pressing Enter on the focused Item select produced no visible change; although Quantity changed with ArrowUp (step 8) and Record/Undo changed inventory state (steps 10 and 12), the directly attempted Item activation was silent."
+        },
+        {
+          "claim": "At the default viewport, the inventory controls, table contents, totals, statuses, and movement log are legible and unobstructed.",
+          "status": "verified",
+          "evidence": "Step 23 explicitly observes the final fresh screen with all controls, table headers, item rows, totals, statuses, and movement-log text legible and unclipped at the default viewport."
+        },
+        {
+          "claim": "Recording a receipt of 3 for Panel A3 increases Panel A3 and total units by 3, adds one movement, and shows a receipt log entry.",
+          "status": "verified",
+          "evidence": "Panel A3 began at 7 with total 535 and 0 movements (step 13); immediately after recording it was 10, total was 538, movements were 1, and the log showed “Received 3” (step 15), reconciling exactly."
+        },
+        {
+          "claim": "Shipping Panel A3's full on-hand quantity of 7 records the shipment, leaves its on-hand quantity at 0, and displays a Shipped 7 log entry.",
+          "status": "contradicted",
+          "evidence": "With Panel A3 at 7, Shipped selected, and quantity 7, the attempted record left Panel A3 at 7, total units at 535, movements at 0, and the log showing “No movements recorded” (step 18); step 19 also describes this as the failed shipment state."
+        },
+        {
+          "claim": "After shipping 5 Hex bolt M4 units, Undo last restores its original on-hand value and the initial empty-log, zero-movement state.",
+          "status": "verified",
+          "evidence": "Hex bolt M4 was initially 140 (steps 20-21), then recorded as 135 with total 530, movement count 1, and a “Shipped 5” log entry (step 22); step 23 records that the final fresh state was restored after the Undo check."
+        }
+      ],
+      "findingTexts": [
+        "The at-or-below reorder rule is not applied to Washer 11mm at 60 on hand / 60 reorder at: it displays OK and Items low is 1 instead of expected 2.",
+        "Boundary validation rejects a shipment equal to available on-hand stock: with Panel A3 at 7 on hand and Shipped quantity 7, Record leaves stock, total units, movements, and log unchanged and shows “On",
+        "Undo last applies the last Shipped 5 movement a second time instead of reversing it: Hex bolt M4 started at 140, became 135 after shipment, then became 130 after Undo while the movement count cleared ",
+        "Validation message names Panel A3 even though Hex bolt M4 is selected, exposing stale error state."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Tab through the item, movement, quantity, Record, and Undo controls, then activate the controls with keyboard input.",
+          "expect": "Each control must show a visible focus indication and remain keyboard-operable.",
+          "priority": 6
+        },
+        {
+          "setup": "",
+          "action": "Inspect all controls, table headers, item rows, totals, statuses, and the movement log at the default viewport.",
+          "expect": "All labels and values must be legible, unclipped, and not covered by another element.",
+          "priority": 5
+        },
+        {
+          "setup": "Select Panel A3, choose Received, and enter quantity 3; note its current on-hand and total units.",
+          "action": "Record the receipt and read the Panel row, total units, movement count, and log.",
+          "expect": "Panel and total units must each increase by 3, movement count by 1, and the log must show receipt.",
+          "priority": 4
+        },
+        {
+          "setup": "Select Panel A3, choose Shipped, and enter its full on-hand quantity of 7.",
+          "action": "Record the shipment.",
+          "expect": "The shipment must be recorded with on-hand 0 and a visible shipped-7 log entry.",
+          "priority": 3
+        },
+        {
+          "setup": "Select Hex bolt M4, choose Shipped, enter quantity 5, and note its initial on-hand value.",
+          "action": "Record the shipment, then click Undo last.",
+          "expect": "Hex bolt must return to its noted value, movements must be 0, and the log must be empty.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Compare the Washer 11mm and Cable 2m rows with the Items low summary.",
+          "expect": "Both at-or-below-reorder items must be flagged, and Items low must equal 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise inventory movement recording, boundary validation, undo behavior, low-stock calculations, totals, and visible presentation.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Tab through the item, movement, quantity, Record, and Undo controls, then activate the controls with keyboard input. — expect: Each control must show a visible focus indication and remain keyboard-operable.\n2. Inspect all controls, table headers, item rows, totals, statuses, and the movement log at the default viewport. — expect: All labels and values must be legible, unclipped, and not covered by another element.\n3. Select Panel A3, choose Received, and enter quantity 3; note its current on-hand and total units. Then Record the receipt and read the Panel row, total units, movement count, and log. — expect: Panel and total units must each increase by 3, movement count by 1, and the log must show receipt.\n4. Select Panel A3, choose Shipped, and enter its full on-hand quantity of 7. Then Record the shipment. — expect: The shipment must be recorded with on-hand 0 and a visible shipped-7 log entry.\n5. Select Hex bolt M4, choose Shipped, enter quantity 5, and note its initial on-hand value. Then Record the shipment, then click Undo last. — expect: Hex bolt must return to its noted value, movements must be 0, and the log must be empty.\n6. Compare the Washer 11mm and Cable 2m rows with the Items low summary. — expect: Both at-or-below-reorder items must be flagged, a"
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 2,
+      "durationMs": 480824,
+      "status": "passed",
+      "steps": 38,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.8796,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "Finding 2 explicitly reports that undoing a 10-unit shipment reduces Hex bolt stock again (140→130→120) rather than restoring it to 140."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "Findings 4 and 7 report Cable at on-hand 25 and reorder point 25 displaying OK rather than Low, despite the stated at-or-below rule."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "Findings 3 and 6 report that shipping exactly the 140 units on hand is rejected with “Only 140 ... on hand” instead of recording the shipment and leaving stock at zero."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At approximately 320px wide, all page text and controls remain readable and reachable without clipping.",
+          "status": "contradicted",
+          "evidence": "Step 30 records that the narrow viewport remained active and that the introductory sentence was clipped at “reorder poin,” so the page is not fully readable without clipping."
+        },
+        {
+          "claim": "Recording a receipt of 5 Washer 11mm units followed by a shipment of 3 Panel A3 units updates inventory to Washer 65 and Panel 4, with Total units 537 and Movements 2.",
+          "status": "verified",
+          "evidence": "Steps 21–25 show Washer increasing from 60 to 65 after the receipt, then Panel decreasing from 7 to 4 after the shipment; Step 25 observes Total units 537 and Movements 2, which reconciles with the seeded 535 + 5 - 3."
+        },
+        {
+          "claim": "With two movements recorded, the movement log lists the newer Panel A3 shipment before the earlier Washer 11mm receipt.",
+          "status": "not_testable",
+          "evidence": "The trace confirms both movements and the resulting count in Step 25, but the recorded observation is truncated before stating the log entries and their displayed order."
+        },
+        {
+          "claim": "Undo last after shipping 10 Hex bolt M4 restores Hex bolt on hand to 140 and leaves zero movements with an empty movement log.",
+          "status": "not_testable",
+          "evidence": "Step 29 confirms the shipment changed Hex bolt from 140 to 130 and created one movement, and the Undo action had domChanged=yes, but no subsequent recorded observation states the restored row value, movement total, or log contents before reload."
+        },
+        {
+          "claim": "Shipping the full available quantity of 140 Hex bolt M4 succeeds, leaving 0 on hand with Low status, no error, and Movements 1.",
+          "status": "contradicted",
+          "evidence": "After Record was clicked for Shipped quantity 140 (Step 33), the fresh verification in Step 34 observed Hex bolt still at 140 with OK status, Total units 535, Movements 0, and “No movements recorded yet.”"
+        },
+        {
+          "claim": "Receiving 7 Cable 2m units leaves Cable at 25 with the expected Low — reorder status and preserves the expected low-item condition.",
+          "status": "contradicted",
+          "evidence": "Step 38 observes Cable 2m at 25 but with status OK, and all five listed items are OK, contradicting the required Cable “Low — reorder” outcome."
+        }
+      ],
+      "findingTexts": [
+        "At the approximately 320px-wide effective viewport, the introductory text is clipped: it displays “Record stock movements. Items at or below their reorder poin” instead of the full sentence. This viol",
+        "Undo last removes the 10-unit Hex bolt shipment from the movement count and log but applies another 10-unit reduction instead of reversing it. Hex bolt changes from 140 to 130 after shipment, then to ",
+        "Boundary shipment validation rejects an amount equal to available stock. For Hex bolt M4 on hand 140, selecting Shipped with quantity 140 and clicking Record shows “Only 140 of Hex bolt M4 on hand.”; ",
+        "At Cable on-hand 25/reorder 25, app shows OK and Items low 0; intended Low — reorder and Items low 2."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Set the viewport to approximately 320px wide and reload the stockroom page.",
+          "action": "Inspect the adjustment controls, table columns, statuses, totals, and movement log at that width.",
+          "expect": "All labels, controls, rows, statuses, and totals must remain readable and reachable without clipping.",
+          "priority": 5
+        },
+        {
+          "setup": "Reload and note the initial totals; select Washer 11mm, choose Received, enter 5, and record it.",
+          "action": "Select Panel A3, choose Shipped, enter 3, record it, then read totals and log order.",
+          "expect": "Total units must be 537, Movements 2, and the log must list Panel shipment before Washer receipt.",
+          "priority": 4
+        },
+        {
+          "setup": "Reload, select Hex bolt M4, choose Shipped, enter 10, record it, and note the resulting on-hand value 130.",
+          "action": "Click Undo last and reread the Hex bolt row, movement total, and log.",
+          "expect": "On hand must return to 140; Movements must be 0 and the log must show no movements.",
+          "priority": 3
+        },
+        {
+          "setup": "Reload the page, select Hex bolt M4, choose Shipped, and enter quantity 140.",
+          "action": "Click Record and read the Hex bolt row, error area, and Movements total.",
+          "expect": "Record must succeed: on hand 0, Low status, no error, and Movements 1.",
+          "priority": 2
+        },
+        {
+          "setup": "Reload the page, select Cable 2m, choose Received, and enter quantity 7.",
+          "action": "Click Record and read the Cable row and Items low total.",
+          "expect": "Cable must show 25 and Low — reorder; Items low must show 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise boundary values and shipped-movement undo first, then verify totals, logs, and narrow-screen usability. Report the exact displayed quantities, counts, statuses, and any clipped or unreachable controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Set the viewport to approximately 320px wide and reload the stockroom page. Then Inspect the adjustment controls, table columns, statuses, totals, and movement log at that width. — expect: All labels, controls, rows, statuses, and totals must remain readable and reachable without clipping.\n2. Reload and note the initial totals; select Washer 11mm, choose Received, enter 5, and record it. Then Select Panel A3, choose Shipped, enter 3, record it, then read totals and log order. — expect: Total units must be 537, Movements 2, and the log must list Panel shipment before Washer receipt.\n3. Reload, select Hex bolt M4, choose Shipped, enter 10, record it, and note the resulting on-hand value 130. Then Click Undo last and reread the Hex bolt row, movement total, and log. — expect: On hand must return to 140; Movements must be 0 and the log must show no movements.\n4. Reload the page, select Hex bolt M4, choose Shipped, and enter quantity 140. Then Click Record and read the Hex bolt row, error area, and Movements total. — expect: Record must succeed: on hand 0, Low status, no error, and Movements 1.\n5. Reload the page, select Cable 2m, choose Received, and enter quantity 7. Then Click Record a"
+    }
+  ]
+}

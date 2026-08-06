@@ -1,0 +1,227 @@
+{
+  "label": "fix1-stockroom",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 4,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.6694,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 184467,
+      "status": "passed",
+      "steps": 15,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.3167,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": true,
+          "why": "The run explicitly reports that undoing a shipment changed Panel A3 from 5 down to 3 instead of restoring its pre-shipment value of 7, matching an undo that subtracts again."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "The run explicitly reports Washer 11mm at exactly its reorder point of 60 displaying OK rather than Low — reorder, contrary to the stated at-or-below rule."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": true,
+          "why": "The run explicitly reports that shipping Cable 2m's exact on-hand quantity of 18 was rejected with “Only 18 ... on hand,” and no shipment was recorded."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Recording a received quantity of 5 for Hex bolt M4 increases its on-hand value and total units by 5, adds one movement, and logs “Received 5 × Hex bolt M4.”",
+          "status": "verified",
+          "evidence": "Before recording, the trace observed 535 total units, 140 Hex bolt M4 on hand, and 0 movements; after Record it observed 540 total units, 145 on hand, 1 movement, and the exact received log entry (steps 2-3)."
+        },
+        {
+          "claim": "Undoing the Panel A3 shipment restores Panel A3 to its pre-shipment on-hand value of 7 and removes that shipment from history.",
+          "status": "contradicted",
+          "evidence": "The shipment correctly reduced Panel A3 from 7 to 5 and raised movements to 2 (step 9), and later history showed only the Hex-bolt entry with 1 movement (step 13), but the final observed Panel A3 value was 3 rather than the required restored value of 7 (step 15)."
+        },
+        {
+          "claim": "Washer 11mm is shown as Low — reorder, and the Items low summary is 2.",
+          "status": "contradicted",
+          "evidence": "The Items low summary was observed as 2, with Cable 2m and Panel A3 identified as the low rows, but Washer 11mm was explicitly observed at its reorder value of 60 with status “OK,” not “Low — reorder” (step 10)."
+        },
+        {
+          "claim": "Recording shipment of all 18 on-hand Cable 2m units reduces Cable 2m to 0, records the movement, and does not show a quantity error.",
+          "status": "contradicted",
+          "evidence": "The requested Record action was performed with Cable 2m selected, Shipped, quantity 18, and 18 on hand (step 14), but final verification still showed Cable 2m at 18 on hand rather than 0 (step 15)."
+        }
+      ],
+      "findingTexts": [
+        "Undo last clears the “Shipped 2 × Panel A3” log entry and decreases Movements from 2 to 1, but Panel A3 becomes 3 on hand and Total units 536. After undoing a shipment from the pre-record value 7, Pan",
+        "Recording Shipped 18 for Cable 2m when Cable 2m has exactly 18 on hand is rejected with “Only 18 of Cable 2m on hand.” The shipment is not recorded: Cable remains 18 on hand, Movements remains 1, and ",
+        "Washer 11mm is 60 on hand at its reorder point of 60 but shows OK; intended at-or-below logic requires Low — reorder."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Select Hex bolt M4, choose Received, enter 5, and note total units and the Hex bolt row.",
+          "action": "Click Record and reread total units, Movements, and the received log entry.",
+          "expect": "Must increase total units by 5, increase Movements by 1, and show Received 5 × Hex bolt M4.",
+          "priority": 4
+        },
+        {
+          "setup": "Select Panel A3, choose Shipped, enter 2, record it, and note its on-hand value.",
+          "action": "Click Undo last and reread Panel A3, Movements, and the movement log.",
+          "expect": "Must restore on hand to 7, set Movements to 0, and clear its log entry.",
+          "priority": 3
+        },
+        {
+          "setup": "",
+          "action": "Read the Washer 11mm row and the Items low summary.",
+          "expect": "Must show Low — reorder and Items low count 2; state both.",
+          "priority": 2
+        },
+        {
+          "setup": "Select Cable 2m, choose Shipped, enter quantity 18, and note its initial on-hand value.",
+          "action": "Click Record and reread the Cable row, error area, movement count, and movement log.",
+          "expect": "Must record shipment: Cable on hand 0, Movements 1, and no quantity error.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise boundary quantities, low-stock status, and undo while comparing on-hand values, summaries, and movement logs before and after each action.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Select Hex bolt M4, choose Received, enter 5, and note total units and the Hex bolt row. Then Click Record and reread total units, Movements, and the received log entry. — expect: Must increase total units by 5, increase Movements by 1, and show Received 5 × Hex bolt M4.\n2. Select Panel A3, choose Shipped, enter 2, record it, and note its on-hand value. Then Click Undo last and reread Panel A3, Movements, and the movement log. — expect: Must restore on hand to 7, set Movements to 0, and clear its log entry.\n3. Read the Washer 11mm row and the Items low summary. — expect: Must show Low — reorder and Items low count 2; state both.\n4. Select Cable 2m, choose Shipped, enter quantity 18, and note its initial on-hand value. Then Click Record and reread the Cable row, error area, movement count, and movement log. — expect: Must record shipment: Cable on hand 0, Movements 1, and no quantity error."
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 2,
+      "durationMs": 230058,
+      "status": "failed",
+      "steps": 22,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.3527,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": false,
+          "why": "No finding describes undoing a shipment or stock being decremented again after an undo."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "The run explicitly reports Washer 11mm at stock 60 and reorder point 60 showing OK despite the stated at-or-below rule requiring Low."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": false,
+          "why": "The run could not select Panel A3 to record a movement, but it did not attempt or report refusal of a shipment exactly equal to an item's on-hand quantity."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The Quantity field remains visibly identified by its Quantity label after a user enters a value.",
+          "status": "verified",
+          "evidence": "Steps 1-2 entered quantity 23, and the recorded observation says it remained identified by the visible Quantity label above it; Item and Movement labels were also visible."
+        },
+        {
+          "claim": "A user can select Panel A3 from the Item control in order to record a movement.",
+          "status": "contradicted",
+          "evidence": "Steps 3-20 repeatedly attempted to select or keyboard-navigate to Panel A3, but every recorded observation showed the Item control still set to BLT-04 with no state change."
+        },
+        {
+          "claim": "At a 320px mobile viewport, all stockroom controls and table content are readable, reachable, and not horizontally clipped.",
+          "status": "not_testable",
+          "evidence": "The trace contains no viewport resize to 320px and no recorded mobile-layout inspection or interaction attempt."
+        },
+        {
+          "claim": "Recording 3 received units for Panel A3 raises its on-hand quantity from 7 to 10 and updates total units, low-item count, and movement count consistently.",
+          "status": "not_testable",
+          "evidence": "The baseline was observed as Panel A3 on hand 7, Total units 535, Items low 1, and Movements 0, but Panel A3 could not be selected and no received movement was recorded."
+        },
+        {
+          "claim": "Undo last reverses the latest Panel A3 movement, restores the prior quantity, decrements the movement count, and removes that movement from the log.",
+          "status": "not_testable",
+          "evidence": "No Panel A3 movement was successfully recorded because the Item control remained on BLT-04; Undo was only observed disabled in step 13."
+        },
+        {
+          "claim": "Panel A3 shipment boundaries work: shipping 2 leaves 5 with status “Low — reorder,” and shipping all 7 is accepted, leaving 0 on hand, 1 movement, and no error.",
+          "status": "not_testable",
+          "evidence": "Although the baseline Panel A3 row was observed as 7 on hand with status OK, no shipment could be configured or recorded after the repeated failed attempts to select Panel A3."
+        }
+      ],
+      "findingTexts": [
+        "Washer 11mm is on hand 60 at reorder 60 but shows OK; intended <= rule requires Low—reorder (Items low is 1, not 2).",
+        "Quantity's visible label is not programmatically associated: the field is exposed as an unnamed spinbutton."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Start fresh and inspect the labels for Item, Movement, and Quantity before entering a value.",
+          "action": "Enter a distinct quantity and reread the field and its surrounding label.",
+          "expect": "The Quantity label must remain visible and identify the field after typing.",
+          "priority": 7
+        },
+        {
+          "setup": "Start fresh at a 320px-wide mobile viewport.",
+          "action": "Inspect and attempt to operate the item, movement, quantity, Record, and Undo controls.",
+          "expect": "All controls and table content must be readable, reachable, and free from horizontal clipping.",
+          "priority": 6
+        },
+        {
+          "setup": "Start fresh and note Total units, Items low, and each item's displayed on-hand quantity and status.",
+          "action": "Record 3 received units for Panel A3 and reread the row and all three totals.",
+          "expect": "Panel A3 must show 10; total units must rise by 3, while low count and movement count update consistently.",
+          "priority": 5
+        },
+        {
+          "setup": "Start fresh, select Panel A3, choose Received, and enter 4; then choose Shipped and enter 1.",
+          "action": "Record both movements, click Undo last, and reread quantity, movements, and log.",
+          "expect": "Quantity must be 11, movements 1, and only the received movement must remain.",
+          "priority": 4
+        },
+        {
+          "setup": "Start fresh, select Panel A3, choose Shipped, and enter quantity 1; note its displayed quantity of 6.",
+          "action": "Record the shipment, click Undo last, and reread Panel A3 and the movement log.",
+          "expect": "On hand must return to 7; movements must be 0 and the log must show no movements.",
+          "priority": 3
+        },
+        {
+          "setup": "Start fresh, select Panel A3, choose Shipped, and enter quantity 2, leaving exactly its reorder point of 5.",
+          "action": "Record the shipment and read Panel A3's on-hand value and status.",
+          "expect": "On hand must be 5 and status must say Low — reorder.",
+          "priority": 2
+        },
+        {
+          "setup": "Start fresh, select Panel A3, choose Shipped, and enter quantity 7, equal to its current on-hand quantity.",
+          "action": "Record the shipment and read Panel A3's row, movement count, and error area.",
+          "expect": "Must accept the shipment: on hand 0, movements 1, and no error.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise inventory movement boundaries, low-stock thresholds, undo behavior, totals, movement logs, and mobile usability. Report the exact displayed quantities, counts, statuses, errors, and any clipped controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Start fresh and inspect the labels for Item, Movement, and Quantity before entering a value. Then Enter a distinct quantity and reread the field and its surrounding label. — expect: The Quantity label must remain visible and identify the field after typing.\n2. Start fresh at a 320px-wide mobile viewport. Then Inspect and attempt to operate the item, movement, quantity, Record, and Undo controls. — expect: All controls and table content must be readable, reachable, and free from horizontal clipping.\n3. Start fresh and note Total units, Items low, and each item's displayed on-hand quantity and status. Then Record 3 received units for Panel A3 and reread the row and all three totals. — expect: Panel A3 must show 10; total units must rise by 3, while low count and movement count update consistently.\n4. Start fresh, select Panel A3, choose Received, and enter 4; then choose Shipped and enter 1. Then Record both movements, click Undo last, and reread quantity, movements, and log. — expect: Quantity must be 11, movements 1, and only the received movement must remain.\n5. Start fresh, select Panel A3, choose Shipped, and enter quantity 1; note its displayed quantity of 6. Then Record the sh"
+    }
+  ]
+}

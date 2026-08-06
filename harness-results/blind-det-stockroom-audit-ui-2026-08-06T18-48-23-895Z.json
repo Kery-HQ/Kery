@@ -1,0 +1,212 @@
+{
+  "label": "blind-det-stockroom-audit-ui",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 1,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.8228,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-audit-ui",
+      "attempt": 1,
+      "durationMs": 316211,
+      "status": "failed",
+      "steps": 12,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.2293,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "caught": false,
+          "why": "The run did not report the size of the plus/minus stepper controls or any tap-target issue."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "caught": false,
+          "why": "The run did not report missing visible focus indication while tabbing."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "caught": true,
+          "why": "The run reported that the confirmation dialog remains open after Escape and backdrop clicks, matching the undismissable-modal defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting the audit opens a confirmation dialog that tells the user the counts were recorded and the variance report was queued.",
+          "status": "verified",
+          "evidence": "After the Submit audit click, step 2 records an “Audit submitted” dialog with a dimmed backdrop and the message that counts were recorded and the variance report queued."
+        },
+        {
+          "claim": "The audit confirmation dialog can be dismissed with Escape or by clicking outside it.",
+          "status": "not_testable",
+          "evidence": "Step 3 records that Escape left the dialog open; the subsequent outside/backdrop click had domChanged=NO, and step 4 reloads specifically to continue without the still-blocking dialog. A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "Keyboard-focused steppers and action buttons show a visible focus indicator distinct from their unfocused state.",
+          "status": "not_testable",
+          "evidence": "Step 7 records that the prior focused-control inspection showed no visible focus treatment distinct from unfocused controls. A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "The second-row Washer plus stepper is independently usable and increases the Washer count by one.",
+          "status": "not_testable",
+          "evidence": "The trace clicked the first-row controls and the Washer-row minus control, but never clicked the second-row Washer plus control or recorded its resulting count."
+        },
+        {
+          "claim": "After changing Washer 11mm, Reset counts restores its counted value to 60 and its variance to an em dash.",
+          "status": "not_testable",
+          "evidence": "Although step 1 records the initial Washer count as 60 with an em-dash variance, no Washer plus action followed by Reset counts was performed or observed."
+        }
+      ],
+      "findingTexts": [
+        "The 'Audit submitted' confirmation dialog cannot be dismissed by Escape or by clicking outside the dialog; both methods left the dialog and backdrop visible."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open stockroom/audit.html and note that the audit counts are initially displayed.",
+          "action": "Click Submit audit, then press Escape and click outside the dialog.",
+          "expect": "The confirmation must appear and must close through Escape or outside click; state which method worked.",
+          "priority": 4
+        },
+        {
+          "setup": "Open stockroom/audit.html and use Tab to focus each stepper and action button.",
+          "action": "Move keyboard focus through the controls and inspect the currently focused control.",
+          "expect": "Every focused control must have a visible focus indicator distinct from its unfocused state.",
+          "priority": 3
+        },
+        {
+          "setup": "Open stockroom/audit.html at normal desktop zoom.",
+          "action": "Inspect every plus and minus stepper and click the second row’s plus control.",
+          "expect": "Stepper controls must be identifiable and independently clickable; Washer count must increase by one.",
+          "priority": 2
+        },
+        {
+          "setup": "Open stockroom/audit.html and note the Washer 11mm counted value and variance.",
+          "action": "Click the Washer 11mm plus button, then click Reset counts.",
+          "expect": "Washer counted value must return to 60 and its variance must return to —.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the audit steppers, reset action, and submission dialog, then inspect keyboard focus and control usability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open stockroom/audit.html and note that the audit counts are initially displayed. Then Click Submit audit, then press Escape and click outside the dialog. — expect: The confirmation must appear and must close through Escape or outside click; state which method worked.\n2. Open stockroom/audit.html and use Tab to focus each stepper and action button. Then Move keyboard focus through the controls and inspect the currently focused control. — expect: Every focused control must have a visible focus indicator distinct from its unfocused state.\n3. Open stockroom/audit.html at normal desktop zoom. Then Inspect every plus and minus stepper and click the second row’s plus control. — expect: Stepper controls must be identifiable and independently clickable; Washer count must increase by one.\n4. Open stockroom/audit.html and note the Washer 11mm counted value and variance. Then Click the Washer 11mm plus button, then click Reset counts. — expect: Washer counted value must return to 60 and its variance must return to —."
+    },
+    {
+      "case": "stockroom-audit-ui",
+      "attempt": 2,
+      "durationMs": 592249,
+      "status": "passed",
+      "steps": 31,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.5935,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "caught": false,
+          "why": "The finding reports incorrect decrement behavior and changes to the wrong item, not the 16x16px target size of the stepper controls."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "caught": false,
+          "why": "The finding does not mention keyboard tabbing or missing visible focus indication."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "caught": false,
+          "why": "The finding does not describe a confirmation dialog or inability to dismiss it via close control, Escape, or backdrop click."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Each inline stepper operates the count for its own row and keyboard navigation provides a visible focus indication.",
+          "status": "not_testable",
+          "evidence": "Attempts to use the Washer and Cable steppers repeatedly changed other rows instead (steps 13, 17, 19, 20, 24, and 27-29), and Tab navigation recorded no visible focus ring (steps 22-23). A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "A submission confirmation dialog can be visibly dismissed with Escape or by clicking outside it.",
+          "status": "not_testable",
+          "evidence": "After Escape, the “Audit submitted” dialog was still present (step 15), and the outside-click action recorded no DOM change or dismissal (step 15). A re-check of this interaction did not reproduce the failure."
+        },
+        {
+          "claim": "Submitting an audit with Washer 11mm counted at 59 opens an “Audit submitted” modal with confirmation text.",
+          "status": "not_testable",
+          "evidence": "Washer could not be set to 59—attempts instead changed Hex bolt or had no effect (steps 17-20)—and the trace records no Submit audit action followed by a modal observation."
+        },
+        {
+          "claim": "Reset counts restores all four seeded items to their system quantities and clears every variance without losing item data.",
+          "status": "verified",
+          "evidence": "After Reset counts, the trace shows Hex bolt M4 140, Washer 11mm 60, Cable 2m 18, and Panel A3 7, each with an em-dash variance (steps 25 and 30); these counts reconcile with their displayed system quantities."
+        },
+        {
+          "claim": "Clicking the second-row Washer 11mm minus stepper once changes Washer from 60 to 59 with variance -1 while leaving all other rows unchanged.",
+          "status": "not_testable",
+          "evidence": "The final purported Washer-minus action instead changed Hex bolt to 139 with variance -1; Washer remained 60 and the other rows were unchanged (step 31). A re-check of this interaction did not reproduce the failure."
+        }
+      ],
+      "findingTexts": [
+        "Intended final Washer decrement to 59/-1 instead leaves Washer 60 and changes Hex bolt to 139/-1."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "View the audit table at normal desktop size and move the pointer over each stepper.",
+          "action": "Try clicking each plus and minus control precisely, then use Tab to reach them.",
+          "expect": "Every control must be reachable and operable, with a visible keyboard-focus indication.",
+          "priority": 5
+        },
+        {
+          "setup": "Open the submission confirmation modal.",
+          "action": "Press Escape, click outside the modal, and look for a close control.",
+          "expect": "At least one method must visibly dismiss the modal and return to the audit screen.",
+          "priority": 4
+        },
+        {
+          "setup": "Change the SECOND row to 59 so the audit contains a nonzero variance.",
+          "action": "Click Submit audit.",
+          "expect": "A visible modal must appear with the title “Audit submitted” and confirmation text.",
+          "priority": 3
+        },
+        {
+          "setup": "Change the first row once and the third row twice using their plus steppers.",
+          "action": "Click Reset counts and reread every row.",
+          "expect": "All counted values must equal system values and every variance must show an em dash.",
+          "priority": 2
+        },
+        {
+          "setup": "Note the initial rows and system quantities, especially Washer 11mm at 60.",
+          "action": "Click the minus stepper for the SECOND row once.",
+          "expect": "Washer must show 59 and variance -1; every other row must remain unchanged.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every audit control, using non-default item counts to verify variance propagation and reset behavior. Inspect the confirmation dialog and the operability of the compact controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. View the audit table at normal desktop size and move the pointer over each stepper. Then Try clicking each plus and minus control precisely, then use Tab to reach them. — expect: Every control must be reachable and operable, with a visible keyboard-focus indication.\n2. Open the submission confirmation modal. Then Press Escape, click outside the modal, and look for a close control. — expect: At least one method must visibly dismiss the modal and return to the audit screen.\n3. Change the SECOND row to 59 so the audit contains a nonzero variance. Then Click Submit audit. — expect: A visible modal must appear with the title “Audit submitted” and confirmation text.\n4. Change the first row once and the third row twice using their plus steppers. Then Click Reset counts and reread every row. — expect: All counted values must equal system values and every variance must show an em dash.\n5. Note the initial rows and system quantities, especially Washer 11mm at 60. Then Click the minus stepper for the SECOND row once. — expect: Washer must show 59 and variance -1; every other row must remain unchanged."
+    }
+  ]
+}

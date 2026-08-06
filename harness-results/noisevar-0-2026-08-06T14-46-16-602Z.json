@@ -1,0 +1,1367 @@
+{
+  "label": "noisevar-0",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 0,
+    "planted": 0,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 5.2926,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "durationMs": 515186,
+      "status": "failed",
+      "steps": 59,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.966,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "At the narrow Attendees view, attendee name, ticket selection, Add attendee, Remove, and Seats reserved controls remain readable and usable without clipping.",
+          "status": "verified",
+          "evidence": "Steps 11-14 show the ticket changed to Workshop, an attendee was added and removed, Seats reserved changed to 2, and the rendered Attendees view recorded the named labels and controls as readable."
+        },
+        {
+          "claim": "An organisation entered as <b>Acme</b> is shown in confirmation as literal text rather than interpreted HTML.",
+          "status": "verified",
+          "evidence": "Step 16 records the organisation field containing the literal sequence “<b>Acme</b>”, and step 21 observes that the confirmation organisation segment displays those literal characters rather than bold rendered text."
+        },
+        {
+          "claim": "Payment promo behavior is correct: Standard plus Workshop yields subtotal $380.00, TEAM15 yields discount $57.00 and total due $323.00, and applying a later invalid code clears the prior discount.",
+          "status": "not_testable",
+          "evidence": "Steps 30-31 establish the two attendees and the pre-promo Payment values of Attendees 2, Subtotal $380.00, Discount −$0.00, and Total due $380.00, but no post-Apply TEAM15 rows were recorded and no invalid promo code was entered or applied."
+        },
+        {
+          "claim": "Previously entered contact details, attendee ticket, and seat count survive both backward and subsequent forward wizard navigation.",
+          "status": "not_testable",
+          "evidence": "Backward navigation preserved the actual entered Persist Org, persist@example.com, 7654321, Persist standard attendee, and seat 1 in steps 57-58, but Workshop and seat 3 were never successfully set and the run ended before continuing forward twice."
+        },
+        {
+          "claim": "Seats reserved values of 0 and 13 show a visible error and do not advance from Attendees.",
+          "status": "verified",
+          "evidence": "After submitting 0, step 52 records Attendees remained active with “Seats reserved must be between 1 and 12”; after submitting 13, step 54 records the same visible error and no advance."
+        },
+        {
+          "claim": "Removing the second attendee from an A/Standard, B/Workshop, C/Student list removes only B and leaves a Payment attendee count of 2.",
+          "status": "not_testable",
+          "evidence": "This three-attendee removal scenario was not reached; the run added and removed only Narrow Attendee in steps 11-13, then ended at the step limit before testing A, B, and C."
+        }
+      ],
+      "findingTexts": [
+        "Applying the visibly entered valid promo code TEAM15 at Payment shows the error “That promo code is not recognised.” and leaves Discount −$0.00 and Total due $380.00 instead of applying the expected 1",
+        "The Attendees ticket combobox cannot be changed from Standard to Workshop through the available interaction mechanisms: repeated focused ArrowDown/type-ahead and direct clicks left the visible value a"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open the wizard at a 320px-wide viewport and reach Attendees.",
+          "action": "Use the attendee name, ticket select, Add attendee, Remove, and Seats controls at that width.",
+          "expect": "Every label, value, and control must remain readable and reachable without horizontal clipping.",
+          "priority": 8
+        },
+        {
+          "setup": "On Contact, enter the organisation exactly as <b>Acme</b>, use a valid email, add an attendee, and reach confirmation.",
+          "action": "Confirm registration and inspect the organisation text in the confirmation message.",
+          "expect": "The organisation must display as literal text, not rendered bold markup or altered HTML.",
+          "priority": 7
+        },
+        {
+          "setup": "Add one Standard attendee and one Workshop attendee, then reach Payment.",
+          "action": "Apply TEAM15 and read Subtotal, Discount, and Total due.",
+          "expect": "Subtotal must be $380.00, Discount $57.00, and Total due $323.00.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter distinct contact values, add attendee Persist with Workshop ticket, set seats to 3, and reach Payment.",
+          "action": "Go back twice, then continue twice and reread every contact, attendee, ticket, and seat value.",
+          "expect": "All previously entered values must survive backward navigation and forward navigation.",
+          "priority": 5
+        },
+        {
+          "setup": "At Attendees with an attendee present, note the current step and set Seats reserved to 0.",
+          "action": "Continue, then set Seats reserved to 13 and continue again.",
+          "expect": "Both boundary violations must show a visible seats error and must not advance.",
+          "priority": 4
+        },
+        {
+          "setup": "At Attendees, add A as Standard, B as Workshop, and C as Student.",
+          "action": "Remove the second attendee, B, and read the remaining list and attendee count on Payment.",
+          "expect": "B must disappear; A and C must remain, and the Payment count must be 2.",
+          "priority": 3
+        },
+        {
+          "setup": "At Contact, enter organisation Acme, email a@b, and phone 123456.",
+          "action": "Continue, then correct the email to a@b.com and phone to 1234567 and continue again.",
+          "expect": "The first attempt must show email and phone errors; corrected values must advance to Attendees.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete contact validation, add one standard attendee, continue to Payment, and note the undiscounted subtotal.",
+          "action": "Apply TEAM15, then enter an invalid code such as TEAM1 and apply it.",
+          "expect": "The invalid-code error must appear and the previous promo discount must be cleared; state the Discount and Total rows.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise all wizard controls, prioritizing mismatched promo state and rendered totals, then check navigation persistence and narrow-screen usability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open the wizard at a 320px-wide viewport and reach Attendees. Then Use the attendee name, ticket select, Add attendee, Remove, and Seats controls at that width. — expect: Every label, value, and control must remain readable and reachable without horizontal clipping.\n2. On Contact, enter the organisation exactly as <b>Acme</b>, use a valid email, add an attendee, and reach confirmation. Then Confirm registration and inspect the organisation text in the confirmation message. — expect: The organisation must display as literal text, not rendered bold markup or altered HTML.\n3. Add one Standard attendee and one Workshop attendee, then reach Payment. Then Apply TEAM15 and read Subtotal, Discount, and Total due. — expect: Subtotal must be $380.00, Discount $57.00, and Total due $323.00.\n4. Enter distinct contact values, add attendee Persist with Workshop ticket, set seats to 3, and reach Payment. Then Go back twice, then continue twice and reread every contact, attendee, ticket, and seat value. — expect: All previously entered values must survive backward navigation and forward navigation.\n5. At Attendees with an attendee present, note the current step and set Seats reserved to 0. Then Continue, then set Seats reserved to 13 and continue again. — exp"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "durationMs": 159981,
+      "status": "failed",
+      "steps": 15,
+      "findings": 0,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.2542,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Adding an attendee as Alice with the Standard ticket places Alice in the attendee list.",
+          "status": "verified",
+          "evidence": "After the Add attendee action, step 6 observes Alice listed as \"Alice · standard\" with one Remove button, while the name field is cleared."
+        },
+        {
+          "claim": "A registration with Alice as Standard and Bob as Student can be confirmed showing two attendees and a total equal to the subtotal less 10%.",
+          "status": "not_testable",
+          "evidence": "The run added only Alice; Bob was never added, no subtotal or EARLY discount was observed, and the Payment/confirmation steps were not reached (steps 6-15)."
+        },
+        {
+          "claim": "Returning from Attendees to Contact preserves the exact organisation text Acme\" Ltd.",
+          "status": "not_testable",
+          "evidence": "The run used \"Test Org\" rather than Acme\" Ltd and never performed a return navigation from Attendees to Contact (steps 1-15)."
+        },
+        {
+          "claim": "Removing Bob leaves Alice listed with the Standard ticket and removes Bob from the attendee list.",
+          "status": "not_testable",
+          "evidence": "The run never added Bob and never clicked a Remove control; the only recorded attendee list contains Alice alone (steps 6-13)."
+        },
+        {
+          "claim": "Invalid boundary inputs are blocked: phone number ------- shows a phone validation error on Contact, and fractional Seats reserved value 1.5 shows a seats error on Attendees without advancing.",
+          "status": "not_testable",
+          "evidence": "Neither ------- nor 1.5 was entered, and no corresponding validation error or blocked Continue attempt was observed."
+        },
+        {
+          "claim": "An attendee-required error shown after continuing with no attendees disappears after adding Alice, and an invalid promo code resets the discount to $0.00 with Total due equal to Subtotal.",
+          "status": "not_testable",
+          "evidence": "The run did not attempt Continue with an empty attendee list, did not observe an attendee error, and never reached Payment or applied TEAM15/BADCODE."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete Contact, add Alice as Standard and Bob as Student, and note the displayed subtotal.",
+          "action": "Apply EARLY, then confirm the registration.",
+          "expect": "The confirmation must show two attendees and a total equal to subtotal minus 10 percent.",
+          "priority": 7
+        },
+        {
+          "setup": "Enter organisation Acme\" Ltd, a valid email, and advance to Attendees.",
+          "action": "Return to Contact and inspect the organisation field.",
+          "expect": "The organisation field must still contain the exact text Acme\" Ltd.",
+          "priority": 6
+        },
+        {
+          "setup": "Complete Contact and add attendees Alice as Standard and Bob as Workshop.",
+          "action": "Remove Bob, the second attendee, and read the attendee list.",
+          "expect": "Bob must disappear while Alice remains with the Standard ticket.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete Contact and enter phone number -------.",
+          "action": "Continue from Contact.",
+          "expect": "The phone value must be rejected with a visible validation error and must not advance.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete Contact and add one attendee, then enter 1.5 for Seats reserved.",
+          "action": "Continue from Attendees.",
+          "expect": "The value must be rejected with a visible seats error and must not advance.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete Contact and advance to Attendees without adding anyone.",
+          "action": "Continue to show the attendee error, then add attendee Alice with the Standard ticket.",
+          "expect": "The attendee error must disappear after Alice is added.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete Contact and add one attendee. On Payment, enter TEAM15 and apply it; note the discounted total.",
+          "action": "Replace TEAM15 with BADCODE and apply the invalid code.",
+          "expect": "An error must appear, the discount must be $0.00, and Total due must equal Subtotal.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every wizard control, prioritizing boundary validation, stale state after corrections, promo failures, attendee changes, and displayed totals.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete Contact, add Alice as Standard and Bob as Student, and note the displayed subtotal. Then Apply EARLY, then confirm the registration. — expect: The confirmation must show two attendees and a total equal to subtotal minus 10 percent.\n2. Enter organisation Acme\" Ltd, a valid email, and advance to Attendees. Then Return to Contact and inspect the organisation field. — expect: The organisation field must still contain the exact text Acme\" Ltd.\n3. Complete Contact and add attendees Alice as Standard and Bob as Workshop. Then Remove Bob, the second attendee, and read the attendee list. — expect: Bob must disappear while Alice remains with the Standard ticket.\n4. Complete Contact and enter phone number -------. Then Continue from Contact. — expect: The phone value must be rejected with a visible validation error and must not advance.\n5. Complete Contact and add one attendee, then enter 1.5 for Seats reserved. Then Continue from Attendees. — expect: The value must be rejected with a visible seats error and must not advance.\n6. Complete Contact and advance to Attendees without adding anyone. Then Continue to show the attendee error, then add attendee Alice with the Standard ticket. — expect: The attendee error must disappear after Alice is ad"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "durationMs": 207330,
+      "status": "passed",
+      "steps": 19,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.4038,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Immediately after submitting valid profile details, the Save changes button shows disabled “Saving…” and a visible saving status.",
+          "status": "not_testable",
+          "evidence": "Step 3 submitted the form, but no immediate post-click observation records the button label, disabled state, or saving status; the next observation is only after the three-second wait."
+        },
+        {
+          "claim": "After a successful save completes, the button re-enables as “Save changes” and a saved confirmation is visible.",
+          "status": "verified",
+          "evidence": "After the three-second wait, step 4 observes an enabled “Save changes” button and the visible text “Your changes have been saved.”; step 10 likewise records the green saved confirmation."
+        },
+        {
+          "claim": "Submitting an empty form displays a required-name validation error.",
+          "status": "verified",
+          "evidence": "The empty submission was performed in step 6, and the subsequent fresh observation in step 7 records the visible error “Full name is required.”"
+        },
+        {
+          "claim": "At a narrow mobile viewport, all validation errors, labels, fields, and cards remain visible, legible, and free of overlap or clipping.",
+          "status": "not_testable",
+          "evidence": "The trace does not record setting or inspecting a narrow mobile-width viewport, nor does it provide a layout observation for overlap, clipping, or legibility."
+        },
+        {
+          "claim": "After a successful save, clearing the name and submitting shows the required-name error while removing the previous saved confirmation.",
+          "status": "verified",
+          "evidence": "Step 10 records the prior visible saved confirmation, step 11 submits after the name was cleared, and step 12 observes the required-name error while stating that the previous saved confirmation is no longer visible."
+        },
+        {
+          "claim": "All five Ada Lovelace settings—name, email, company, Weekly digest, and delivery notes—remain unchanged after reloading account.html.",
+          "status": "not_testable",
+          "evidence": "The trace records the intended pre-save values for name, email, company, and digest, but does not observe the entered delivery notes after filling, and the post-reload observation in step 19 only generically says persisted values remain visible without rereading and stating each of the five values."
+        }
+      ],
+      "findingTexts": [
+        "“Full name is required.” remains visible even after the Full name field contains Grace Hopper."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter valid name “Katherine Johnson” and email “kj@example.com”.",
+          "action": "Submit and inspect the button and saving status immediately, then after three seconds.",
+          "expect": "Button must show disabled “Saving…” with visible status, then re-enable with a visible saved confirmation.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave the form empty and keep the browser at a narrow mobile-width viewport.",
+          "action": "Submit the form and inspect the error, labels, fields, and cards.",
+          "expect": "The required error and every label and control must be legible, visible, and not overlap or clip.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter valid name “Grace Hopper” and email “grace@example.com”, then save and wait for the success message.",
+          "action": "Clear the name, submit the form, and inspect both feedback areas.",
+          "expect": "A required-name error must be visible, and the prior saved confirmation must be absent.",
+          "priority": 2
+        },
+        {
+          "setup": "Open account.html. Enter name “Ada Lovelace”, email “ada@example.com”, company “Analytical Engines”, choose Weekly, and enter “Ring twice” in Delivery notes. Write down every value.",
+          "action": "Save changes, wait for the confirmation, reload the page, and reread every field.",
+          "expect": "All five entered values must remain unchanged after reload; state each value.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the account settings screen and run the ranked checks, recording the exact visible values, messages, and control states.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter valid name “Katherine Johnson” and email “kj@example.com”. Then Submit and inspect the button and saving status immediately, then after three seconds. — expect: Button must show disabled “Saving…” with visible status, then re-enable with a visible saved confirmation.\n2. Leave the form empty and keep the browser at a narrow mobile-width viewport. Then Submit the form and inspect the error, labels, fields, and cards. — expect: The required error and every label and control must be legible, visible, and not overlap or clip.\n3. Enter valid name “Grace Hopper” and email “grace@example.com”, then save and wait for the success message. Then Clear the name, submit the form, and inspect both feedback areas. — expect: A required-name error must be visible, and the prior saved confirmation must be absent.\n4. Open account.html. Enter name “Ada Lovelace”, email “ada@example.com”, company “Analytical Engines”, choose Weekly, and enter “Ring twice” in Delivery notes. Write down every value. Then Save changes, wait for the confirmation, reload the page, and reread every field. — expect: All five entered values must remain unchanged after reload; state each value."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "durationMs": 220396,
+      "status": "passed",
+      "steps": 23,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.4615,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "At normal page width, the Profile and Notifications cards and their labels, controls, and Save changes control are fully legible and not clipped or covered.",
+          "status": "verified",
+          "evidence": "After entering the initial valid name, step 2 observed both cards, labels, controls, and the Save changes button at normal width with no clipping; subsequent steps observed the saved confirmation below the button (step 5) and visible red validation errors (steps 10 and 15)."
+        },
+        {
+          "claim": "Submitting valid profile and notification values saves all five values and retains them after reloading the account settings page: Avery Persistence, avery.persistence@example.com, Avery Archive Co., ",
+          "status": "verified",
+          "evidence": "Step 20 observed all five intended values before submission, step 21 observed an immediate saved confirmation, and the fresh final snapshot in step 23 showed the persisted five values in their controls after navigation back to /account.html."
+        },
+        {
+          "claim": "Saving displays a visible in-progress state: Save changes disables and reads “Saving…” during the 2.6-second delay, then re-enables with confirmation.",
+          "status": "contradicted",
+          "evidence": "Immediately after submitting the valid five-value form, step 21 observed a saved confirmation while the button remained enabled as “Save changes,” with no visible “Saving…” state."
+        },
+        {
+          "claim": "Submitting an email without a domain suffix visibly requires a valid email address rather than accepting the malformed value.",
+          "status": "verified",
+          "evidence": "Step 9 submitted person@example, and step 10 observed the red email validation error still visible alongside that malformed address."
+        },
+        {
+          "claim": "Submitting an empty form shows the required-name error without unexpectedly moving the Save changes layout.",
+          "status": "verified",
+          "evidence": "After the empty-form submission in step 14, step 15 observed the required-name error beneath Full name and recorded that the save button remained at its prior position."
+        }
+      ],
+      "findingTexts": [
+        "Save feedback does not enter the required visible 2.6-second saving state after submitting changed valid values: immediately after click and on a fresh re-check, the button remained enabled as “Save c",
+        "Validation errors push the Notifications card and Save changes button downward versus the empty-form layout.",
+        "“Full name is required.” remains visible beneath a populated Full name field, showing stale/contradictory validation."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter valid name and email, then inspect both the Profile and Notifications cards at normal page width.",
+          "action": "Submit the valid form and inspect all labels, fields, errors, and confirmation text.",
+          "expect": "Labels, controls, validation area, and save feedback must all be legible and not clipped or covered.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter valid name and email, choose Weekly, enter distinct company and delivery notes, then submit.",
+          "action": "Watch the save button and message during the 2.6-second save delay.",
+          "expect": "The button must disable as Saving… with visible progress, then re-enable with a saved confirmation.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter a valid name and an email missing its domain suffix, such as person@example.",
+          "action": "Submit the form and read the validation area.",
+          "expect": "The form must remain unsaved and visibly require a valid email address.",
+          "priority": 3
+        },
+        {
+          "setup": "Open the page and record the Save changes button's vertical position with all fields empty.",
+          "action": "Submit the empty form and compare the button position and visible error with the recorded state.",
+          "expect": "The required-name error must be visible, and validation must not unexpectedly push the save layout.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /bookflow/account.html. Enter distinct values in name, email, company, digest, and delivery notes; write them down.",
+          "action": "Save changes, wait for the confirmation, reload the page, and reread every field.",
+          "expect": "All five saved values must remain after reload; state each value and the confirmation or persistence result.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the account settings page and verify validation, saved profile and notification values, and the visibility and behavior of save feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter valid name and email, then inspect both the Profile and Notifications cards at normal page width. Then Submit the valid form and inspect all labels, fields, errors, and confirmation text. — expect: Labels, controls, validation area, and save feedback must all be legible and not clipped or covered.\n2. Enter valid name and email, choose Weekly, enter distinct company and delivery notes, then submit. Then Watch the save button and message during the 2.6-second save delay. — expect: The button must disable as Saving… with visible progress, then re-enable with a saved confirmation.\n3. Enter a valid name and an email missing its domain suffix, such as person@example. Then Submit the form and read the validation area. — expect: The form must remain unsaved and visibly require a valid email address.\n4. Open the page and record the Save changes button's vertical position with all fields empty. Then Submit the empty form and compare the button position and visible error with the recorded state. — expect: The required-name error must be visible, and validation must not unexpectedly push the save layout.\n5. Open /bookflow/account.html. Enter distinct values in name, email, company, digest, and delivery notes; write them down. Then Save changes, wait for th"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "durationMs": 169516,
+      "status": "passed",
+      "steps": 12,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.2768,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "A valid checkout submission creates a confirmation and an order receipt.",
+          "status": "verified",
+          "evidence": "After the markup-email submission in step 3, step 4 observes the completed confirmation \"Order BK-1002 confirmed.\" and two visible receipts, BK-1001 and BK-1002."
+        },
+        {
+          "claim": "The Place order button disables and shows Processing immediately after submission, then re-enables after processing.",
+          "status": "not_testable",
+          "evidence": "Step 1 initiated a valid order but records no immediate observation of the button label or disabled state; later observations show enabled buttons only after completed orders."
+        },
+        {
+          "claim": "Displayed checkout amounts reconcile: line amounts total the Subtotal, and Subtotal plus Tax equals Total.",
+          "status": "verified",
+          "evidence": "Step 12 records line amounts $360.02, $521.11, and $45.34, summing to the displayed Subtotal $926.47; Tax is $76.43, and $926.47 + $76.43 = $1002.90, consistent with the visible receipt total $1002.90 in step 3."
+        },
+        {
+          "claim": "A receipt renders billing email <b>probe</b>@example.test as literal text rather than bold HTML.",
+          "status": "not_testable",
+          "evidence": "Step 3 confirms the billing input contains the exact markup-like value and a subsequent receipt was created, but no recorded receipt content shows how that email itself was rendered."
+        },
+        {
+          "claim": "Two immediate Place order clicks create exactly one order and one confirmation.",
+          "status": "not_testable",
+          "evidence": "The trace records the first duplicate-test click completing as BK-1003 with three receipts in step 6, but does not record a second successful button click or a post-second-click result."
+        },
+        {
+          "claim": "Invalid card number 1234 is visibly rejected and does not add a receipt.",
+          "status": "verified",
+          "evidence": "After actual submission, step 9 records the red error \"Enter a valid 16-digit card number. No order was placed.\" and says Orders placed still contains exactly three receipts."
+        }
+      ],
+      "findingTexts": [
+        "Receipt BK-1002 rendered the supplied email markup instead of displaying it literally: the receipt visibly shows bold \"probe@example.test\" and does not show the literal <b> and </b> characters."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Use valid billing details and keep the checkout page visible.",
+          "action": "Click Place order, inspect immediately, then inspect again after processing finishes.",
+          "expect": "Button must disable during Processing, then re-enable with visible confirmation and a receipt.",
+          "priority": 6
+        },
+        {
+          "setup": "Read and write down each displayed line amount, Subtotal, Tax, and Total.",
+          "action": "Compare the displayed line sum with Subtotal, then compare Subtotal plus Tax with Total.",
+          "expect": "Subtotal must equal line amounts summed, and Total must equal Subtotal plus Tax.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter billing email `<b>probe</b>@example.test` and a valid card; confirm no receipt exists.",
+          "action": "Place the order and wait for the confirmation and receipt.",
+          "expect": "Receipt must display the email as literal text, not render `probe` as bold markup.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter a valid email and card number, and note that the receipt area is empty.",
+          "action": "Click Place order twice immediately, then wait for processing to finish.",
+          "expect": "Must create exactly one receipt and one confirmation, not two orders.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter a valid email and card value `1234`; confirm the receipt area says no orders yet.",
+          "action": "Click Place order and wait for processing to finish.",
+          "expect": "Must reject the card visibly and must not add an order receipt.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave the card valid, but enter billing email `buyer@` and confirm the receipt area says no orders yet.",
+          "action": "Click Place order and wait for processing to finish.",
+          "expect": "Must reject the email with a visible error and must not add an order receipt.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise checkout totals, billing inputs, order placement, failure handling, duplicate clicks, and receipt rendering. Report the exact visible values, messages, receipt count, and control states.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use valid billing details and keep the checkout page visible. Then Click Place order, inspect immediately, then inspect again after processing finishes. — expect: Button must disable during Processing, then re-enable with visible confirmation and a receipt.\n2. Read and write down each displayed line amount, Subtotal, Tax, and Total. Then Compare the displayed line sum with Subtotal, then compare Subtotal plus Tax with Total. — expect: Subtotal must equal line amounts summed, and Total must equal Subtotal plus Tax.\n3. Enter billing email `<b>probe</b>@example.test` and a valid card; confirm no receipt exists. Then Place the order and wait for the confirmation and receipt. — expect: Receipt must display the email as literal text, not render `probe` as bold markup.\n4. Enter a valid email and card number, and note that the receipt area is empty. Then Click Place order twice immediately, then wait for processing to finish. — expect: Must create exactly one receipt and one confirmation, not two orders.\n5. Enter a valid email and card value `1234`; confirm the receipt area says no orders yet. Then Click Place order and wait for processing to finish. — expect: Must reject the card visibly and must not add "
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "durationMs": 110540,
+      "status": "failed",
+      "steps": 9,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.1389,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Email, card-number, and Place order controls show a visible focus indicator and remain identifiable by their labels/text during keyboard focus traversal.",
+          "status": "verified",
+          "evidence": "Steps 3 and 4 observe visible blue outlines on the focused Billing email and Card number controls with their labels intact; step 5 observes Place order focused with a visible blue outline and identifiable text."
+        },
+        {
+          "claim": "Checkout content, amounts, labels, and the Place order control remain legible, reachable, and uncropped at a 320-pixel viewport.",
+          "status": "not_testable",
+          "evidence": "The trace contains no viewport resize to 320 pixels or recorded observation of the narrow-layout rendering."
+        },
+        {
+          "claim": "Displayed subtotal equals all displayed line amounts, and displayed total equals subtotal plus the displayed tax.",
+          "status": "not_testable",
+          "evidence": "Step 5 records only a partial order-row observation (Standard seat × 3: $360.02 and an incomplete Workshop row); no subtotal, tax, total, or complete set of line amounts was recorded to reconcile."
+        },
+        {
+          "claim": "A valid default checkout submission produces an order confirmation and one receipt.",
+          "status": "verified",
+          "evidence": "After the Place order action in step 5, step 6 records that submission completed with \"Order BK-1001 confirmed.\" and that Orders placed contains exactly one receipt."
+        },
+        {
+          "claim": "Rapidly clicking Place order twice results in exactly one confirmation and one receipt, without a duplicate order.",
+          "status": "not_testable",
+          "evidence": "Only one Place order click is recorded in step 5; step 6 explicitly says the first submission completed before a second click could be issued, so duplicate-click handling was not exercised."
+        },
+        {
+          "claim": "Checkout safely handles literal-markup emails in receipts and visibly rejects missing card numbers or malformed emails without adding receipts.",
+          "status": "not_testable",
+          "evidence": "The literal email was entered and a Place order click was attempted in step 7, but no post-processing receipt observation was recorded; the missing-card and x@ validation scenarios were never reached before the forced exit."
+        }
+      ],
+      "findingTexts": [
+        "The literal-markup email test did not reach receipt rendering: with billing email \"buyer@<b>example</b>\" and populated card, submission displayed \"That billing email is not valid. No order was placed."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open checkout without changing its fields.",
+          "action": "Tab through the email, card, and Place order controls.",
+          "expect": "Each control must show a visible focus indicator and remain identifiable by its label.",
+          "priority": 7
+        },
+        {
+          "setup": "Open checkout at a 320-pixel-wide viewport.",
+          "action": "Inspect the order rows, amounts, totals, form labels, and Place order control.",
+          "expect": "All text and controls must remain legible, reachable, and uncropped.",
+          "priority": 6
+        },
+        {
+          "setup": "Read and record each displayed line amount, subtotal, tax, and total.",
+          "action": "Compare the displayed subtotal and total against the visible line amounts and tax.",
+          "expect": "Subtotal must equal line amounts summed; total must equal subtotal plus displayed tax.",
+          "priority": 5
+        },
+        {
+          "setup": "Leave both default checkout fields unchanged.",
+          "action": "Click Place order twice rapidly, then wait for processing to finish.",
+          "expect": "Exactly one confirmation and one receipt must appear.",
+          "priority": 4
+        },
+        {
+          "setup": "Set the billing email to `buyer@<b>example</b>` and leave the card populated.",
+          "action": "Place the order and inspect the new receipt text.",
+          "expect": "Receipt must show the exact email literally, without rendering markup or executing it.",
+          "priority": 3
+        },
+        {
+          "setup": "Open checkout with a valid billing email and clear the card number completely.",
+          "action": "Click Place order and wait for processing to finish.",
+          "expect": "Must reject the order visibly and must not add a receipt.",
+          "priority": 2
+        },
+        {
+          "setup": "Open checkout, leave the card unchanged, and replace the billing email with `x@`.",
+          "action": "Click Place order and wait for processing to finish.",
+          "expect": "Must show an invalid-email error and must not add an order receipt.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise checkout validation, payment details, totals, order placement, duplicate clicks, receipt rendering, and responsive usability. Report the exact displayed values and any state that remains or changes unexpectedly.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open checkout without changing its fields. Then Tab through the email, card, and Place order controls. — expect: Each control must show a visible focus indicator and remain identifiable by its label.\n2. Open checkout at a 320-pixel-wide viewport. Then Inspect the order rows, amounts, totals, form labels, and Place order control. — expect: All text and controls must remain legible, reachable, and uncropped.\n3. Read and record each displayed line amount, subtotal, tax, and total. Then Compare the displayed subtotal and total against the visible line amounts and tax. — expect: Subtotal must equal line amounts summed; total must equal subtotal plus displayed tax.\n4. Leave both default checkout fields unchanged. Then Click Place order twice rapidly, then wait for processing to finish. — expect: Exactly one confirmation and one receipt must appear.\n5. Set the billing email to `buyer@<b>example</b>` and leave the card populated. Then Place the order and inspect the new receipt text. — expect: Receipt must show the exact email literally, without rendering markup or executing it.\n6. Open checkout with a valid billing email and clear the card number completely. Then Click Place order"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "durationMs": 81225,
+      "status": "failed",
+      "steps": 9,
+      "findings": 0,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.1492,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Entering “password” in Search subject shows the matching “Cannot reset password” ticket and updates the shown-ticket count consistently.",
+          "status": "verified",
+          "evidence": "Step 2 records Search subject as “password”, the table rendering only “Cannot reset password”, and status “Showing 1 of 8 tickets · 0 sel…”. Step 3 confirms the same one-row result for “Password”."
+        },
+        {
+          "claim": "Clearing Search subject restores all eight seeded tickets.",
+          "status": "not_testable",
+          "evidence": "The clear attempt did not complete: steps 4–7 leave “pass” visibly selected in the input and continue to show one ticket; the interaction became stuck, so no post-clear queue state was observed."
+        },
+        {
+          "claim": "At desktop width, all queue controls, ticket text, status text, and bulk-action feedback are legible without clipping or overlap.",
+          "status": "not_testable",
+          "evidence": "The trace begins with a search-field interaction and contains no recorded inspection of the full unfiltered desktop queue, its controls, or toast feedback."
+        },
+        {
+          "claim": "Closing an already-closed ticket does not report a misleading successful close and instead explains that no ticket changed.",
+          "status": "not_testable",
+          "evidence": "The trace never reloads, selects “Export never finishes”, or invokes Close selected."
+        },
+        {
+          "claim": "Select-all and filtering keep row checkboxes, header checkbox, selected count, and hidden-selection behavior accurate.",
+          "status": "not_testable",
+          "evidence": "No row checkbox, header select-all checkbox, priority filter, or selection indicator was exercised in the trace."
+        },
+        {
+          "claim": "Bulk closing selected open tickets closes exactly the selected visible tickets, clears selection, and reports the correct number closed.",
+          "status": "not_testable",
+          "evidence": "No tickets were selected and Close selected was never clicked, so neither resulting row statuses, selection cleanup, nor toast feedback was observed."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reload the queue and inspect the filters, table, status, and action button at normal desktop width.",
+          "action": "Read every label, filter value, ticket row, status message, and bulk-action feedback.",
+          "expect": "All controls, table text, status text, and toast feedback must be legible and no content may be clipped or covered.",
+          "priority": 9
+        },
+        {
+          "setup": "Reload the queue.",
+          "action": "Enter “password” in Search subject, then clear the search field.",
+          "expect": "The password row must appear while searching and all eight seeded tickets must return after clearing.",
+          "priority": 8
+        },
+        {
+          "setup": "Reload, select the closed “Export never finishes” ticket, and note its status.",
+          "action": "Click Close selected and read the toast and selection state.",
+          "expect": "Already-closed tickets must not produce a misleading successful close; feedback must explain that no ticket changed.",
+          "priority": 7
+        },
+        {
+          "setup": "Reload the queue and leave all filters unchanged.",
+          "action": "Click the table select-all checkbox and inspect it, every visible row checkbox, and the status.",
+          "expect": "The header checkbox must visibly remain checked, all visible rows must be checked, and selected count must equal visible rows.",
+          "priority": 6
+        },
+        {
+          "setup": "Select the first visible ticket, then change the priority filter so that ticket is hidden.",
+          "action": "Click Close selected and read the toast and filtered table.",
+          "expect": "The action must not close a hidden ticket unless hidden selections are explicitly supported and visibly represented.",
+          "priority": 5
+        },
+        {
+          "setup": "Filter to High priority and select both visible open tickets.",
+          "action": "Click Close selected and reread the rows, statuses, selection count, and toast.",
+          "expect": "Both tickets must become Closed, selection must clear, and feedback must report closing exactly two tickets.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave the queue unfiltered and note the initial rows and status count.",
+          "action": "Choose Low priority, enter “dark” in Search subject, and enable Open only.",
+          "expect": "Only the matching open Low ticket must remain, and Showing count must equal the rendered row count.",
+          "priority": 3
+        },
+        {
+          "setup": "Select one ticket, filter to a different priority, then click the table's select-all checkbox twice.",
+          "action": "After the second click, read selection indicators and the selected count.",
+          "expect": "Unselect-all must affect only the filtered rows; any previously hidden selection must remain selected.",
+          "priority": 2
+        },
+        {
+          "setup": "Select the second visible ticket, then filter Priority to Low.",
+          "action": "Read the table, selection count, and Close selected button.",
+          "expect": "The hidden selection must not make the visible selection state misleading; state the displayed count and button state.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every queue control, focusing on filter/count/selection disagreements, bulk-close state cleanup, and visible feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reload the queue and inspect the filters, table, status, and action button at normal desktop width. Then Read every label, filter value, ticket row, status message, and bulk-action feedback. — expect: All controls, table text, status text, and toast feedback must be legible and no content may be clipped or covered.\n2. Reload the queue. Then Enter “password” in Search subject, then clear the search field. — expect: The password row must appear while searching and all eight seeded tickets must return after clearing.\n3. Reload, select the closed “Export never finishes” ticket, and note its status. Then Click Close selected and read the toast and selection state. — expect: Already-closed tickets must not produce a misleading successful close; feedback must explain that no ticket changed.\n4. Reload the queue and leave all filters unchanged. Then Click the table select-all checkbox and inspect it, every visible row checkbox, and the status. — expect: The header checkbox must visibly remain checked, all visible rows must be checked, and selected count must equal visible rows.\n5. Select the first visible ticket, then change the priority filter so that ticket is hidden. Then Click Close selected and read the toast and filtered table. — expect: The action must not close a hi"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "durationMs": 179842,
+      "status": "failed",
+      "steps": 19,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.3376,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "At a narrow mobile viewport, every queue column, subject, status, and action remains readable and reachable.",
+          "status": "not_testable",
+          "evidence": "Step 1 records that the supplied viewport was desktop-width and that a narrow-screen inspection could not be performed."
+        },
+        {
+          "claim": "Choosing Low priority shows only the two Low-priority tickets and a Showing count equal to the displayed-row count.",
+          "status": "verified",
+          "evidence": "Step 3 observes exactly two Low-priority rows, “Feature request: dark mode” and “Typo on pricing page,” and the footer says “Showing 2 of 8 tickets.”"
+        },
+        {
+          "claim": "Closing a selected open ticket while Open only is active removes that ticket from the open results and reduces the remaining open rows.",
+          "status": "verified",
+          "evidence": "After the close action in step 5, step 6 observes that selected “Feature request: dark mode” disappeared under Open only and only “Typo on pricing page” remained among the Low open rows."
+        },
+        {
+          "claim": "Closing an already Closed ticket leaves it Closed and reports “Closed 0 ticket(s).”",
+          "status": "not_testable",
+          "evidence": "Steps 9-10 show that “Export never finishes” remained Closed and its selection later cleared, but no recorded observation captures the required “Closed 0 ticket(s)” confirmation."
+        },
+        {
+          "claim": "Queue filters correctly constrain results: Open only shows open tickets, searching “login” yields only “SSO login loop,” and High priority yields the three High-priority tickets.",
+          "status": "verified",
+          "evidence": "Step 11 observes exactly five displayed rows that are all Open; step 13 observes exactly one “login” result, “SSO login loop,” with footer “Showing 1 of 8 tickets”; and step 17 observes exactly three High-filter rows: Cannot reset password, Invoice total looks wrong, and Export never finishes."
+        },
+        {
+          "claim": "The second displayed High-priority ticket can be closed with a success message and cleared selection, and table select-all remains checked while checking every displayed ticket.",
+          "status": "not_testable",
+          "evidence": "Step 17 identified “Invoice total looks wrong” as the second High row, but the run entered a repeated-action loop at step 18 and never selected/closed it or exercised the table select-all checkbox."
+        }
+      ],
+      "findingTexts": [
+        "Table columns shift horizontally when filtering to one result, causing unstable header and cell alignment."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "At a narrow mobile viewport, inspect the queue and horizontally scroll if needed.",
+          "expect": "Every column header, ticket subject, status, and action control must remain readable and reachable.",
+          "priority": 9
+        },
+        {
+          "setup": "Set Priority to High and note the visible subjects.",
+          "action": "Change Priority to Low and read the table and Showing count.",
+          "expect": "Only Low-priority subjects must appear, and the Showing count must equal the displayed row count.",
+          "priority": 8
+        },
+        {
+          "setup": "Select one open ticket, enable Open only, and note the remaining open rows.",
+          "action": "Click Close selected while the open-only filter is active.",
+          "expect": "The selected row must disappear, the open-row count must decrease by one, and the button must disable.",
+          "priority": 7
+        },
+        {
+          "setup": "",
+          "action": "Select “Export never finishes” and click Close selected.",
+          "expect": "The row must remain visible but change from Closed to Closed, with “Closed 0 ticket(s).”",
+          "priority": 6
+        },
+        {
+          "setup": "",
+          "action": "Enable Open only and count the displayed rows.",
+          "expect": "Only open-status rows must remain, and the displayed count must equal the visible row count.",
+          "priority": 5
+        },
+        {
+          "setup": "",
+          "action": "Type “login” into Search subject.",
+          "expect": "Exactly one row must remain, and its subject must be “SSO login loop”.",
+          "priority": 4
+        },
+        {
+          "setup": "",
+          "action": "Choose High in the Priority filter.",
+          "expect": "Exactly three rows must remain: the three High-priority tickets.",
+          "priority": 3
+        },
+        {
+          "setup": "Identify the second displayed ticket and note its subject and initial status.",
+          "action": "Select that ticket, then click Close selected.",
+          "expect": "That ticket must show Closed, a success message must appear, and selection must clear.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Click the table’s select-all checkbox.",
+          "expect": "The checkbox must remain checked and every displayed ticket checkbox must be checked.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every queue control, especially filtered selection and bulk closing, then verify counts, statuses, cleanup, and narrow-screen readability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. At a narrow mobile viewport, inspect the queue and horizontally scroll if needed. — expect: Every column header, ticket subject, status, and action control must remain readable and reachable.\n2. Set Priority to High and note the visible subjects. Then Change Priority to Low and read the table and Showing count. — expect: Only Low-priority subjects must appear, and the Showing count must equal the displayed row count.\n3. Select one open ticket, enable Open only, and note the remaining open rows. Then Click Close selected while the open-only filter is active. — expect: The selected row must disappear, the open-row count must decrease by one, and the button must disable.\n4. Select “Export never finishes” and click Close selected. — expect: The row must remain visible but change from Closed to Closed, with “Closed 0 ticket(s).”\n5. Enable Open only and count the displayed rows. — expect: Only open-status rows must remain, and the displayed count must equal the visible row count.\n6. Type “login” into Search subject. — expect: Exactly one row must remain, and its subject must be “SSO login loop”.\n7. Choose High in the Priority filter. — expect: Exactly three rows must remain: the three High-priority tickets.\n8. Identify the second displayed ticket and "
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "durationMs": 193524,
+      "status": "passed",
+      "steps": 11,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.348,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "On the desktop report, all three headline cards and all nine agent rows remain visible with readable AGENT, SUMMARY OF THE WEEK, and RESOLVED columns.",
+          "status": "verified",
+          "evidence": "Step 10 records headline cards, all three headers, and all nine rows as visible; step 4 likewise observes all three columns and nine rows above the fixed action bar."
+        },
+        {
+          "claim": "Clicking Export CSV shows a visible export confirmation alert.",
+          "status": "contradicted",
+          "evidence": "Step 2 directly clicked Export CSV and recorded domChanged=NO with no observed confirmation."
+        },
+        {
+          "claim": "Clicking Send to stakeholders shows a visible stakeholder-send confirmation alert.",
+          "status": "contradicted",
+          "evidence": "Immediately after the Step 3 click, the observation says, “No visible alert is currently shown,” while both action-bar buttons remained visible."
+        },
+        {
+          "claim": "The requested /gridworks/report.html report URL opens the report so its headline and per-agent Resolved values can be reviewed.",
+          "status": "contradicted",
+          "evidence": "Step 6 records that /gridworks/report.html displayed “Error response,” “Error code: 404,” and “Message: File not found.”"
+        },
+        {
+          "claim": "The headline Resolved total equals the sum of every per-agent Resolved value.",
+          "status": "not_testable",
+          "evidence": "The trace never records the individual per-agent Resolved values or the headline value needed to recompute the total; the explicitly requested URL for this check returned 404."
+        },
+        {
+          "claim": "At a narrow mobile viewport, every table column and row is reachable and readable without clipping or obstruction.",
+          "status": "not_testable",
+          "evidence": "Steps 7-10 attempted browser zoom, but the layout remained desktop-width and the trace states that a narrow viewport was not available."
+        }
+      ],
+      "findingTexts": [
+        "Requested /gridworks/report.html route returns a 404 File not found error instead of the weekly report."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open the report and note the three headline labels and values before scrolling.",
+          "action": "Scroll through the full table and compare its headers and row values with the headline cards.",
+          "expect": "All three headline cards and all nine agent rows must remain visible and unambiguous.",
+          "priority": 5
+        },
+        {
+          "setup": "Open the report with the action bar visible.",
+          "action": "Click Export CSV, dismiss its alert, then click Send to stakeholders.",
+          "expect": "Each click must show its corresponding visible confirmation alert.",
+          "priority": 4
+        },
+        {
+          "setup": "Open the report at a narrow mobile viewport and note all visible table columns.",
+          "action": "Scroll across and down the report, reading headers, agent names, summaries, and resolved values.",
+          "expect": "All table content must remain readable and reachable without unintended clipping; state any obstruction.",
+          "priority": 3
+        },
+        {
+          "setup": "Open the report at the default desktop viewport and scroll to the bottom of the table.",
+          "action": "Inspect the final table row and the fixed action bar together.",
+          "expect": "The fixed bar must not cover the last row or obscure either button.",
+          "priority": 2
+        },
+        {
+          "setup": "Open `/gridworks/report.html` and note the headline Resolved value.",
+          "action": "Read every per-agent Resolved value and add them; compare the total with the headline Resolved value.",
+          "expect": "The headline must equal the sum; state both values.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the weekly report, verify that headline statistics agree with the per-agent data, operate both export actions, and inspect the layout while scrolling and at a narrow viewport.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open the report and note the three headline labels and values before scrolling. Then Scroll through the full table and compare its headers and row values with the headline cards. — expect: All three headline cards and all nine agent rows must remain visible and unambiguous.\n2. Open the report with the action bar visible. Then Click Export CSV, dismiss its alert, then click Send to stakeholders. — expect: Each click must show its corresponding visible confirmation alert.\n3. Open the report at a narrow mobile viewport and note all visible table columns. Then Scroll across and down the report, reading headers, agent names, summaries, and resolved values. — expect: All table content must remain readable and reachable without unintended clipping; state any obstruction.\n4. Open the report at the default desktop viewport and scroll to the bottom of the table. Then Inspect the final table row and the fixed action bar together. — expect: The fixed bar must not cover the last row or obscure either button.\n5. Open `/gridworks/report.html` and note the headline Resolved value. Then Read every per-agent Resolved value and add them; compare the total with the headline Resolved value. — expect: The headline must equal the sum; "
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "durationMs": 141141,
+      "status": "passed",
+      "steps": 5,
+      "findings": 0,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.2345,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "In a narrow mobile view, the weekly report’s headline cards, table headers, all nine agent rows and Resolved values, and both fixed action buttons are readable and reachable without clipped content.",
+          "status": "verified",
+          "evidence": "Step 5 records a fresh view with readable headline cards, headers, all nine agent rows and Resolved values, and both action buttons."
+        },
+        {
+          "claim": "The final agent row and its Resolved value remain fully visible and unobstructed beside the fixed action bar.",
+          "status": "verified",
+          "evidence": "Step 1 states the bottom-row obstruction check was visually satisfied, and Step 5 records that Lena Marsh’s final row with value 12 is visible."
+        },
+        {
+          "claim": "Clicking Export CSV provides a visible CSV-export confirmation.",
+          "status": "verified",
+          "evidence": "After the Export CSV action, Step 2 records the visible confirmation message “CSV export started.”"
+        },
+        {
+          "claim": "Clicking Send to stakeholders provides its corresponding visible confirmation message.",
+          "status": "contradicted",
+          "evidence": "Send to stakeholders was clicked in Steps 2 and 4, but the subsequent checks record no visible confirmation (Step 3) and no DOM change for either action; no stakeholder-send confirmation was observed."
+        },
+        {
+          "claim": "The headline Resolved statistic equals the total of the nine table Resolved values (34+29+26+21+18+17+15+14+12 = 186).",
+          "status": "not_testable",
+          "evidence": "The trace does not record the displayed headline Resolved number or the individual table values needed to independently reconcile the total; Step 5 only says the values were readable."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Use a narrow mobile viewport and load the report.",
+          "action": "Read the headline cards, table headers, final-column values, and both action buttons.",
+          "expect": "All labels, values, summaries, and buttons must be readable and reachable without clipped text.",
+          "priority": 4
+        },
+        {
+          "setup": "",
+          "action": "Scroll to the bottom of the report and inspect the final agent row beside the fixed action bar.",
+          "expect": "The final row and its values must remain fully readable and must not be covered by the bar.",
+          "priority": 3
+        },
+        {
+          "setup": "",
+          "action": "Click Export CSV, dismiss its message, then click Send to stakeholders.",
+          "expect": "Each action must show its corresponding visible confirmation message.",
+          "priority": 2
+        },
+        {
+          "setup": "Read and add the Resolved values for all nine agent rows: 34, 29, 26, 21, 18, 17, 15, 14, and 12.",
+          "action": "Compare the resulting table total with the headline Resolved value.",
+          "expect": "The headline must equal the table total; state both figures.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Verify that the weekly report’s headline statistics agree with its agent table, both export actions provide feedback, and the fixed action bar does not obstruct report content.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use a narrow mobile viewport and load the report. Then Read the headline cards, table headers, final-column values, and both action buttons. — expect: All labels, values, summaries, and buttons must be readable and reachable without clipped text.\n2. Scroll to the bottom of the report and inspect the final agent row beside the fixed action bar. — expect: The final row and its values must remain fully readable and must not be covered by the bar.\n3. Click Export CSV, dismiss its message, then click Send to stakeholders. — expect: Each action must show its corresponding visible confirmation message.\n4. Read and add the Resolved values for all nine agent rows: 34, 29, 26, 21, 18, 17, 15, 14, and 12. Then Compare the resulting table total with the headline Resolved value. — expect: The headline must equal the table total; state both figures."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "durationMs": 112721,
+      "status": "passed",
+      "steps": 10,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 0,
+      "costUsd": 0.2149,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Clicking Book shift with an empty Shift date does not add a shift and keeps the “No shifts booked.” message visible.",
+          "status": "verified",
+          "evidence": "After the empty-date booking click, step 2 records that the booking area still displayed “No shifts booked.” and rendered no shift rows."
+        },
+        {
+          "claim": "Clearing a completed directory search removes all prior result rows and shows “Type to search.”",
+          "status": "verified",
+          "evidence": "Step 3 observed seven rows for “a”; step 4 then records that clearing Search removed all seven rows and changed the directory message to “Type to search.”"
+        },
+        {
+          "claim": "Rapidly changing the query from “a” to “am” suppresses stale results, leaving only Amara Osei and a footer for “am”.",
+          "status": "verified",
+          "evidence": "Step 5 observed seven rows after “a”, while step 6 records that the settled “am” query showed exactly one row, Amara Osei, with footer text `Showing results for \"am\"`."
+        },
+        {
+          "claim": "Booking a shift assigned to `<b>Injected</b>` renders the literal text in the new shift row rather than interpreting it as bold HTML.",
+          "status": "not_testable",
+          "evidence": "The date and literal assignee input were successfully recorded before the booking click (steps 8–9), but the trace contains no post-click observation of a newly rendered shift row or its displayed assignee text."
+        }
+      ],
+      "findingTexts": [
+        "Booking a shift with assignee `<b>Injected</b>` renders the assignee as bold `Injected` rather than displaying the literal text `<b>Injected</b>`. The rendered row is `Thu, 31 Dec 2026 — Injected`, wi"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Leave Shift date empty and keep the default assignee.",
+          "action": "Click Book shift and inspect the booking area.",
+          "expect": "No shift must be added; “No shifts booked.” must remain visible.",
+          "priority": 4
+        },
+        {
+          "setup": "Search for “a” and wait until its result rows are visible.",
+          "action": "Clear the Search field and wait for the delayed update.",
+          "expect": "All old rows must disappear and the message must read “Type to search.”",
+          "priority": 3
+        },
+        {
+          "setup": "Focus Search with no existing results.",
+          "action": "Type “a”, immediately append “m”, wait for results, and read the result rows and footer.",
+          "expect": "Only Amara Osei must appear, and the footer must say results are for “am”.",
+          "priority": 2
+        },
+        {
+          "setup": "Open the schedule page, select 2026-12-31, and enter `<b>Injected</b>` as the team member name.",
+          "action": "Click Book shift and inspect the new shift row.",
+          "expect": "The row must display the literal `<b>Injected</b>` text, not render Injected as bold markup.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise booking and directory search with edge-case inputs, rapid typing, and state-clearing actions. Report the exact rendered shift rows, search results, and messages.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Leave Shift date empty and keep the default assignee. Then Click Book shift and inspect the booking area. — expect: No shift must be added; “No shifts booked.” must remain visible.\n2. Search for “a” and wait until its result rows are visible. Then Clear the Search field and wait for the delayed update. — expect: All old rows must disappear and the message must read “Type to search.”\n3. Focus Search with no existing results. Then Type “a”, immediately append “m”, wait for results, and read the result rows and footer. — expect: Only Amara Osei must appear, and the footer must say results are for “am”.\n4. Open the schedule page, select 2026-12-31, and enter `<b>Injected</b>` as the team member name. Then Click Book shift and inspect the new shift row. — expect: The row must display the literal `<b>Injected</b>` text, not render Injected as bold markup."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "durationMs": 88245,
+      "status": "failed",
+      "steps": 8,
+      "findings": 0,
+      "checks": 4,
+      "contradicted": 0,
+      "costUsd": 0.1581,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Clearing the directory search removes the Rui result and shows only the empty-search prompt, \"Type to search.\"",
+          "status": "verified",
+          "evidence": "After clearing and waiting, step 3 observes that the directory shows only \"Type to search.\" and that no Rui result is rendered."
+        },
+        {
+          "claim": "Searching for \"rui\" from an empty directory shows only Rui Tavares, with the footer reflecting the query.",
+          "status": "verified",
+          "evidence": "Step 4 observes that the lowercase \"rui\" result is exactly Rui Tavares and the footer says `Showing results for \"rui\".`"
+        },
+        {
+          "claim": "Rapidly replacing the short prefix \"a\" with \"ama\" settles on only Amara Osei and a footer referring to \"ama\".",
+          "status": "not_testable",
+          "evidence": "The run stopped at step 7 before entering and observing the required `a` then `ama` sequence; no Amara results or `ama` footer were recorded."
+        },
+        {
+          "claim": "Booking a 31 Dec 2030 shift assigned to `<b>Injected</b>` displays that date and preserves the assignee as literal text rather than rendering markup.",
+          "status": "not_testable",
+          "evidence": "The shift date, assignee, Book shift action, and booked-entry inspection were never reached before the forced exit at step 8."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Search for `rui` and wait for its result.",
+          "action": "Clear the Search field and wait for delayed results to settle.",
+          "expect": "The directory must show `Type to search.` and no stale Rui result.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave the directory search empty.",
+          "action": "Search for `rui` and wait until the result appears.",
+          "expect": "Only Rui Tavares must appear, with no other team members listed.",
+          "priority": 3
+        },
+        {
+          "setup": "Focus Search and prepare to type a short prefix followed immediately by a longer prefix.",
+          "action": "Type `a`, immediately replace it with `ama`, then wait one second.",
+          "expect": "Results must contain only Amara Osei and the footer must refer to `ama`.",
+          "priority": 2
+        },
+        {
+          "setup": "Set Shift date to 31 Dec 2030 and Assign to to `<b>Injected</b>`.",
+          "action": "Click Book shift and inspect the booked entry.",
+          "expect": "Entry must show 31 Dec 2030 and the literal `<b>Injected</b>` text, not formatted markup.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking with boundary-like user text, then stress live-search ordering and clearing. Report the exact rendered booking and directory results.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Search for `rui` and wait for its result. Then Clear the Search field and wait for delayed results to settle. — expect: The directory must show `Type to search.` and no stale Rui result.\n2. Leave the directory search empty. Then Search for `rui` and wait until the result appears. — expect: Only Rui Tavares must appear, with no other team members listed.\n3. Focus Search and prepare to type a short prefix followed immediately by a longer prefix. Then Type `a`, immediately replace it with `ama`, then wait one second. — expect: Results must contain only Amara Osei and the footer must refer to `ama`.\n4. Set Shift date to 31 Dec 2030 and Assign to to `<b>Injected</b>`. Then Click Book shift and inspect the booked entry. — expect: Entry must show 31 Dec 2030 and the literal `<b>Injected</b>` text, not formatted markup."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "durationMs": 168821,
+      "status": "passed",
+      "steps": 14,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.2613,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "At a narrow approximately 320px viewport, all stockroom labels, controls, table values, Record, and Undo controls remain readable, reachable, and unclipped.",
+          "status": "not_testable",
+          "evidence": "Step 1 explicitly states viewport resizing was unavailable, and no narrow-screen layout observation was recorded."
+        },
+        {
+          "claim": "Recording 3 received Cable 2m units increases Cable 2m from 18 to 21 and reconciles the total from 535 to 538 with one movement recorded.",
+          "status": "verified",
+          "evidence": "After the Record action, step 4 observes Cable 2m at 21, Panel A3 at 7, Total units 538 (535 + 3), Movements 1, Undo enabled, and a receipt log entry."
+        },
+        {
+          "claim": "After shipping 2 Panel A3 units and undoing that shipment, Cable remains 21, Panel returns to 7, total returns to 538, movement count is 1, and only the Cable receipt remains in the log.",
+          "status": "verified",
+          "evidence": "Step 9 observes the completed undo state: Cable 2m 21, Panel A3 7, Total units 538, Items low 2, Movements 1, and only “Received 3 × Cable 2m” in the log."
+        },
+        {
+          "claim": "After the later Panel shipment is undone, the movement history is empty and the movement count is 0.",
+          "status": "contradicted",
+          "evidence": "The post-undo observation in step 13 shows Panel A3 restored to 7 but Movements remains 1 and the movement log still contains the Cable receipt, rather than being empty."
+        },
+        {
+          "claim": "Attempting to ship 8 Panel A3 units when only 5 are on hand shows an over-shipment error and does not alter inventory or movement history.",
+          "status": "verified",
+          "evidence": "Step 12 records the visible error “Only 5 of Panel A3 on hand.” while Panel A3 remains 5, Cable 2m remains 21, Total units remains 536, Items low remains 3, and Movements remains 2."
+        },
+        {
+          "claim": "Attempting to ship 8 Panel A3 units when its restored on-hand value is 7 shows the correct visible over-shipment error.",
+          "status": "verified",
+          "evidence": "Step 13 observes Panel A3 restored to 7 before the final submission, and step 14 records the final red error as “Only 7 of Panel A3 on hand.”"
+        }
+      ],
+      "findingTexts": [
+        "Item, Movement, and Quantity labels are not programmatically associated; Quantity is an unnamed spinbutton."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Set the browser viewport to approximately 320px wide and load the stockroom screen.",
+          "action": "Inspect and operate the item, movement, quantity, Record, and Undo controls and the inventory table at that width.",
+          "expect": "All labels, controls, table values, and buttons must remain readable, reachable, and not clipped or covered.",
+          "priority": 4
+        },
+        {
+          "setup": "Note Cable 2m at 18 and Panel A3 at 7; record 3 received Cable units, then 2 shipped Panel units.",
+          "action": "Click Undo last and reread both rows, totals, movement count, and movement log.",
+          "expect": "Cable must remain 21, Panel must return to 7, count must be 1, and only the Cable receipt may remain in the log.",
+          "priority": 3
+        },
+        {
+          "setup": "Record 2 shipped Panel A3 units, then enter 8 and click Record to create a visible validation error.",
+          "action": "Click Undo last and reread Panel A3, the error area, movement count, and log.",
+          "expect": "Panel A3 must return to 7, movements must be 0, the log must be empty, and the old error must disappear.",
+          "priority": 2
+        },
+        {
+          "setup": "Select Panel A3, choose Shipped, note its on-hand value of 7, and enter quantity 8.",
+          "action": "Click Record and reread the Panel A3 row, movement count, log, and error area.",
+          "expect": "Must show a visible over-shipment error; on-hand, movements, and log must remain unchanged.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise movement validation, recording, undo, history summaries, and the narrow-screen layout. Report the exact visible values, messages, and any clipped or unreachable controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Set the browser viewport to approximately 320px wide and load the stockroom screen. Then Inspect and operate the item, movement, quantity, Record, and Undo controls and the inventory table at that width. — expect: All labels, controls, table values, and buttons must remain readable, reachable, and not clipped or covered.\n2. Note Cable 2m at 18 and Panel A3 at 7; record 3 received Cable units, then 2 shipped Panel units. Then Click Undo last and reread both rows, totals, movement count, and movement log. — expect: Cable must remain 21, Panel must return to 7, count must be 1, and only the Cable receipt may remain in the log.\n3. Record 2 shipped Panel A3 units, then enter 8 and click Record to create a visible validation error. Then Click Undo last and reread Panel A3, the error area, movement count, and log. — expect: Panel A3 must return to 7, movements must be 0, the log must be empty, and the old error must disappear.\n4. Select Panel A3, choose Shipped, note its on-hand value of 7, and enter quantity 8. Then Click Record and reread the Panel A3 row, movement count, log, and error area. — expect: Must show a visible over-shipment error; on-hand, movements, and log must remain unchanged."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "durationMs": 194191,
+      "status": "passed",
+      "steps": 12,
+      "findings": 2,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.3424,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "At approximately 320px wide, the stockroom form, table, totals, and movement log remain reachable and legible without clipping or unintended overflow.",
+          "status": "not_testable",
+          "evidence": "Steps 8-9 explicitly report that no 320px viewport was available, so overflow, clipping, reachability, and legibility at the required width were not inspected."
+        },
+        {
+          "claim": "Recording a received movement of 5 for Cable 2m increases Cable from 18 to 23, increases Total units from 535 to 540, increases Movements from 0 to 1, and adds a received entry to the log.",
+          "status": "verified",
+          "evidence": "Step 2 records the baseline of Cable 2m 18, Total units 535, Movements 0, and an empty log; after Record, step 4 observes Cable 23, Total units 540 (535 + 5), Movements 1, and a movement-log entry beginning “Receiv”."
+        },
+        {
+          "claim": "Undo last removes the most recent shipped movement, leaving only the Received 5 entry and one movement with Cable 2m at 23 units.",
+          "status": "contradicted",
+          "evidence": "Step 7 directly clicks Undo last and records domChanged=NO with no observed stock, total, movement-count, or log update, so the undo control produced no observed effect."
+        },
+        {
+          "claim": "A received quantity of 0.5 is visibly rejected without changing Cable 2m stock, Total units, Movements, or the movement log.",
+          "status": "verified",
+          "evidence": "Step 10 records the unchanged baseline of Cable 18, Total units 535, Movements 0, and no movements; after submitting 0.5, step 12 shows the same values and empty log plus a visible validation message beginning “Quantity must be”."
+        }
+      ],
+      "findingTexts": [
+        "At the 320px responsive check, the movement form remains a wide single row and would overflow rather than reflow.",
+        "Quantity spinbutton has no accessible name despite the visible Quantity label."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Set the viewport to approximately 320px wide and open the stockroom screen.",
+          "action": "Inspect the movement form, table, totals, and log at that viewport width.",
+          "expect": "All controls and content must remain reachable and legible without unintended clipping; state any overflow.",
+          "priority": 3
+        },
+        {
+          "setup": "Note Cable 2m starts at 18 units and the movement count before recording anything.",
+          "action": "Select Cable 2m, record Received 5, then record Shipped 2 and click Undo last.",
+          "expect": "Cable must show 23 units; only Received 5 remains in the log and movements must equal one.",
+          "priority": 2
+        },
+        {
+          "setup": "Open the stockroom screen, note Cable 2m has 18 units, and note the Total units value.",
+          "action": "Select Cable 2m, choose Received, enter quantity 0.5, and click Record.",
+          "expect": "Must reject 0.5 with a visible error; Cable, total units, movements, and log must remain unchanged.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise inventory movement entry, validation, undo, totals, movement history, and the responsive presentation of the stockroom screen.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Set the viewport to approximately 320px wide and open the stockroom screen. Then Inspect the movement form, table, totals, and log at that viewport width. — expect: All controls and content must remain reachable and legible without unintended clipping; state any overflow.\n2. Note Cable 2m starts at 18 units and the movement count before recording anything. Then Select Cable 2m, record Received 5, then record Shipped 2 and click Undo last. — expect: Cable must show 23 units; only Received 5 remains in the log and movements must equal one.\n3. Open the stockroom screen, note Cable 2m has 18 units, and note the Total units value. Then Select Cable 2m, choose Received, enter quantity 0.5, and click Record. — expect: Must reject 0.5 with a visible error; Cable, total units, movements, and log must remain unchanged."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "durationMs": 253309,
+      "status": "failed",
+      "steps": 21,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.3641,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Initially, all four inventory rows show Counted equal to System and Variance as —.",
+          "status": "not_testable",
+          "evidence": "The run began with a visible confirmation dialog that was not successfully closed at step 1, and no initial all-four-row audit values were recorded before controls were changed."
+        },
+        {
+          "claim": "At approximately 320px viewport width, every row’s SKU, item, System, Counted, steppers, and Variance remains readable and reachable without clipping.",
+          "status": "not_testable",
+          "evidence": "The trace contains no viewport resize to approximately 320px and no recorded narrow-layout inspection."
+        },
+        {
+          "claim": "Submitting an audit opens a confirmation dialog that can be dismissed by Close, Escape, and clicking the backdrop, restoring access to page controls.",
+          "status": "verified",
+          "evidence": "Steps 5, 7, and 9 record the visible “Audit submitted” modal and dimmed backdrop; steps 6, 8, and 11 respectively observe Close, Escape, and an outside-backdrop click removing the modal/overlay and restoring usable audit controls."
+        },
+        {
+          "claim": "After changing Cable 2m and Panel A3, Reset counts restores every row so Counted equals System and Variance is —.",
+          "status": "not_testable",
+          "evidence": "Reset counts was never clicked because the run became stuck attempting to reach Panel A3’s decrement control and exited at step 21."
+        },
+        {
+          "claim": "At the default viewport, decrementing Washer 11mm once changes its Counted value from System 60 to 59 and Variance to −1 while leaving every other row unchanged.",
+          "status": "not_testable",
+          "evidence": "The required Washer 11mm minus-stepper action was never attempted; instead, a mis-mapped plus interaction changed Washer to 61 at step 3 and later 62."
+        }
+      ],
+      "findingTexts": [
+        "The Audit submitted dialog remains exposed in the accessibility tree but is visually absent, and its Close button times out on click, preventing reliable dismissal.",
+        "Intended Panel A3 − should change Panel; clicking it repeatedly decremented Cable 2m while Panel stayed 7."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Read the initial Counted and Variance columns for all four items.",
+          "expect": "Each Counted value must equal its System value and each Variance must show —.",
+          "priority": 5
+        },
+        {
+          "setup": "Set the viewport to approximately 320 pixels wide.",
+          "action": "Inspect the audit table and try reaching each row's steppers and variance values.",
+          "expect": "All SKU, item, system, counted, steppers, and variance content must remain readable and reachable without clipping.",
+          "priority": 4
+        },
+        {
+          "setup": "Change the Cable 2m count so the audit is visibly non-default.",
+          "action": "Submit, close with the button, submit again, press Escape, then submit again and click the backdrop.",
+          "expect": "The dialog must close after its button, Escape, and backdrop clicks, allowing page controls to work again.",
+          "priority": 3
+        },
+        {
+          "setup": "Increment Cable 2m once and decrement Panel A3 twice; note both changed counts and variances.",
+          "action": "Click Reset counts and reread every row.",
+          "expect": "Every Counted value must equal System and every Variance must show —.",
+          "priority": 2
+        },
+        {
+          "setup": "Use the stock audit page at its default viewport and note the System and Counted values for Washer 11mm.",
+          "action": "Click the − stepper for Washer 11mm once.",
+          "expect": "Counted must be 59 and Variance must be −1; all other rows must remain unchanged.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise each audit control, verify count and variance relationships, confirm reset behavior, and inspect the confirmation dialog and narrow-screen layout.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Read the initial Counted and Variance columns for all four items. — expect: Each Counted value must equal its System value and each Variance must show —.\n2. Set the viewport to approximately 320 pixels wide. Then Inspect the audit table and try reaching each row's steppers and variance values. — expect: All SKU, item, system, counted, steppers, and variance content must remain readable and reachable without clipping.\n3. Change the Cable 2m count so the audit is visibly non-default. Then Submit, close with the button, submit again, press Escape, then submit again and click the backdrop. — expect: The dialog must close after its button, Escape, and backdrop clicks, allowing page controls to work again.\n4. Increment Cable 2m once and decrement Panel A3 twice; note both changed counts and variances. Then Click Reset counts and reread every row. — expect: Every Counted value must equal System and every Variance must show —.\n5. Use the stock audit page at its default viewport and note the System and Counted values for Washer 11mm. Then Click the − stepper for Washer 11mm once. — expect: Counted must be 59 and Variance must be −1; all other rows must remain unchanged."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "durationMs": 223826,
+      "status": "passed",
+      "steps": 13,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.3813,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Submitting an audit visibly opens a confirmation dialog, and the Close button, backdrop, and Escape each visibly dismiss it without changing counts.",
+          "status": "not_testable",
+          "evidence": "No Submit action or backdrop dismissal action is recorded; the attempted Close action at step 2 failed while the dialog remained in the DOM, and before Escape at step 3 the trace says no visible dialog or backdrop was rendered, so visible dismissal could not be assessed."
+        },
+        {
+          "claim": "Reset counts restores every counted value to its system value and clears every variance to an em dash.",
+          "status": "verified",
+          "evidence": "After Reset counts, step 9 records counted values 140, 60, 18, and 7 matching the system values, with every visible variance shown as —."
+        },
+        {
+          "claim": "The second-row plus and fourth-row minus steppers update their own rows independently while leaving other rows unchanged.",
+          "status": "not_testable",
+          "evidence": "The intended interactions did not reliably land on their named rows: after the purported second-row plus, step 6 shows Hex bolt changed to 141/+1 while Washer remained 60/—, and the purported fourth-row minus clicks changed Cable from 18 to 16/-2 while Panel remained 7/—."
+        },
+        {
+          "claim": "The /stockroom/audit.html route opens the audit controls so Washer 11mm can be decremented from 60 to 58 with variance -2.",
+          "status": "contradicted",
+          "evidence": "Step 10 records that /stockroom/audit.html visibly remained a 404 Error response page with no audit controls, so the required Washer interactions were unavailable."
+        },
+        {
+          "claim": "At a 320px-wide viewport, all four audit rows, columns, values, and steppers remain readable, reachable, and unclipped.",
+          "status": "not_testable",
+          "evidence": "The trace contains no 320px viewport observation or narrow-table inspection; it only records unsuccessful/approximate browser zoom attempts in steps 11-12."
+        }
+      ],
+      "findingTexts": [
+        "The required route /stockroom/audit.html is unavailable: it returns 'Error response', Error code 404, 'File not found' rather than the audit page."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Change a count so the audit has a visible nonzero variance.",
+          "action": "Click Submit audit, then close the dialog with its button, reopen it, and close via backdrop and Escape.",
+          "expect": "The dialog must appear after submission and each close method must visibly dismiss it without changing the count.",
+          "priority": 5
+        },
+        {
+          "setup": "Open the audit page at a 320px-wide viewport and scroll through the table.",
+          "action": "Inspect all columns, item names, values, and steppers at the narrow viewport.",
+          "expect": "Every row and control must remain readable, reachable, and not be clipped or covered.",
+          "priority": 4
+        },
+        {
+          "setup": "Open the audit page with its default counts.",
+          "action": "Click the second row's plus stepper, then the fourth row's minus stepper.",
+          "expect": "Each clicked row must update its counted value and variance independently, with the other rows unchanged.",
+          "priority": 3
+        },
+        {
+          "setup": "Change the second row once and the fourth row twice, noting their resulting counted values and variances.",
+          "action": "Click Reset counts and reread every row.",
+          "expect": "All counted values must equal system values and every variance must display an em dash.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /stockroom/audit.html and note the second row's system and counted values, initially 60 and 60.",
+          "action": "Click the second row's minus stepper twice.",
+          "expect": "Washer 11mm counted must be 58 and variance must be -2; other rows must remain unchanged.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every audit control, verify count and variance propagation, confirm reset behavior, and inspect the dialog and compact layout.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Change a count so the audit has a visible nonzero variance. Then Click Submit audit, then close the dialog with its button, reopen it, and close via backdrop and Escape. — expect: The dialog must appear after submission and each close method must visibly dismiss it without changing the count.\n2. Open the audit page at a 320px-wide viewport and scroll through the table. Then Inspect all columns, item names, values, and steppers at the narrow viewport. — expect: Every row and control must remain readable, reachable, and not be clipped or covered.\n3. Open the audit page with its default counts. Then Click the second row's plus stepper, then the fourth row's minus stepper. — expect: Each clicked row must update its counted value and variance independently, with the other rows unchanged.\n4. Change the second row once and the fourth row twice, noting their resulting counted values and variances. Then Click Reset counts and reread every row. — expect: All counted values must equal system values and every variance must display an em dash.\n5. Open /stockroom/audit.html and note the second row's system and counted values, initially 60 and 60. Then Click the second row's minus stepper twice. — expect: Washer 11mm counted must be 58 and variance must be -2; other rows "
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "label": "confirm-1",
+  "runs": 16,
+  "cleanRuns": 4,
+  "raw": 25,
+  "deduped": 25,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Payment promo field is prefilled with TEAM15 before the user enters any promo code."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Attendee rows use lowercase ticket labels while the ticket selector uses title case, creating inconsistent labeling."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Valid promo code TEAM15 is rejected: immediately after Apply, the payment panel shows “That promo code is not recognised.” with discount −$0.00 and total $120.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Stale attendee validation error: after Continue rejects an empty attendee list with “Add at least one attendee,” adding Alice successfully displays an Alice row but the same error remains visible."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Discount is formatted as “−$0.00” after an invalid promo, which misleadingly implies a negative discount."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Applying the valid TEAM15 promo code accepts it and applies its discount. — After clicking Apply with TEAM15 (step 8), the subsequent recorded state still had TEAM15 in the input but displayed the red “That promo code is not recognised.” message (step 9), rather than an applied promotion."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Adding an attendee clears the prior “Add at least one attendee” validation error. — Alice was present as the only attendee, but the visible stale “Add at least one attendee” message remained (step 16)."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After submitting <b>receipt-test</b>@example.com, the BK-1002 receipt displays receipt-test in bold rather than showing the literal <b> and </b> characters, so entered email HTML is rendered."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Place order shows visible processing feedback before the completed confirmation. — Immediately after the first Place order click, step 2 recorded the completed confirmation and receipt rather than any processing state."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "An email entered as `<b>receipt-test</b>@example.com` is shown literally in the receipt without HTML formatting. — Step 4 observed that BK-1002 displayed the email content with \"receipt-test\" bolded, showing the entered HTML-like text was rendered rather than displayed literally."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Receipt rendering interprets billing email HTML instead of displaying the entered characters literally: submitting <b>attacker@example.com</b> produced a bold attacker@example.com in receipt BK-1003 w"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Expected one order from an immediate double-click, but two confirmations/receipts (BK-1001 and BK-1002) were created."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Rapid repeated placement of the same valid order produces exactly one confirmation and one receipt. — Step 2 records that the first valid submission produced BK-1001 and one receipt before a second Place order click was issued; by step 7 the page shows the pre-existing confirmation “Order BK-1003 confirmed” and exactly three receipts, demonstrating duplicate orders were created."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Select All stays checked with 0 of 1 visible rows selected; it should reflect that no visible rows are selected."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Select All and every ticket-row checkbox are exposed as unnamed controls, preventing assistive-tech identification."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Header select-all checkbox remains checked when the table shows 0 selected and all row checkboxes are unchecked."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV displays a visible alert saying “Export queued.” — Export CSV was clicked in steps 3 and 4 with domChanged=NO, and step 5 records that the Export confirmation was absent after immediate inspection."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows an on-page confirmation that the report was sent. — Step 2 directly clicked Send to stakeholders and recorded domChanged=NO, with no confirmation observed."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV produces a CSV download or download notification containing all nine agent rows and resolved values. — Step 3 directly clicked Export CSV and recorded domChanged=NO, with no download or download notification observed."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended literal assignee markup is interpreted as HTML: <b>Injected</b> renders as bold “Injected”."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Booked-shift name is rendered as HTML rather than escaped text. Booking `<b>Injected</b>` on 15 January 2030 produced the row `Tue, 15 Jan 2030 — Injected` with Injected bold instead of literal `<b>In"
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The PNL-A3 minus control (element 7) changed the preceding CBL-2M row from counted 18 to 17 with variance -1; PNL-A3 remained 7 with an em dash variance."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Closing the submission dialog with its Close button dismisses the dialog. — Step 2 attempted the Close control and step 3 reports that the Close-button attempt timed out with no visible change; step 4 still reports that the Audit submitted dialog and Close button are exposed."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Clicking the dimmed backdrop outside the open 'Audit submitted' modal did not dismiss it; the dialog and overlay remained visible after a fresh re-check."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking outside the submitted-audit modal dismisses it. — Step 9 clicked the backdrop outside the dialog, but step 10 observed that the modal remained visible with its heading and Close button."
+    }
+  ]
+}

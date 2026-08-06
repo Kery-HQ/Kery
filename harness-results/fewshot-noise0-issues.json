@@ -1,0 +1,213 @@
+{
+  "label": "fewshot-noise0",
+  "runs": 16,
+  "cleanRuns": 2,
+  "raw": 34,
+  "deduped": 34,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Ticket selector cannot change from Standard to Workshop; intended Workshop choice remains Standard."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Selecting Workshop before adding an attendee results in that attendee being identified as Workshop. — The attempted Workshop selection failed and the Ticket control repeatedly remained “Standard — $120” with no state change (steps 21-29), preventing the requested Workshop selection from taking effect."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After clicking Continue with no attendees and then successfully adding attendee A, the attendee row “A · standard” is present but the red validation error “Add at least one attendee” remains visible."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Applying TEAM15 at Payment displays “That promo code is not recognised.” and leaves the discount at −$0.00 and total due at $120.00, so the specified valid TEAM15 promotion cannot be established."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Confirming the registration produces a user-visible confirmation or completed-registration result. — Step 26 directly clicks Confirm registration but records domChanged=NO and only the unchanged Payment/promo summary, with no confirmation, completion state, or navigation observed."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After the empty-attendee validation error, adding attendee A removes the stale \"Add at least one attendee\" error while listing A. — After Add attendee, step 40 records that A is listed as standard but the stale red attendee validation message is still visible."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "TEAM15 applies its valid promo discount and lowers the total for one Standard attendee before it is replaced with BADCODE. — Following the TEAM15 Apply action in step 41, step 42 records TEAM15 still entered alongside an unrecognised-code error, −$0.00 discount, and unchanged $120.00 total rather than a valid promo discount."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Saved-confirmation remains visible after unsaved edits to company, digest, and delivery notes."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Full-name required error is displayed while the Full name input visibly contains “Jordan Rivera”."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Immediately after submitting changed company, digest, and delivery-notes values, the page shows a disabled \"Saving\" button and a visible saving message. — Immediately after the submission in step 7, the observation says the button still reads \"Save changes\" and the prior saved confirmation remains visible; no saving state/message is recorded."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Selecting the Email digest preference to Never updates the notification setting. — Step 8 directly attempted to select Never for Email digest, but recorded domChanged=NO and did not observe a changed selected option."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Duplicate-submission protection failed: beginning from one receipt (BK-1001), the rapid double Place order sequence produced BK-1002 and BK-1003. The page shows confirmation for BK-1003 and three tota"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting valid billing and card details shows a confirmation and a receipt containing the order reference, total, and full billing email. — Step 3 observed confirmation \"Order BK-1001 confirmed.\" and receipt \"BK-1001 — $1002.90 to finance\"; the recorded receipt text includes the reference and total but shows \"finance,\" not the full billing email finance@northwind.test recorded in step 6."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Two rapid Place order clicks create exactly one new receipt and do not create a duplicate order. — The receipt list was observed with BK-1001 after the initial valid order (step 3), BK-1001 and BK-1002 after the first duplicate-test click (step 4), and three existing receipts before invalid-card submission (step 6), showing two new receipts from the double-click sequence."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clearing the Card number field causes Place order to reject the order with visible card-related feedback and no new receipt. — Step 7 records the card field visibly empty before submission, and the subsequent repeated Place order action is recorded in step 8 as having no page state change; no card-validation feedback or rejection state was observed after the attempted submission."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The header select-all checkbox remains checked after clearing the High + Open-only “invoice” search, even though the visible row Cannot reset password is unchecked and the summary is “Showing 1 of 8 t"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Filtering to a single result causes table headers to shift out of alignment with their data columns."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Ticket row and select-all checkboxes have no accessible names (trace reports every checkbox as unnamed)."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Searching for \"invoice\" leaves only Invoice total looks wrong with High priority and Open status visible. — With invoice entered and Open only enabled, step 25 observed \"No tickets match\"; after Open only was disabled, step 26 showed the sole Invoice total looks wrong row as High priority but Closed rather than Open."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows its visible confirmation alert. — Step 2 directly clicked Export CSV with domChanged=NO and the trace records no confirmation alert or other observed effect."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows its visible confirmation alert. — Step 3 directly clicked Send to stakeholders with domChanged=NO and the trace records no confirmation alert or other observed effect."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The delayed directory search exposes no visible loading or progress feedback immediately after Search changes. Directly after entering \"a\", seven completed results and \"Showing results for \\\"a\\\"\" were"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Navigating to http://localhost:4113/stockroom/index.html returns an Error response page with “Error code: 404”, “Message: File not found.”, and “Nothing matches the given URI.” The requested Cable 2m "
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After correcting Cable shipment from 19 to 1, stale error still says “Only 18 of Cable 2m on hand.”"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Quantity spinbutton has no accessible name in the element trace, despite the visible Quantity label."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Attempting to ship 100 Hex bolts when only 143 are on hand is rejected with an error and does not create a movement or reduce stock. — After the ship-100 Record attempt, step 24 observed it was accepted: Hex bolts fell from 143 to 43, total units from 538 to 438, and the low-item count changed, rather than showing the required validation failure."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Opening /stockroom/index.html provides the inventory controls needed to perform the final Cable shipment boundary check. — Steps 25-26 observed the route ended on a 404 page showing “Error response”, “Error code: 404”, “Message: File not found.”, and “Nothing matches the given URI.”, so no stockroom controls were reachable."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After Undo last removed the valid shipped Washer movement, restored Washer on hand to 60, total units to 535, movements to 0, and cleared the log, the validation message “Only 59 of Washer 11mm on han"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Quantity input has no accessible name: trace exposes it as an unnamed spinbutton despite visible Quantity text."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Each item's plus and minus steppers update that same item's Counted value and variance, including Cable 2m. — Step 11 records that a purported Cable control action changed Washer 11mm to 61/+1 while Cable remained 18/18/—; step 13 similarly records Washer at 59/−1 before a Cable-plus test, and step 14 shows Cable still 18/18/— afterward."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "For Washer 11mm (System 60), clicking plus twice and minus once results in Counted 61 and Variance +1 without changing other rows. — Steps 20-21 show the two purported Washer-plus actions instead changed Hex bolt to 141/+1 and then 142/+2, while Washer remained 60 with an em-dash variance; the final snapshot at step 22 still shows Washer 60/60/— and Hex bolt incorrectly changed to 141/+1."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Dismissed submission dialog remains in the accessibility tree, leaving a hidden Close control focusable."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Increasing Cable 2m three times produces counted value 21 and variance +3. — Multiple direct Cable-plus attempts failed or changed other rows; the highest observed Cable state was 20 with variance +2 in steps 37 and 43, while step 44 confirms it remained 20/+2 instead of reaching 21/+3."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Washer 11mm can be decremented once and incremented twice from 60/— to 61/+1 without changing other rows. — The attempted Washer minus action changed Hex bolt to 139/-1 instead in steps 51-54, and the intended Washer minus-plus sequence was never completed; therefore the required 61/+1 outcome with unchanged other rows was not achieved."
+    }
+  ]
+}

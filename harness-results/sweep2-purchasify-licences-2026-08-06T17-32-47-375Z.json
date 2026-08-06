@@ -1,0 +1,278 @@
+{
+  "label": "sweep2-purchasify-licences",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 0,
+    "planted": 0,
+    "heldOut": {
+      "caught": 3,
+      "planted": 6
+    },
+    "costUsd": 0.8641,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-licences",
+      "attempt": 1,
+      "durationMs": 251703,
+      "status": "passed",
+      "steps": 27,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.5429,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "The run explicitly reports that Team Annual is the last plan on page 1 and repeats as the first plan on page 2."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": true,
+          "why": "The run reports that after saving 23 seats with Remember enabled, reload resets to 10 and unchecks the control, matching the persistence symptom."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": false,
+          "why": "No finding checks or reports that Request quote is enabled or submits when no plan is selected."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Shipping estimate opens /estimate, the purchasify logo opens /, and browser Back returns to /licences.",
+          "status": "verified",
+          "evidence": "Steps 2-5 record navigation to http://localhost:4101/estimate, restoration of http://localhost:4101/licences, navigation to http://localhost:4101/, and a subsequent Back restoration to /licences."
+        },
+        {
+          "claim": "At a 375px viewport, all six catalogue headings and every visible Choose/Select control are readable and reachable without horizontal page scrolling.",
+          "status": "not_testable",
+          "evidence": "The only catalogue reachability observation in step 5 explicitly describes a desktop-width view; the trace contains no 375px viewport action or narrow-screen observation."
+        },
+        {
+          "claim": "Plans display accurate minimum-seat requirements: Enterprise Monthly requires 100 seats and Team Monthly requires 5 seats.",
+          "status": "verified",
+          "evidence": "Step 11 shows Enterprise Monthly selected at 99 seats with the warning that it starts at 100 seats, and step 20 records the exact Team Monthly warning: “Team Monthly starts at 5 seats — increase your team size to qualify.”"
+        },
+        {
+          "claim": "Changing Team Annual from 10 to 11 seats retains the Team Annual selection and updates the monthly total accurately to $165.00.",
+          "status": "verified",
+          "evidence": "Step 13 shows Team Annual retained at 10 seats with $150.00 monthly, and step 14 shows it still selected at 11 seats with $165.00; the observed $15-per-seat rate reconciles 11 × $15 = $165.00."
+        },
+        {
+          "claim": "A qualifying Team Monthly quote at 5 seats totals $90.00 and confirms the selected plan and seat count.",
+          "status": "verified",
+          "evidence": "Steps 20-22 show Team Monthly's 5-seat minimum warning at 4 seats, then at 5 seats an enabled Request quote control, $90.00 monthly, and the confirmation “Quote requested: Team Monthly for 5 seats.” The rate also reconciles with step 19's $198.00 for 11 seats (11 × $18 = $198; 5 × $18 = $90)."
+        },
+        {
+          "claim": "When Remember my team size is enabled for 23 seats, reloading /licences preserves both the 23-seat value and the checked Remember control.",
+          "status": "contradicted",
+          "evidence": "Step 24 records the control checked with 23 seats before reload, but step 25's post-reload observation shows team size 10 and Remember my team size unchecked."
+        }
+      ],
+      "findingTexts": [
+        "Pagination duplicates Team Annual: it was the fourth plan on page 1 and is the first plan displayed on page 2. Page 2 currently lists Team Annual, Business Monthly, Business Annual, and Enterprise Mon",
+        "Remembered team size does not persist: after entering 23 and checking “Remember my team size,” reloading /licences shows team size 10 and the checkbox unchecked."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /licences and note the current URL.",
+          "action": "Open Shipping estimate, return with browser Back, then open the purchasify logo and return again.",
+          "expect": "Shipping estimate must reach /estimate, and the logo must reach /; both returns must restore /licences.",
+          "priority": 7
+        },
+        {
+          "setup": "At 375px viewport width, open /licences with any plan page visible.",
+          "action": "Inspect the catalogue table and try to reach every Choose control without horizontal page scrolling.",
+          "expect": "All six column headings and every visible Choose control must be readable and reachable, not clipped.",
+          "priority": 6
+        },
+        {
+          "setup": "Select Enterprise Monthly on page 3 and enter 99 seats.",
+          "action": "Read the minimum-seat message and Request quote control.",
+          "expect": "Message must require 100 seats, and Request quote must be disabled.",
+          "priority": 5
+        },
+        {
+          "setup": "Navigate to page 2 and select a non-first plan, such as Team Annual.",
+          "action": "Change seats from 10 to 11 and read the selected plan, seats, and monthly total.",
+          "expect": "Selected plan must remain Team Annual, seats must show 11, and total must equal $165.00.",
+          "priority": 4
+        },
+        {
+          "setup": "Select Team Monthly and enter 4 seats.",
+          "action": "Read the warning and button, change seats to 5, then request the quote.",
+          "expect": "At 4, request must be disabled; at 5, total must be $90.00 and confirmation must name 5 seats.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter 23 seats, enable Remember my team size, and confirm the field shows 23.",
+          "action": "Reload /licences and read the team-size field and remember checkbox.",
+          "expect": "The field must still show 23 and Remember must remain checked.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /licences and write down the four plan names shown on page 1.",
+          "action": "Click Next, compare page 2 with the notes, then click Previous.",
+          "expect": "Page 2 must begin with the fifth catalogue plan; no plan may appear on two pages.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise pagination, remembered team size, plan selection, minimum-seat validation, quote totals, navigation, and narrow-screen usability. Report the exact visible plans, values, messages, and whether controls remain reachable.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /licences and note the current URL. Then Open Shipping estimate, return with browser Back, then open the purchasify logo and return again. — expect: Shipping estimate must reach /estimate, and the logo must reach /; both returns must restore /licences.\n2. At 375px viewport width, open /licences with any plan page visible. Then Inspect the catalogue table and try to reach every Choose control without horizontal page scrolling. — expect: All six column headings and every visible Choose control must be readable and reachable, not clipped.\n3. Select Enterprise Monthly on page 3 and enter 99 seats. Then Read the minimum-seat message and Request quote control. — expect: Message must require 100 seats, and Request quote must be disabled.\n4. Navigate to page 2 and select a non-first plan, such as Team Annual. Then Change seats from 10 to 11 and read the selected plan, seats, and monthly total. — expect: Selected plan must remain Team Annual, seats must show 11, and total must equal $165.00.\n5. Select Team Monthly and enter 4 seats. Then Read the warning and button, change seats to 5, then request the quote. — expect: At 4, request must be disabled; at 5, total must be $"
+    },
+    {
+      "case": "purchasify-licences",
+      "attempt": 2,
+      "durationMs": 158998,
+      "status": "failed",
+      "steps": 15,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.3212,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "pagination-repeats-boundary-row",
+          "class": "pagination",
+          "caught": true,
+          "why": "The run explicitly reports that Team Annual appears on both page 1 and page 2, which is the boundary-row repetition defect."
+        },
+        {
+          "id": "remembered-seats-read-from-wrong-key",
+          "class": "persistence",
+          "caught": false,
+          "why": "No finding describes enabling Remember, reloading, and seeing the saved team size revert or the checkbox become unticked."
+        },
+        {
+          "id": "quote-button-enabled-without-plan",
+          "class": "guard",
+          "caught": false,
+          "why": "No finding reports the Request quote button being enabled or submitting a quote when no plan is selected."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Selecting Starter Monthly with 10 seats shows a quote summary for Starter Monthly, 10 seats, with an estimated monthly total of $90.00.",
+          "status": "verified",
+          "evidence": "After selecting Starter Monthly and requesting a quote, step 2 observed: “Starter Monthly is selected; the quote shows Seats 10 and Estimated monthly $90.00.”"
+        },
+        {
+          "claim": "Changing the seat count after requesting a quote clears or updates the confirmation so it does not describe the prior seat count.",
+          "status": "contradicted",
+          "evidence": "Step 3 filled the Team size field (domChanged=yes), but the observed confirmation still read “Quote requested: Starter Monthly for 10 seats,” and the summary still showed 10 seats and $90.00."
+        },
+        {
+          "claim": "Pagination exposes four distinct plans on page 2 without duplicating any page-1 plan.",
+          "status": "verified",
+          "evidence": "Step 9 observed page 1 as Starter Monthly, Starter Annual, Team Monthly, and Team Annual; step 6 observed page 2 as Team Annual, Business Monthly, Business Annual, and Enterprise Monthly and explicitly recorded no page-1 duplication."
+        },
+        {
+          "claim": "A selected plan and its quote remain selected when navigating across catalogue pages and back.",
+          "status": "verified",
+          "evidence": "Steps 5, 7, 8, and 9 repeatedly observed Team Monthly remaining selected and the quote continuing to show Team Monthly, 11 seats, and $198.00 while moving through pages 2, 3, and back to page 1."
+        },
+        {
+          "claim": "The visible Team Annual Select control selects Team Annual for quoting.",
+          "status": "contradicted",
+          "evidence": "Steps 10, 11, and 12 attempted the Team Annual Select control with domChanged=no, and step 13 observed that Team Annual selection had no visible effect while Team Monthly remained selected."
+        },
+        {
+          "claim": "The narrow-screen layout, remembered-seat behavior, minimum-seat validation, disabled quote control, and Team Annual quote confirmation work as specified.",
+          "status": "not_testable",
+          "evidence": "The run ended after the failed Team Annual selection loop at step 15; no narrow viewport inspection, remember-checkbox/reload flow, 0-seat flow, 4/5-seat flow, 19-seat Business flow, or 6-seat Team Annual quote flow was completed."
+        }
+      ],
+      "findingTexts": [
+        "After requesting Starter Monthly for 10 seats, changing Team size to 11 updates the quote summary to 11 seats and $99.00 but leaves the confirmation reading “Quote requested: Starter Monthly for 10 se",
+        "Pagination overlaps Team Annual: it appears on page 1 and page 2 instead of four distinct page-2 plans."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /licences and set seats to 10.",
+          "action": "Select Starter Monthly and read the quote summary.",
+          "expect": "The summary must show Starter Monthly, 10 seats, and an estimated monthly total of $90.00.",
+          "priority": 11
+        },
+        {
+          "setup": "Open /licences at a narrow mobile viewport around 375px wide.",
+          "action": "Inspect every table column and operate the pagination and Select controls.",
+          "expect": "All plan names, values, and controls must be readable and reachable without clipped or hidden table content.",
+          "priority": 10
+        },
+        {
+          "setup": "Select a qualifying plan, request a quote, and note its confirmation.",
+          "action": "Change the seat count and reread the confirmation and quote summary.",
+          "expect": "The confirmation must update or clear; it must not continue describing the old seat count.",
+          "priority": 9
+        },
+        {
+          "setup": "Select the last visible plan on page 1, then navigate to page 2 and page 3.",
+          "action": "Return to page 1 and read the selected row and quote plan.",
+          "expect": "The selection must survive pagination and the quote must still name the original plan.",
+          "priority": 8
+        },
+        {
+          "setup": "Select Team Annual and enter 6 seats; note the plan, seats, and estimated monthly amount.",
+          "action": "Click Request quote and read the confirmation message.",
+          "expect": "Confirmation must name Team Annual, 6 seats, and the selected quote; estimate must be $90.00.",
+          "priority": 7
+        },
+        {
+          "setup": "Select Business Monthly and enter 19 seats.",
+          "action": "Read the warning and try to request a quote.",
+          "expect": "A visible 20-seat warning must appear and Request quote must remain disabled.",
+          "priority": 6
+        },
+        {
+          "setup": "Select Team Monthly, enter 4 seats, and note the displayed minimum-seat warning.",
+          "action": "Increase seats to 5 and read the warning, button, and monthly estimate.",
+          "expect": "Warning must disappear, Request quote must enable, and estimate must equal $90.00.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /licences with no plan selected and enter 0 seats.",
+          "action": "Read the Request quote control and attempt to activate it.",
+          "expect": "Request quote must be disabled until a plan is selected and at least one seat is entered.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /licences, enable remembering, enter 37 seats, then disable remembering.",
+          "action": "Reload the page and reread the team-size field and remember checkbox.",
+          "expect": "Remembering must be off and the prior remembered 37-seat value must not be restored.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /licences, enable Remember my team size, enter 37 seats, then navigate to /estimate and return to /licences.",
+          "action": "Reload /licences and reread the team-size field and remember checkbox.",
+          "expect": "The field must show 37 and the checkbox must remain checked.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /licences and note the four plan names on page 1.",
+          "action": "Click Next and compare the four displayed plan names with page 1.",
+          "expect": "Page 2 must contain four different plans with no duplicate from page 1; state both lists.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Test the public licence planner by exercising pagination, remembered team size, plan selection, minimum-seat validation, quote totals, and narrow-screen usability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /licences and set seats to 10. Then Select Starter Monthly and read the quote summary. — expect: The summary must show Starter Monthly, 10 seats, and an estimated monthly total of $90.00.\n2. Open /licences at a narrow mobile viewport around 375px wide. Then Inspect every table column and operate the pagination and Select controls. — expect: All plan names, values, and controls must be readable and reachable without clipped or hidden table content.\n3. Select a qualifying plan, request a quote, and note its confirmation. Then Change the seat count and reread the confirmation and quote summary. — expect: The confirmation must update or clear; it must not continue describing the old seat count.\n4. Select the last visible plan on page 1, then navigate to page 2 and page 3. Then Return to page 1 and read the selected row and quote plan. — expect: The selection must survive pagination and the quote must still name the original plan.\n5. Select Team Annual and enter 6 seats; note the plan, seats, and estimated monthly amount. Then Click Request quote and read the confirmation message. — expect: Confirmation must name Team Annual, 6 seats, and the selected quote; estimate must be $90.00.\n6. Select Business Monthly and enter 19 seats. "
+    }
+  ]
+}

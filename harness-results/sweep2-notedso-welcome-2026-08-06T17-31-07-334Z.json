@@ -1,0 +1,276 @@
+{
+  "label": "sweep2-notedso-welcome",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.7788,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 429443,
+      "status": "passed",
+      "steps": 45,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.939,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports an email address without a dot in the domain being accepted."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run explicitly reports that entering 21 for a stated 1-20 daily limit advanced the wizard rather than showing a validation error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "why": "No finding clicks Remove on a non-last note or reports removal of the wrong note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Creating a valid workspace reaches a confirmation that accurately summarizes Atlas with one completed note.",
+          "status": "verified",
+          "evidence": "After creating with the Launch note, step 45 records the confirmation text “You're all set” and “Atlas is ready with 1 note”; step 44 records the single remaining note as “Launch” and “1 note ready.”"
+        },
+        {
+          "claim": "Clicking Open my board navigates from the confirmation to the board route.",
+          "status": "contradicted",
+          "evidence": "Step 9 clicked “Open my board,” but the recorded observation only shows the confirmation content, and the final inspection in step 45 still reports the page at /welcome rather than a board route."
+        },
+        {
+          "claim": "At a narrow mobile viewport, all wizard labels, validation messages, controls, and progress indicators remain legible and reachable without clipping or overlap.",
+          "status": "verified",
+          "evidence": "Steps 12, 16, 18, 20, and 21 record reachable controls and visible validations across all steps, explicitly describing the compact layout as legible with no visible clipping and all three progress markers visible."
+        },
+        {
+          "claim": "Removing a filled second note leaves the first filled note intact and updates the summary to exactly 1 note ready.",
+          "status": "verified",
+          "evidence": "Step 26 records that after removing note 2, the first input remained filled with “First note,” the second input and remove button disappeared, and the summary read exactly “1 note ready.”"
+        },
+        {
+          "claim": "Step 1 blocks invalid profiles with a visible minimum-three-character workspace error and visible required errors for all empty fields.",
+          "status": "verified",
+          "evidence": "Step 30 records that Continue stayed on Step 1 with “Use at least 3 characters” for workspace “At”; step 34 records that submitting blank fields remained on Step 1 with visible required errors for workspace, email, and display name."
+        },
+        {
+          "claim": "The confirmation carries the entered profile and preference values, including email, display name, week start, reminder time, and daily limit.",
+          "status": "contradicted",
+          "evidence": "The configured values were observed before completion (Atlas, atlas@example.com, Riley, Sunday, 21:00, limit 7 in steps 37-42), but the final confirmation inspection in step 45 lists only Atlas, 1 note, and Focus areas: Work, with none of the required email, name, week-start, reminder, or limit valu"
+        }
+      ],
+      "findingTexts": [
+        "After completing Atlas with one Launch note, clicking Open my board changes the URL to http://localhost:4102/ but renders a client-side application-error page instead of the board.",
+        "After setting Max notes per day to 21 and clicking Continue, the wizard advanced to Step 3 instead of remaining on Step 2 with an error that the daily limit must be between 1 and 20.",
+        "After creating the workspace with Atlas, atlas@example.com, Riley, Sunday, 21:00, Work, daily limit 7, and Launch, the confirmation only shows Atlas, “1 note,” and Work. It does not display the submit",
+        "Max notes per day spinbutton is exposed as unnamed in the interactive-element trace, despite its visible label."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete all steps with workspace Atlas, one focus area, and note Launch.",
+          "action": "Create the workspace and click Open my board.",
+          "expect": "Confirmation must show Atlas and one note, then the link must navigate to the board route.",
+          "priority": 9
+        },
+        {
+          "setup": "Open /welcome at a narrow mobile viewport.",
+          "action": "Visit each step, trigger validation, and inspect fields, messages, buttons, and progress indicators.",
+          "expect": "All labels, errors, controls, and progress indicators must be legible, reachable, and free from clipping or overlap.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete steps 1 and 2 and reach step 3 with its initial blank note.",
+          "action": "Add another note, fill both notes, remove the second note, and inspect the remaining controls.",
+          "expect": "One filled note must remain, and its count must read 1 note ready.",
+          "priority": 7
+        },
+        {
+          "setup": "Enter valid step 1 data, continue to step 2, then return with Back.",
+          "action": "Re-read all step 1 fields after navigating back.",
+          "expect": "Workspace, email, and display name must retain their previously entered values.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter a two-character workspace name, a@example.com, and Sam.",
+          "action": "Click Continue and read the workspace validation.",
+          "expect": "Must remain on step 1 with a visible minimum-three-character error.",
+          "priority": 5
+        },
+        {
+          "setup": "Leave step 1 fields empty.",
+          "action": "Click Continue and read every validation message.",
+          "expect": "Must stay on step 1 with visible errors for workspace, email, and display name.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter workspace Atlas, email atlas@example.com, display name Riley, choose Sunday and 21:00, select Work, and set limit 7.",
+          "action": "Continue through the wizard with note Launch, create the workspace, and read the confirmation.",
+          "expect": "Resulting output must carry the email, name, week start, reminder, and daily limit values.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2; add notes A and B, then add a third note C.",
+          "action": "Enter A, B, and C, then click Remove note 2.",
+          "expect": "A and C must remain; B must disappear.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete step 1; on step 2 select Work and enter 21 for Max notes per day.",
+          "action": "Click Continue and read the step and validation message.",
+          "expect": "Must remain on step 2 with a visible error saying the daily limit must be between 1 and 20.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every onboarding control, especially boundary values and non-first items, then verify state, validation, summaries, and navigation remain correct.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete all steps with workspace Atlas, one focus area, and note Launch. Then Create the workspace and click Open my board. — expect: Confirmation must show Atlas and one note, then the link must navigate to the board route.\n2. Open /welcome at a narrow mobile viewport. Then Visit each step, trigger validation, and inspect fields, messages, buttons, and progress indicators. — expect: All labels, errors, controls, and progress indicators must be legible, reachable, and free from clipping or overlap.\n3. Complete steps 1 and 2 and reach step 3 with its initial blank note. Then Add another note, fill both notes, remove the second note, and inspect the remaining controls. — expect: One filled note must remain, and its count must read 1 note ready.\n4. Enter valid step 1 data, continue to step 2, then return with Back. Then Re-read all step 1 fields after navigating back. — expect: Workspace, email, and display name must retain their previously entered values.\n5. Enter a two-character workspace name, a@example.com, and Sam. Then Click Continue and read the workspace validation. — expect: Must remain on step 1 with a visible minimum-three-character error.\n6. Leave step 1 fields empty. Then Click Continue and read every validation message. — exp"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 359756,
+      "status": "passed",
+      "steps": 47,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.8398,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that entering 21 despite the stated 1–20 limit advances the wizard to Step 3 with no validation error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking remove on the first note leaves the first note and removes the second (last) note instead."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Correcting all required Step-1 fields clears their visible errors and allows the wizard to advance to Step 2.",
+          "status": "verified",
+          "evidence": "After empty submission, all three required errors were visible (step 24); entering Workspace, user@example.com, and Alex cleared each error (steps 24-27), and the next observation shows the Step-2 planning screen (step 28)."
+        },
+        {
+          "claim": "Workspace, email, display name, all five focus areas, week start Sunday, and reminder 21:00 remain selected after navigating Back and then Continue.",
+          "status": "verified",
+          "evidence": "Step 1 re-displayed the exact values Workspace, user@example.com, and Alex after Back (steps 14 and 36), while Step 2 retained five selected areas, the \"5 selected\" count, Sunday, and 21:00 after returning (steps 15 and 37)."
+        },
+        {
+          "claim": "Removing note 1 removes First note while preserving Second note.",
+          "status": "contradicted",
+          "evidence": "Before removal both fields contained First note and Second note (step 19), but after clicking Remove note 1 the sole remaining field contained First note rather than Second note (step 20)."
+        },
+        {
+          "claim": "The completion result accurately presents the workspace, two-note count, and every collected profile and preference value.",
+          "status": "not_testable",
+          "evidence": "No completion-card contents were recorded after Create workspace; moreover, the exercised completion flow used Workspace and had only one remaining note after the removal test rather than Acme with two notes (step 20)."
+        },
+        {
+          "claim": "Clicking Open my board reaches a working board route.",
+          "status": "contradicted",
+          "evidence": "After clicking Open my board (step 21), the board destination was observed to show only a client-side application error at the root route rather than a usable board (step 22)."
+        },
+        {
+          "claim": "Entering 21 for Max notes per day shows the stated 1–20 validation error and keeps the user on Step 2.",
+          "status": "contradicted",
+          "evidence": "With Max notes per day still 21 and a focus area selected, submitting advanced to the Step-3 notes screen (steps 45-47); the recorded Step-2 observation also reported no 1–20 error (step 45)."
+        }
+      ],
+      "findingTexts": [
+        "Removing note 1 removes the second note instead of the first: after entering First note and Second note, clicking the first remove control leaves First note visible and removes Second note.",
+        "Completion result omits collected profile and preference values: it shows only workspace, note count, and focus areas rather than all collected values.",
+        "Open my board routes to the root path, but the destination crashes with a client-side application error instead of rendering a usable board.",
+        "Max notes per day accepts 21 despite the stated 1–20 limit: after selecting Work and clicking Continue, the wizard advanced to Step 3 rather than showing a 1–20 error and remaining on Step 2."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /welcome at a 375px-wide viewport and advance to each step with valid values.",
+          "action": "Inspect every field, validation message, progress indicator, and navigation button while scrolling.",
+          "expect": "All labels, values, messages, and buttons must be readable and reachable without horizontal clipping or overlap.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete the wizard with workspace Acme, focus Work, and two distinct nonempty notes.",
+          "action": "Click Create workspace, then click Open my board.",
+          "expect": "Completion must say Acme has 2 notes and navigation must reach the board route.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete step 1 validly and advance to step 2.",
+          "action": "Select all five focus areas, choose Sunday and 21:00, then press Back and Continue.",
+          "expect": "The step-2 count must read 5, and the selected options must remain selected after navigation.",
+          "priority": 6
+        },
+        {
+          "setup": "Leave step-1 fields empty and press Continue, then enter Workspace, user@example.com, and Alex.",
+          "action": "Press Continue again.",
+          "expect": "Visible step-1 errors must clear and the wizard must advance to step 2.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter Workspace, user@example.com, and Alex on step 1, then advance to step 2.",
+          "action": "Press Back and reread all three step-1 fields.",
+          "expect": "Workspace, email, and display name must retain their exact entered values.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter distinct values for workspace, email, display name, week start, reminder, daily limit, two focus areas, and two notes.",
+          "action": "Finish the wizard and read the completion card.",
+          "expect": "The result must expose all collected profile and preference values, not only workspace, count, and focus.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 with valid values; on step 3 enter First note, add another note, and enter Second note.",
+          "action": "Click Remove note 1.",
+          "expect": "First note must disappear and Second note must remain.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete step 1 with workspace Acme, email user@example.com, and display name Sam; advance to step 2.",
+          "action": "Enter 21 in Max notes per day and press Continue.",
+          "expect": "Must show the stated 1–20 error and remain on step 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every onboarding step and control, prioritizing boundary validation, non-first note removal, state preservation, and whether collected values appear in the result.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /welcome at a 375px-wide viewport and advance to each step with valid values. Then Inspect every field, validation message, progress indicator, and navigation button while scrolling. — expect: All labels, values, messages, and buttons must be readable and reachable without horizontal clipping or overlap.\n2. Complete the wizard with workspace Acme, focus Work, and two distinct nonempty notes. Then Click Create workspace, then click Open my board. — expect: Completion must say Acme has 2 notes and navigation must reach the board route.\n3. Complete step 1 validly and advance to step 2. Then Select all five focus areas, choose Sunday and 21:00, then press Back and Continue. — expect: The step-2 count must read 5, and the selected options must remain selected after navigation.\n4. Leave step-1 fields empty and press Continue, then enter Workspace, user@example.com, and Alex. Then Press Continue again. — expect: Visible step-1 errors must clear and the wizard must advance to step 2.\n5. Enter Workspace, user@example.com, and Alex on step 1, then advance to step 2. Then Press Back and reread all three step-1 fields. — expect: Workspace, email, and display name must retain their exact entered values.\n6. Enter distinct values "
+    }
+  ]
+}

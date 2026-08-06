@@ -1,0 +1,232 @@
+{
+  "label": "sweep2-gridworks-report-ui",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 4,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.3026,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "gridworks-report-ui",
+      "attempt": 1,
+      "durationMs": 103850,
+      "status": "passed",
+      "steps": 5,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.1636,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "delta-text-too-faint",
+          "class": "contrast",
+          "caught": true,
+          "why": "Finding 2 explicitly reports that the delta labels have insufficient contrast against the white statistic cards, making the text difficult to read."
+        },
+        {
+          "id": "summary-text-clipped",
+          "class": "overflow",
+          "caught": true,
+          "why": "Finding 3 explicitly states that the per-agent summary is clipped and cannot be completely read."
+        },
+        {
+          "id": "actionbar-covers-last-row",
+          "class": "occlusion",
+          "caught": false,
+          "why": "No finding reports the fixed bottom action bar overlapping or hiding part of the final table row."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking Export CSV visibly shows the alert message \"Export queued.\"",
+          "status": "not_testable",
+          "evidence": "Step 2 records that a browser alert appeared after Export CSV and was dismissed, but does not record the alert's text."
+        },
+        {
+          "claim": "Clicking Send to stakeholders visibly shows the alert message \"Report sent.\"",
+          "status": "contradicted",
+          "evidence": "Send to stakeholders was clicked in steps 2 and 3, but the recorded post-click observations show only the unchanged report and action-bar buttons, with domChanged=NO and no send alert observed."
+        },
+        {
+          "claim": "The +12% vs last week and −8m vs last week delta labels are legible with their signs, values, and units on their statistic cards.",
+          "status": "not_testable",
+          "evidence": "No trace step records inspecting either headline delta label or its statistic card."
+        },
+        {
+          "claim": "All table rows and cells remain reachable and unobscured when scrolled to the bottom despite the fixed action bar.",
+          "status": "verified",
+          "evidence": "After the bottom scroll in step 4, the final observation in step 5 states that all nine rows were visible above the fixed action bar."
+        },
+        {
+          "claim": "Kai Lindqvist's complete weekly summary is readable from its beginning through its final period without clipping.",
+          "status": "not_testable",
+          "evidence": "The trace contains no recorded observation of Kai Lindqvist's summary text or its ending."
+        },
+        {
+          "claim": "The headline Resolved figure equals the sum of all nine per-agent Resolved values, 186.",
+          "status": "not_testable",
+          "evidence": "Step 5 records the nine row values (34, 29, 26, 21, 18, 17, 15, 14, 12) and their sum of 186, but does not record the separate headline Resolved figure needed to reconcile the displayed total."
+        }
+      ],
+      "findingTexts": [
+        "Headline Resolved statistic is 128 but the nine table rows total 186.",
+        "The “+12% vs last week” and “−8m vs last week” delta labels have insufficient contrast against the white statistic cards, making their signs, numbers, and units difficult to read.",
+        "Kai Lindqvist’s Summary of the week is clipped before its final period, so the complete summary cannot be read."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /report.html with the report visible.",
+          "action": "Click Export CSV, dismiss its alert, then click Send to stakeholders.",
+          "expect": "Export CSV must show 'Export queued.' and Send must show 'Report sent.' visibly.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /report.html and inspect the '+12% vs last week' and '−8m vs last week' delta text.",
+          "action": "Read both delta labels against their white statistic cards.",
+          "expect": "Both delta labels must be legible, including their signs, numbers, and units.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /report.html on the default viewport and note the last agent rows before interacting.",
+          "action": "Scroll to the bottom and inspect whether the fixed action bar overlaps any table row or cell.",
+          "expect": "Every table row and cell must remain reachable and unobscured by the action bar.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /report.html and locate the long Summary of the week text for Kai Lindqvist.",
+          "action": "Read the Kai summary from its beginning through its final period.",
+          "expect": "The complete summary must be readable without clipping or hidden continuation.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /report.html and write down every per-agent Resolved value: 34, 29, 26, 21, 18, 17, 15, 14, and 12.",
+          "action": "Add the nine visible row values and compare their sum with the headline Resolved figure.",
+          "expect": "Headline Resolved must equal the table sum of 186; state both figures.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the weekly report, verify that headline figures agree with the table, inspect readability and scrolling, and operate both export actions.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /report.html with the report visible. Then Click Export CSV, dismiss its alert, then click Send to stakeholders. — expect: Export CSV must show 'Export queued.' and Send must show 'Report sent.' visibly.\n2. Open /report.html and inspect the '+12% vs last week' and '−8m vs last week' delta text. Then Read both delta labels against their white statistic cards. — expect: Both delta labels must be legible, including their signs, numbers, and units.\n3. Open /report.html on the default viewport and note the last agent rows before interacting. Then Scroll to the bottom and inspect whether the fixed action bar overlaps any table row or cell. — expect: Every table row and cell must remain reachable and unobscured by the action bar.\n4. Open /report.html and locate the long Summary of the week text for Kai Lindqvist. Then Read the Kai summary from its beginning through its final period. — expect: The complete summary must be readable without clipping or hidden continuation.\n5. Open /report.html and write down every per-agent Resolved value: 34, 29, 26, 21, 18, 17, 15, 14, and 12. Then Add the nine visible row values and compare their sum with the headline Resolved figure. — expect: Headline Resolved must equal the table sum of 186; state both figures."
+    },
+    {
+      "case": "gridworks-report-ui",
+      "attempt": 2,
+      "durationMs": 95416,
+      "status": "passed",
+      "steps": 4,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.139,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "delta-text-too-faint",
+          "class": "contrast",
+          "caught": true,
+          "why": "Finding 3 explicitly reports that the headline comparison deltas are too faint against the white statistic cards to be legible, matching the low-contrast defect."
+        },
+        {
+          "id": "summary-text-clipped",
+          "class": "overflow",
+          "caught": true,
+          "why": "Finding 2 reports that multiple agent summary cells are clipped mid-sentence with no continuation, matching the fixed-height summary text clipping defect."
+        },
+        {
+          "id": "actionbar-covers-last-row",
+          "class": "occlusion",
+          "caught": false,
+          "why": "None of the findings describe the fixed action bar overlapping or hiding part of the final table row."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking Export CSV shows the visible confirmation “Export queued.”",
+          "status": "verified",
+          "evidence": "Step 1 clicked Export CSV, and step 2 recorded that an alert was shown and dismissed with the visible message “Export queued.”"
+        },
+        {
+          "claim": "Clicking Send to stakeholders shows the visible confirmation “Report sent.”",
+          "status": "contradicted",
+          "evidence": "Step 2 directly clicked Send to stakeholders, but recorded domChanged=NO and no resulting alert or “Report sent.” confirmation was observed."
+        },
+        {
+          "claim": "The final agent row remains reachable and readable while the fixed action bar stays visible without covering it.",
+          "status": "verified",
+          "evidence": "After the scroll in step 3, the observation states all nine rows including final row Lena Marsh (Resolved 12) were above the fixed action bar and not visibly covered; step 4 again confirms the final row and both action-bar buttons were visible."
+        },
+        {
+          "claim": "Each of the three headline comparison deltas is legible against its white card background.",
+          "status": "not_testable",
+          "evidence": "The trace contains no recorded reading or visual observation of any headline comparison delta."
+        },
+        {
+          "claim": "Every agent summary is fully readable through its final visible words, with no unexplained clipping or hidden continuation.",
+          "status": "not_testable",
+          "evidence": "Although the final-row visibility was observed, the trace does not record inspection of any complete summary text or summary-cell endings."
+        },
+        {
+          "claim": "The Resolved headline equals the sum of all nine per-agent Resolved values.",
+          "status": "not_testable",
+          "evidence": "Only Lena Marsh’s Resolved value (12) was recorded; the Resolved headline and the other eight per-agent values were not observed, so the sum cannot be reconciled."
+        }
+      ],
+      "findingTexts": [
+        "The Resolved headline total is 128, but the nine displayed agent Resolved values (34, 29, 26, 21, 18, 17, 15, 14, 12) sum to 186.",
+        "Multiple agent summary cells are clipped mid-sentence without an explained continuation, so their complete displayed summaries are not readable.",
+        "Headline comparison deltas are too faint against the white statistic cards to be legible."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Click Export CSV, dismiss its alert, click Send to stakeholders, and read both alerts.",
+          "expect": "Each must show its stated visible confirmation: “Export queued.” and “Report sent.”",
+          "priority": 5
+        },
+        {
+          "setup": "Scroll to the bottom of the report and locate the final agent row.",
+          "action": "Inspect the final row and its contents while the fixed action bar remains visible.",
+          "expect": "The action bar must not cover any row or make the final row unreachable.",
+          "priority": 4
+        },
+        {
+          "setup": "",
+          "action": "Read the comparison delta beneath each of the three headline statistics.",
+          "expect": "Every delta must be legible against its white card background.",
+          "priority": 3
+        },
+        {
+          "setup": "Read each agent's complete summary text as displayed in the table.",
+          "action": "Inspect every summary cell, including its final visible words.",
+          "expect": "Every summary must be fully readable without unexplained clipping or hidden continuation.",
+          "priority": 2
+        },
+        {
+          "setup": "Read and write down the Resolved headline and all nine per-agent Resolved values.",
+          "action": "Add the nine per-agent values and compare their sum with the Resolved headline.",
+          "expect": "The row sum must equal the headline; state both totals.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the weekly report and verify that its headline totals agree with the agent rows, all report content is readable, the action bar is usable, and both exports respond.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Click Export CSV, dismiss its alert, click Send to stakeholders, and read both alerts. — expect: Each must show its stated visible confirmation: “Export queued.” and “Report sent.”\n2. Scroll to the bottom of the report and locate the final agent row. Then Inspect the final row and its contents while the fixed action bar remains visible. — expect: The action bar must not cover any row or make the final row unreachable.\n3. Read the comparison delta beneath each of the three headline statistics. — expect: Every delta must be legible against its white card background.\n4. Read each agent's complete summary text as displayed in the table. Then Inspect every summary cell, including its final visible words. — expect: Every summary must be fully readable without unexplained clipping or hidden continuation.\n5. Read and write down the Resolved headline and all nine per-agent Resolved values. Then Add the nine per-agent values and compare their sum with the Resolved headline. — expect: The row sum must equal the headline; state both totals."
+    }
+  ]
+}

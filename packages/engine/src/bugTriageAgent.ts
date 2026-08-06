@@ -29,12 +29,40 @@ Rules:
 - NEGATIVE CLAIMS NEED A QUOTED OBSERVATION: a bug asserting that something did NOT happen — no error appeared, a value never updated, a control did nothing, a code was not applied, a confirmation was missing — must quote the concrete text or value seen in its place. Drop it when it does not. Measured against pages verified correct beforehand, unquoted negative claims were the single largest source of false reports: promos that had in fact applied, validation errors that were in fact displayed, buttons that had in fact disabled.
 - BRIEF STATES ARE NOT ABSENT: drop bugs asserting that a spinner, disabled button, "Processing"/"Saving" label or toast never appeared, unless the bug states the observation was taken WHILE the operation was still running. These states last a moment; observing afterwards misses them and proves nothing.
 - THE TESTER'S OWN FAILURE IS NOT A PRODUCT BUG: drop bugs whose evidence is that the agent could not enter a value, could not find a control, or had its input land somewhere unexpected, unless the report shows the control itself is genuinely unusable — for example it is disabled, absent, or rejects a value the page states is valid.
-- INVENTED ADDRESSES: drop bugs whose evidence is that a URL returned 404 or was unavailable, when that URL looks assembled from a source file path rather than followed from a link in the app. Source layout is not routing.
-- UNREPEATED CONTROL CLAIMS: drop bugs asserting a control acted on the wrong element or did nothing, unless the report states the interaction was repeated and behaved the same way. A single mis-aimed click is the usual cause.
 - Date/year bugs: before flagging a displayed year as "wrong" or "future", check it against the current date provided in the system prompt. A year that equals the current year is NOT a bug.
 - Placeholder text: drop bugs that describe placeholder/example text in empty inputs as "prefilled data" — that is styling, not state.
 - Blocked runs: if the run was blocked before reaching a surface, drop bugs that speculate about that unreached surface; keep the blocker bug itself.
 - Change-scoped runs (PR/preview tests): prefer bugs plausibly caused by the change under test. Keep clearly unrelated, likely pre-existing defects only when their impact is high, and say "likely pre-existing" in the reason so the report separates them from regressions.
+
+
+
+Worked examples. These are real reports checked by hand against the page afterwards; the verdicts are ground truth.
+
+DROP - "Applying the stated TEAM15 promo shows 'not recognised' and leaves the discount at $0.00."
+   The page showed "Promo TEAM15 applied - 15% off". Nothing in the report quotes the discount line it claims to have read.
+
+DROP - "Submitting with Full name empty shows no required-name error."
+   The error "Full name is required." was displayed and visible. Claiming a message is absent without quoting what appeared instead is the most common false report.
+
+DROP - "Clicking Save never puts the button into a disabled Saving state."
+   The button did disable and read "Saving...". It lasts about two seconds and the observation was taken afterwards. Missing a brief state is not evidence it is absent.
+
+DROP - "The minus control on the Washer row decrements the Hex bolt row instead."
+   Only the Washer row changed. A single mis-aimed click is likelier than a control wired to the wrong row, and the report does not say the interaction was repeated.
+
+DROP - "The route /stockroom/audit.html returns 404."
+   The page is served at /audit.html; the address was assembled from a source file path. Source layout is not routing.
+
+KEEP - "Subtotal $926.47 plus Tax $76.43 equals $1002.90, but the Total shows $1002.89."
+   Quotes all three figures; the arithmetic is checkable from the report alone.
+
+KEEP - "After saving, a reload shows Full name, company and digest all reset to defaults."
+   Names the fields and the action that lost them; reproducible as written.
+
+KEEP - "Team Annual appears as the last row of page 1 and again as the first row of page 2."
+   Names the row and both locations.
+
+The pattern: a report that QUOTES what was on screen is usually real. A report asserting something was missing, without saying what appeared instead, is usually the tester having looked in the wrong place or at the wrong moment. Judge on what the report evidences, never on whether the described behaviour sounds wrong.
 
 Return JSON only in this exact shape:
 {

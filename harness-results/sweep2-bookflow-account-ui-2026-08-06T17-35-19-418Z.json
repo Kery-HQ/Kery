@@ -1,0 +1,223 @@
+{
+  "label": "sweep2-bookflow-account-ui",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 4,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.8921,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 1,
+      "durationMs": 210460,
+      "status": "passed",
+      "steps": 21,
+      "findings": 4,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.4592,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "No finding describes submitting empty required fields and receiving no visible validation feedback or an off-screen validation message."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "Findings explicitly state that the profile fields rely only on placeholders and have no visible identifying labels after values are entered; the failed check confirms this for Full name, Email address, and Company."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "Finding 1 states that after Save changes was pressed, the button remained enabled and unchanged, with no in-flight progress indicator or disabled state visible."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting valid profile values shows a readable confirmation that the changes were saved.",
+          "status": "verified",
+          "evidence": "After Full name \"Alex Rivera\" and Email address \"alex@example.com\" were submitted (steps 1-3), step 4 observes the visible confirmation \"Your changes have been saved.\" below Save changes."
+        },
+        {
+          "claim": "Save changes visibly indicates in-flight saving by showing progress or becoming disabled immediately after submission.",
+          "status": "not_testable",
+          "evidence": "The second save was clicked in step 6, but its observation records field values only; the next observation (step 7) is after the completed save confirmation, so no immediate in-flight button/progress state was recorded."
+        },
+        {
+          "claim": "Each populated profile field retains a visible identifying label after its placeholder disappears.",
+          "status": "contradicted",
+          "evidence": "After entering values, step 10 explicitly records no separate visible Full name label, step 11 records no separate visible Email address label, and step 12 records no separate visible label after Company was populated."
+        },
+        {
+          "claim": "After saving and reloading, Full name Alex Rivera, Email address alex@example.com, Company Northstar, Email digest Weekly, and Delivery notes Leave at reception remain unchanged.",
+          "status": "contradicted",
+          "evidence": "Step 16 records all five specified values before saving, but after reload step 18 observes blank profile fields and delivery notes with Email digest reset to \"Daily,\" rather than the saved values."
+        },
+        {
+          "claim": "Submitting alex@example as the email shows a visible nearby email-validation message and does not proceed with saving.",
+          "status": "not_testable",
+          "evidence": "The malformed email was submitted in step 20, but neither that step nor the final snapshot records the area near the email field or a validation message; the final snapshot only records that Save changes is enabled."
+        }
+      ],
+      "findingTexts": [
+        "Immediately after submitting the Weekly delivery-note changes, Save changes still visibly read \"Save changes\" and remained enabled; no in-flight progress indicator or disabled state was visible.",
+        "Profile inputs rely only on placeholders: after entering Full name \"Taylor Morgan\", Email address \"taylor.morgan@example.com\", and Company \"Summit Labs\", no visible identifying labels remain for any o",
+        "“Your changes have been saved” remains visible after subsequent unsaved edits, making the save state misleading.",
+        "Saved settings do not persist on reload: profile, notes and Weekly reset to blanks and Daily."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter Full name Alex Rivera and email alex@example.com.",
+          "action": "Submit the form and wait for the save response.",
+          "expect": "A readable confirmation must state that the changes were saved.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter valid name and email values, then select Weekly and type a distinct delivery note.",
+          "action": "Submit the form and inspect the page immediately before the confirmation delay ends.",
+          "expect": "The save control must show visible progress or become disabled while saving is in flight.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave Full name, Email address, and Company empty so their placeholders are visible.",
+          "action": "Type distinct values into all three profile fields.",
+          "expect": "Each profile field must retain a visible identifying label after its placeholder disappears.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter Full name Alex Rivera, email alex@example.com, company Northstar, choose Weekly, and enter Leave at reception.",
+          "action": "Save changes, wait for confirmation, reload the page, and reread every field.",
+          "expect": "All five entered values must remain unchanged after reload; state each value.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter Full name as Alex Rivera and Email address as alex@example (missing the stated domain suffix).",
+          "action": "Submit the form.",
+          "expect": "A visible email validation message must appear near the email field; saving must not proceed.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise profile fields, notification preferences, validation, saving, reload behavior, and the visible usability of labels and errors.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter Full name Alex Rivera and email alex@example.com. Then Submit the form and wait for the save response. — expect: A readable confirmation must state that the changes were saved.\n2. Enter valid name and email values, then select Weekly and type a distinct delivery note. Then Submit the form and inspect the page immediately before the confirmation delay ends. — expect: The save control must show visible progress or become disabled while saving is in flight.\n3. Leave Full name, Email address, and Company empty so their placeholders are visible. Then Type distinct values into all three profile fields. — expect: Each profile field must retain a visible identifying label after its placeholder disappears.\n4. Enter Full name Alex Rivera, email alex@example.com, company Northstar, choose Weekly, and enter Leave at reception. Then Save changes, wait for confirmation, reload the page, and reread every field. — expect: All five entered values must remain unchanged after reload; state each value.\n5. Enter Full name as Alex Rivera and Email address as alex@example (missing the stated domain suffix). Then Submit the form. — expect: A visible email validation message must appear near the email field; saving must not proceed."
+    },
+    {
+      "case": "bookflow-account-ui",
+      "attempt": 2,
+      "durationMs": 182349,
+      "status": "passed",
+      "steps": 21,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.4329,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "error-rendered-offscreen",
+          "class": "ux-feedback",
+          "caught": true,
+          "why": "The run reports that submitting an invalid email results in no visible validation feedback, matching the defect's user-visible symptom of validation feedback being present but not visible."
+        },
+        {
+          "id": "inputs-have-no-labels",
+          "class": "a11y-naming",
+          "caught": true,
+          "why": "The run explicitly reports that Full name and Company have no persistent visible labels after being filled because their placeholders disappear."
+        },
+        {
+          "id": "no-save-progress-feedback",
+          "class": "ux-feedback",
+          "caught": false,
+          "why": "No finding describes the save action's approximately three-second period lacking a spinner, disabled state, or progress/message feedback. The reported save/persistence and stale-confirmation issues are different defects."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Saving valid profile values with Email digest set to Never shows a legible confirmation that the changes were saved.",
+          "status": "verified",
+          "evidence": "After Save changes was clicked in step 4, step 5 recorded a visible green confirmation beneath the button reading \"Your changes have been saved.\""
+        },
+        {
+          "claim": "Each typed profile input remains visibly identified by a label rather than becoming dependent on placeholder text.",
+          "status": "verified",
+          "evidence": "Steps 6-9 recorded Full name as textbox \"Full name\", Email address as textbox \"Email address\", Company as \"Company (optional)\", and Delivery notes as textbox \"Delivery notes\" after values were entered."
+        },
+        {
+          "claim": "Submitting an initially empty Full name shows a visible required-name error and does not show a saved confirmation.",
+          "status": "not_testable",
+          "evidence": "Step 10 submitted with Full name visibly empty, but the recorded observation is truncated before it states whether required-name feedback or the post-submit confirmation state was visible."
+        },
+        {
+          "claim": "After saving Alex Rivera, alex@example.com, Acme Labs, Weekly, and Leave packages at reception, all five values remain after reloading the settings page.",
+          "status": "contradicted",
+          "evidence": "Step 16 recorded the complete pre-save form with Alex Rivera, alex@example.com, Acme Labs, Weekly, and Leave packages at reception; after navigation/reload, step 18 recorded all four text inputs empty and Email digest reset to Daily."
+        },
+        {
+          "claim": "Submitting an email without a domain suffix shows a visible invalid-email message and does not show a saved confirmation.",
+          "status": "contradicted",
+          "evidence": "After submitting Alex Rivera with alex@example in step 20, the final fresh inspection in step 21 recorded that no validation feedback or saved confirmation was visible."
+        }
+      ],
+      "findingTexts": [
+        "Saved account settings do not persist after reload: Alex Rivera, alex@example.com, Acme Labs, Weekly, and Leave packages at reception reverted to empty fields/default Daily.",
+        "Full name and Company have no persistent visible labels once filled; their placeholders disappear.",
+        "The saved confirmation remains visible while the user edits unsaved profile values, creating misleading status."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Enter valid profile values and choose Never for Email digest.",
+          "action": "Save changes and inspect the confirmation area after the stated delay.",
+          "expect": "A legible confirmation must appear and state that the changes have been saved.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter distinct values in Full name, Email address, Company, and Delivery notes.",
+          "action": "Read each input after typing and identify it without relying on its placeholder.",
+          "expect": "Every typed input must retain a visible identifying label; none may become unidentified.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave the form initially empty.",
+          "action": "Submit once, then inspect the Profile card for the required-name feedback.",
+          "expect": "A visible Full name required message must appear, and no saved confirmation must appear.",
+          "priority": 3
+        },
+        {
+          "setup": "Enter Alex Rivera, alex@example.com, Acme Labs, choose Weekly, and enter Leave packages at reception.",
+          "action": "Save changes, wait for confirmation, reload the page, and reread every field.",
+          "expect": "All five entered values must remain after reload; state each value found.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter a valid full name and an email missing its domain suffix, such as Alex Rivera and alex@example.",
+          "action": "Submit the form and inspect the profile card for validation feedback.",
+          "expect": "A visible invalid-email message must appear, and the saved confirmation must not appear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise profile fields, notification preferences, validation, saving, and reload behavior. Report whether errors, confirmations, labels, and saved values are visibly usable.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Enter valid profile values and choose Never for Email digest. Then Save changes and inspect the confirmation area after the stated delay. — expect: A legible confirmation must appear and state that the changes have been saved.\n2. Enter distinct values in Full name, Email address, Company, and Delivery notes. Then Read each input after typing and identify it without relying on its placeholder. — expect: Every typed input must retain a visible identifying label; none may become unidentified.\n3. Leave the form initially empty. Then Submit once, then inspect the Profile card for the required-name feedback. — expect: A visible Full name required message must appear, and no saved confirmation must appear.\n4. Enter Alex Rivera, alex@example.com, Acme Labs, choose Weekly, and enter Leave packages at reception. Then Save changes, wait for confirmation, reload the page, and reread every field. — expect: All five entered values must remain after reload; state each value found.\n5. Enter a valid full name and an email missing its domain suffix, such as Alex Rivera and alex@example. Then Submit the form and inspect the profile card for validation feedback. — expect: A visible invalid-email message must appear, and the saved confirma"
+    }
+  ]
+}

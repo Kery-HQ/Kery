@@ -1,0 +1,218 @@
+{
+  "label": "sweep2-stockroom-audit-ui",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.4306,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-audit-ui",
+      "attempt": 1,
+      "durationMs": 434102,
+      "status": "failed",
+      "steps": 44,
+      "findings": 0,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.7487,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "caught": false,
+          "why": "The run reports that the Cable plus action affected the wrong row/failed to change Cable, but it does not report that the plus/minus controls are about 16px or otherwise below the minimum tap-target size."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "caught": true,
+          "why": "The run explicitly observed no visually distinguishable focus ring or other focus marker while tabbing through focusable stepper and audit controls, matching the missing focus-indicator defect."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "caught": false,
+          "why": "None of the findings describe opening a confirmation dialog or being unable to dismiss it via a close control, Escape, or backdrop click."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The audit table displays all four stock items with complete initial System/count/variance information: Hex bolt M4 140/140/—, Washer 11mm 60/60/—, Cable 2m 18/18/—, and Panel A3 7/7/—.",
+          "status": "verified",
+          "evidence": "Steps 24 and 26 explicitly record the four-row baseline with each counted value equal to its System value and every variance shown as —."
+        },
+        {
+          "claim": "Keyboard-focused steppers and audit controls have a visible focus indication.",
+          "status": "contradicted",
+          "evidence": "Steps 38-43 traverse focus through the first-row controls, Washer minus/plus, and Cable minus, and each observation records no visually distinguishable focus ring or other focus marker."
+        },
+        {
+          "claim": "The submission dialog can be dismissed by an available user action.",
+          "status": "verified",
+          "evidence": "Steps 3-4 show Escape left the dialog open, but clicking outside the dialog closed it and returned to the operable audit table; the same outside-click dismissal was repeatedly observed in steps 6, 8, 10, and 12."
+        },
+        {
+          "claim": "Reset counts restores every row’s counted value to its System value and restores every variance to —.",
+          "status": "verified",
+          "evidence": "After changed counts, step 20 records Reset restoring Hex bolt M4 140/—, Washer 11mm 60/—, Cable 2m 18/—, and Panel A3 7/—; this complete restoration is also observed in steps 26 and 30."
+        },
+        {
+          "claim": "From the baseline, decrementing Washer 11mm and incrementing Cable 2m produces Washer 11mm 59 with −1 and Cable 2m 19 with +1, without changing other rows.",
+          "status": "contradicted",
+          "evidence": "Washer’s keyboard decrement did work in step 41, producing 59 and -1 while the other rows remained unchanged, but the attempted Cable 2m plus action in step 28 left Cable at 18/— and instead the later visible state showed an unintended Washer 61/+1 (step 29); the required combined result was never r"
+        },
+        {
+          "claim": "A keyboard user can activate a focused inline stepper.",
+          "status": "verified",
+          "evidence": "Step 41 records that Enter on the Tab-focused Washer 11mm minus stepper changed its count from 60 to 59 and variance from — to -1."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Use Tab to focus each stepper, Reset counts, and Submit audit control.",
+          "expect": "Every focused control must have a visible focus indication.",
+          "priority": 4
+        },
+        {
+          "setup": "Reload the page with the initial counts displayed.",
+          "action": "Click Submit audit, then try Escape, clicking outside, and any visible dialog close control.",
+          "expect": "The dialog must close via a visible close control, Escape, or outside click; report whether any method works.",
+          "priority": 3
+        },
+        {
+          "setup": "Change the counted values for two non-first rows.",
+          "action": "Click Reset counts and reread every row.",
+          "expect": "Every counted value must equal its System value and every Variance must display —.",
+          "priority": 2
+        },
+        {
+          "setup": "Reload the audit page so all counted values initially equal their System values.",
+          "action": "Click the minus stepper for the SECOND row and the plus stepper for the THIRD row.",
+          "expect": "Washer 11mm must show 59 and −1; Cable 2m must show 19 and +1; other rows must remain unchanged.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the audit steppers, reset behavior, submission dialog, and keyboard usability. Report exact displayed counts, variances, and whether the dialog and controls remain operable.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use Tab to focus each stepper, Reset counts, and Submit audit control. — expect: Every focused control must have a visible focus indication.\n2. Reload the page with the initial counts displayed. Then Click Submit audit, then try Escape, clicking outside, and any visible dialog close control. — expect: The dialog must close via a visible close control, Escape, or outside click; report whether any method works.\n3. Change the counted values for two non-first rows. Then Click Reset counts and reread every row. — expect: Every counted value must equal its System value and every Variance must display —.\n4. Reload the audit page so all counted values initially equal their System values. Then Click the minus stepper for the SECOND row and the plus stepper for the THIRD row. — expect: Washer 11mm must show 59 and −1; Cable 2m must show 19 and +1; other rows must remain unchanged."
+    },
+    {
+      "case": "stockroom-audit-ui",
+      "attempt": 2,
+      "durationMs": 351050,
+      "status": "passed",
+      "steps": 28,
+      "findings": 4,
+      "checks": 5,
+      "contradicted": 3,
+      "costUsd": 0.6819,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "stepper-targets-too-small",
+          "class": "target-size",
+          "caught": true,
+          "why": "Finding 3 explicitly reports that the inline plus/minus stepper hit targets are roughly 16px, below the expected minimum target size."
+        },
+        {
+          "id": "focus-indicator-removed",
+          "class": "a11y-focus",
+          "caught": true,
+          "why": "Finding 7 reports no distinct visible focus outline or styling while tabbing through the inline steppers, which surfaces the missing focus indicator defect."
+        },
+        {
+          "id": "modal-cannot-be-dismissed",
+          "class": "dead-end",
+          "caught": false,
+          "why": "The findings report that the Audit submitted dialog opens unexpectedly, but do not report that it lacks a close control or cannot be dismissed with Escape or backdrop clicks."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Using Washer 11mm’s minus twice and plus once leaves its counted quantity at 59 with variance -1.",
+          "status": "contradicted",
+          "evidence": "Across the requested Washer stepper sequence, Washer remained 60 with an em-dash variance, while Hex bolt M4 changed instead (steps 4-7, including the post-action observation at step 7 of Washer 60/em dash and Hex 139/-1)."
+        },
+        {
+          "claim": "Washer 11mm’s inline minus and plus steppers operate the Washer row accurately.",
+          "status": "contradicted",
+          "evidence": "Direct attempts on the Washer minus and plus controls left Washer at 60/em dash but changed Hex bolt quantities and opened the Audit submitted dialog (steps 9-11 and 15-17)."
+        },
+        {
+          "claim": "Reset counts restores altered audit counts to their system quantities and clears variances.",
+          "status": "verified",
+          "evidence": "Before reset, Hex bolt was visibly 137 with variance -3 (step 13); after clicking Reset counts and dismissing its dialog, all four rows were visible at system counts and Washer showed 60 with an em-dash variance (steps 14-15)."
+        },
+        {
+          "claim": "Keyboard tabbing provides a visible focus indicator on every inline stepper, Reset counts, and Submit audit.",
+          "status": "contradicted",
+          "evidence": "No distinct focus outline or styling was observed for each tabbed inline stepper, from Hex bolt through Panel A3 (steps 19-26), although Reset counts and Submit audit did receive visible teal/green focus outlines (steps 27-28)."
+        },
+        {
+          "claim": "The audit confirmation dialog can be dismissed by keyboard or outside click.",
+          "status": "verified",
+          "evidence": "Pressing Escape left the dialog visible (steps 2 and 11), but clicking the blank backdrop repeatedly closed the visible dialog, including the explicit confirmation at step 4."
+        }
+      ],
+      "findingTexts": [
+        "Washer 11mm minus stepper is miswired: it decrements Hex bolt M4 and triggers the Audit submitted dialog instead of decrementing Washer.",
+        "Intended: only Submit audit opens confirmation; steppers and Reset counts also open “Audit submitted” dialog.",
+        "Inline ± stepper hit targets are roughly 16px, making them difficult to select accurately.",
+        "Stepper buttons expose only “−” and “+” names, without identifying the item or adjustment action."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Note Washer 11mm's system quantity as 60.",
+          "action": "Click its minus stepper twice and its plus stepper once.",
+          "expect": "Washer counted value must be 59 and variance must be -1.",
+          "priority": 5
+        },
+        {
+          "setup": "Note Washer 11mm's initial counted value and variance.",
+          "action": "Click its minus stepper twice, then click Reset counts.",
+          "expect": "Washer counted value must return to 60 and its variance must return to an em dash.",
+          "priority": 4
+        },
+        {
+          "setup": "",
+          "action": "Inspect the inline steppers and click minus and plus for Washer 11mm.",
+          "expect": "Each stepper must be visibly reachable and large enough to operate accurately; report any difficulty.",
+          "priority": 3
+        },
+        {
+          "setup": "",
+          "action": "Tab through every stepper, Reset counts, and Submit audit control.",
+          "expect": "Each focused control must have a visible focus indicator; state any control without one.",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Click Submit audit, press Escape, then click outside the dialog.",
+          "expect": "At least one method must close the dialog; state which method worked.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every audit control, verify count and variance propagation, then inspect keyboard focus and dialog dismissal behavior.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Note Washer 11mm's system quantity as 60. Then Click its minus stepper twice and its plus stepper once. — expect: Washer counted value must be 59 and variance must be -1.\n2. Note Washer 11mm's initial counted value and variance. Then Click its minus stepper twice, then click Reset counts. — expect: Washer counted value must return to 60 and its variance must return to an em dash.\n3. Inspect the inline steppers and click minus and plus for Washer 11mm. — expect: Each stepper must be visibly reachable and large enough to operate accurately; report any difficulty.\n4. Tab through every stepper, Reset counts, and Submit audit control. — expect: Each focused control must have a visible focus indicator; state any control without one.\n5. Click Submit audit, press Escape, then click outside the dialog. — expect: At least one method must close the dialog; state which method worked."
+    }
+  ]
+}

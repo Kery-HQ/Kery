@@ -1,0 +1,237 @@
+{
+  "label": "noise-v19",
+  "runs": 16,
+  "cleanRuns": 1,
+  "raw": 38,
+  "deduped": 38,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Valid promo code TEAM15 is rejected. Applied it twice on Payment with two attendees (Workshop $260 and Student $45); each time the visible error was “That promo code is not recognised.” and totals rem"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After registration confirmation, the Back button cannot be activated. It was clicked twice, and both attempts timed out after 5 seconds; the page remained on the confirmation state."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 to a Workshop attendee ($260) and a Student attendee ($45) produces the reconciled $305.00 subtotal, $45.75 discount, and $259.25 total, and confirmation repeats $259.25. — Steps 16-20 show the two attendees and the correctly reconciled $305.00 subtotal, but TEAM15 was rejected as unrecognised, discount stayed −$0.00 and total stayed $305.00; confirmation charged $305.00 rather than $259.25."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting the punctuation-only phone value ------- keeps the user on Contact and displays a phone validation error. — After submitting ------- in step 42, the next recorded surface in step 43 is the Attendees step, demonstrating that invalid phone input did not block progression."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting fractional Seats reserved value 1.5 keeps the user on Attendees and displays a seats validation error. — Step 44 submits the visible 1.5 value, and step 45 subsequently records the Payment step, demonstrating that the fractional seat count did not block progression."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After Contact validation shows “Enter a valid email address” for a@b, replacing the value with valid a@b.co leaves the old inline error visibly displayed. Fresh observation confirmed it persists."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "TEAM15 is not accepted as a promo code: with subtotal $260.00, clicking Apply showed the visible invalid-promo error and no discount, although TEAM15 is required as the valid promo preceding BADCODE."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Discount is rendered as a negative zero value (“−$0.00”), which is misleading when no discount applies."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Correcting an invalid email before resubmitting clears the old inline email validation error. — After the email was changed from a@b to a@b.co, step 5 recorded that the corrected value was present but the prior “Enter a valid email address” error remained visible."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A fractional Seats reserved value of 1.5 is rejected with a visible error and the wizard remains on Attendees. — Step 16 showed Seats reserved as 1.5, and the subsequent observation in step 17 was the Payment screen with Dana’s $260.00 summary, demonstrating that the fractional value was allowed to proceed."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Confirming a registration with one Standard attendee and one reserved seat opens a confirmation that preserves the $120.00 Payment total and attendee/seat counts. — Step 39 clicked Confirm registration but the recorded post-action observation still showed the Payment screen with 1 attendee, $120.00 subtotal, −$0.00 discount, and $120.00 total; no confirmation screen or preserved seat count was observed."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After submitting the empty form, the visible “Full name is required.” validation message remained displayed even after entering “Ada Lovelace”; it cleared only after a subsequent successful save. This"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The Delivery notes control saves “Call before delivery” and retains that exact value after reload. — The Delivery notes fill in step 6 has domChanged=NO and its observation records other fields but not the requested notes value; no later observation rereads “Call before delivery” after reload."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Required-name error remains visible after Full name has been corrected to “Ada Lovelace”."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Submitting valid settings shows a disabled “Saving…” button with visible progress before completion, then re-enables with a saved confirmation. — Immediately after the valid Save changes click, step 9 observes the button already enabled and labeled “Save changes” rather than “Saving…”, although the green “Your changes have been saved.” confirmation was already visible."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Place order lacks duplicate-click protection: two rapid clicks using the valid prefilled email and card created two distinct orders (BK-1001 and BK-1002) and two receipts."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Rapidly clicking Place order twice with valid default billing details produces exactly one confirmation and one receipt. — Step 2 observed one confirmation and receipt BK-1001 after the first click, while Step 3 recorded two visible receipts, BK-1001 and BK-1002, after the duplicate-click test."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting x@ as the billing email with a valid card number visibly rejects the email and adds no order receipt. — The malformed-email submission was attempted in Step 7, but no visible email validation result was recorded; the subsequent repeated Place order action had no page-state change (Step 8), so the required visible rejection was not produced."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Rapid double activation created two confirmed orders and receipts: BK-1001 and BK-1002, each for $1002.90 to finance@northwind.test. Exactly one receipt was expected."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Header select-all is stale after filtering Priority to Low and unchecking Typo on pricing page. With two visible Low rows, Feature request: dark mode selected and Typo on pricing page unselected, the "
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "After selecting all eight tickets, filtering to Low, and unchecking visible \"Typo on pricing page,\" the header select-all checkbox becomes unchecked because a visible row is unselected. — Steps 10-11 show all 8 selected, then both Low rows checked before Typo on pricing page was unchecked; step 12 freshly observes Feature request: dark mode checked, Typo unchecked, but the header checkbox still checked. Step 23 confirms the same stale checked header state."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Header selection checkbox does not become checked when every visible filtered row is selected. Reproduced after filtering to the single Invoice total looks wrong row and selecting its checkbox: row ch"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Header and row selection checkboxes are exposed as unnamed controls, preventing users of assistive tech from identifying them."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "When the only visible row is selected, the header selection checkbox is checked as well as the row checkbox. — Steps 19-20 filter to the sole Invoice row and select it, and the final recorded observation in step 21 explicitly identifies a “header checkbox mismatch in the final single-visible-row selection scenario.”"
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Export CSV produced no visible confirmation, dialog, toast, download indicator, or report change immediately after two direct clicks."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended stakeholder-send confirmation is absent: two clicks produced no visible response or DOM change."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Export CSV and Send to stakeholders each provide their own visible confirmation when clicked. — Immediately after Export CSV in step 4 and Send to stakeholders in step 6, the trace explicitly records no confirmation, dialog, toast, download indicator, or report change; repeated Export CSV was also still silent in step 5."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Intended /gridworks/report.html report route returns 404 File not found instead of the weekly report."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Opening /gridworks/report.html displays the weekly report for inspecting the Resolved headline and all nine agent values. — Step 5 records that navigation to http://localhost:4112/gridworks/report.html showed a 404 Error response page with “File not found,” rather than the report."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Book shift with no date shows a visible date-validation message and does not add a shift. — Step 1 clicked Book shift, but no validation message or other resulting UI effect was recorded; step 5 later observed that no shifts were booked."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Booking a valid dated shift with assignee text <b>Injected</b> adds a new shift row whose assignee is shown as literal text rather than rendered markup. — After entering date 2026-08-20 and the exact assignee text, step 6 clicked Book shift and observed the field still containing “<b>Injected</b>” with “no shift is yet listed,” so the required new row was not added."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Undo last does not clear the obsolete shipping error after it restores the preceding Hex bolt receipt. After undo, Hex bolt M4 is 140, total units 535, movements 0, and log empty, but “Only 142 of Hex"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The required /stockroom/index.html page is unavailable: navigating to it returns HTTP 404 File not found instead of the stockroom adjustment interface."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Undoing the valid Cable 2m shipment restores the inventory and removes the movement, but it does not clear the stale failed-shipment validation error (“Only 17 of Cable 2m on hand.”)."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Washer stock error remains visible after switching the selected item to Cable 2m, creating mismatched validation context."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Undoing the valid Cable shipment clears any prior failed-shipment error so no stale shipping error remains. — Step 26 records the failed Cable shipment error “Only 17 of Cable 2m on hand.” immediately before Undo, and step 27 explicitly observes that the stale Cable error remains visible after Undo."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting the default audit opens a confirmation dialog. — Step 6 directly clicked Submit audit, recorded domChanged=NO, and observed the desktop screen still showing the default table values with no state change; no confirmation dialog appeared."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Keyboard Tab traversal reaches every audit control (all row steppers, Reset counts, Submit audit, and dialog Close) with a visible, identifiable focus indicator at each stop. — Steps 2-6 observed visible blue focus outlines through Cable 2m minus, but the subsequent Tab action produced no page-state change (step 7) and the run exited before Cable 2m plus, Reset counts, Submit audit, or dialog Close were reached."
+    }
+  ]
+}

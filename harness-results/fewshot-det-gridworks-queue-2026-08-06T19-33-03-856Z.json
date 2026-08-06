@@ -1,0 +1,238 @@
+{
+  "label": "fewshot-det-gridworks-queue",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 1,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.4757,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "gridworks-queue",
+      "attempt": 1,
+      "durationMs": 95887,
+      "status": "failed",
+      "steps": 9,
+      "findings": 0,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.1711,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": false,
+          "why": "run produced no findings"
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": false,
+          "why": "run produced no findings"
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "run produced no findings"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Typing “password” keeps the “Search subject” label legible and leaves “Cannot reset password” identifiable in the filtered queue.",
+          "status": "verified",
+          "evidence": "Step 2 observed the exact lowercase “password” value with a legible “Search subject” label and the identifiable Open ticket “Cannot reset password” remaining."
+        },
+        {
+          "claim": "Enabling “Open only” renders exactly six tickets and every rendered ticket has Open status.",
+          "status": "verified",
+          "evidence": "Step 7 observed Open only enabled, six rows rendered, and each rendered row marked Open."
+        },
+        {
+          "claim": "With “Open only” enabled, the status line reads exactly “Showing 6 of 8 tickets”.",
+          "status": "not_testable",
+          "evidence": "Step 7 records six Open rows but does not preserve the status-line text needed to verify the exact required wording."
+        },
+        {
+          "claim": "Combining Priority “High” with subject search “invoice” leaves only “Invoice total looks wrong” and shows “Showing 1 of 8 tickets”.",
+          "status": "not_testable",
+          "evidence": "The run stopped after the Open-only check and never exercised the Priority High plus invoice-search combination."
+        },
+        {
+          "claim": "Filtering out a selected ticket does not leave a misleading selected count, and High-priority header select-all selects exactly the three visible rows with status “3 selected”.",
+          "status": "not_testable",
+          "evidence": "No row-selection, hidden-selection, or header select-all action was reached before the run exited."
+        },
+        {
+          "claim": "Closing the selected “Cannot reset password” ticket changes it to Closed, clears selection to 0, disables “Close selected”, and shows a confirmation message.",
+          "status": "not_testable",
+          "evidence": "The row was never selected and “Close selected” was never clicked before the forced exit."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Leave the queue visible and confirm the “Search subject” label is present.",
+          "action": "Type “password” into the search field and inspect the field and filtered result.",
+          "expect": "The label must remain legible after typing, and the password ticket must remain identifiable.",
+          "priority": 6
+        },
+        {
+          "setup": "Clear filters and note that six initial rows show Open and two show Closed.",
+          "action": "Enable “Open only” and compare the rendered rows, statuses, and showing count.",
+          "expect": "Every rendered row must be Open, with six rows and status “Showing 6 of 8 tickets”.",
+          "priority": 5
+        },
+        {
+          "setup": "Choose Priority “High” and note its three rows.",
+          "action": "Type “invoice” into Search subject and read the table and status line.",
+          "expect": "Only “Invoice total looks wrong” must remain, and status must say “Showing 1 of 8 tickets”.",
+          "priority": 4
+        },
+        {
+          "setup": "Select “Cannot reset password”, then enter “dark mode” in Search subject so the selected ticket disappears.",
+          "action": "Read the visible checkboxes and status line after the search filter applies.",
+          "expect": "Selected count must equal the number of checked visible rows; hidden selections must not create a misleading count.",
+          "priority": 3
+        },
+        {
+          "setup": "Choose Priority “High” and note the three visible ticket subjects.",
+          "action": "Click the header select-all checkbox and read every visible checkbox and the status line.",
+          "expect": "Exactly three visible rows must be selected, and status must say “3 selected”.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave the default queue visible and select the row named “Cannot reset password”.",
+          "action": "Click “Close selected”, then reread the row, selection count, button, and confirmation message.",
+          "expect": "The row must be Closed, selected count must be 0, button must be disabled, and confirmation must be visible.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every changed queue control, prioritizing disagreements between visible rows, selection counts, filters, and bulk-close state. Report exact row names, counts, statuses, and any unreadable or unclear feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Leave the queue visible and confirm the “Search subject” label is present. Then Type “password” into the search field and inspect the field and filtered result. — expect: The label must remain legible after typing, and the password ticket must remain identifiable.\n2. Clear filters and note that six initial rows show Open and two show Closed. Then Enable “Open only” and compare the rendered rows, statuses, and showing count. — expect: Every rendered row must be Open, with six rows and status “Showing 6 of 8 tickets”.\n3. Choose Priority “High” and note its three rows. Then Type “invoice” into Search subject and read the table and status line. — expect: Only “Invoice total looks wrong” must remain, and status must say “Showing 1 of 8 tickets”.\n4. Select “Cannot reset password”, then enter “dark mode” in Search subject so the selected ticket disappears. Then Read the visible checkboxes and status line after the search filter applies. — expect: Selected count must equal the number of checked visible rows; hidden selections must not create a misleading count.\n5. Choose Priority “High” and note the three visible ticket subjects. Then Click the header select-all checkbox and read ever"
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 2,
+      "durationMs": 167059,
+      "status": "failed",
+      "steps": 15,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.3046,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": false,
+          "why": "The findings do not describe applying a filter or header select-all selecting hidden rows."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "Both findings explicitly report that after closing selected tickets, the ticket remains checked, the selected count remains 1, and Close selected stays enabled instead of selection clearing."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "The only toast reported is \"Closed 1 ticket(s).\" for one selected ticket; there is no evidence that it counted already-closed tickets or overstated the number changed."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Closing selected tickets clears the selection and disables Close selected.",
+          "status": "contradicted",
+          "evidence": "After clicking Close selected in step 2, the recorded observation still shows \"Showing 8 of 8 tickets · 1 selected\" and Close selected enabled, rather than a cleared selection and disabled control."
+        },
+        {
+          "claim": "Closing a ticket displays a legible green success message.",
+          "status": "not_testable",
+          "evidence": "No step records the presence, text, color, or legibility of a success/green feedback message after either Close selected action."
+        },
+        {
+          "claim": "Selecting only the second ticket, Invoice total looks wrong, checks only that row and reports exactly 1 selected.",
+          "status": "verified",
+          "evidence": "Step 13 records that Invoice total looks wrong is checked, all other row checkboxes are unchecked, and the summary reads \"Showing 8 of 8 tickets · 1 selected\"."
+        },
+        {
+          "claim": "With Open only enabled and subject search set to password, only Cannot reset password remains and the summary says Showing 1 of 8 tickets.",
+          "status": "verified",
+          "evidence": "Step 8 records that Open only removes the two Closed tickets and leaves six open subjects, and step 9 records only Cannot reset password with \"Showing 1 of 8 tickets · 0 selected\"."
+        },
+        {
+          "claim": "Closing Invoice total looks wrong changes its status to Closed.",
+          "status": "not_testable",
+          "evidence": "The trace clicks Close selected for Invoice total looks wrong in step 13, but records no post-action row status; the captured observation still describes it as checked and selected."
+        },
+        {
+          "claim": "Priority=High supports visible-row-only bulk closing without changing non-High ticket statuses.",
+          "status": "not_testable",
+          "evidence": "The run never sets Priority to High, selects the High rows, or performs the required High-filter bulk-close action."
+        }
+      ],
+      "findingTexts": [
+        "Bulk closing a selected ticket does not clear its selection: immediately afterward, Cannot reset password remains checked, the summary says \"1 selected\", and Close selected remains enabled, although t"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Select a ticket and close it so the queue displays the success message.",
+          "action": "Inspect the status line, close button, and green feedback message after the action.",
+          "expect": "The success message must be legible, and the status and button must reflect the cleared selection.",
+          "priority": 6
+        },
+        {
+          "setup": "Select the second visible ticket, Invoice total looks wrong, without selecting the first row.",
+          "action": "Read the selected count and the checked row after selection rerenders.",
+          "expect": "Only Invoice total looks wrong must be checked, and status must report exactly 1 selected.",
+          "priority": 5
+        },
+        {
+          "setup": "Enable Open only and note the number and subjects of the open rows.",
+          "action": "Enter `password` in Search subject, then read the filtered table and status.",
+          "expect": "Only Cannot reset password must remain, and status must say Showing 1 of 8 tickets.",
+          "priority": 4
+        },
+        {
+          "setup": "Start with the unfiltered queue and locate the second ticket, Invoice total looks wrong.",
+          "action": "Select that ticket and click Close selected.",
+          "expect": "Its status must become Closed, selected count must become 0, and Close selected must be disabled.",
+          "priority": 3
+        },
+        {
+          "setup": "Set Priority to High and note the three visible rows, including their initial statuses.",
+          "action": "Click the table header checkbox, then click Close selected.",
+          "expect": "Only the three visible High rows must be closed; non-High tickets must retain their initial statuses.",
+          "priority": 2
+        },
+        {
+          "setup": "Set Priority to High, enter `Invoice` in Search subject, and enable Open only.",
+          "action": "Read the remaining table row and the status summary.",
+          "expect": "Exactly Invoice total looks wrong must remain, and status must say Showing 1 of 8 tickets.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every changed filter, selection, and bulk-close control, focusing on filtered selection scope and state cleanup after closing.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Select a ticket and close it so the queue displays the success message. Then Inspect the status line, close button, and green feedback message after the action. — expect: The success message must be legible, and the status and button must reflect the cleared selection.\n2. Select the second visible ticket, Invoice total looks wrong, without selecting the first row. Then Read the selected count and the checked row after selection rerenders. — expect: Only Invoice total looks wrong must be checked, and status must report exactly 1 selected.\n3. Enable Open only and note the number and subjects of the open rows. Then Enter `password` in Search subject, then read the filtered table and status. — expect: Only Cannot reset password must remain, and status must say Showing 1 of 8 tickets.\n4. Start with the unfiltered queue and locate the second ticket, Invoice total looks wrong. Then Select that ticket and click Close selected. — expect: Its status must become Closed, selected count must become 0, and Close selected must be disabled.\n5. Set Priority to High and note the three visible rows, including their initial statuses. Then Click the table header checkbox, then click Close selected. — expect: Only the three visible High rows must be closed; non-High tickets must"
+    }
+  ]
+}

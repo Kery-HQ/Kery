@@ -1,0 +1,189 @@
+{
+  "label": "noisevar-1",
+  "runs": 16,
+  "cleanRuns": 1,
+  "raw": 30,
+  "deduped": 30,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Valid promo code TEAM15 is rejected for a $380.00 two-attendee order. The displayed discount remains $0.00 and total remains $380.00 instead of a $57.00 discount and $323.00 total."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Correcting a malformed phone without resubmitting does not clear its existing “Enter a valid phone number” validation message immediately."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 to Alice (Standard, $120) and Bob (Workshop, $260) applies a 15% discount of $57.00 to the $380.00 subtotal and sets the total to $323.00. — On Payment, the two attendee tickets produce the displayed $380.00 subtotal (step 17), but after the attempted TEAM15 application the flow later shows TEAM15 with “That promo code is not recognised,” −$0.00 discount, and $380.00 total (step 33); $0.00 does not reconcile with the required $57.00 disc"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Email and phone validation messages disappear immediately when malformed values are corrected, without another Contact submission. — After correction, contact@acme.test is visible but the email error remains, and the malformed-phone error also remains (step 24); both stale messages are still present immediately before a subsequent Continue action (step 25)."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Replacing an applied TEAM15 promo code with INVALID shows an invalid-code error, removes the prior promo application/note, and resets Discount to $0.00. — TEAM15 never reaches an applied-promo state: immediately after the attempted application it still has the red “That promo code is not recognised” error and −$0.00 discount (step 50); INVALID also shows an error with no success note and $0.00 discount (steps 51-52), so the required valid-then-invalid"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "TEAM15 remains in the promo field while discount is −$0.00 and no applied-code feedback is visible."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Organisation, phone, attendee-name, and reserved-seat inputs are exposed as unnamed controls despite visible labels."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Validation feedback causes an approximately 20px downward layout shift: Profile card bottom y=443→463 and Notifications heading y=493→513, contrary to the no-shift expectation."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "“Full name is required.” remains visible even though the Full name field visibly contains Avery Stone."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The email boundary value \"person@example..com\" is accepted on submission: the page shows the green \"Your changes have been saved.\" confirmation and no visible invalid-email error."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Saved confirmation remains visible after a new, unsaved company change, misleading users that current edits are saved."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Save changes with valid name and email immediately disables the button and shows “Saving…” before completion. — Immediately after the valid save click, step 4 records the button as enabled and labeled “Save changes,” with status already reading “Your changes have been saved.” rather than a disabled “Saving…” state."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Submitting billing email \"x@<b>MARKUP</b>\" with default card number is rejected with \"That billing email is not valid. No order was placed.\" and no receipt is created, so the required literal-email re"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Receipt does not display the billing email literally: after submitting <b>literal</b>@example.com, the receipt is rendered as “BK-1001 — $1002.90 to literal@example.com” with “literal” bold and the <b"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Duplicate-click handling fails: two immediate Place order clicks created two confirmations/orders. The first rapid click created BK-1003 and the second created BK-1004, so the receipt list increased f"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A receipt preserves the complete billing email as literal text, including markup-like characters, rather than losing or rendering them. — Step 7 records the field value as literal “<b>literal</b>@example.com”, but step 9 reports the resulting receipt as “BK-1001 — $1002.90 to literal@example.com,” with the `<b>` markup characters missing."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Open only checkbox appears unchecked while the filtered view is presented after enabling Open only."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Success toast remains visible through later filter/search states, leaving stale confirmation in the queue."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After switching to High, the header is checked with only 1/3 rows selected; clicking it clears selection instead of selecting all 3."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV creates a CSV download. — Step 5 clicked Export CSV with no DOM change, and step 6 immediately observed the report unchanged with no download prompt, confirmation, dialog, or browser download indicator."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders displays a visible sent confirmation. — Step 6 directly exercised Send to stakeholders with no DOM change and no recorded confirmation or other visible outcome; the final visible state in step 7 still only records the report and fixed buttons."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking “Export CSV” shows a visible alert with exactly “Export queued.” — Export CSV was clicked in steps 2 and 3, but the immediate inspection recorded no alert text or other resulting effect (both actions have domChanged=NO)."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Booking an assignee entered as <b>Injected</b> renders the row as “Thu, 1 Jan 2026 — Injected” with Injected bold, rather than showing the tag characters as literal text. The input retains the literal"
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The booking row containing the 120-character X assignee is not constrained to the booking card: its unbroken text visibly overflows horizontally past the card’s right boundary, so the long name is not"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The specified stockroom URL /stockroom/index.html returns a visible 404 Error response (File not found) instead of the Stockroom screen."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Undo last does not clear the over-shipment validation error. After rejecting Cable 2m shipped quantity 19 and clicking Undo last to reverse the sole Panel A3 receipt, the page still visibly displays \""
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After the rejected Cable shipment, Undo last clears the over-shipment error and reverses the prior Panel A3 receipt, returning Panel A3 to 7 and movements to 0. — Step 22 verifies the restored data state—Panel A3 7, Total units 535, Items low 2, Movements 0, disabled Undo, and \"No movements recorded yet\"—but explicitly records an observed undo error-cleanup defect, so the required error clearing did not work."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Escape does not dismiss the visible “Audit submitted” dialog, contrary to the required dialog closing behavior."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The submission dialog disappears when closed with Close, by clicking outside it, or by pressing Escape. — After Escape was pressed, the fresh observation in step 6 states that the dialog remained exposed with no visible change; thus at least the Escape closing method did not dismiss it."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "The submission modal can be dismissed with Escape. — Step 16 pressed Escape, and step 17 explicitly observed that the dialog remained open after Escape."
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "label": "sweep2-gridworks-schedule",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 0,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.339,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "gridworks-schedule",
+      "attempt": 1,
+      "durationMs": 90454,
+      "status": "failed",
+      "steps": 8,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.1733,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": false,
+          "why": "The run reports that the shift-date control became empty after attempting to set a date, not that a booked shift for a selected date was displayed as the previous calendar day."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "The query append action failed and the page remained on the original `a` query with its corresponding results. It does not show stale results from an earlier query overriding a later typed query."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "No finding tests or reports HTML-like search input being rendered as formatting rather than displayed literally."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Directory labels, placeholders, and muted no-match status text are legible and fully visible at normal zoom.",
+          "status": "verified",
+          "evidence": "After entering `zzzz`, step 2 observed the fully visible muted status `No matches for \"zzzz\"` and stated that the visible labels plus date and search placeholders were legible."
+        },
+        {
+          "claim": "Rapidly changing the directory query from `a` to `ama` leaves only Amara Osei and identifies the query as `ama`.",
+          "status": "contradicted",
+          "evidence": "The append-`ma` action failed in step 3; the subsequent observation in step 4 records that the value remained `a`, seven results remained visible, and the status still read `Showing results for \"a\"`."
+        },
+        {
+          "claim": "Choosing 10 August 2026 retains that date in the shift-date control for booking.",
+          "status": "contradicted",
+          "evidence": "Although setting the requested date was attempted in step 5, the fresh snapshot in step 6 recorded the Shift date control as empty with placeholder `dd/mm/yyyy`."
+        },
+        {
+          "claim": "Booking a shift for Kai Lindqvist on 10 August 2026 renders a row showing `Mon, 10 Aug 2026` and Kai Lindqvist.",
+          "status": "not_testable",
+          "evidence": "The date was not retained, the assignee was never entered, and Book shift was never clicked; step 6 observed no shift row before the run exited."
+        }
+      ],
+      "findingTexts": [
+        "Muted directory status text has very low contrast on white, reducing readability at normal zoom."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Inspect the initial page, then enter a query with no matches and inspect its status message.",
+          "expect": "Labels, placeholders, and muted status messages must be legible and fully visible at normal zoom.",
+          "priority": 3
+        },
+        {
+          "setup": "",
+          "action": "Type \"a\", wait briefly, then append \"ma\" immediately and read the final directory results.",
+          "expect": "Only Amara Osei must remain, and the results message must identify the query as \"ama\".",
+          "priority": 2
+        },
+        {
+          "setup": "Choose 10 August 2026 and enter Kai Lindqvist as the assignee.",
+          "action": "Click Book shift and read the newly rendered shift row.",
+          "expect": "The row must show Mon, 10 Aug 2026 and Kai Lindqvist; state the exact displayed date.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and rapid directory searches, focusing on disagreements between stored values, rendered values, and asynchronous results. Also inspect whether the page's labels and status text remain readable.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Inspect the initial page, then enter a query with no matches and inspect its status message. — expect: Labels, placeholders, and muted status messages must be legible and fully visible at normal zoom.\n2. Type \"a\", wait briefly, then append \"ma\" immediately and read the final directory results. — expect: Only Amara Osei must remain, and the results message must identify the query as \"ama\".\n3. Choose 10 August 2026 and enter Kai Lindqvist as the assignee. Then Click Book shift and read the newly rendered shift row. — expect: The row must show Mon, 10 Aug 2026 and Kai Lindqvist; state the exact displayed date."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 2,
+      "durationMs": 79990,
+      "status": "failed",
+      "steps": 7,
+      "findings": 0,
+      "checks": 4,
+      "contradicted": 0,
+      "costUsd": 0.1657,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": false,
+          "why": "run produced no findings"
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "run produced no findings"
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "run produced no findings"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Searching the directory for \"zz\" keeps the no-match feedback and search controls visible without clipping.",
+          "status": "verified",
+          "evidence": "Step 2 records that, while the current search value was \"zz\", the no-match feedback and all controls remained visible."
+        },
+        {
+          "claim": "At the narrow mobile layout, all directory labels, inputs, and surrounding cards remain readable, reachable, and unclipped during a no-match search.",
+          "status": "not_testable",
+          "evidence": "The trace records visibility of no-match feedback and controls, but does not record the mobile viewport or inspect labels and surrounding cards for readability/reachability."
+        },
+        {
+          "claim": "After rapidly changing the directory query from \"a\" to \"am\", the directory settles on only Amara Osei and labels the results for \"am\".",
+          "status": "verified",
+          "evidence": "Step 4 records the intermediate \"a\" results, and step 5 records Search = \"am\", exactly one result (Amara Osei), and the label `Showing results for \"am\"`."
+        },
+        {
+          "claim": "Booking a shift dated 2026-08-06 for Rui Tavares creates a row showing Thu, 6 Aug 2026 and Rui Tavares rather than the preceding date.",
+          "status": "not_testable",
+          "evidence": "Step 5 set the shift date, but the trace never records replacing the assignee with Rui Tavares, clicking Book shift, or observing a booked-shift row before the run failed."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open schedule.html at a narrow mobile viewport.",
+          "action": "Search for zz and inspect the no-match message, labels, inputs, and surrounding cards.",
+          "expect": "All labels, controls, and no-match feedback must remain readable, reachable, and unclipped.",
+          "priority": 3
+        },
+        {
+          "setup": "Open schedule.html with the directory search empty.",
+          "action": "Type a, immediately type m, wait one second, and read all displayed results.",
+          "expect": "Results must correspond only to am: Amara Osei and the am query label.",
+          "priority": 2
+        },
+        {
+          "setup": "Open schedule.html, enter 2026-08-06 as the shift date, and replace the assignee with Rui Tavares.",
+          "action": "Click Book shift and read the new booked-shift row.",
+          "expect": "The row must show Thu, 6 Aug 2026 and Rui Tavares, not the preceding date.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and directory search with boundary values and rapid input changes, then inspect the rendered feedback for readability and clipping.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open schedule.html at a narrow mobile viewport. Then Search for zz and inspect the no-match message, labels, inputs, and surrounding cards. — expect: All labels, controls, and no-match feedback must remain readable, reachable, and unclipped.\n2. Open schedule.html with the directory search empty. Then Type a, immediately type m, wait one second, and read all displayed results. — expect: Results must correspond only to am: Amara Osei and the am query label.\n3. Open schedule.html, enter 2026-08-06 as the shift date, and replace the assignee with Rui Tavares. Then Click Book shift and read the new booked-shift row. — expect: The row must show Thu, 6 Aug 2026 and Rui Tavares, not the preceding date."
+    }
+  ]
+}

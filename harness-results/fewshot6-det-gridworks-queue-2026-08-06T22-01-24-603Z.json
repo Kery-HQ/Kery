@@ -1,0 +1,628 @@
+{
+  "label": "fewshot6-det-gridworks-queue",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 10,
+    "planted": 18,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.9894,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "gridworks-queue",
+      "attempt": 1,
+      "durationMs": 198758,
+      "status": "failed",
+      "steps": 19,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.4316,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": true,
+          "why": "The run explicitly reports that under the Open-only filter, six visible rows are checked but the footer says 8 selected, including excluded closed tickets."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "The run states that after bulk-closing the selected SSO row, its selection remains and the selected count stays at 1 instead of clearing."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": true,
+          "why": "The run reports a toast claiming one ticket was closed for the SSO row, while another finding establishes that this row was already Closed before the requested bulk-close operation. Thus the toast counts a ticket that did not actually chang"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At the 320px-wide queue view, every table column, row value, filter, and bulk-action control remains readable and reachable without being covered.",
+          "status": "verified",
+          "evidence": "Step 1 records that the rightmost visible column is Age (days) and that all columns and the Close selected control are reachable in the available view."
+        },
+        {
+          "claim": "Selecting the second ticket selects it and enables Close selected; selecting it again deselects it and disables the bulk action.",
+          "status": "verified",
+          "evidence": "Step 2 shows “Invoice total looks wrong” checked, the footer changing to 1 selected, and Close selected enabled; step 3 records it unchecked again with 0 selected and Close selected disabled."
+        },
+        {
+          "claim": "Open-only select-all and bulk close affect only the six visible open tickets, without selecting, counting, or changing excluded closed tickets.",
+          "status": "contradicted",
+          "evidence": "Step 4 shows 6 of 8 tickets under Open only, but step 5 reports all six visible checkboxes checked while the footer incorrectly says 8 selected; after the bulk-close sequence, step 7 shows all 8 tickets Closed and all row checkboxes still checked."
+        },
+        {
+          "claim": "The SSO login loop ticket is Open when isolated by search, so bulk close can transition it to Closed.",
+          "status": "contradicted",
+          "evidence": "Step 9 shows the isolated “SSO login loop” row already has Closed status before its requested bulk-close operation."
+        },
+        {
+          "claim": "Closing the selected SSO row clears its selection and disables Close selected afterward.",
+          "status": "verified",
+          "evidence": "After the selected SSO row is closed, step 11 records its checkbox unchecked, the footer at 0 selected, and Close selected disabled."
+        },
+        {
+          "claim": "Bulk closing the High-priority selection closes exactly the three High tickets while leaving non-High tickets unchanged, clears selection, and reports the expected toast.",
+          "status": "not_testable",
+          "evidence": "Step 17 records the three High-filter rows selected, but no post-close table state, non-High comparison, selection cleanup, or toast text was recorded before the run failed at step 19."
+        }
+      ],
+      "findingTexts": [
+        "With Open only enabled, clicking the header checkbox checks the six visible open rows but the footer reports “Showing 6 of 8 tickets · 8 selected.” Excluded closed tickets are being counted as selecte",
+        "Bulk closing one selected SSO row does not clear its selection or disable Close selected. The toast reports one ticket, but the selected count remains 1 after the action."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "At a 320px-wide viewport, load the queue and note the table’s rightmost columns and bulk-action control.",
+          "action": "Inspect the full queue and try reaching every column and the Close selected button.",
+          "expect": "Every header, row value, filter, and action must remain readable and reachable without content covering it.",
+          "priority": 5
+        },
+        {
+          "setup": "Leave all filters at their defaults and verify Close selected is disabled with no tickets selected.",
+          "action": "Select the second ticket row, then click its checkbox again to deselect it.",
+          "expect": "The second row must toggle selected then unselected, and the button must follow those states.",
+          "priority": 4
+        },
+        {
+          "setup": "Enable Open only and note the visible row count and the already-closed tickets excluded from the table.",
+          "action": "Click the header checkbox, click Close selected, and inspect the table, status, and toast.",
+          "expect": "Only visible open tickets must close; excluded closed tickets must not be selected or counted.",
+          "priority": 3
+        },
+        {
+          "setup": "Search for “SSO” and select the SSO login loop row; note its selected count and Open status.",
+          "action": "Click Close selected and re-read the row, selected count, toast, and button.",
+          "expect": "The row must become Closed; selection must be zero, button disabled, and toast must report one ticket.",
+          "priority": 2
+        },
+        {
+          "setup": "Choose Priority High and note the three visible High tickets and their statuses.",
+          "action": "Click the header checkbox, click Close selected, and inspect every remaining row and the status and toast.",
+          "expect": "Only the three High tickets must close; non-High tickets must remain unchanged and selection must clear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every new filter, selection, and bulk-close control, especially filtered bulk selection and cleanup after closing. Report the visible rows, counts, statuses, button state, and toast text.\n\nWork through these checks in order, and record what you actually observe for each:\n1. At a 320px-wide viewport, load the queue and note the table’s rightmost columns and bulk-action control. Then Inspect the full queue and try reaching every column and the Close selected button. — expect: Every header, row value, filter, and action must remain readable and reachable without content covering it.\n2. Leave all filters at their defaults and verify Close selected is disabled with no tickets selected. Then Select the second ticket row, then click its checkbox again to deselect it. — expect: The second row must toggle selected then unselected, and the button must follow those states.\n3. Enable Open only and note the visible row count and the already-closed tickets excluded from the table. Then Click the header checkbox, click Close selected, and inspect the table, status, and toast. — expect: Only visible open tickets must close; excluded closed tickets must not be selected or counted.\n4. Search for “SSO” and select the SSO login loop row; note its selected count and Open status. Then Click Close selected and re-read the row, selected count, toast, and button. — expect: The row must become Closed; selection must be zero, button disabled, and toast must report one ticket.\n5. Choose Priorit"
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 2,
+      "durationMs": 85433,
+      "status": "failed",
+      "steps": 10,
+      "findings": 2,
+      "checks": 3,
+      "contradicted": 0,
+      "costUsd": 0.1588,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": false,
+          "why": "The run mentions select-all checkbox accessibility only; it does not report that select-all includes filtered-out tickets or produces an inflated selected count."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": false,
+          "why": "No finding reports closing selected tickets or a selection count remaining after close."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "No finding reports the close confirmation toast, its count, or a mismatch between reported and actually closed tickets."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Combining Priority High, subject search \"password\", and Open only leaves exactly the open ticket \"Cannot reset password\" and reports Showing 1 of 8 tickets.",
+          "status": "verified",
+          "evidence": "Step 5 observes Priority High with Search subject \"password\" and Open only enabled; only \"Cannot reset password\" is visible as Open and the summary reads \"Showing 1 of 8 tickets · 0 selected.\""
+        },
+        {
+          "claim": "With Priority set to Low and no subject restriction, exactly \"Feature request: dark mode\" and \"Typo on pricing page\" are visible, and select-all followed by Close selected closes only those Low-priori",
+          "status": "not_testable",
+          "evidence": "The run changed Priority to Low but Search subject remained \"password\"; step 8 observed no tickets, and the attempted clearing action did not complete, so neither the Low-row contents nor select-all/bulk close scope was exercised."
+        },
+        {
+          "claim": "Selecting \"Cannot reset password\" and \"SSO login loop\" and closing selected closes both, then clears selection, unchecks both row checkboxes, and disables Close selected.",
+          "status": "not_testable",
+          "evidence": "The run exited at step 10 before either named row was selected or Close selected was invoked for this cleanup check."
+        }
+      ],
+      "findingTexts": [
+        "Table column headers and cells shift horizontally between filtered states, causing an unstable table layout.",
+        "Table select-all and row-selection checkboxes have no accessible names, preventing users from identifying their scope."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Set Priority to High, enter “password” in Search subject, and enable Open only.",
+          "expect": "Exactly “Cannot reset password” must remain, and status must say Showing 1 of 8 tickets.",
+          "priority": 3
+        },
+        {
+          "setup": "Filter Priority to Low and note that only “Feature request: dark mode” and “Typo on pricing page” are visible.",
+          "action": "Click the table’s select-all checkbox, then click “Close selected”.",
+          "expect": "Only the two Low rows must close; High and Normal ticket statuses must remain unchanged.",
+          "priority": 2
+        },
+        {
+          "setup": "Select “Cannot reset password” and “SSO login loop”; note both selected checkboxes and the selected count.",
+          "action": "Click “Close selected”, then reread both rows, the selected count, button state, and checkboxes.",
+          "expect": "Both rows must be Closed; selected count must be 0, button disabled, and both checkboxes unchecked.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every added filter and bulk-selection control, concentrating on selection scope and cleanup after closing tickets.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Set Priority to High, enter “password” in Search subject, and enable Open only. — expect: Exactly “Cannot reset password” must remain, and status must say Showing 1 of 8 tickets.\n2. Filter Priority to Low and note that only “Feature request: dark mode” and “Typo on pricing page” are visible. Then Click the table’s select-all checkbox, then click “Close selected”. — expect: Only the two Low rows must close; High and Normal ticket statuses must remain unchanged.\n3. Select “Cannot reset password” and “SSO login loop”; note both selected checkboxes and the selected count. Then Click “Close selected”, then reread both rows, the selected count, button state, and checkboxes. — expect: Both rows must be Closed; selected count must be 0, button disabled, and both checkboxes unchecked."
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 3,
+      "durationMs": 207550,
+      "status": "passed",
+      "steps": 21,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.4467,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": true,
+          "why": "Findings 2 and 4 explicitly report that using the header select-all in a filtered view selected all 8 tickets, including hidden rows, rather than only the visible filtered tickets."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "Findings 1 and 3 explicitly state that after closing a selected ticket it remained checked, the selected count stayed at 1, and Close selected remained enabled instead of resetting."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "The findings report incorrect bulk selection/closing scope and stale selection after closing, but do not report a confirmation toast whose closed-ticket count exceeds the number of tickets actually changed."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "With Open only enabled, Low priority selected, and subject search set to “dark,” only the open “Feature request: dark mode” ticket is shown, with no closed or unrelated tickets visible.",
+          "status": "verified",
+          "evidence": "Steps 2-4 show the Low/Open filter reduced the list to two open Low tickets, then the “dark” search left exactly one row, “Feature request: dark mode,” marked Open, with “Showing 1 of 8 tickets.”"
+        },
+        {
+          "claim": "Closing the selected Invoice ticket shows its Closed result and a legible success message beneath the table.",
+          "status": "verified",
+          "evidence": "After Close selected was clicked in step 6, step 7 records that “Invoice total looks wrong is Closed” and that the status plus green “Closed 1 ticket(s).” success message were fully visible beneath the table."
+        },
+        {
+          "claim": "Searching the default queue for “invoice” leaves exactly “Invoice total looks wrong” and accurately reports “Showing 1 of 8 tickets.”",
+          "status": "verified",
+          "evidence": "Step 8 established the restored default list contained eight tickets, and step 9 records that search “invoice” showed exactly “Invoice total looks wrong” with status “Showing 1 of 8 tickets · 0 selected.”"
+        },
+        {
+          "claim": "Closing a selected ticket clears its selection, returns the selected count to 0, and disables Close selected.",
+          "status": "contradicted",
+          "evidence": "Immediately after the selected Invoice ticket was closed, step 12 records it was “Closed but still checked” and the status remained “Showing 8 of 8 tickets · 1 selected,” demonstrating selection cleanup did not occur."
+        },
+        {
+          "claim": "Bulk closing from a filtered High-priority, Open-only view closes only the two visible tickets and preserves the statuses of previously hidden tickets.",
+          "status": "contradicted",
+          "evidence": "Steps 15-16 selected only the two visible High/Open tickets, but step 17 reported “0 of 8 tickets · 8 selected” after closing, and step 19 confirmed that all eight rows—including previously hidden tickets—were checked and marked Closed."
+        },
+        {
+          "claim": "Using the default-view header checkbox selects all eight displayed tickets and reports 8 selected.",
+          "status": "verified",
+          "evidence": "Step 20 recorded the fresh default view with eight tickets and 0 selected; after the header selection action, step 21 recorded all eight tickets checked and “Showing 8 of 8 tickets · 8 selected.”"
+        }
+      ],
+      "findingTexts": [
+        "Bulk close does not clean up selection: the closed Invoice total looks wrong row remains selected, the selected count remains 1, and Close selected stays enabled after closing it.",
+        "Filtered header select intended to select 2 visible tickets, but selected and closed all 8 hidden and visible tickets."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reload and enable Open only so the table shows only open tickets.",
+          "action": "Change Priority to Low, then type \"dark\" into Search subject.",
+          "expect": "The remaining row must be Feature request: dark mode, and no closed or unrelated row may remain visible.",
+          "priority": 6
+        },
+        {
+          "setup": "Reload, select the second ticket, and prepare to close it while watching the status and feedback area.",
+          "action": "Click Close selected and reread the status and feedback beneath the table.",
+          "expect": "The Closed result and the success message must both be legible and unobscured beneath the table.",
+          "priority": 5
+        },
+        {
+          "setup": "Reload and note the default ticket list and the status count.",
+          "action": "Type \"invoice\" into Search subject.",
+          "expect": "Exactly Invoice total looks wrong must remain, and status must say Showing 1 of 8 tickets.",
+          "priority": 4
+        },
+        {
+          "setup": "Reload and identify the second ticket, Invoice total looks wrong.",
+          "action": "Select that row and click Close selected.",
+          "expect": "The row must be Closed, selected count must return to 0, the button must be disabled, and a visible success message must appear.",
+          "priority": 3
+        },
+        {
+          "setup": "Reload; set Priority to High, enable Open only, and note the visible open High-priority ticket names.",
+          "action": "Click the header checkbox, click Close selected, then clear Priority and Open only.",
+          "expect": "Only the noted visible tickets must become Closed; all previously hidden tickets must retain their original statuses.",
+          "priority": 2
+        },
+        {
+          "setup": "Load the queue with its default filters and note the eight displayed tickets and the selected count.",
+          "action": "Click the header checkbox to select all tickets.",
+          "expect": "The header checkbox must remain checked, every row must be checked, and status must say 8 selected.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every changed queue control, prioritizing filtered bulk-selection behavior, hidden-ticket protection, selection cleanup, and visible feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reload and enable Open only so the table shows only open tickets. Then Change Priority to Low, then type \"dark\" into Search subject. — expect: The remaining row must be Feature request: dark mode, and no closed or unrelated row may remain visible.\n2. Reload, select the second ticket, and prepare to close it while watching the status and feedback area. Then Click Close selected and reread the status and feedback beneath the table. — expect: The Closed result and the success message must both be legible and unobscured beneath the table.\n3. Reload and note the default ticket list and the status count. Then Type \"invoice\" into Search subject. — expect: Exactly Invoice total looks wrong must remain, and status must say Showing 1 of 8 tickets.\n4. Reload and identify the second ticket, Invoice total looks wrong. Then Select that row and click Close selected. — expect: The row must be Closed, selected count must return to 0, the button must be disabled, and a visible success message must appear.\n5. Reload; set Priority to High, enable Open only, and note the visible open High-priority ticket names. Then Click the header checkbox, click Close selected, then clear Priority and Open only. — expect: Only the noted visible tickets must become Closed; all"
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 4,
+      "durationMs": 174866,
+      "status": "passed",
+      "steps": 17,
+      "findings": 3,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.4071,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": true,
+          "why": "Findings 3 and 5 explicitly report that filtered header select-all selected all 8 tickets, including hidden tickets, instead of only the visible filtered rows."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "Findings 2 and 4 report that after bulk close, the ticket remains checked, the footer still shows selected tickets, and Close selected remains enabled rather than selection resetting."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "The run reports a toast of “Closed 8 ticket(s)” after select-all incorrectly selected 8 filtered/hidden tickets, but it does not establish that any of those tickets were already closed or that the toast exceeded the number of tickets actual"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clearing a visible row after selecting all visible tickets makes the header checkbox become unchecked.",
+          "status": "not_testable",
+          "evidence": "The trace records that selecting the header checked all nine checkboxes at step 2 and that 7 tickets remained selected before reload at step 3, but it never records the header checkbox state after the row was cleared."
+        },
+        {
+          "claim": "Closing the selected “Invoice total looks wrong” ticket changes its status to Closed.",
+          "status": "verified",
+          "evidence": "After Close selected was clicked, step 6 observes that “Invoice total looks wrong is Closed.”"
+        },
+        {
+          "claim": "After closing selected tickets, selection is cleared and Close selected is disabled.",
+          "status": "contradicted",
+          "evidence": "Step 6 observes the closed Invoice total looks wrong ticket still checked, with “1 selected” shown and Close selected still enabled after the close action."
+        },
+        {
+          "claim": "With Priority High and Open only enabled, header select-all selects and closes only the two visible open High tickets, and the toast reports Closed 2 ticket(s).",
+          "status": "contradicted",
+          "evidence": "Step 10 observes only two filtered rows but “8 selected”; after closing, step 11 records toast “Closed 8 ticket(s),” no matching filtered tickets, and “8 selected,” rather than closing only two."
+        },
+        {
+          "claim": "Priority High, Open only, and Search subject reset leave exactly “Cannot reset password” visible with Open status, show “Showing 1 of 8,” and retain the Search subject label.",
+          "status": "verified",
+          "evidence": "Step 17 records Priority High, Open only checked, the visible Search subject label with value “reset,” exactly Cannot reset password with Open status, and the required Showing 1 of 8 result."
+        }
+      ],
+      "findingTexts": [
+        "Header select-all checkbox remains checked after the first visible ticket is deselected. Footer shows 7 selected of 8, so the header state is stale.",
+        "Bulk-closing a selected ticket does not clear its selection. Immediately after closing Invoice total looks wrong, its status is Closed but its checkbox remains checked, the footer says 1 selected, and",
+        "Filtered header select-all selects hidden tickets. With High and Open only filters applied, it selected all 8 tickets; clicking Close selected immediately produced “Closed 8 ticket(s).” and the filter"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Reload the page with all tickets visible.",
+          "action": "Click the header checkbox, then clear the first visible ticket's row checkbox.",
+          "expect": "The header checkbox must become unchecked when any visible row is unselected.",
+          "priority": 4
+        },
+        {
+          "setup": "Reload the page and note the initial status showing zero selected.",
+          "action": "Select the second ticket, Invoice total looks wrong, then click Close selected.",
+          "expect": "Invoice total looks wrong must show Closed; selected count must be 0 and Close selected must be disabled.",
+          "priority": 3
+        },
+        {
+          "setup": "Reload the page so all eight tickets are visible.",
+          "action": "Choose High, enable Open only, click the header checkbox, and click Close selected.",
+          "expect": "Only the two visible open High tickets must be selected and closed; toast must report Closed 2 ticket(s).",
+          "priority": 2
+        },
+        {
+          "setup": "",
+          "action": "Choose Priority High, enable Open only, and type reset into Search subject.",
+          "expect": "Exactly Cannot reset password must remain, show Open status, and status must say Showing 1 of 8; Search subject label must remain visible.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every added filter and selection control, then verify bulk-close counts, selection cleanup, and visible control state.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Reload the page with all tickets visible. Then Click the header checkbox, then clear the first visible ticket's row checkbox. — expect: The header checkbox must become unchecked when any visible row is unselected.\n2. Reload the page and note the initial status showing zero selected. Then Select the second ticket, Invoice total looks wrong, then click Close selected. — expect: Invoice total looks wrong must show Closed; selected count must be 0 and Close selected must be disabled.\n3. Reload the page so all eight tickets are visible. Then Choose High, enable Open only, click the header checkbox, and click Close selected. — expect: Only the two visible open High tickets must be selected and closed; toast must report Closed 2 ticket(s).\n4. Choose Priority High, enable Open only, and type reset into Search subject. — expect: Exactly Cannot reset password must remain, show Open status, and status must say Showing 1 of 8; Search subject label must remain visible."
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 5,
+      "durationMs": 194551,
+      "status": "failed",
+      "steps": 22,
+      "findings": 2,
+      "checks": 5,
+      "contradicted": 2,
+      "costUsd": 0.3848,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": true,
+          "why": "The run explicitly reports that filtered header select-all selected all 8 tickets rather than only the 1 visible filtered row."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "After closing the selected ticket, the summary still reported 1 selected and Close selected remained enabled; reopening the queue showed the closed ticket still checked."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "The run reports a toast of “Closed 1 ticket(s).” when closing one selected open ticket, but does not show the toast counting already-closed tickets or exceeding the number actually changed."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Open-only filtering retains selected open tickets and reports visible-ticket count separately from selected-ticket count.",
+          "status": "verified",
+          "evidence": "After Open only was enabled, the trace recorded six open rows (step 4), and after clearing one prior selection the summary explicitly read “Showing 6 of 8 tickets · 2 selected” while Cannot reset password and SSO login loop remained checked (step 6)."
+        },
+        {
+          "claim": "Closing one selected ticket changes that ticket to Closed while clearing its selection and disabling Close selected afterward.",
+          "status": "contradicted",
+          "evidence": "Cannot reset password was later shown as Closed (step 14), but after the Close selected action it remained checked when the unfiltered queue was reopened (step 9), so bulk closing did not clear the selection as required."
+        },
+        {
+          "claim": "Bulk closing one selected ticket displays a toast reporting one ticket closed.",
+          "status": "not_testable",
+          "evidence": "Close selected was clicked in step 7, but the trace recorded no post-action toast observation; a later row-status observation cannot establish whether a transient toast appeared."
+        },
+        {
+          "claim": "From an unfiltered queue, selecting all eight tickets and then unchecking the second ticket leaves the header checkbox unchecked and exactly seven tickets selected.",
+          "status": "verified",
+          "evidence": "The header and all eight rows were checked after select-all (step 12); after Invoice total looks wrong was unchecked, the header was unchecked and the other seven row checkboxes remained checked (step 13)."
+        },
+        {
+          "claim": "With Priority High, subject search “invoice,” and Open only enabled, header select-all selects the one visible matching ticket and reports 1 selected.",
+          "status": "contradicted",
+          "evidence": "The filters produced exactly one visible Open High invoice ticket (step 18), but the header-checkbox action left that row unchecked while the header remained checked (step 19); the next header action instead cleared the seven hidden selections rather than selecting the visible row (step 20)."
+        }
+      ],
+      "findingTexts": [
+        "After closing the only selected ticket, Cannot reset password is removed from the Open-only rows and the toast says “Closed 1 ticket(s).”, but the summary still says “1 selected” and Close selected re",
+        "Filtered header select-all selects all 8 tickets; intended behavior is to select only the 1 visible filtered row."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Select \"Invoice total looks wrong\" and \"SSO login loop\", then enable Open only.",
+          "action": "Read the rows and status summary after filtering.",
+          "expect": "Only selected open tickets must remain visible, while the summary must identify the visible count separately from selected count.",
+          "priority": 4
+        },
+        {
+          "setup": "Select the \"Cannot reset password\" ticket and note its selected checkbox and the enabled Close selected button.",
+          "action": "Click Close selected and reread the row, checkbox, button, and toast.",
+          "expect": "The row must be Closed, selection must be cleared, the button disabled, and the toast must report one ticket.",
+          "priority": 3
+        },
+        {
+          "setup": "Start with the unfiltered queue and select the first visible ticket.",
+          "action": "Select all tickets, then uncheck the second visible ticket.",
+          "expect": "The header checkbox must be unchecked, and the status must say 7 selected.",
+          "priority": 2
+        },
+        {
+          "setup": "Set Priority to High, enter \"invoice\" in Search subject, and enable Open only.",
+          "action": "Click the header selection checkbox and read the visible row and status summary.",
+          "expect": "Exactly one visible row must be selected, and the status must say 1 selected.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every changed queue control, prioritizing filtered select-all behavior, selection indicators, and cleanup after bulk closing.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Select \"Invoice total looks wrong\" and \"SSO login loop\", then enable Open only. Then Read the rows and status summary after filtering. — expect: Only selected open tickets must remain visible, while the summary must identify the visible count separately from selected count.\n2. Select the \"Cannot reset password\" ticket and note its selected checkbox and the enabled Close selected button. Then Click Close selected and reread the row, checkbox, button, and toast. — expect: The row must be Closed, selection must be cleared, the button disabled, and the toast must report one ticket.\n3. Start with the unfiltered queue and select the first visible ticket. Then Select all tickets, then uncheck the second visible ticket. — expect: The header checkbox must be unchecked, and the status must say 7 selected.\n4. Set Priority to High, enter \"invoice\" in Search subject, and enable Open only. Then Click the header selection checkbox and read the visible row and status summary. — expect: Exactly one visible row must be selected, and the status must say 1 selected."
+    },
+    {
+      "case": "gridworks-queue",
+      "attempt": 6,
+      "durationMs": 88581,
+      "status": "failed",
+      "steps": 10,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.1604,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "select-all-ignores-filter",
+          "class": "bulk-scope",
+          "caught": false,
+          "why": "The findings do not describe applying a filter or header select-all selecting hidden rows."
+        },
+        {
+          "id": "selection-persists-after-close",
+          "class": "stale-state",
+          "caught": true,
+          "why": "Both findings explicitly report that after bulk close the ticket remains checked, the selected count remains 1, and Close selected stays enabled rather than the selection resetting."
+        },
+        {
+          "id": "close-toast-overstates-count",
+          "class": "count-vs-reality",
+          "caught": false,
+          "why": "The findings do not mention the close confirmation toast or an overstated number of tickets closed."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The default queue displays its core table headings and default filters, with an eight-ticket total.",
+          "status": "verified",
+          "evidence": "Step 3 records headings Subject, Requester, Priority, Status, and Age (days), with Priority=All, an empty Search subject field, Open only unchecked; step 7 records “Showing 8 of 8 tickets.”"
+        },
+        {
+          "claim": "Keyboard focus on the Search subject field, Open only control, and header checkbox has a visible focus indication, and the empty search field remains identifiable.",
+          "status": "verified",
+          "evidence": "Steps 4-6 observe a visible blue focus outline on Search subject, Open only, and the header checkbox; step 4 also records the visible “type to filter” placeholder."
+        },
+        {
+          "claim": "Closing a selected ticket changes that ticket to Closed and provides readable success feedback.",
+          "status": "verified",
+          "evidence": "Step 7 performs Close selected with domChanged=yes, and step 8 observes Cannot reset password as Closed plus the green toast “Closed 1 ticket(s).”"
+        },
+        {
+          "claim": "A completed bulk close clears the completed ticket selection and selected count.",
+          "status": "contradicted",
+          "evidence": "After the Close selected action, step 8 explicitly observes Cannot reset password’s checkbox still checked and the status still reporting a selected ticket, despite the ticket having been closed."
+        },
+        {
+          "claim": "Changing and clearing filters preserves feedback, reconciles visible/selected counts, scopes bulk actions to filtered visible rows, and handles closed-ticket/no-op bulk close correctly.",
+          "status": "not_testable",
+          "evidence": "The run stopped after step 8; it did not observe a completed priority-filter change/clear or execute the remaining search, open-only, header-selection, filtered bulk-close, and closed-ticket scenarios."
+        }
+      ],
+      "findingTexts": [
+        "After bulk close, the closed ticket remains checked and status still says 1 selected; Close selected stays enabled."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Load the queue with its default filters and inspect the headings, labels, controls, rows, and status.",
+          "action": "Use the keyboard to move focus through filters, selection controls, and Close selected.",
+          "expect": "Every focused control must have a visible focus indication, and every input must remain identifiable after typing.",
+          "priority": 10
+        },
+        {
+          "setup": "Select a ticket and close it, leaving the success toast visible.",
+          "action": "Change the priority filter and then clear it, observing the toast and selection state.",
+          "expect": "The success message must remain readable, while no stale selection must remain after the completed bulk action.",
+          "priority": 9
+        },
+        {
+          "setup": "Filter to Low priority and note the visible ticket subjects.",
+          "action": "Type “dark” into Search subject, enable Open only, and reread the table and status.",
+          "expect": "The table must show only the open Low-priority subject containing “dark”, with matching visible and total counts.",
+          "priority": 8
+        },
+        {
+          "setup": "With all filters off, note the eight-ticket total and leave every row unselected.",
+          "action": "Click the header checkbox, then click it again and reread every row and the selected count.",
+          "expect": "The first click must select all visible rows; the second must clear all selections and show zero selected.",
+          "priority": 7
+        },
+        {
+          "setup": "With all filters off, select “Cannot reset password” and note the selected count.",
+          "action": "Enter “password” in Search subject and reread the result and selected count.",
+          "expect": "Only the matching row must remain, and selected count must equal the matching selected rows shown.",
+          "priority": 6
+        },
+        {
+          "setup": "With all filters off, select two distinct tickets and note their subjects and the selected count.",
+          "action": "Enable Open only and reread the rows, selected count, and Close selected control.",
+          "expect": "Closed rows must disappear, while selected count must describe only currently visible selected rows.",
+          "priority": 5
+        },
+        {
+          "setup": "Filter Priority to High, select the header checkbox, and note the selected count.",
+          "action": "Click Close selected and inspect all rows after removing the filter.",
+          "expect": "Only the filtered High tickets must close; non-High tickets must retain their previous statuses.",
+          "priority": 4
+        },
+        {
+          "setup": "Select the priority filter High and note the visible High-priority rows.",
+          "action": "Click the table header checkbox and read the selected count and each visible row.",
+          "expect": "Only visible High rows must be selected, and the selected count must equal their visible row count.",
+          "priority": 3
+        },
+        {
+          "setup": "Leave all filters off and note the rows; identify the closed ticket “Export never finishes.”",
+          "action": "Select that closed ticket and click Close selected.",
+          "expect": "No ticket must be newly closed, and the interface must not claim it closed one ticket.",
+          "priority": 2
+        },
+        {
+          "setup": "Leave all filters off and note the initial ticket rows and the status count.",
+          "action": "Select the second ticket, then click Close selected and reread its row, status, and controls.",
+          "expect": "The second ticket must show Closed, selected count must be zero, and Close selected must be disabled.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every changed queue control, prioritizing filter/selection disagreements and verifying that bulk close updates and clears the interface.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Load the queue with its default filters and inspect the headings, labels, controls, rows, and status. Then Use the keyboard to move focus through filters, selection controls, and Close selected. — expect: Every focused control must have a visible focus indication, and every input must remain identifiable after typing.\n2. Select a ticket and close it, leaving the success toast visible. Then Change the priority filter and then clear it, observing the toast and selection state. — expect: The success message must remain readable, while no stale selection must remain after the completed bulk action.\n3. Filter to Low priority and note the visible ticket subjects. Then Type “dark” into Search subject, enable Open only, and reread the table and status. — expect: The table must show only the open Low-priority subject containing “dark”, with matching visible and total counts.\n4. With all filters off, note the eight-ticket total and leave every row unselected. Then Click the header checkbox, then click it again and reread every row and the selected count. — expect: The first click must select all visible rows; the second must clear all selections and show zero selected.\n5. With all filters off, select “Cannot reset password” and note the selected count. Then"
+    }
+  ]
+}

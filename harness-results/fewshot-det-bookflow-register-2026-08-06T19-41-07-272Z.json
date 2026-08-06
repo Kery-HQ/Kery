@@ -1,0 +1,269 @@
+{
+  "label": "fewshot-det-bookflow-register",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 3,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.5491,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "bookflow-register",
+      "attempt": 1,
+      "durationMs": 447155,
+      "status": "passed",
+      "steps": 51,
+      "findings": 5,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.959,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "workshop-price-label-vs-charge",
+          "class": "label-vs-value",
+          "caught": true,
+          "why": "The run explicitly reports that Workshop is displayed as $260 but Payment charges a $240 subtotal/total for one Workshop attendee."
+        },
+        {
+          "id": "back-discards-attendees",
+          "class": "navigation-data-loss",
+          "caught": true,
+          "why": "The run reports that an added attendee disappears after going Back from Attendees to Contact and then continuing back, leaving an empty attendee list."
+        },
+        {
+          "id": "seats-input-has-no-effect",
+          "class": "dead-control",
+          "caught": true,
+          "why": "The run reports that changing Seats reserved from 1 to 2 leaves the payment totals unchanged and provides no visible seat count or mismatch message."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "All wizard text and controls are legible, unobscured, and unclipped at both normal and narrow viewport widths.",
+          "status": "not_testable",
+          "evidence": "The trace records only a final unobscured Payment view at the current viewport (step 51) and contains no viewport resize or narrow-width observations."
+        },
+        {
+          "claim": "Submitting empty contact details keeps the user on Contact and visibly identifies both the required organisation and invalid email.",
+          "status": "verified",
+          "evidence": "After Continue was clicked with empty fields, the wizard remained on Contact and displayed “Organisation is required” and “Enter a valid email address” (steps 1-2; repeated in steps 24-25)."
+        },
+        {
+          "claim": "An attendee and ticket selection persist when the user goes Back to Contact and then Continues to Attendees again.",
+          "status": "contradicted",
+          "evidence": "Alice · standard was present immediately after being added (step 7), but after Back returned to Contact (step 8) and Continue returned to Attendees, the list was observed as empty before a new Alice was entered (step 10)."
+        },
+        {
+          "claim": "Confirmation for two standard-ticket attendees preserves the attendee count, organisation, and payment total, with the displayed $240.00 reconciling to two $120 standard tickets.",
+          "status": "verified",
+          "evidence": "Payment showed 2 attendees and $240.00 (step 22), and the confirmation panel then stated “2 attendee(s) for Acme. Total charged $240.00” (step 23); the two attendee rows were Alice · standard and Bob · standard (step 21)."
+        },
+        {
+          "claim": "Payment accurately reflects changed seat reservations and displayed ticket prices, or visibly reports a seat mismatch instead of silently using stale values.",
+          "status": "contradicted",
+          "evidence": "After Seats reserved changed from 1 to 2 with one $120 standard attendee, Payment still showed one attendee and a $120.00 subtotal/total (steps 30-32); separately, Workshop was displayed as $260 but the Payment subtotal and total were $240.00 (steps 49-51)."
+        },
+        {
+          "claim": "Applying TEAM15 produces its discount, and replacing it with BADCODE visibly rejects the invalid code without silently retaining a prior discount.",
+          "status": "contradicted",
+          "evidence": "Immediately after the TEAM15 apply attempt, Payment showed “That promo code is not recognised.” with −$0.00 discount and $120.00 total (step 16); BADCODE likewise left the error, −$0.00 discount, and $120.00 total (steps 17-18), so the expected TEAM15 discount was never applied."
+        }
+      ],
+      "findingTexts": [
+        "Attendee state is lost when navigating Back from Attendees to Contact and then Continue back: Alice · standard was present before Back, but the returned Attendees view shows “No attendees yet” with an",
+        "Applying TEAM15, the stated valid promo code, shows “That promo code is not recognised.” The Payment summary remains Subtotal $120.00, Discount −$0.00, Total due $120.00.",
+        "With one listed standard attendee (Seat S) and Seats reserved changed from 1 to 2, Payment shows Attendees 1, Subtotal $120.00, Discount −$0.00, and Total due $120.00, with no visible seats count or m",
+        "Workshop ticket pricing calculation disagrees with the displayed rule: after adding one attendee shown as “Workshop W · workshop,” Payment lists Attendees 1 but Subtotal $240.00 and Total due $240.00,",
+        "Organisation 'is required' error remains visible after the Organisation field contains Acme."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open each wizard step, including an invalid-contact state and the Payment summary, at normal and narrow viewport widths.",
+          "action": "Inspect labels, inputs, errors, buttons, attendee rows, and totals for reachability and visibility.",
+          "expect": "All text and controls must be legible, unobscured, and free of clipping at both widths.",
+          "priority": 8
+        },
+        {
+          "setup": "Reach Payment with two attendees and note the displayed total.",
+          "action": "Click Confirm registration and read the confirmation panel.",
+          "expect": "Confirmation must show two attendees, the organisation, and the same total noted before confirmation.",
+          "priority": 7
+        },
+        {
+          "setup": "Leave contact fields empty and click Continue from step 1.",
+          "action": "Read the validation messages and whether the wizard advances.",
+          "expect": "Visible errors must identify required organisation and invalid email; the wizard must remain on step 1.",
+          "priority": 6
+        },
+        {
+          "setup": "On step 2, add distinct attendees Alice and Bob.",
+          "action": "Remove Bob, continue to Payment, and read the attendee count and remaining names.",
+          "expect": "Bob must be absent, Alice must remain, and the summary count must be 1.",
+          "priority": 5
+        },
+        {
+          "setup": "On step 2, add attendee Alice with a standard ticket and note that she appears.",
+          "action": "Click Back, then Continue to return to step 2 and reread the attendee list.",
+          "expect": "Alice must still appear with her ticket selection after navigating away and back.",
+          "priority": 4
+        },
+        {
+          "setup": "Reach step 2 with one standard attendee and Seats reserved set to 1.",
+          "action": "Change seats to 2, continue to Payment, and compare the summary with the earlier seat value.",
+          "expect": "The payment view must visibly reflect two seats or reject the mismatch with a visible message.",
+          "priority": 3
+        },
+        {
+          "setup": "Reach Payment with one standard attendee and apply TEAM15; note the discount and total.",
+          "action": "Replace the applied code with BADCODE and click Apply.",
+          "expect": "The invalid attempt must not leave the prior discount silently applied; state the error, discount, and total.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter organisation Acme, email owner@acme.com, and add one attendee named Workshop W on step 2.",
+          "action": "Select Workshop, add the attendee, continue to Payment, and read its displayed ticket price and subtotal.",
+          "expect": "Subtotal must use the displayed Workshop price of $260; state both price and subtotal.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the registration wizard end to end, focusing on disagreements between displayed rules and calculations, stale state, navigation persistence, and visible usability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open each wizard step, including an invalid-contact state and the Payment summary, at normal and narrow viewport widths. Then Inspect labels, inputs, errors, buttons, attendee rows, and totals for reachability and visibility. — expect: All text and controls must be legible, unobscured, and free of clipping at both widths.\n2. Reach Payment with two attendees and note the displayed total. Then Click Confirm registration and read the confirmation panel. — expect: Confirmation must show two attendees, the organisation, and the same total noted before confirmation.\n3. Leave contact fields empty and click Continue from step 1. Then Read the validation messages and whether the wizard advances. — expect: Visible errors must identify required organisation and invalid email; the wizard must remain on step 1.\n4. On step 2, add distinct attendees Alice and Bob. Then Remove Bob, continue to Payment, and read the attendee count and remaining names. — expect: Bob must be absent, Alice must remain, and the summary count must be 1.\n5. On step 2, add attendee Alice with a standard ticket and note that she appears. Then Click Back, then Continue to return to step 2 and reread the attendee list. — expect: Alice must still appear with her ti"
+    },
+    {
+      "case": "bookflow-register",
+      "attempt": 2,
+      "durationMs": 299205,
+      "status": "failed",
+      "steps": 36,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.5901,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "workshop-price-label-vs-charge",
+          "class": "label-vs-value",
+          "caught": false,
+          "why": "The run reports that the Ticket control could not be changed as expected, but it never observes or reports the Workshop label advertising $260 while pricing/confirmation charges $240."
+        },
+        {
+          "id": "back-discards-attendees",
+          "class": "navigation-data-loss",
+          "caught": false,
+          "why": "No finding describes navigating back from attendees to contact details and returning to find entered attendees cleared."
+        },
+        {
+          "id": "seats-input-has-no-effect",
+          "class": "dead-control",
+          "caught": false,
+          "why": "Seats reserved is reported as an unnamed accessibility control, but the run does not report changing its value and observing no effect on totals or confirmation."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Applying TEAM15 to one $120 Standard attendee applies the 15% discount and produces a $102.00 confirmation total.",
+          "status": "contradicted",
+          "evidence": "After Apply, Payment showed TEAM15 with Subtotal $120.00, Discount −$0.00, and Total due $120.00 (step 7); Confirm showed an unrecognised-code error (step 8), and the confirmation displayed Total charged $120.00 rather than $102.00 (step 9)."
+        },
+        {
+          "claim": "The confirmation identifies the submitted registration as one attendee for Acme.",
+          "status": "verified",
+          "evidence": "The displayed confirmation states “1 attendee(s) for Acme” (step 9)."
+        },
+        {
+          "claim": "Submitting Contact with phone number 123456 keeps the user on Contact and shows a visible phone validation error.",
+          "status": "verified",
+          "evidence": "After Continue with phone 123456, the recorded result remained on Contact and showed the red message “Enter a valid phone number” directly below Phone (steps 20–21)."
+        },
+        {
+          "claim": "Organisation, email, and phone values persist after proceeding to Attendees and returning to Contact.",
+          "status": "verified",
+          "evidence": "After valid submission to Attendees and Back navigation, Contact displayed the retained values Organisation Acme, Email owner@acme.com, and Phone 1234567 (steps 22–24)."
+        },
+        {
+          "claim": "At a 320px viewport, every Attendees control and its labels, values, and validation messages remain fully readable and reachable.",
+          "status": "not_testable",
+          "evidence": "The trace explicitly reports that no viewport-resize action was available, so the Attendees controls were exercised only at the default viewport (step 10)."
+        },
+        {
+          "claim": "The Ticket control allows a user to change the selected ticket from Workshop to Standard.",
+          "status": "contradicted",
+          "evidence": "After attempting selectOption and multiple direct/keyboard selection methods, the rendered ticket remained Workshop and later Student rather than Standard, with no state change for the repeated attempts (steps 26–34)."
+        }
+      ],
+      "findingTexts": [
+        "TEAM15 should apply a $18 discount to one Standard ticket ($102), but is rejected and confirmation charges $120.",
+        "Visible labels are not programmatically associated: attendee name and Seats reserved are exposed as unnamed controls."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete contact details, add one Standard attendee, and apply TEAM15 on Payment.",
+          "action": "Confirm registration and read the confirmation attendee count, organisation, and total.",
+          "expect": "Confirmation must show one attendee, Acme, and a $102.00 total.",
+          "priority": 8
+        },
+        {
+          "setup": "Open the wizard at a 320px-wide viewport and reach the Attendees step.",
+          "action": "Inspect and operate the attendee name, ticket, Add, removal, seats, Back, and Continue controls.",
+          "expect": "Every label, value, button, and validation message must remain readable and fully reachable.",
+          "priority": 7
+        },
+        {
+          "setup": "Enter valid organisation and email, then enter phone 123456 and continue.",
+          "action": "Submit the Contact step and inspect the phone field area.",
+          "expect": "The flow must remain on Contact with a visible phone validation error.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter Organisation Acme, email owner@acme.com, and phone 1234567; continue to Attendees.",
+          "action": "Go back to Contact and reread all three contact fields.",
+          "expect": "Organisation, email, and phone must retain their entered values after navigation.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete contact details, add attendees A as Standard and B as Student.",
+          "action": "Remove the second attendee B, continue, and read the attendee count and subtotal.",
+          "expect": "B must disappear, A must remain, and count and subtotal must describe only A.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete contact details, add one Standard attendee, continue to Payment, and apply TEAM15.",
+          "action": "Replace the promo with INVALID, apply it, and reread the discount and promo message.",
+          "expect": "An error must appear and the previous discount and applied-promo note must be removed.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete contact details, add one Standard attendee, and set Seats reserved to 3.",
+          "action": "Continue to Payment and compare the reserved-seat input with the summary.",
+          "expect": "The summary must reflect 3 reserved seats, not silently show only one attendee.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter Organisation Acme, email owner@acme.com, then continue. Add one attendee named Alex and select Workshop.",
+          "action": "Continue to Payment and read the workshop option price and Subtotal.",
+          "expect": "Subtotal must equal the displayed Workshop price of $260; state both figures.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise all wizard controls, prioritizing mismatches between displayed rules and calculations, stale promo state, unused seat input, and navigation state.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete contact details, add one Standard attendee, and apply TEAM15 on Payment. Then Confirm registration and read the confirmation attendee count, organisation, and total. — expect: Confirmation must show one attendee, Acme, and a $102.00 total.\n2. Open the wizard at a 320px-wide viewport and reach the Attendees step. Then Inspect and operate the attendee name, ticket, Add, removal, seats, Back, and Continue controls. — expect: Every label, value, button, and validation message must remain readable and fully reachable.\n3. Enter valid organisation and email, then enter phone 123456 and continue. Then Submit the Contact step and inspect the phone field area. — expect: The flow must remain on Contact with a visible phone validation error.\n4. Enter Organisation Acme, email owner@acme.com, and phone 1234567; continue to Attendees. Then Go back to Contact and reread all three contact fields. — expect: Organisation, email, and phone must retain their entered values after navigation.\n5. Complete contact details, add attendees A as Standard and B as Student. Then Remove the second attendee B, continue, and read the attendee count and subtotal. — expect: B must disappear, A must remain, and count and subtotal must describe only A.\n6. Complete c"
+    }
+  ]
+}

@@ -1,0 +1,821 @@
+{
+  "label": "detband-notedso-welcome",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 9,
+    "planted": 18,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 7.1532,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "notedso-welcome",
+      "attempt": 1,
+      "durationMs": 566632,
+      "status": "failed",
+      "steps": 83,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 1.3698,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": false,
+          "why": "The run uses daily limit 17, within the stated 1-20 range, and does not test or report acceptance of a value above 20."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "Removing middle note B from A, B, C left A and B while C disappeared, directly showing that the last note was removed instead of the clicked note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At a 320px viewport, the planning and first-note steps keep their controls readable, visible, keyboard reachable, and visibly focused, and the completion control is reachable.",
+          "status": "verified",
+          "evidence": "Steps 5-15 record readable visible Step-2 controls and visible focus progressing through every focus button, both selects, max-notes input, Back, and Continue; steps 16-23 similarly record both note inputs, remove controls, Add another note, Back, and Create workspace reachable, while step 25 record"
+        },
+        {
+          "claim": "Required-field validation blocks invalid submissions, displays the relevant error, clears it after correction, and then permits progress: this applies to Step 1 fields, focus-area selection, and the f",
+          "status": "verified",
+          "evidence": "Step 57 records all three Step-1 required errors, steps 58-61 show them clearing after Acme/user@example.com/Sam and reaching Step 2; steps 51-54 show the focus error at zero selected, recovery to Personal as the sole selection, and advance; steps 33-35 show the exact blank-note error “Add at least "
+        },
+        {
+          "claim": "Study, Sunday, and 12:00 remain selected after leaving Step 2 with Back and returning with Continue.",
+          "status": "not_testable",
+          "evidence": "Study and Sunday were observed before navigating away (steps 41-42), but the trace never records the Step-2 week-start and reminder values after returning; step 45 only says Study is selected, without rereading Sunday or 12:00."
+        },
+        {
+          "claim": "The chosen Sunday week start, 21:00 reminder, and daily limit of 17 are exposed in a visible completion summary or functioning board setting after workspace creation.",
+          "status": "contradicted",
+          "evidence": "Step 65 records the underlying selected values as Sunday, 21:00, and 17, but step 68 explicitly records that completion does not display Sunday, 21:00, or 17, and step 69 records that the board destination at / shows only a client-side application-error message."
+        },
+        {
+          "claim": "Removing the middle note B from notes A, B, and C preserves A and C and removes only B.",
+          "status": "contradicted",
+          "evidence": "Before removal, step 81 records all three values A, B, and C; after clicking Remove note 2, step 82 records remaining values A and B with C absent, so the wrong note was retained and C was lost."
+        },
+        {
+          "claim": "Entering 21 for Max notes per day shows the stated 1–20 validation error and keeps the user on Step 2.",
+          "status": "not_testable",
+          "evidence": "The run reached the three-note removal scenario and stopped at the 92-step limit after step 82; it never entered 21 into Max notes per day or submitted Step 2 for this boundary validation."
+        }
+      ],
+      "findingTexts": [
+        "After creating Acme with Work, week start Sunday, reminder 21:00, daily limit 17, and note Launch, “Open my board” navigates to / and immediately shows only: “Application error: a client-side exceptio",
+        "On Step 3 with notes A, B, and C, clicking “Remove note 2” beside B left two notes with visible values A and B (status: “2 notes ready”); C disappeared. The non-last removal removed the wrong note.",
+        "Intended Sunday, 21:00, and 17 settings are absent from completion; it shows only Focus areas: Work.",
+        "Max notes per day spinbutton has no accessible name, so assistive tech cannot identify its label."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Use a 320px-wide viewport and advance through the wizard with valid values, including two notes.",
+          "action": "Inspect each step and completion screen while scrolling and keyboard-tabbing through every control.",
+          "expect": "Labels, errors, buttons, progress indicators, and note inputs must remain readable, visible, reachable, and visibly focused.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and leave the initial note blank.",
+          "action": "Click Create workspace, add note Launch, and click Create workspace again.",
+          "expect": "Blank submission must show a visible note error; corrected submission must show completion with one note.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete step 1, select Study, Sunday, and 12:00 on step 2, and note those values before navigating.",
+          "action": "Click Back, click Continue, and reread all step-2 selections.",
+          "expect": "Study, Sunday, and 12:00 must survive leaving and returning to step 2.",
+          "priority": 6
+        },
+        {
+          "setup": "Complete step 1 with valid values and leave all focus areas unselected on step 2.",
+          "action": "Click Continue, select Work, deselect Work, select Personal, then click Continue.",
+          "expect": "Must first show focus validation, then show zero and one selected respectively, and advance only with Personal selected.",
+          "priority": 5
+        },
+        {
+          "setup": "Leave all step-1 fields empty.",
+          "action": "Click Continue, then enter Acme, user@example.com, and Sam and click Continue again.",
+          "expect": "Required errors must appear first; corrected values must clear errors and advance to step 2.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete step 1 and choose Work, Sunday, 21:00, and daily limit 17 on step 2; add note Launch on step 3.",
+          "action": "Create the workspace, read the completion screen, then open the board.",
+          "expect": "Chosen week start, reminder, and daily limit must affect a visible summary or board setting; state each value.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, then add notes A, B, and C on step 3.",
+          "action": "Click Remove note 2 beside B.",
+          "expect": "B must disappear while A and C remain; state the remaining note values.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete step 1 with Workspace, user@example.com, and Sam, then continue to step 2 and select Work.",
+          "action": "Enter 21 for Max notes per day and click Continue.",
+          "expect": "Must show the stated 1–20 validation error and remain on step 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the public three-step wizard with boundary values, non-last note removal, navigation, validation recovery, and narrow-screen presentation. Report the exact visible values, errors, counts, and routes observed.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use a 320px-wide viewport and advance through the wizard with valid values, including two notes. Then Inspect each step and completion screen while scrolling and keyboard-tabbing through every control. — expect: Labels, errors, buttons, progress indicators, and note inputs must remain readable, visible, reachable, and visibly focused.\n2. Complete steps 1 and 2 validly and leave the initial note blank. Then Click Create workspace, add note Launch, and click Create workspace again. — expect: Blank submission must show a visible note error; corrected submission must show completion with one note.\n3. Complete step 1, select Study, Sunday, and 12:00 on step 2, and note those values before navigating. Then Click Back, click Continue, and reread all step-2 selections. — expect: Study, Sunday, and 12:00 must survive leaving and returning to step 2.\n4. Complete step 1 with valid values and leave all focus areas unselected on step 2. Then Click Continue, select Work, deselect Work, select Personal, then click Continue. — expect: Must first show focus validation, then show zero and one selected respectively, and advance only with Personal selected.\n5. Leave all step-1 fields empty. Then "
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 2,
+      "durationMs": 304630,
+      "status": "passed",
+      "steps": 37,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.7013,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tested or reported acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": false,
+          "why": "The run did not report entering a daily limit above 20 being accepted or advancing; the board navigation failure is unrelated to this validation behavior."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run explicitly reports that removing the middle note removed the last note (Gamma) instead of the selected note (Beta), matching the planted defect."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At a narrow mobile viewport, step-one controls remain readable, reachable, and visibly focused during keyboard Tab navigation.",
+          "status": "verified",
+          "evidence": "Steps 3-5 record Tab focus moving through Workspace name, Email, and Display name, each fully visible with readable labels and a visible focus outline; Back and Continue were also readable."
+        },
+        {
+          "claim": "Adding distinct notes Alpha and Beta keeps both visible and updates the ready count to 2.",
+          "status": "verified",
+          "evidence": "Step 15 observes a third blank field beneath Alpha and Beta and reports the ready count as exactly “2 notes ready,” establishing both entered notes were retained and counted."
+        },
+        {
+          "claim": "Submitting step 3 with the initial note blank shows a visible notes-required error and keeps the wizard on step 3.",
+          "status": "not_testable",
+          "evidence": "Step 19 clicked Create workspace with the sole note cleared and recorded a DOM change, but no post-submit screen observation records either a visible error or the current wizard step."
+        },
+        {
+          "claim": "Previously entered profile and planning preferences persist after moving back through the wizard.",
+          "status": "verified",
+          "evidence": "Step 28 visibly confirms Personal, Sunday, 21:00, and max notes 7 on step 2; step 29 visibly confirms Test Workspace, tester@example.com, and Taylor on step 1."
+        },
+        {
+          "claim": "Removing the middle note from Alpha, Beta, Gamma removes Beta while preserving Alpha and Gamma.",
+          "status": "not_testable",
+          "evidence": "Remove note 2 was clicked in step 16, but there is no observation of the note list immediately afterward; the later observation only confirms that a subsequent removal left Alpha."
+        },
+        {
+          "claim": "Creating a workspace with Sunday, 21:00, a 17-note daily limit, Work, and Alpha preserves those planning preferences in completion or board behavior.",
+          "status": "not_testable",
+          "evidence": "Step 36 confirms the completion screen displayed the one-note count and Work focus area, but step 37 reports the board showed only an application-error message, preventing inspection of Sunday, 21:00, and the 17-note limit's effect."
+        }
+      ],
+      "findingTexts": [
+        "Removing the middle note removes the last note rather than the selected note: clicking Remove note 2 in Alpha/Beta/Gamma left Alpha and Beta and removed Gamma.",
+        "The “Open my board” control navigates to http://localhost:4102/ but the destination fails with “Application error: a client-side exception has occurred while loading localhost,” preventing inspection "
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /welcome at a narrow mobile viewport and use keyboard navigation across the current step's controls.",
+          "action": "Tab through inputs, buttons, and selects while reading the screen.",
+          "expect": "Labels and controls must remain readable, unclipped, reachable, and visibly focused.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and enter Alpha in the first note.",
+          "action": "Add another note, enter Beta, and read the count.",
+          "expect": "Both distinct notes must remain visible and the ready count must be 2.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and leave the initial note blank.",
+          "action": "Click Create workspace.",
+          "expect": "A visible notes error must appear and the wizard must remain on step 3.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter valid step-one data, advance to step 2, choose Personal, Sunday, 21:00, and daily limit 7; advance to step 3.",
+          "action": "Go back twice and reread the profile and preference controls.",
+          "expect": "Previously entered profile and preference values must still be present.",
+          "priority": 5
+        },
+        {
+          "setup": "Leave every step-one field blank.",
+          "action": "Click Continue.",
+          "expect": "Visible required errors must appear and the wizard must remain on step 1.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter valid profile data, select Sunday, select reminder 21:00, set daily limit 17, choose Work, and enter note Alpha.",
+          "action": "Create the workspace and inspect completion, then open the board.",
+          "expect": "Selected planning values must affect visible completion or board behavior rather than being discarded.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly; on step 3 create notes Alpha, Beta, and Gamma.",
+          "action": "Click Remove note 1.",
+          "expect": "Alpha and Gamma must remain; Beta must be removed.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete step 1 validly, choose one focus area on step 2, and enter 21 for Max notes per day.",
+          "action": "Click Continue.",
+          "expect": "Must remain on step 2 and show the stated 1–20 validation error.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every onboarding control, prioritizing boundary validation, non-last note removal, state persistence, and whether collected preferences affect the resulting workspace.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /welcome at a narrow mobile viewport and use keyboard navigation across the current step's controls. Then Tab through inputs, buttons, and selects while reading the screen. — expect: Labels and controls must remain readable, unclipped, reachable, and visibly focused.\n2. Complete steps 1 and 2 validly and enter Alpha in the first note. Then Add another note, enter Beta, and read the count. — expect: Both distinct notes must remain visible and the ready count must be 2.\n3. Complete steps 1 and 2 validly and leave the initial note blank. Then Click Create workspace. — expect: A visible notes error must appear and the wizard must remain on step 3.\n4. Enter valid step-one data, advance to step 2, choose Personal, Sunday, 21:00, and daily limit 7; advance to step 3. Then Go back twice and reread the profile and preference controls. — expect: Previously entered profile and preference values must still be present.\n5. Leave every step-one field blank. Then Click Continue. — expect: Visible required errors must appear and the wizard must remain on step 1.\n6. Enter valid profile data, select Sunday, select reminder 21:00, set daily limit 17, choose Work, and enter note Alpha. Then Create the workspace and inspect completio"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 3,
+      "durationMs": 547027,
+      "status": "failed",
+      "steps": 88,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 1.2947,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that Max notes per day = 21 is accepted and advances despite the stated 1–20 range and no validation error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove note 2 with notes A, B, C removes C and leaves A and B, matching removal of the last row rather than the clicked row."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Focus-area selection toggles accurately: after Work is toggled off and Personal and Health are selected, only Personal and Health are selected and the counter is 2.",
+          "status": "verified",
+          "evidence": "Step 9 records Personal and Health visibly selected, Work unselected, and the counter reading “2 selected.”"
+        },
+        {
+          "claim": "Invalid wizard steps remain blocked with visible validation feedback for empty profile fields, no selected focus area, and a daily limit of 0.",
+          "status": "verified",
+          "evidence": "Step 12 shows “Pick at least one focus area” while remaining on step 2; step 17 records required errors beside workspace, email, and display name; step 80 records that limit 0 remains on step 2 with “Daily limit must be between 1 and 20.”"
+        },
+        {
+          "claim": "Profile and planning preferences persist when navigating backward and returning to a prior wizard step.",
+          "status": "verified",
+          "evidence": "Steps 24-25 show Work, Monday, 08:00, max notes 5, and all profile values preserved after returning through steps 2 and 1; step 50 shows Personal and reminder 18:00 still selected after returning to step 2."
+        },
+        {
+          "claim": "Creating a workspace with three nonblank notes reports a count that reconciles with the entered notes.",
+          "status": "verified",
+          "evidence": "Step 32 records note fields A, B, and C with “3 notes ready,” and step 33 reports “Acme is ready with 3 notes.”"
+        },
+        {
+          "claim": "Completion or the board visibly reflects the collected Sunday week start, 21:00 reminder, and daily limit of 7.",
+          "status": "contradicted",
+          "evidence": "Step 58 records that completion shows only workspace name, one-note count, and Health—not Sunday, 21:00, or limit 7—and step 59 records a client-side application error on the board route."
+        },
+        {
+          "claim": "Removing note 2 removes B while retaining notes A and C.",
+          "status": "contradicted",
+          "evidence": "Before removal, step 71 records A, B, and C; after clicking “Remove note 2,” step 72 records remaining values A and B, so B remained and C was lost."
+        }
+      ],
+      "findingTexts": [
+        "Open my board navigates to / and renders “Application error: a client-side exception has occurred while loading localhost,” preventing inspection of persisted planning preferences.",
+        "Removing note 2 from three notes A, B, C removes C instead of B. The resulting two fields show A and B (2 notes ready), so the non-first remove control targets the wrong note.",
+        "Step 2 accepts Max notes per day = 21 and advances to step 3. No visible 1–20 validation error appears, despite Work being selected and all other step-2 fields valid."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "At step 2, select Work and inspect the focus controls and selected counter.",
+          "action": "Toggle Work off, then select Personal and Health.",
+          "expect": "Only Personal and Health must appear selected, and the counter must read 2.",
+          "priority": 11
+        },
+        {
+          "setup": "Reach step 2 with valid profile values and no focus area selected.",
+          "action": "Click Continue and inspect the focus validation area.",
+          "expect": "Must show a visible focus error and remain on step 2.",
+          "priority": 10
+        },
+        {
+          "setup": "At step 1, leave the form empty and click Continue.",
+          "action": "Read all displayed validation feedback on the first step.",
+          "expect": "Workspace, email, and display-name errors must be visible beside their corresponding inputs.",
+          "priority": 9
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3.",
+          "action": "Use Back to revisit step 2, then step 1, and inspect the previously entered values.",
+          "expect": "Profile, focus, and preference values must survive both backward navigations.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3.",
+          "action": "Add two additional note fields, enter distinct notes A, B, and C, then click Create workspace.",
+          "expect": "Completion must report three notes, matching the three nonblank note fields.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3 with the initial note blank.",
+          "action": "Click Create workspace without entering a note.",
+          "expect": "Must show a visible note error and remain on step 3.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter valid profile values, continue to step 2, select Personal, and set the reminder to 18:00.",
+          "action": "Click Back, then Continue, and reread the step-2 selections.",
+          "expect": "Personal and 18:00 must still be selected after navigating away and returning.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete step 1 with valid values and reach step 2.",
+          "action": "Choose Sunday, reminder 21:00, focus Health, set daily limit 7, and finish with note \"Plan\".",
+          "expect": "The completion or board state must visibly reflect Sunday, 21:00, and limit 7.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, then add two notes and enter distinct notes \"A\", \"B\", and \"C\".",
+          "action": "Click the remove control for note 2.",
+          "expect": "B must disappear while A and C remain; state the remaining note values.",
+          "priority": 3
+        },
+        {
+          "setup": "At step 2, select Work and leave all other fields valid.",
+          "action": "Enter 0 for Max notes per day and click Continue.",
+          "expect": "Must reject 0 with a visible 1–20 error and remain on step 2.",
+          "priority": 2
+        },
+        {
+          "setup": "At /welcome, enter workspace \"Acme\", email \"sam@example.com\", display name \"Sam\", then continue and select Work.",
+          "action": "Enter 21 for Max notes per day and click Continue.",
+          "expect": "Must reject 21 with a visible 1–20 error and remain on step 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public onboarding wizard and exercise boundary values, non-first note removal, navigation persistence, and whether every collected preference reaches the result.\n\nWork through these checks in order, and record what you actually observe for each:\n1. At step 2, select Work and inspect the focus controls and selected counter. Then Toggle Work off, then select Personal and Health. — expect: Only Personal and Health must appear selected, and the counter must read 2.\n2. Reach step 2 with valid profile values and no focus area selected. Then Click Continue and inspect the focus validation area. — expect: Must show a visible focus error and remain on step 2.\n3. At step 1, leave the form empty and click Continue. Then Read all displayed validation feedback on the first step. — expect: Workspace, email, and display-name errors must be visible beside their corresponding inputs.\n4. Complete steps 1 and 2 validly and reach step 3. Then Use Back to revisit step 2, then step 1, and inspect the previously entered values. — expect: Profile, focus, and preference values must survive both backward navigations.\n5. Complete steps 1 and 2 validly and reach step 3. Then Add two additional note fields, enter distinct notes A, B, and C, then click Create workspace. — expect: Completion must report three notes, matching the three nonblank note fields.\n6. Complete steps 1 and 2 validly and reach step 3 with the initial note blank. Then Click Create workspace without entering a note. — expect: "
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 4,
+      "durationMs": 472660,
+      "status": "passed",
+      "steps": 67,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 1.1602,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run explicitly reports that daily limit 21, despite the stated 1-20 range, is accepted and advances from step 2 to step 3 without an error."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": false,
+          "why": "No finding clicks Remove on a specific note or reports that the last note is removed instead of the clicked note."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking Open my board takes the user to a board that visibly contains the submitted workspace Northstar and notes Alpha and Beta.",
+          "status": "contradicted",
+          "evidence": "After the Open my board action, step 41 records that the destination was a client-side application-error page with no interactive controls, not a board showing Northstar or its notes."
+        },
+        {
+          "claim": "Completion visibly includes the submitted planning preferences Sunday, 21:00, and daily limit 7.",
+          "status": "contradicted",
+          "evidence": "Step 53 observes the completion screen for Preference Output contains only the one-note count and Study focus area; Sunday, 21:00, and the daily limit are absent after those values were submitted in steps 47-50."
+        },
+        {
+          "claim": "Submitting step 2 with daily limit 21 keeps the user on step 2 and displays that the limit must be between 1 and 20.",
+          "status": "contradicted",
+          "evidence": "The trace shows 21 entered with Work selected before submission (step 66), but the final snapshot is on step 3 with 0 notes ready (step 67), rather than remaining on step 2 with the required error."
+        },
+        {
+          "claim": "Submitting step 2 with no focus area remains on step 2 and shows a legible focus-area validation error.",
+          "status": "verified",
+          "evidence": "After Continue with 0 selected, step 59 records that the wizard remained on step 2 and displayed the red, legible error “Pick at least one focus area.”"
+        },
+        {
+          "claim": "Clicking Create workspace with all note fields empty remains on step 3 and visibly requires at least one note.",
+          "status": "not_testable",
+          "evidence": "Create workspace was clicked with an empty initial note at step 23, but no post-submit screen observation records whether an error appeared or whether step 3 remained visible before the run navigated away."
+        },
+        {
+          "claim": "Removing note 2 from three distinct notes removes Beta while retaining Alpha and Gamma.",
+          "status": "not_testable",
+          "evidence": "The run exercised removal of note 3 and confirmed Alpha and Beta remained (steps 15-16), but it never created Gamma or clicked Remove note 2."
+        }
+      ],
+      "findingTexts": [
+        "After completing workspace Northstar with notes Alpha and Beta, clicking Open my board navigates to http://localhost:4102/ but the destination crashes with “Application error: a client-side exception ",
+        "Completion screen for Preference Output shows only “Preference Output is ready with 1 note.” and “Focus areas: Study”; it does not visibly show the submitted Sunday week start, 21:00 reminder, or dail",
+        "With Work selected and Max notes per day visibly set to 21, clicking Continue advanced from Step 2 to Step 3 instead of remaining on Step 2 and showing an error that the daily limit must be between 1 "
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3 with one note.",
+          "action": "Tab through the note controls and inspect the focused control at each stop.",
+          "expect": "The focused control must have a clearly visible focus indicator and remain operable.",
+          "priority": 9
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3.",
+          "action": "Add two note fields, enter distinct text, and click Remove note 3.",
+          "expect": "Only the third note must be removed; the first two entered values must survive.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, then reach step 3 with the initial note field empty.",
+          "action": "Click Create workspace without entering a note.",
+          "expect": "Must remain on step 3 with a visible error requiring at least one note.",
+          "priority": 7
+        },
+        {
+          "setup": "Enter valid workspace, email, and display name values, then advance to step 2.",
+          "action": "Choose Personal and Health, change week start to Sunday, change reminder to 18:00, then click Back.",
+          "expect": "Step 1 must reappear with all previously entered profile values intact.",
+          "priority": 6
+        },
+        {
+          "setup": "Complete the wizard with workspace Northstar, one focus area, and distinct notes Alpha and Beta.",
+          "action": "Click Open my board and inspect the destination.",
+          "expect": "The board must visibly contain Northstar and the submitted notes Alpha and Beta.",
+          "priority": 5
+        },
+        {
+          "setup": "Complete step 1; on step 2 select Study, choose Sunday, choose 21:00, and enter daily limit 7.",
+          "action": "Continue to step 3, enter one note, and create the workspace.",
+          "expect": "Completion output must visibly include Sunday, 21:00, and daily limit 7.",
+          "priority": 4
+        },
+        {
+          "setup": "Complete step 1 validly and reach step 2 without selecting any focus area.",
+          "action": "Click Continue on step 2.",
+          "expect": "Must remain on step 2 with a visible, legible focus-area validation error.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, then create three notes with distinct text: Alpha, Beta, and Gamma.",
+          "action": "Click Remove note 2 and inspect the remaining note fields.",
+          "expect": "Beta must disappear while Alpha and Gamma remain.",
+          "priority": 2
+        },
+        {
+          "setup": "Complete step 1 validly, select a focus area on step 2, and enter 21 for Max notes per day.",
+          "action": "Click Continue on step 2.",
+          "expect": "Must stay on step 2 and show an error stating the daily limit must be between 1 and 20.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise each wizard step with boundary values, non-first note removal, preference changes, validation failures, and completion navigation. Report exact visible values, errors, and whether entered data appears on the resulting board.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete steps 1 and 2 validly and reach step 3 with one note. Then Tab through the note controls and inspect the focused control at each stop. — expect: The focused control must have a clearly visible focus indicator and remain operable.\n2. Complete steps 1 and 2 validly and reach step 3. Then Add two note fields, enter distinct text, and click Remove note 3. — expect: Only the third note must be removed; the first two entered values must survive.\n3. Complete steps 1 and 2 validly, then reach step 3 with the initial note field empty. Then Click Create workspace without entering a note. — expect: Must remain on step 3 with a visible error requiring at least one note.\n4. Enter valid workspace, email, and display name values, then advance to step 2. Then Choose Personal and Health, change week start to Sunday, change reminder to 18:00, then click Back. — expect: Step 1 must reappear with all previously entered profile values intact.\n5. Complete the wizard with workspace Northstar, one focus area, and distinct notes Alpha and Beta. Then Click Open my board and inspect the destination. — expect: The board must visibly contain Northstar and the submitted notes Alpha"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 5,
+      "durationMs": 563031,
+      "status": "failed",
+      "steps": 81,
+      "findings": 4,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 1.3905,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "No finding tests or reports acceptance of an email address without a dot in the domain, such as sam@example."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run reports that entering 21 for a field labeled 1–20 advanced to Step 3 rather than showing a validation error, directly demonstrating the missing upper-bound validation."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that removing the second note (Beta) instead removed the final note (Gamma), leaving Alpha and Beta. This is the specific incorrect removal behavior."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Submitting a daily limit of 21 on step 2 shows the stated 1–20 validation error while keeping the user on step 2.",
+          "status": "not_testable",
+          "evidence": "At step 7, the value 21 was visible and Step 2 remained active after Continue, but the trace did not record whether the required validation message was visible."
+        },
+        {
+          "claim": "Removing the second of three distinct notes preserves Alpha and Gamma while removing Beta.",
+          "status": "contradicted",
+          "evidence": "After Remove note 2, the recorded result at step 21 was Alpha and Beta remaining, Gamma absent, with 2 notes ready."
+        },
+        {
+          "claim": "Values entered across onboarding steps persist when navigating Back twice and then forward twice.",
+          "status": "verified",
+          "evidence": "Steps 43–46 show Work and daily limit 7 retained on Step 2, Acme/sam@example.com/Sam retained on Step 1, and the Planning note retained on Step 3 after the Back/Continue sequence."
+        },
+        {
+          "claim": "Step 1 blocks invalid workspace details with visible required-field and minimum-length validation.",
+          "status": "verified",
+          "evidence": "After submitting empty fields, step 52 recorded all three required errors while Step 1 remained visible; steps 53–56 recorded “Use at least 3 characters” for workspace Ab and continued blocking advancement on Step 1."
+        },
+        {
+          "claim": "Toggling Work, Personal, and Work leaves only Personal selected and the selection count at 1.",
+          "status": "contradicted",
+          "evidence": "After the specified toggle sequence, step 61 recorded both Work and Personal visibly selected and a count of “2 selected,” rather than only Personal and 1."
+        },
+        {
+          "claim": "After completing the final workspace, clicking Open my board navigates the user to the board.",
+          "status": "contradicted",
+          "evidence": "Step 80 recorded the completion page still showing “Acme is ready with 2 notes,” “Focus areas: Work, Study,” and the Open my board link after the board-opening action; no board navigation was recorded before the run ended."
+        }
+      ],
+      "findingTexts": [
+        "Submitting Max notes per day 21 advanced from Step 2 to Step 3 instead of showing the stated 1–20 validation error and remaining on Step 2.",
+        "After adding Alpha, Beta, and Gamma, removing the second note (Beta) left Alpha and Beta visible with \"2 notes ready\"; Gamma disappeared. The removal acted on the final note rather than the middle not",
+        "After creating the workspace with Sunday, 21:00, and daily limit 12, completion only displayed “Acme is ready with 1 note.” and “Focus areas: Work”; it did not visibly reflect the chosen week start, r",
+        "Starting with Work selected, toggling Work, Personal, then Work again left both Work and Personal selected; the visible count reads “2 selected,” rather than only Personal with a count of 1."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Complete step 1 with workspace Acme, email sam@example.com, and display name Sam; on step 2 select Work.",
+          "action": "Enter 21 for Max notes per day and click Continue.",
+          "expect": "Must show the stated 1–20 validation error and remain on step 2.",
+          "priority": 0
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, add notes Alpha and Beta, then add a third note Gamma.",
+          "action": "Enter distinct notes and remove the second note, Beta.",
+          "expect": "Alpha and Gamma must remain; Beta must disappear.",
+          "priority": 0
+        },
+        {
+          "setup": "Complete step 1 validly and select Work on step 2.",
+          "action": "Choose Sunday, 21:00, and daily limit 12, then finish with note Launch.",
+          "expect": "Completion must visibly reflect the chosen week start, reminder, and daily limit.",
+          "priority": 0
+        },
+        {
+          "setup": "Enter workspace Acme, email sam@example.com, and display name Sam; select Work and set daily limit 7.",
+          "action": "Advance to step 3, enter Planning, go Back twice, then return forward twice.",
+          "expect": "Acme, Work, daily limit 7, and Planning must retain their values.",
+          "priority": 0
+        },
+        {
+          "setup": "Leave step 1 fields empty.",
+          "action": "Click Continue and inspect every field and the current step.",
+          "expect": "Visible errors must identify workspace, email, and display name; the wizard must remain on step 1.",
+          "priority": 0
+        },
+        {
+          "setup": "Enter workspace Ab, email sam@example.com, and display name Sam.",
+          "action": "Click Continue and inspect the workspace validation.",
+          "expect": "Must reject the two-character workspace with a visible at-least-three-characters error.",
+          "priority": 0
+        },
+        {
+          "setup": "Complete step 1 with valid values and reach step 2.",
+          "action": "Toggle Work, Personal, and Work again, then inspect the selection count and focus styling.",
+          "expect": "Only Personal must remain selected and the count must read 1.",
+          "priority": 0
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3 with its initial empty note.",
+          "action": "Click Create workspace without entering a note.",
+          "expect": "Must show a visible notes error and remain on step 3.",
+          "priority": 0
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and reach step 3.",
+          "action": "Add two notes, remove the final note, and enter First note in the remaining field.",
+          "expect": "Exactly one note must be ready, and the displayed count must read 1.",
+          "priority": 0
+        },
+        {
+          "setup": "Open /welcome at a narrow viewport and focus each field and button using keyboard navigation.",
+          "action": "Inspect labels, focused controls, validation text, and the step navigation at that viewport.",
+          "expect": "All labels and errors must be legible, and every focused control must have a visible focus indication.",
+          "priority": 0
+        },
+        {
+          "setup": "Complete all steps with workspace Acme, focus Work and Study, and notes Alpha and Beta.",
+          "action": "Click Create workspace, then click Open my board.",
+          "expect": "Completion must show Acme, two notes, both focus areas, and the link must navigate to the board.",
+          "priority": 0
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every onboarding control, prioritizing boundary values, state mismatches, persistence across steps, and visible feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Complete step 1 with workspace Acme, email sam@example.com, and display name Sam; on step 2 select Work. Then Enter 21 for Max notes per day and click Continue. — expect: Must show the stated 1–20 validation error and remain on step 2.\n2. Complete steps 1 and 2 validly, add notes Alpha and Beta, then add a third note Gamma. Then Enter distinct notes and remove the second note, Beta. — expect: Alpha and Gamma must remain; Beta must disappear.\n3. Complete step 1 validly and select Work on step 2. Then Choose Sunday, 21:00, and daily limit 12, then finish with note Launch. — expect: Completion must visibly reflect the chosen week start, reminder, and daily limit.\n4. Enter workspace Acme, email sam@example.com, and display name Sam; select Work and set daily limit 7. Then Advance to step 3, enter Planning, go Back twice, then return forward twice. — expect: Acme, Work, daily limit 7, and Planning must retain their values.\n5. Leave step 1 fields empty. Then Click Continue and inspect every field and the current step. — expect: Visible errors must identify workspace, email, and display name; the wizard must remain on step 1.\n6. Enter workspace Ab, email sam@example.com, and display name Sam. Then Click Continue and inspect the workspace validation. — expect: Must reje"
+    },
+    {
+      "case": "notedso-welcome",
+      "attempt": 6,
+      "durationMs": 513408,
+      "status": "passed",
+      "steps": 79,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 1.2367,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "email-regex-accepts-no-tld",
+          "class": "validation",
+          "caught": false,
+          "why": "None of the findings test or report that an email without a dot in its domain (such as sam@example) is accepted and advances."
+        },
+        {
+          "id": "daily-limit-upper-bound-missing",
+          "class": "boundary",
+          "caught": true,
+          "why": "The run explicitly reports that entering daily limit 21, above the stated 1–20 range, advances to Step 3 without validation feedback."
+        },
+        {
+          "id": "remove-note-drops-last",
+          "class": "list-index",
+          "caught": true,
+          "why": "The run reports that clicking Remove beside Alpha removes Beta (the last/second note) while leaving Alpha, which is the specified wrong-row removal behavior."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Removing note 2 removes only the second note while preserving the first note and updates the summary to 1 note ready.",
+          "status": "verified",
+          "evidence": "After clicking Remove note 2 (step 10), the subsequent observation states that only the first textbox remained with \"First mobile note\" and the summary read \"1 note ready\" (step 11)."
+        },
+        {
+          "claim": "Removing note 1 beside Alpha leaves Beta as the sole remaining note.",
+          "status": "not_testable",
+          "evidence": "Remove note 1 was clicked after Alpha and Beta were observed (step 70), but the run navigated away at step 71 without recording the post-removal note fields or summary."
+        },
+        {
+          "claim": "Profile fields and planning preferences persist when navigating Back and Continue between wizard steps.",
+          "status": "verified",
+          "evidence": "After returning from step 1, step 2 retained Work and Study, \"2 selected,\" Sunday, 21:00, and max notes 19 (step 18); a separate Back flow retained Northstar, user@example.com, and Alex on step 1 (step 48)."
+        },
+        {
+          "claim": "The completion result retains all collected workspace information, including workspace name, note count, and planning preferences.",
+          "status": "contradicted",
+          "evidence": "Completion showed \"Mobile Test is ready with 1 note\" and the focus areas, but explicitly did not display Sunday, 21:00, or limit 19 anywhere on the completion screen (step 20)."
+        },
+        {
+          "claim": "Clicking Open my board reaches the board successfully.",
+          "status": "contradicted",
+          "evidence": "After Open my board was clicked (step 20), the recorded destination was an application-error page at / rather than a usable board (step 21)."
+        },
+        {
+          "claim": "Entering an out-of-range daily limit of 21 shows the stated 1–20 validation error and keeps the user on step 2.",
+          "status": "contradicted",
+          "evidence": "After entering 21 and clicking Continue (steps 77-78), the final observed state was the Step 3 notes screen rather than step 2 with validation feedback (step 79)."
+        }
+      ],
+      "findingTexts": [
+        "After a successful wizard completion, clicking Open my board navigates to / but the page displays \"Application error: a client-side exception has occurred while loading localhost\" instead of a board.",
+        "Mismatched note removal: clicking Remove note 1 beside Alpha removes the second note (Beta) and leaves Alpha.",
+        "Daily-limit upper-bound validation is not enforced: with Work selected and Max notes per day 21, Continue advances to Step 3 with no visible 1–20 error."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /welcome at a narrow mobile viewport and type into each step 1 field and the step 3 note.",
+          "action": "Inspect labels, progress indicators, buttons, and validation feedback while navigating the wizard.",
+          "expect": "Labels and feedback must remain legible, and no control or content may be clipped or covered.",
+          "priority": 11
+        },
+        {
+          "setup": "At step 3, add a second note and enter distinct text in both note fields.",
+          "action": "Click Remove note 2 and then read the remaining note count.",
+          "expect": "The second note must disappear, the first must remain, and the summary must read 1 note ready.",
+          "priority": 10
+        },
+        {
+          "setup": "At step 2, select Work, select Study, change week start to Sunday, change reminder to 21:00, and set limit to 19.",
+          "action": "Click Back to step 1, then Continue to return to step 2.",
+          "expect": "Both focus selections, Sunday, 21:00, and 19 must still be displayed.",
+          "priority": 9
+        },
+        {
+          "setup": "Complete the wizard with distinct valid profile, focus, preference, and note values; note the displayed note count and workspace.",
+          "action": "Create the workspace, then click Open my board.",
+          "expect": "Completion must show the noted workspace and count, and Open my board must reach the board.",
+          "priority": 8
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly and leave the first note blank on step 3.",
+          "action": "Click Create workspace.",
+          "expect": "Must show an add-note error and remain on step 3.",
+          "priority": 7
+        },
+        {
+          "setup": "Complete step 1 validly and leave all focus areas unselected on step 2.",
+          "action": "Click Continue, then select Work and Study and read the selection summary.",
+          "expect": "Must first show a focus error; afterward the summary must read 2 selected.",
+          "priority": 6
+        },
+        {
+          "setup": "Enter a two-character workspace name, a valid-looking email, and a display name.",
+          "action": "Click Continue on step 1.",
+          "expect": "Must show the three-character error and remain on step 1.",
+          "priority": 5
+        },
+        {
+          "setup": "Enter workspace Northstar, email user@example.com, and display name Alex.",
+          "action": "Continue to step 2, click Back, and re-read all step 1 fields.",
+          "expect": "Northstar, user@example.com, and Alex must still be present.",
+          "priority": 4
+        },
+        {
+          "setup": "Enter valid profile values, select Work, choose Sunday, choose 21:00, and set the daily limit to 19.",
+          "action": "Continue through the wizard, add one note, create the workspace, and inspect the completion screen.",
+          "expect": "The resulting workspace or board must visibly retain Sunday, 21:00, and limit 19.",
+          "priority": 3
+        },
+        {
+          "setup": "Complete steps 1 and 2 validly, then add notes Alpha and Beta on step 3.",
+          "action": "Click Remove note 1 beside Alpha.",
+          "expect": "Alpha must disappear and Beta must remain as the only note.",
+          "priority": 2
+        },
+        {
+          "setup": "At /welcome, complete step 1 validly, choose any focus area on step 2, and leave the daily limit ready to edit.",
+          "action": "Enter 21 for Max notes per day and click Continue.",
+          "expect": "Must show the stated 1–20 validation error and remain on step 2.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise every onboarding control, prioritizing boundary values, mismatched note removal, state preservation, and whether collected preferences reach the result.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /welcome at a narrow mobile viewport and type into each step 1 field and the step 3 note. Then Inspect labels, progress indicators, buttons, and validation feedback while navigating the wizard. — expect: Labels and feedback must remain legible, and no control or content may be clipped or covered.\n2. At step 3, add a second note and enter distinct text in both note fields. Then Click Remove note 2 and then read the remaining note count. — expect: The second note must disappear, the first must remain, and the summary must read 1 note ready.\n3. At step 2, select Work, select Study, change week start to Sunday, change reminder to 21:00, and set limit to 19. Then Click Back to step 1, then Continue to return to step 2. — expect: Both focus selections, Sunday, 21:00, and 19 must still be displayed.\n4. Complete the wizard with distinct valid profile, focus, preference, and note values; note the displayed note count and workspace. Then Create the workspace, then click Open my board. — expect: Completion must show the noted workspace and count, and Open my board must reach the board.\n5. Complete steps 1 and 2 validly and leave the first note blank on step 3. Then Click Create workspace. — expect: Must show an add-note error and remain "
+    }
+  ]
+}

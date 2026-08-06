@@ -1,0 +1,535 @@
+{
+  "label": "fewshot6-det-gridworks-schedule",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 7,
+    "planted": 18,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.7016,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "gridworks-schedule",
+      "attempt": 1,
+      "durationMs": 122080,
+      "status": "passed",
+      "steps": 8,
+      "findings": 2,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.2589,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run booked 2026-08-06 and observed the resulting shift rendered as Wed, 5 Aug 2026, explicitly showing the date displayed one day earlier."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "No finding tested or reported search results after a two-letter query resolving to stale one-letter-query results."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "No finding tested or reported HTML-tag search input being rendered as formatting rather than literal text."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Clicking Book shift with an empty Shift date shows a visible date-required message.",
+          "status": "contradicted",
+          "evidence": "Step 1 directly clicked Book shift with no date, but recorded no DOM change or feedback observation; the attempted control produced no observed effect."
+        },
+        {
+          "claim": "Clicking Book shift with an empty Shift date does not add a shift row.",
+          "status": "verified",
+          "evidence": "After the empty-date submission and before the later valid-date booking, step 7 observed the booking list still reading “No shifts booked.”"
+        },
+        {
+          "claim": "Rapidly entering “am” in the directory search settles to only Amara Osei and shows status for “am”.",
+          "status": "verified",
+          "evidence": "Step 4 observed Search value “am”, only “Amara Osei” visible, and status “Showing results for “am”” after the wait."
+        },
+        {
+          "claim": "Booking 2026-08-06 for Amara Osei renders the new shift row as 6 Aug 2026 rather than the prior day.",
+          "status": "contradicted",
+          "evidence": "Step 8 confirmed Shift date remained 2026-08-06 but the added row rendered “Wed, 5 Aug 2026 — Amara Osei,” demonstrating an incorrect one-day timezone/date shift."
+        }
+      ],
+      "findingTexts": [
+        "Clicking Book shift with an empty Shift date silently leaves “No shifts booked.” and shows no visible date-required feedback.",
+        "Booking Shift date 2026-08-06 for Amara Osei adds one row rendered “Wed, 5 Aug 2026 — Amara Osei”, one day earlier than the selected date."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /schedule.html and leave Shift date empty.",
+          "action": "Click Book shift without choosing a date.",
+          "expect": "A visible date-required message must appear, and no shift row must be added.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /schedule.html with the directory search empty.",
+          "action": "Type “a”, append “m” within 100 milliseconds, and wait 800 milliseconds.",
+          "expect": "Results must match “am”: only Amara Osei and status for “am” must be shown.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /schedule.html; choose 2026-08-06 and leave the assignee as Amara Osei.",
+          "action": "Click Book shift and read the newly added shift row.",
+          "expect": "The row must show 6 Aug 2026, matching the selected date, not 5 Aug 2026.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and directory search with boundary and rapid-input cases, then verify rendered dates, result consistency, and user feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /schedule.html and leave Shift date empty. Then Click Book shift without choosing a date. — expect: A visible date-required message must appear, and no shift row must be added.\n2. Open /schedule.html with the directory search empty. Then Type “a”, append “m” within 100 milliseconds, and wait 800 milliseconds. — expect: Results must match “am”: only Amara Osei and status for “am” must be shown.\n3. Open /schedule.html; choose 2026-08-06 and leave the assignee as Amara Osei. Then Click Book shift and read the newly added shift row. — expect: The row must show 6 Aug 2026, matching the selected date, not 5 Aug 2026."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 2,
+      "durationMs": 153986,
+      "status": "passed",
+      "steps": 11,
+      "findings": 2,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.3052,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run observed that booking 2030-08-06 created a row displayed as Mon, 5 Aug 2030, the previous day."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "No finding describes a two-letter search being overwritten by results from an earlier one-letter query or mismatching names."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": true,
+          "why": "The run reports that an HTML-like search term was rendered as markup, with the <b> tags absent from the displayed message."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Entering <b>not-a-name</b> in directory search shows a no-match message with the tags displayed literally rather than rendered as markup.",
+          "status": "contradicted",
+          "evidence": "Step 2 directly attempted to fill Search with the HTML-like term, but recorded domChanged=NO and observed that the field remained empty and the directory still said “Type to search,” so the requested search result was never produced."
+        },
+        {
+          "claim": "Booking a shift without a date shows a visible date-validation message and does not create a booking row.",
+          "status": "not_testable",
+          "evidence": "Step 3 clicked Book shift and changed the DOM, and step 9 later observed no shifts booked, but the trace never records the post-click validation message or the immediate booking-list state needed to prove the full outcome."
+        },
+        {
+          "claim": "Rapidly typing \"am\" into directory search leaves only Amara Osei visible and labels the summary as results for \"am\".",
+          "status": "not_testable",
+          "evidence": "Step 6 records only the intermediate \"a\" state and its multiple results; the claimed settled \"am\" result and summary appear only in step 7 reasoning, without a recorded observation."
+        },
+        {
+          "claim": "Booking Amara Osei on 6 August 2030 creates a row dated Tue, 6 Aug 2030, rather than the preceding date.",
+          "status": "contradicted",
+          "evidence": "Step 10 confirms the date control held 2030-08-06 before booking, but the final snapshot in step 11 shows the created row as “Mon, 5 Aug 2030 — Amara Osei,” one day earlier than the required Tue, 6 Aug 2030."
+        }
+      ],
+      "findingTexts": [
+        "Booking Shift date 2030-08-06 for Amara Osei creates a row reading “Mon, 5 Aug 2030 — Amara Osei”, one day earlier than the selected date.",
+        "Intended literal HTML-like no-match query is rendered as markup: message shows “not-a-name” without <b> tags."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Focus the directory search field.",
+          "action": "Enter <b>not-a-name</b> as the search term and wait for results.",
+          "expect": "The no-match message must display the tags literally, not interpret them as markup.",
+          "priority": 4
+        },
+        {
+          "setup": "Clear the shift date while leaving the assignee populated.",
+          "action": "Click Book shift with no date selected.",
+          "expect": "A visible date validation message must appear and no shift row must be created.",
+          "priority": 3
+        },
+        {
+          "setup": "Leave the directory search empty and prepare to type rapidly.",
+          "action": "Type a, immediately append m, then wait one second.",
+          "expect": "Only Amara Osei must appear, and the summary must say results are for \"am\".",
+          "priority": 2
+        },
+        {
+          "setup": "Choose 6 August 2030 as the shift date and leave the assignee as Amara Osei.",
+          "action": "Click Book shift and read the newly added booking row.",
+          "expect": "The row must show Tue, 6 Aug 2030 and Amara Osei, not the preceding date.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and live directory search, targeting date handling, asynchronous result ordering, validation feedback, and safe rendering of search text.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Focus the directory search field. Then Enter <b>not-a-name</b> as the search term and wait for results. — expect: The no-match message must display the tags literally, not interpret them as markup.\n2. Clear the shift date while leaving the assignee populated. Then Click Book shift with no date selected. — expect: A visible date validation message must appear and no shift row must be created.\n3. Leave the directory search empty and prepare to type rapidly. Then Type a, immediately append m, then wait one second. — expect: Only Amara Osei must appear, and the summary must say results are for \"am\".\n4. Choose 6 August 2030 as the shift date and leave the assignee as Amara Osei. Then Click Book shift and read the newly added booking row. — expect: The row must show Tue, 6 Aug 2030 and Amara Osei, not the preceding date."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 3,
+      "durationMs": 108099,
+      "status": "passed",
+      "steps": 8,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.2357,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run explicitly reports that booking 2026-08-06 renders as Wed, 5 Aug 2026, one day earlier than the selected date."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "No finding describes search results from an earlier query overriding results for a later two-letter query."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "No finding describes HTML-like search input being rendered as formatting rather than literal text."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "After rapidly entering \"rui\" and waiting, the directory shows only Rui Tavares and the summary reflects the \"rui\" query, with no stale earlier results.",
+          "status": "verified",
+          "evidence": "Step 4, after an 800 ms wait, records search value \"rui\", only Rui Tavares rendered, and summary \"Showing results for \\\"rui\\\".\""
+        },
+        {
+          "claim": "The shift form can be set to the exact requested values: date 2026-08-06 and assignee Kai Lindqvist.",
+          "status": "verified",
+          "evidence": "Step 6 observes Shift date element value \"2026-08-06\" (rendered 06/08/2026), and Step 7 observes Assign to exact value \"Kai Lindqvist\" while the date remains 2026-08-06."
+        },
+        {
+          "claim": "Clicking Book shift creates a booked-shift row using the selected date, displayed as Thu, 6 Aug 2026.",
+          "status": "contradicted",
+          "evidence": "The Book shift click changed the DOM (Step 7), but the final fresh snapshot in Step 8 shows one booked row dated \"Wed, 5 Aug 2026\" rather than the selected 2026-08-06 / expected Thu, 6 Aug 2026."
+        },
+        {
+          "claim": "The booked shift row displays Kai Lindqvist as its assignee.",
+          "status": "not_testable",
+          "evidence": "Steps 6-7 confirm the selected assignee is Kai Lindqvist, but Step 8 records only the booked row's incorrect date and does not record the row's assignee text."
+        }
+      ],
+      "findingTexts": [
+        "Booking the selected date 2026-08-06 for Kai Lindqvist creates a row dated \"Wed, 5 Aug 2026 — Kai Lindqvist\" instead of \"Thu, 6 Aug 2026 — Kai Lindqvist\". The assignee is correct but the rendered date"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Leave the directory search empty so the initial results state is visible.",
+          "action": "Type r, immediately append ui, and wait at least 700 ms after the final keystroke.",
+          "expect": "Only Rui Tavares and the rui summary must remain visible.",
+          "priority": 2
+        },
+        {
+          "setup": "Choose 2026-08-06 as the shift date and replace the assignee with Kai Lindqvist; note both values.",
+          "action": "Click Book shift and read the booked shift row.",
+          "expect": "The row must show Thu, 6 Aug 2026 and Kai Lindqvist, matching the selected date and assignee.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and rapid directory search, focusing on date accuracy and stale search results. Report the exact selected values and rendered results.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Leave the directory search empty so the initial results state is visible. Then Type r, immediately append ui, and wait at least 700 ms after the final keystroke. — expect: Only Rui Tavares and the rui summary must remain visible.\n2. Choose 2026-08-06 as the shift date and replace the assignee with Kai Lindqvist; note both values. Then Click Book shift and read the booked shift row. — expect: The row must show Thu, 6 Aug 2026 and Kai Lindqvist, matching the selected date and assignee."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 4,
+      "durationMs": 96303,
+      "status": "failed",
+      "steps": 8,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.2015,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": false,
+          "why": "The run reports only search no-match rendering behavior and provides no evidence of a booked shift being displayed on the previous day."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "The run does not describe a rapid multi-query search where results for an earlier query overwrite those for a later query."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": true,
+          "why": "The run shows that the typed HTML-like search term `<b>am</b>` is interpreted as markup in the no-match message, rendering `am` bold/omitting the tags instead of displaying the literal text."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Searching for `<b>am</b>` with no matches displays the full query literally in the no-match message rather than interpreting or stripping HTML-like text.",
+          "status": "contradicted",
+          "evidence": "After filling Search with `<b>am</b>`, step 2 observed the input containing `<b>am</b>` but the directory message reading `No matches for \"am\"`; the `<b>` tags were omitted rather than displayed literally."
+        },
+        {
+          "claim": "Clicking Book shift with an empty Shift date shows a visible date validation message and creates no booked-shift row.",
+          "status": "not_testable",
+          "evidence": "Step 2 clicked Book shift, but the only recorded observation concerns the directory search message; the trace never records the booking area's validation state or whether a shift row was created."
+        },
+        {
+          "claim": "Rapidly entering `a` then `m` into an empty directory search produces only Amara Osei and updates the summary to `am`, without stale `a` results.",
+          "status": "not_testable",
+          "evidence": "Step 5 recorded the intermediate `a` state with seven results and summary `Showing results for \"a\"`, but no successful `m` append or post-wait `am` results observation was recorded before the run failed."
+        },
+        {
+          "claim": "Booking 2025-07-15 for the default assignee Amara Osei creates a row displaying `Tue, 15 Jul 2025`, matching the selected date.",
+          "status": "not_testable",
+          "evidence": "Step 6 set the Shift date, but the trace contains no subsequent Book shift action or booked-row observation before the forced exit."
+        }
+      ],
+      "findingTexts": [
+        "No-match message renders `am` as bold instead of displaying the literal `<b>am</b>` query."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Use the directory search field with no existing results.",
+          "action": "Enter `<b>am</b>` and wait for the search result.",
+          "expect": "The no-match message must display the query literally, without rendering it as bold HTML.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave Shift date empty and leave the default assignee unchanged.",
+          "action": "Click Book shift and inspect the booking area.",
+          "expect": "A visible date validation message must appear and no booked shift row must be created.",
+          "priority": 3
+        },
+        {
+          "setup": "Start with an empty directory search field.",
+          "action": "Type \"a\", immediately append \"m\", wait one second, and read all directory results.",
+          "expect": "Results must show only Amara Osei and the summary must say \"am\", not older \"a\" results.",
+          "priority": 2
+        },
+        {
+          "setup": "Set Shift date to 2025-07-15 and leave the default assignee Amara Osei.",
+          "action": "Click Book shift and read the booked shift row.",
+          "expect": "The row must show Tue, 15 Jul 2025, matching the selected date; state the displayed date.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and directory search with boundary, rapid-input, empty-input, and rendering cases. Report the exact dates, results, and visible validation or escaping behavior.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use the directory search field with no existing results. Then Enter `<b>am</b>` and wait for the search result. — expect: The no-match message must display the query literally, without rendering it as bold HTML.\n2. Leave Shift date empty and leave the default assignee unchanged. Then Click Book shift and inspect the booking area. — expect: A visible date validation message must appear and no booked shift row must be created.\n3. Start with an empty directory search field. Then Type \"a\", immediately append \"m\", wait one second, and read all directory results. — expect: Results must show only Amara Osei and the summary must say \"am\", not older \"a\" results.\n4. Set Shift date to 2025-07-15 and leave the default assignee Amara Osei. Then Click Book shift and read the booked shift row. — expect: The row must show Tue, 15 Jul 2025, matching the selected date; state the displayed date."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 5,
+      "durationMs": 175588,
+      "status": "failed",
+      "steps": 21,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 1,
+      "costUsd": 0.4188,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run explicitly reports that bookings selected for 2026-08-06 and 2026-08-07 are displayed one day earlier, matching the planted date-rendering defect."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "No finding describes search results for a two-letter query being replaced by stale results from an earlier one-letter query."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "No finding describes HTML-containing search text being rendered as markup rather than displayed literally."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Booking shifts for 2026-08-06/Kai Lindqvist and 2026-08-07/Mira Halden preserves both selected dates, distinct assignees, and booking order.",
+          "status": "contradicted",
+          "evidence": "After both bookings, step 10 records exactly two ordered rows, “Wed, 5 Aug 2026 — Kai Lindqvist” and “Thu, 6 Aug 2026 — Mira Halden”; the assignees and order are retained, but each displayed date is one day earlier than the selected 2026-08-06 and 2026-08-07."
+        },
+        {
+          "claim": "Submitting a shift with an empty date does not add a booking row.",
+          "status": "verified",
+          "evidence": "Immediately after the empty-date submission, step 12 records an empty Shift date and only the two pre-existing Kai and Mira booking rows in the booking area."
+        },
+        {
+          "claim": "Submitting an empty shift date shows a visible date-validation message.",
+          "status": "not_testable",
+          "evidence": "Step 12 confirms the empty date and unchanged rows after submission, but its recorded observation does not state whether a validation message was present or what was shown in the validation area."
+        },
+        {
+          "claim": "Rapidly replacing directory search “a” with “Kai” leaves only Kai Lindqvist and the “Kai” summary, with no stale “a” results.",
+          "status": "verified",
+          "evidence": "Step 15 observed seven names and “Showing results for ‘a’” after the initial query, while step 16 then observed only Kai Lindqvist and “Showing results for ‘Kai’,” with no stale “a” result or summary."
+        },
+        {
+          "claim": "Booking 2026-08-06 for the default assignee Amara Osei displays the date as Thu 6 Aug 2026.",
+          "status": "not_testable",
+          "evidence": "The final date entry did not succeed: step 19 records the Shift date still empty after the attempted direct entry, and the run exited before a final booking could be submitted or its displayed date observed."
+        }
+      ],
+      "findingTexts": [
+        "Booking date display is shifted back one day: selected 2026-08-06 for Kai Lindqvist is listed as Wed, 5 Aug 2026, and selected 2026-08-07 for Mira Halden is listed as Thu, 6 Aug 2026."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Book one shift for 2026-08-06 assigned to Kai Lindqvist.",
+          "action": "Book a second shift for 2026-08-07 assigned to Mira Halden and read both rows.",
+          "expect": "Both rows must remain with their distinct dates and assignees in booking order.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave the shift date empty and keep the default assignee.",
+          "action": "Click Book shift and inspect the booking area.",
+          "expect": "A visible date-validation message must appear and no shift row may be added.",
+          "priority": 3
+        },
+        {
+          "setup": "Focus the directory search with no existing query.",
+          "action": "Type “a”, immediately replace it with “Kai”, and wait for all results to settle.",
+          "expect": "Only Kai Lindqvist and the “Kai” summary must remain; no results or summary for “a” may appear.",
+          "priority": 2
+        },
+        {
+          "setup": "Enter 2026-08-06 as the shift date and leave the assignee as Amara Osei.",
+          "action": "Click Book shift and read the newly listed shift date.",
+          "expect": "The displayed date must be Thu 6 Aug 2026, matching the selected date; state both dates.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and live directory search with boundary inputs and rapid changes, then report any stale, incorrect, or missing visible feedback.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Book one shift for 2026-08-06 assigned to Kai Lindqvist. Then Book a second shift for 2026-08-07 assigned to Mira Halden and read both rows. — expect: Both rows must remain with their distinct dates and assignees in booking order.\n2. Leave the shift date empty and keep the default assignee. Then Click Book shift and inspect the booking area. — expect: A visible date-validation message must appear and no shift row may be added.\n3. Focus the directory search with no existing query. Then Type “a”, immediately replace it with “Kai”, and wait for all results to settle. — expect: Only Kai Lindqvist and the “Kai” summary must remain; no results or summary for “a” may appear.\n4. Enter 2026-08-06 as the shift date and leave the assignee as Amara Osei. Then Click Book shift and read the newly listed shift date. — expect: The displayed date must be Thu 6 Aug 2026, matching the selected date; state both dates."
+    },
+    {
+      "case": "gridworks-schedule",
+      "attempt": 6,
+      "durationMs": 126797,
+      "status": "passed",
+      "steps": 9,
+      "findings": 3,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.2815,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "booked-date-off-by-one",
+          "class": "timezone",
+          "caught": true,
+          "why": "The run explicitly observed that booking 2026-08-15 created a row displayed as “Fri, 14 Aug 2026,” one day earlier than the selected date."
+        },
+        {
+          "id": "stale-search-result-wins",
+          "class": "race-condition",
+          "caught": false,
+          "why": "No finding describes a two-letter search resolving to results from an earlier one-letter query or names mismatching the typed search term."
+        },
+        {
+          "id": "search-term-not-escaped",
+          "class": "escaping",
+          "caught": false,
+          "why": "No finding tests search input containing HTML tags or reports search text being rendered as HTML formatting rather than literal text."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Before input, the muted “No shifts booked.” and “Type to search.” status messages are clearly legible on their white cards.",
+          "status": "not_testable",
+          "evidence": "Step 1 records that the initial readability check was required, but contains no observation of either message or its visual contrast/legibility."
+        },
+        {
+          "claim": "Clicking Book shift with an empty date shows a visible date-validation message and does not create a shift row.",
+          "status": "contradicted",
+          "evidence": "Step 2 directly clicked Book shift with the date empty and recorded domChanged=NO, showing no observed validation response; step 7 subsequently observed that no shift row existed."
+        },
+        {
+          "claim": "Rapidly changing the directory query from “a” to “amara” leaves only Amara Osei and the “amara” summary, without stale “a” results overwriting them.",
+          "status": "not_testable",
+          "evidence": "Steps 3-4 entered “a” and then “amara” (with the latter changing the DOM), but the trace never records the results after the required one-second wait or identifies any displayed people/summary."
+        },
+        {
+          "claim": "Booking 15 August 2026 for Kai Lindqvist creates a row showing Sat, 15 Aug 2026 and Kai Lindqvist, matching the entered date and assignee.",
+          "status": "contradicted",
+          "evidence": "Step 7 observed the date control at 2026-08-15 and assignee Kai Lindqvist before submission, but after the successful booking click in step 8, step 9 observed the created row as “Fri, 14 Aug 2026 — Kai Lindqvist,” while the input still held 2026-08-15."
+        }
+      ],
+      "findingTexts": [
+        "Clicking “Book shift” with Shift date empty showed no visible date-validation message. The booking area remained “No shifts booked.” and no row was created.",
+        "Submitting Shift date 2026-08-15 with assignee Kai Lindqvist created one row reading “Fri, 14 Aug 2026 — Kai Lindqvist”, rendering the date one day earlier than the selected date.",
+        "Muted empty-state messages (“No shifts booked.” and “Type to search.”) have very low contrast on white."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "",
+          "action": "Read “No shifts booked.” and “Type to search.” before entering anything.",
+          "expect": "Both muted status messages must be clearly legible against the white cards.",
+          "priority": 4
+        },
+        {
+          "setup": "Leave the shift date empty and retain the displayed assignee.",
+          "action": "Click Book shift and inspect the booking area.",
+          "expect": "A visible date-validation message must appear, and no shift row must be created.",
+          "priority": 3
+        },
+        {
+          "setup": "Leave the directory search empty.",
+          "action": "Type “a”, immediately append “mara”, then wait one second and read the results.",
+          "expect": "Only Amara Osei and the “amara” summary must appear; stale results for “a” must not overwrite them.",
+          "priority": 2
+        },
+        {
+          "setup": "Select 15 August 2026 and replace the assignee with Kai Lindqvist.",
+          "action": "Click Book shift and read the booked shift row.",
+          "expect": "The row must show Sat, 15 Aug 2026 and Kai Lindqvist, matching the selected date and assignee.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise shift booking and directory search with boundary and rapid-input cases, then inspect visible feedback and readability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Read “No shifts booked.” and “Type to search.” before entering anything. — expect: Both muted status messages must be clearly legible against the white cards.\n2. Leave the shift date empty and retain the displayed assignee. Then Click Book shift and inspect the booking area. — expect: A visible date-validation message must appear, and no shift row must be created.\n3. Leave the directory search empty. Then Type “a”, immediately append “mara”, then wait one second and read the results. — expect: Only Amara Osei and the “amara” summary must appear; stale results for “a” must not overwrite them.\n4. Select 15 August 2026 and replace the assignee with Kai Lindqvist. Then Click Book shift and read the booked shift row. — expect: The row must show Sat, 15 Aug 2026 and Kai Lindqvist, matching the selected date and assignee."
+    }
+  ]
+}

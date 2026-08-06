@@ -1,0 +1,252 @@
+{
+  "label": "sweep-stockroom-adjust",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 1,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.3549,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "stockroom-adjust",
+      "attempt": 1,
+      "durationMs": 110585,
+      "status": "failed",
+      "steps": 11,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 0,
+      "costUsd": 0.145,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": false,
+          "why": "The run did not test or report undoing a shipment and seeing stock decrease again."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": true,
+          "why": "It reports that a washer with stock exactly at its reorder point (60) is shown OK, despite the stated at-or-below rule requiring Low."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": false,
+          "why": "The run did not attempt to ship exactly the full on-hand quantity or report that such a shipment was refused."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Recording a shipped quantity of 0 for Cable 2m shows a quantity error and leaves Cable 2m and Movements unchanged.",
+          "status": "not_testable",
+          "evidence": "Cable 2m was never selected and Record was never clicked; steps 1-9 show the item selector remained on Hex bolt M4, so the validation flow was not exercised."
+        },
+        {
+          "claim": "At a 320px-wide viewport, all inventory controls and table values are readable and operable without horizontal clipping or overlap.",
+          "status": "not_testable",
+          "evidence": "The trace contains no viewport resize to 320px and no responsive-layout inspection."
+        },
+        {
+          "claim": "Receiving 5 Washer 11mm raises it from 60 to 65, changes its status to OK, increases total units by 5, adds one movement, and reduces the low-item count by one.",
+          "status": "not_testable",
+          "evidence": "No Washer 11mm receipt was performed; the trace only records its unchanged seeded quantity of 60 in step 8."
+        },
+        {
+          "claim": "After a zero-quantity error for Panel A3, recording a received quantity of 1 clears the error and raises Panel A3 from 7 to 8 with one movement logged.",
+          "status": "not_testable",
+          "evidence": "Panel A3 was never selected and neither Record action was attempted."
+        },
+        {
+          "claim": "Undo last reverses only the most recent Cable 2m shipment while preserving the prior Hex bolt M4 receipt and its logged movement.",
+          "status": "not_testable",
+          "evidence": "Neither the Hex bolt receipt nor Cable shipment was recorded, and Undo last was not clicked."
+        },
+        {
+          "claim": "The freshly loaded inventory shows Washer 11mm at 60 on hand and one low item, with no movements.",
+          "status": "verified",
+          "evidence": "Step 8 records the unchanged seeded table with Washer 11mm at 60, while steps 5-7 record total units 535, Items low 1, and Movements 0."
+        }
+      ],
+      "findingTexts": [
+        "Washer at reorder point 60 is shown OK and Items low is 1; intended at-or-below rule requires Low and 2."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Start fresh, select Cable 2m, select Shipped, and enter quantity 0.",
+          "action": "Click Record and inspect the feedback area and Cable 2m row.",
+          "expect": "A visible quantity error must appear, and Cable 2m and Movements must remain unchanged.",
+          "priority": 9
+        },
+        {
+          "setup": "Start fresh with the page at a 320px-wide viewport.",
+          "action": "Inspect and operate the item, movement, quantity, Record, and Undo controls.",
+          "expect": "Every control and table value must remain readable and operable without being horizontally clipped or covered.",
+          "priority": 8
+        },
+        {
+          "setup": "Start fresh and note the initial On hand values, low-status rows, and empty movement log.",
+          "action": "Receive 5 Washer 11mm and reread its row, total units, Items low, Movements, and log.",
+          "expect": "Washer must be 65 and OK; totals must reflect the five added units, one movement, and one fewer low row.",
+          "priority": 7
+        },
+        {
+          "setup": "Start fresh, select Panel A3, select Received, and enter quantity 0.",
+          "action": "Record it, then enter quantity 1 and record again.",
+          "expect": "The invalid error must disappear, and Panel A3 must increase to 8 with one movement logged.",
+          "priority": 6
+        },
+        {
+          "setup": "Start fresh, select Hex bolt M4 and receive 2, then select Cable 2m and ship 3.",
+          "action": "Click Undo last and compare both item rows and the movement log.",
+          "expect": "Only Cable 2m must revert; Hex bolt M4 must remain at 142 and its receipt must remain logged.",
+          "priority": 5
+        },
+        {
+          "setup": "Start fresh, select Hex bolt M4, select Shipped, and enter quantity 10; note its initial quantity of 140.",
+          "action": "Record the shipment, click Undo last, then reread Hex bolt M4 and Movements.",
+          "expect": "Hex bolt M4 must return to 140, and Movements must be 0.",
+          "priority": 4
+        },
+        {
+          "setup": "Start fresh, select Panel A3, select Received, and enter quantity 4; note its initial quantity of 7.",
+          "action": "Record the receipt, click Undo last, then reread Panel A3, the log, and Movements.",
+          "expect": "Panel A3 must return to 7; the log must be empty and Movements must be 0.",
+          "priority": 3
+        },
+        {
+          "setup": "Start fresh, select Panel A3, select Shipped, and leave its quantity at 7, matching its on-hand quantity.",
+          "action": "Record the shipment and read Panel A3 and the movement log.",
+          "expect": "The shipment must be accepted; Panel A3 must show 0 on hand and one shipped log entry.",
+          "priority": 2
+        },
+        {
+          "setup": "Start with the freshly loaded stockroom screen and note Washer 11mm's on-hand quantity of 60 and reorder point of 60.",
+          "action": "Read the Washer 11mm row and the Items low total.",
+          "expect": "Washer must show Low — reorder, and Items low must equal the number of low-status rows.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the inventory controls at rule boundaries, verify undo restores the prior quantity, and inspect low-stock counts, logs, feedback, and responsive usability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Start fresh, select Cable 2m, select Shipped, and enter quantity 0. Then Click Record and inspect the feedback area and Cable 2m row. — expect: A visible quantity error must appear, and Cable 2m and Movements must remain unchanged.\n2. Start fresh with the page at a 320px-wide viewport. Then Inspect and operate the item, movement, quantity, Record, and Undo controls. — expect: Every control and table value must remain readable and operable without being horizontally clipped or covered.\n3. Start fresh and note the initial On hand values, low-status rows, and empty movement log. Then Receive 5 Washer 11mm and reread its row, total units, Items low, Movements, and log. — expect: Washer must be 65 and OK; totals must reflect the five added units, one movement, and one fewer low row.\n4. Start fresh, select Panel A3, select Received, and enter quantity 0. Then Record it, then enter quantity 1 and record again. — expect: The invalid error must disappear, and Panel A3 must increase to 8 with one movement logged.\n5. Start fresh, select Hex bolt M4 and receive 2, then select Cable 2m and ship 3. Then Click Undo last and compare both item rows and the movement log. — expect: Only Cable 2m must revert; Hex bolt M4 must remain at 142 and its "
+    },
+    {
+      "case": "stockroom-adjust",
+      "attempt": 2,
+      "durationMs": 149939,
+      "status": "failed",
+      "steps": 11,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.2099,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "undo-ignores-direction",
+          "class": "inverse-operation",
+          "caught": false,
+          "why": "The run did not perform or report an undo operation, so it did not observe stock decreasing again after undoing a shipment."
+        },
+        {
+          "id": "reorder-equality-not-flagged",
+          "class": "boundary-equality",
+          "caught": false,
+          "why": "The findings do not test or report an item at exactly its reorder point being shown as OK instead of low."
+        },
+        {
+          "id": "cannot-ship-entire-stock",
+          "class": "off-by-one-guard",
+          "caught": false,
+          "why": "The failed shipment attempt used quantity 1 while PNL-A3 had 7 on hand, not a shipment of the entire on-hand quantity. It therefore does not establish the full-stock off-by-one refusal."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Recording a shipped movement of 1 for PNL-A3 decreases its displayed quantity from 7 to 6 and updates inventory state.",
+          "status": "contradicted",
+          "evidence": "After PNL-A3, Shipped, and quantity 1 were shown, clicking Record at step 9 produced domChanged=NO and the observation says inventory had not changed."
+        },
+        {
+          "claim": "Undo last restores PNL-A3, total units, and the movement log to their initial values after a one-unit shipment.",
+          "status": "not_testable",
+          "evidence": "Undo last was never clicked; step 3 only observed it disabled before any successful movement was recorded."
+        },
+        {
+          "claim": "After receiving 3 and then shipping 2 for PNL-A3, Undo last leaves PNL-A3 at 10 with one received movement remaining.",
+          "status": "not_testable",
+          "evidence": "The received-3 and shipped-2 sequence was never performed because the run stopped during the first recording scenario."
+        },
+        {
+          "claim": "Shipping 2 PNL-A3 units lowers the row to 5, marks it Low — reorder, and raises Items low to 2.",
+          "status": "not_testable",
+          "evidence": "The PNL-A3 two-unit shipment and subsequent row/Items low observations were never attempted."
+        },
+        {
+          "claim": "Shipping all 140 BLT-04 units reaches 0 without an error and creates one shipped movement-log entry.",
+          "status": "not_testable",
+          "evidence": "BLT-04 was only used while attempting to operate the item selector; no 140-unit shipment was entered or recorded."
+        },
+        {
+          "claim": "At a 320px viewport, all inventory controls, table values, statuses, and totals remain readable, reachable, and unclipped.",
+          "status": "not_testable",
+          "evidence": "The trace contains no viewport resize to 320px and no recorded narrow-screen inspection."
+        }
+      ],
+      "findingTexts": [
+        "Narrow-screen horizontal/text clipping: the Stockroom subtitle ends at “poin” and the Item select's exposed text ends at “PNL” at the requested 320px-wide fresh page."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Use a 320px-wide viewport on a fresh page.",
+          "action": "Inspect every label, input, select, button, table column, status, and total at that viewport.",
+          "expect": "All controls and table values must remain readable, reachable, and free of horizontal clipping.",
+          "priority": 5
+        },
+        {
+          "setup": "On a fresh page, select PNL-A3, choose Shipped, enter 1, and note its resulting 6 units.",
+          "action": "Click Undo last and compare the row, totals, and log with the initial page.",
+          "expect": "The row and total units must return to their initial values; the log must say no movements recorded.",
+          "priority": 4
+        },
+        {
+          "setup": "On a fresh page, select PNL-A3, record Received 3, then record Shipped 2; note its resulting 8 units.",
+          "action": "Click Undo last and reread PNL-A3, Movements, and the movement log.",
+          "expect": "PNL-A3 must return to 10; Movements must be 1; only the received entry must remain.",
+          "priority": 3
+        },
+        {
+          "setup": "On a fresh page, select PNL-A3, choose Shipped, enter 2, and note its initial 7 units and reorder point 5.",
+          "action": "Record the movement and reread the PNL-A3 row and Items low total.",
+          "expect": "PNL-A3 must show 5 and Low — reorder; Items low must increase to 2.",
+          "priority": 2
+        },
+        {
+          "setup": "On a fresh page, select BLT-04, choose Shipped, enter 140, and note its current 140 units.",
+          "action": "Record the movement and reread the BLT-04 row, error area, totals, and movement log.",
+          "expect": "BLT-04 must show 0, no error, one movement, and a shipped log entry.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise inventory recording, boundary validation, undo behavior, low-stock thresholds, totals, movement logs, and narrow-screen usability. Report the exact displayed quantities, counts, statuses, errors, and any clipped or unreachable controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Use a 320px-wide viewport on a fresh page. Then Inspect every label, input, select, button, table column, status, and total at that viewport. — expect: All controls and table values must remain readable, reachable, and free of horizontal clipping.\n2. On a fresh page, select PNL-A3, choose Shipped, enter 1, and note its resulting 6 units. Then Click Undo last and compare the row, totals, and log with the initial page. — expect: The row and total units must return to their initial values; the log must say no movements recorded.\n3. On a fresh page, select PNL-A3, record Received 3, then record Shipped 2; note its resulting 8 units. Then Click Undo last and reread PNL-A3, Movements, and the movement log. — expect: PNL-A3 must return to 10; Movements must be 1; only the received entry must remain.\n4. On a fresh page, select PNL-A3, choose Shipped, enter 2, and note its initial 7 units and reorder point 5. Then Record the movement and reread the PNL-A3 row and Items low total. — expect: PNL-A3 must show 5 and Low — reorder; Items low must increase to 2.\n5. On a fresh page, select BLT-04, choose Shipped, enter 140, and note its current 140 units. Then Reco"
+    }
+  ]
+}

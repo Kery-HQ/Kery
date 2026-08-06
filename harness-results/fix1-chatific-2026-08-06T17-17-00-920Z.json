@@ -1,0 +1,273 @@
+{
+  "label": "fix1-chatific",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 4,
+    "planted": 6,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.663,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "chatific-compare",
+      "attempt": 1,
+      "durationMs": 284576,
+      "status": "passed",
+      "steps": 21,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.4609,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "why": "With Vision only enabled, exactly three rows were visible but the summary remained “Showing 5 of 5 models,” directly showing the counter does not match the filtered list."
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": false,
+          "why": "No finding reports clicking a numeric column header twice, observing an arrow direction change, and seeing the numeric row order fail to reverse."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "For DeepSeek V3 with 2M input and 1M output, displayed rates of $0.14 input and $0.28 output produced $0.84 instead of $0.56, consistent with applying the $0.28 output rate to both input and output usage."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "The Model catalog link navigates to /models and the chatific logo navigates to the home page at /.",
+          "status": "verified",
+          "evidence": "After clicking Model catalog, step 2 records navigation to /models (though that route displayed a 404); after clicking the logo, step 4 records navigation to http://localhost:4103/ with path /."
+        },
+        {
+          "claim": "At a 375px viewport, all six comparison-table columns and row values are readable and reachable without clipping.",
+          "status": "not_testable",
+          "evidence": "Step 21 explicitly states that the viewport-specific check could not be performed using the provided action set; no narrow-width table observation was recorded."
+        },
+        {
+          "claim": "Selecting OpenAI with Vision only disabled leaves only GPT-4o mini and accurately reports Showing 1 of 5 models.",
+          "status": "verified",
+          "evidence": "Step 6 records Provider OpenAI, one displayed row named GPT-4o mini, and the summary text Showing 1 of 5 models."
+        },
+        {
+          "claim": "Clicking sortable headers reorders the five model rows by the selected column, and the second Model sort reverses the alphabetical order.",
+          "status": "verified",
+          "evidence": "Steps 7-12 record alphabetical Model order, then reversed Model order (Llama through Claude), followed by concrete ascending row orders for Input, Output, and Context after their respective header selections."
+        },
+        {
+          "claim": "Monthly usage estimates use the displayed model prices and reject negative token usage rather than displaying a negative cost.",
+          "status": "contradicted",
+          "evidence": "After DeepSeek was selected and output usage set to 0, entering -1 input tokens produced a displayed DeepSeek estimate of $-0.28 in step 15; DeepSeek's shown prices were $0.14 input and $0.28 output per 1M in step 19. The required final $0.56 figure after setting input 2 and output 1 was not recorde"
+        },
+        {
+          "claim": "Enabling Vision only with all providers selected leaves exactly three visible models and updates the summary to Showing 3 of 5 models.",
+          "status": "contradicted",
+          "evidence": "Step 17 records that Vision only was checked and exactly three rows were visible (GPT-4o mini, Claude Sonnet 4.5, and Gemini 2.5 Flash), but the summary still read Showing 5 of 5 models."
+        }
+      ],
+      "findingTexts": [
+        "Negative input usage is accepted and produces a negative monthly estimate: input -1, output 0, DeepSeek V3 estimate $-0.28.",
+        "DeepSeek V3's estimate is incorrect: at 2M input and 1M output with displayed rates $0.14 and $0.28, the table shows $0.84 instead of the expected $0.56.",
+        "Model catalog navigates to /models, but that route displays a 404 instead of a usable catalog."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /compare with its default state.",
+          "action": "Click Model catalog, return to /compare, then click the chatific logo.",
+          "expect": "Model catalog must navigate to /models, and the logo must navigate to /; state both resulting paths.",
+          "priority": 7
+        },
+        {
+          "setup": "Open /compare at a 375px-wide viewport.",
+          "action": "Inspect the table header and rows at the narrow width without zooming.",
+          "expect": "All six columns and their values must be readable and reachable; no header or row may be clipped.",
+          "priority": 6
+        },
+        {
+          "setup": "Reload /compare with provider set to All and vision disabled.",
+          "action": "Select OpenAI and read the rows and Showing summary.",
+          "expect": "Only GPT-4o mini must remain, and the summary must read Showing 1 of 5 models.",
+          "priority": 5
+        },
+        {
+          "setup": "Reload /compare with all models visible and record the current row order.",
+          "action": "Click Model twice, then Input, Output, and Context headers once each, recording the order after every click.",
+          "expect": "Each selected column must reorder rows by its values; the second Model click must reverse alphabetical order.",
+          "priority": 4
+        },
+        {
+          "setup": "Select DeepSeek and set output usage to 0 million tokens.",
+          "action": "Enter -1 in the input-token field and read the estimate.",
+          "expect": "Negative usage must not produce a negative estimate; state the input and displayed cost.",
+          "priority": 3
+        },
+        {
+          "setup": "Start with all five models visible and note the initial summary.",
+          "action": "Enable Vision only and count the remaining model rows and summary text.",
+          "expect": "Exactly 3 rows must remain, and the summary must read Showing 3 of 5 models.",
+          "priority": 2
+        },
+        {
+          "setup": "On /compare, note DeepSeek V3's displayed input and output prices: $0.14 and $0.28.",
+          "action": "Select DeepSeek, enter 2 input and 1 output million tokens, and read its monthly estimate.",
+          "expect": "DeepSeek's estimate must be $0.56, calculated from both displayed prices; state the displayed figure.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public comparison page and exercise every filter, usage input, sortable header, and navigation link. Verify displayed estimates, row counts, ordering, validation behavior, and table usability at a narrow viewport.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /compare with its default state. Then Click Model catalog, return to /compare, then click the chatific logo. — expect: Model catalog must navigate to /models, and the logo must navigate to /; state both resulting paths.\n2. Open /compare at a 375px-wide viewport. Then Inspect the table header and rows at the narrow width without zooming. — expect: All six columns and their values must be readable and reachable; no header or row may be clipped.\n3. Reload /compare with provider set to All and vision disabled. Then Select OpenAI and read the rows and Showing summary. — expect: Only GPT-4o mini must remain, and the summary must read Showing 1 of 5 models.\n4. Reload /compare with all models visible and record the current row order. Then Click Model twice, then Input, Output, and Context headers once each, recording the order after every click. — expect: Each selected column must reorder rows by its values; the second Model click must reverse alphabetical order.\n5. Select DeepSeek and set output usage to 0 million tokens. Then Enter -1 in the input-token field and read the estimate. — expect: Negative usage must not produce a negative estimate; state the input and displayed"
+    },
+    {
+      "case": "chatific-compare",
+      "attempt": 2,
+      "durationMs": 146998,
+      "status": "failed",
+      "steps": 11,
+      "findings": 2,
+      "checks": 6,
+      "contradicted": 1,
+      "costUsd": 0.2021,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "counter-ignores-vision-filter",
+          "class": "count-vs-list",
+          "caught": true,
+          "why": "The run explicitly reports that with Vision only enabled, 3 rows are visible while the summary incorrectly remains \"Showing 5 of 5 models.\""
+        },
+        {
+          "id": "numeric-sort-ignores-direction",
+          "class": "sort-order",
+          "caught": false,
+          "why": "The run notes that Output $/1M and Context headers are non-interactive, but it does not report a numeric header whose arrow flips on a second click while the row order fails to reverse."
+        },
+        {
+          "id": "estimate-uses-output-rate-for-input",
+          "class": "derived-value",
+          "caught": true,
+          "why": "The run explicitly identifies Claude's estimate as $45 for 2M input and 1M output, instead of $21 from 2×$3 input plus $15 output, demonstrating that the output rate is used for input tokens."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At approximately 375px width, every comparison-table column and row is readable and reachable without clipping or controls covering content.",
+          "status": "not_testable",
+          "evidence": "The trace never sets a mobile-width viewport or records horizontal/vertical table traversal at that viewport."
+        },
+        {
+          "claim": "With Vision only enabled, selecting Anthropic and then returning Provider to All keeps Anthropic visible while limiting the table to vision-capable models.",
+          "status": "verified",
+          "evidence": "Step 3 records Anthropic selected with Vision only checked and exactly the Claude Sonnet 4.5 row visible; step 4 records that after returning to All, Claude Sonnet 4.5 remains visible among the three vision-capable rows."
+        },
+        {
+          "claim": "The Showing summary matches the visible filtered rows, including showing 3 of 5 models when Vision only is enabled.",
+          "status": "contradicted",
+          "evidence": "Step 2 observes only three vision-capable rows but the summary still reads \"Showing 5 of 5 models,\" rather than the required 3 of 5."
+        },
+        {
+          "claim": "Clicking the Model column changes the table between ascending and descending alphabetical model order.",
+          "status": "verified",
+          "evidence": "The default first model is recorded as Claude Sonnet 4.5 in step 8, and after the Model sort action step 9 records a changed DOM, a \"Model ↓\" indicator, and Llama 3.3 70B as the first row."
+        },
+        {
+          "claim": "Clicking Output $/1M, Input $/1M, and Context (K) reorders rows between ascending and descending values.",
+          "status": "not_testable",
+          "evidence": "The trace ends after Model sorting and contains no clicks or resulting table observations for Output $/1M, Input $/1M, or Context (K)."
+        },
+        {
+          "claim": "Usage inputs reject negative values and monthly estimates remain non-negative and correctly reconcile with displayed input/output prices.",
+          "status": "not_testable",
+          "evidence": "No token values were entered, no negative-input attempt was made, and no Claude Sonnet 4.5 monthly estimate was observed for the required 2-input/1-output calculation."
+        }
+      ],
+      "findingTexts": [
+        "Monthly estimates ignore input price: Claude shows $45 for 2 input/1 output, not 2×$3+$15=$21.",
+        "Output $/1M and Context (K) are displayed as non-interactive headers; only Model and Input are sortable buttons."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Set the viewport to approximately 375px wide and keep the comparison page at its initial scroll position.",
+          "action": "Inspect the table and horizontally or vertically attempt to reach every column and row.",
+          "expect": "All table columns and values must be readable and reachable without clipping or covering controls.",
+          "priority": 10
+        },
+        {
+          "setup": "Enable Vision only and select Anthropic as provider.",
+          "action": "Read the table and then switch the provider back to All.",
+          "expect": "Anthropic must remain visible in both states, with only vision-capable rows shown.",
+          "priority": 9
+        },
+        {
+          "setup": "Note the visible rows and Showing summary with All providers selected.",
+          "action": "Select OpenAI, then select DeepSeek, and compare each table with its provider summary.",
+          "expect": "Each selection must show only that provider's rows and a matching count of 1.",
+          "priority": 8
+        },
+        {
+          "setup": "Use default filters and note the first model name.",
+          "action": "Click Model once, then click it again.",
+          "expect": "Model order must reverse between ascending and descending alphabetical order.",
+          "priority": 7
+        },
+        {
+          "setup": "Use default filters and note the first model and its output price.",
+          "action": "Click Output $/1M once, then click it again.",
+          "expect": "Rows must reorder between ascending and descending output prices; the first prices must differ.",
+          "priority": 6
+        },
+        {
+          "setup": "Use default filters and note the first model and its input price.",
+          "action": "Click Input $/1M once, then click it again.",
+          "expect": "Rows must reorder between ascending and descending input prices; the first prices must differ.",
+          "priority": 5
+        },
+        {
+          "setup": "Use default filters and note the first model and its context value.",
+          "action": "Click Context (K) once, then click it again.",
+          "expect": "Rows must reorder between ascending and descending context values; the first values must differ.",
+          "priority": 4
+        },
+        {
+          "setup": "Use default filters and enter 0 for input and output tokens.",
+          "action": "Enter -1 in the input-token field and read every displayed monthly estimate.",
+          "expect": "Negative usage must be rejected or prevented; no displayed estimate may be negative.",
+          "priority": 3
+        },
+        {
+          "setup": "Note the five-model total and visible rows with default filters.",
+          "action": "Enable Vision only and compare the Showing summary with the visible table rows.",
+          "expect": "Showing count must equal visible rows and be 3 of 5 models.",
+          "priority": 2
+        },
+        {
+          "setup": "Use the default filters and enter 2 for input tokens and 1 for output tokens per month.",
+          "action": "Read Claude Sonnet 4.5's input price, output price, and estimated monthly cost.",
+          "expect": "Cost must equal 2×input price plus 1×output price; state all three displayed values.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the comparison page and verify that filters, sorting controls, usage inputs, totals, badges, and table presentation remain consistent.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Set the viewport to approximately 375px wide and keep the comparison page at its initial scroll position. Then Inspect the table and horizontally or vertically attempt to reach every column and row. — expect: All table columns and values must be readable and reachable without clipping or covering controls.\n2. Enable Vision only and select Anthropic as provider. Then Read the table and then switch the provider back to All. — expect: Anthropic must remain visible in both states, with only vision-capable rows shown.\n3. Note the visible rows and Showing summary with All providers selected. Then Select OpenAI, then select DeepSeek, and compare each table with its provider summary. — expect: Each selection must show only that provider's rows and a matching count of 1.\n4. Use default filters and note the first model name. Then Click Model once, then click it again. — expect: Model order must reverse between ascending and descending alphabetical order.\n5. Use default filters and note the first model and its output price. Then Click Output $/1M once, then click it again. — expect: Rows must reorder between ascending and descending output prices; the first prices must differ.\n6. Use default filters and note the first model and its input price. Then Click Input $/"
+    }
+  ]
+}

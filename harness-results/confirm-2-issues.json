@@ -1,0 +1,189 @@
+{
+  "label": "confirm-2",
+  "runs": 16,
+  "cleanRuns": 2,
+  "raw": 30,
+  "deduped": 30,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Attendee-step validation accepts fractional seats: entering 1.5 in Seats reserved and clicking Continue advances to Payment without a visible seats error."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 gives exactly a 15% discount and reduces the total accordingly. — With a $380.00 subtotal from the Standard and Workshop attendees, TEAM15 should discount $57.00 and produce $323.00, but after Apply the recorded Payment values remain discount −$0.00 and total $380.00 (step 24), followed by the error “That promo code is not recognised.” (step 25)."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Entering fractional seats such as 1.5 is rejected with a visible seats error and does not advance to Payment. — Seats visibly contains 1.5 immediately before submission (step 36), and the following observation records that Payment is active with 2 attendees and a $165.00 total (step 37), demonstrating that the wizard advanced rather than rejecting the value."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The “Add at least one attendee” validation error remains visible after Alice is successfully added to the attendee list."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "TEAM15 is rejected as unrecognised instead of applying the expected 15% discount, so the required successful-to-invalid promo replacement transition cannot be exercised."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Promo field shows TEAM15 while the visible applied-promo notice and totals still say EARLY, creating contradictory feedback."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Visible field labels are not programmatically associated: attendee name and seats appear as unnamed controls."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Validation errors disappear immediately when the Organisation and email fields become valid, and the no-attendees error disappears after an attendee is added. — After valid contact values were entered, both prior errors remained rendered (step 4); after Alice was added, “Add at least one attendee” was still visible (step 8), and the same stale attendee and seat errors persisted even with Alice and seats 1 before submission (step 44)."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Inline validation error expands Profile and pushes the Notifications card down versus its initial position."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "“Full name is required.” remains visible after the field contains “Progress Test User”; valid input does not clear it."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended literal email receipt rendering fails: <b>unsafe</b> is interpreted, making “unsafe” bold and omitting tags."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Bulk close after selecting all eight tickets reports \"Closed 4 ticket(s).\" rather than the expected \"Closed 8 ticket(s).\" Although all eight rows become Closed and selection clears, the toast count on"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "The header select-all checkbox has no effect after all tickets are closed: clicking it leaves the header and every visible ticket-row checkbox unchecked, selection at 0, and Close selected disabled. I"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The header selection checkbox and all eight row selection checkboxes are exposed as unnamed checkboxes, with no visible identifying text or equivalent accessible name."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Export CSV provides visible feedback when clicked. — After the Export CSV click in step 2, step 3 recorded that the page state remained unchanged and no feedback was visible for that action."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Sending the report provides visible feedback for each Send action. — After the first Send click, step 4 recorded no visible Send feedback or dialog; after the second Send click, step 5 again showed no alert, toast, dialog, or confirmation."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The required /gridworks/report.html report path is unavailable: it returns HTTP 404 File not found instead of the weekly report."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows a visible “Export queued” confirmation. — After the Export CSV click, step 3's fresh inspection recorded no visible alert, toast, or confirmation message while the report and bottom-bar buttons remained visible."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows a visible “Report sent” confirmation. — Step 4 records that both export actions had been clicked and fresh inspections immediately afterward showed no visible “Export queued” or “Report sent” confirmation."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "The report is available at /gridworks/report.html and its headline Resolved figure equals the sum of all nine displayed agent Resolved values. — Navigating to /gridworks/report.html resulted in a visible 404, “File not found for /gridworks/report.html” (step 5), so the required report route and its figures could not be accessed there."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended literal '<b>Injected</b>' text is rendered as bold 'Injected' in the booked-shift row."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Booking a valid shift with an assignee entered as <b>Injected</b> creates a row that displays those characters as literal text rather than rendering markup. — After the Book shift click in step 14, the observed booked-shifts area still has only the two existing rows, with no injected-assignee shift row rendered; therefore the required literal-text row was not created."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Pressing Tab from Shift date advances keyboard focus to Assign to. — After the additional Tab in step 4, the observation says Shift date remained visibly focused; step 5 likewise records that the prior Tab did not visibly move focus to Assign to."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After clicking Undo last to remove the latest Received 4 × Cable 2m movement, the stale red validation feedback “Only 26 of Cable 2m on hand.” remains visible. Inventory rollback itself is correct: Ca"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Undoing the latest receipt after an invalid shipment reverts stock, totals, movement history, and clears the stale shipping-validation error. — Step 22 records that Undo correctly rolled back stock, totals, movement count, and log, but the fresh final snapshot still showed the stale validation error after the undo action."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Quantity spinbutton has no accessible name despite the visible Quantity label."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After undoing the Washer receipt, the movement log is empty. — Step 20 records that the Washer receipt was removed but an earlier Panel shipment remained; the summary also still showed 1 movement rather than an empty log."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended Panel A3 stepper updates decrement Cable 2m instead; Panel remains 7, blocking required non-first-item updates."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The WSH-11 “+” stepper is mapped incorrectly: clicking listed element 4 twice left WSH-11 at 60 (variance —) but incremented BLT-04 from 140 to 142 (variance +2)."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The specified stock audit URL /stockroom/audit.html returns HTTP 404 File not found instead of the audit page."
+    }
+  ]
+}

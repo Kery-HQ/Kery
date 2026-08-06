@@ -1,0 +1,171 @@
+{
+  "label": "fewshot-noise2",
+  "runs": 16,
+  "cleanRuns": 3,
+  "raw": 27,
+  "deduped": 27,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "On Payment with attendees A Standard, B Workshop, and C Student (subtotal $425.00), applying the displayed code TEAM15 shows the visible error “That promo code is not recognised.” Discount remains −$0"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Fractional seats reserved (1.5) is accepted and advances to Payment rather than being visibly rejected on the Attendees step."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Organisation, phone, attendee-name, and seats inputs have no accessible names despite visible labels."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "For Standard ($120), Workshop ($260), and Student ($45) attendees, applying TEAM15 yields subtotal $425.00, discount −$63.75, and total due $361.25. — The three listed ticket types reconcile to a $425.00 subtotal, so a 15% TEAM15 discount should be $63.75 and total $361.25; after Apply, step 26 observed TEAM15 still in the input with an error and amounts remaining subtotal $425.00, discount −$0.00, total $425.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A fractional seats-reserved value such as 1.5 is visibly rejected and does not advance from Attendees. — After entering 1.5 and clicking Continue (steps 55-56), step 57 observed the Payment step visible with 2 attendees and totals, demonstrating that the fractional value advanced instead of being rejected on Attendees."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "“Full name is required.” remains visible while the Full name field displays “Alex Stone.”"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "“Enter a valid email address.” remains visible after the email is corrected to alex.stone@example.com."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "The required persistence URL http://localhost:4131/bookflow/account.html returns an Error response page with HTTP 404, \"Message: File not found,\" so the specified persistence scenario cannot be perfor"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After saving, the saved confirmation remains visible when both required fields are cleared and invalid save is submitted."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Receipt BK-1001 renders the submitted \"<b>Injected</b>@example.test\" email as formatted HTML: displayed text is bold \"Injected@example.test\" and the literal <b> and </b> characters are absent."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Select-all and ticket selection checkboxes have no accessible names, so assistive tech cannot identify their purpose."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking the table header checkbox reliably selects all visible tickets. — The header-checkbox click in step 2 recorded domChanged=NO and no selection effect, despite directly attempting to select every visible ticket."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "With High priority, Open only, and subject search “invoice” applied, exactly one ticket—“Invoice total looks wrong”—is shown and the summary reads “Showing 1 of 8 tickets.” — Steps 9-10 established the prerequisite High/Open-only state, but the required invoice-search attempt subsequently produced no page state change (step 11) and no one-row or “Showing 1 of 8 tickets” result was observed."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The report's Resolved headline shows the expected value of 128 and reconciles with the nine listed Resolved values. — Step 3 records that the page headline reads “Resolved 186, not 128”; the nine values specified for the report total 186, so the observed headline does not match the expected headline value of 128."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders produces a visible success or failure result rather than leaving the user uncertain. — Step 2 directly clicks Send to stakeholders with domChanged=NO, and Step 4 records that no visible send result is displayed."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV downloads a CSV containing all nine agents and the visible report values. — Step 3 directly clicks Export CSV with domChanged=NO, and Step 4 records no visible export result; no download or CSV contents were observed."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Export CSV did not display its expected visible confirmation alert after clicking it; a fresh immediate observation showed only the unchanged report and action buttons."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV produces its visible confirmation alert. — Step 2 clicked Export CSV with domChanged=NO and recorded no confirmation alert; the later fresh report observation in Step 4 also states that no confirmation alert was visible."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders produces its visible confirmation alert. — Step 3 clicked Send to stakeholders with domChanged=NO, but the immediate recorded observation showed only the table and action bar rather than an alert; Step 4 likewise reports no confirmation alert visible."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Muted directory instruction/status text has insufficient contrast on white, failing the legibility requirement."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Replacing a short Search query with Kai before results settle leaves only Kai Lindqvist and the Kai summary, with no stale results. — Step 11 shows the broad \"a\" result list, and the attempted replacement at step 12 is recorded as a repeated Search action with no page state change, so the search did not update to Kai or remove the prior results."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Directory feedback text is rendered in very low-contrast gray, making result/status feedback hard to read."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After the invalid Cable 2m shipment was submitted and then Undo last was clicked, the prior receipt was reversed but the visible validation error “Only 18 of Cable 2m on hand.” remained. The required "
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After recording 1 received Panel A3 unit and submitting an invalid shipment of 19 Cable 2m units, Undo last returns Panel A3 to 7 with zero movements and an empty log, while clearing the error. — The invalid shipment showed “Only 18 of Cable 2m on hand,” but Undo left Panel A3 at 10, total units 538, movements 1, and the “Received 3 × Panel A3” log entry rather than the required 7/zero/empty state; it did clear the error (steps 19-20)."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting the audit after changing Washer 11mm opens the confirmation dialog. — Step 11 directly clicks Submit audit, but records domChanged=NO and no confirmation dialog or other submission effect is observed."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Stepper buttons expose only “−” or “+” with no item context, so their actions are not distinguishable to assistive tech."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Each item’s stepper changes that item’s counted value and variance, including decreasing Cable 2m twice. — Attempts to use Cable 2m’s minus control in steps 10-13 repeatedly changed Washer 11mm from 60 to 56 with variances −1 through −4, while Cable 2m remained 18 with variance —."
+    }
+  ]
+}

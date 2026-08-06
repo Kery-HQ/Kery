@@ -41,6 +41,15 @@ const outDir = path.resolve(arg("out", path.join(here, "../../../harness-results
  */
 const mode = arg("mode", "scripted");
 /**
+ * Sharding for parallel runs. Each shard drives its OWN copy of the apps on a
+ * distinct port block, because two runs against one app server corrupted results
+ * earlier: shared page state leaked between them.
+ *   --shard 0/4      take every 4th case starting at 0
+ *   --portOffset 10  add 10 to every case port (that shard's own servers)
+ */
+const shardArg = arg("shard", null);
+const portOffset = Number(arg("portOffset", "0"));
+/**
  * "review" mode needs the cloud worker's compiled review pass, which lives in a
  * separate repo. Point KERY_PR_REVIEW_PATH at its built prReview.js; without it
  * only "scripted" mode (the ceiling) can run.
@@ -179,7 +188,18 @@ async function runCase(testCase, attempt) {
   };
 }
 
-const cases = suite.cases.filter((c) => (only ? c.id === only : true) && !c.disabled);
+let cases = suite.cases.filter((c) => (only ? c.id === only : true) && !c.disabled);
+if (shardArg) {
+  const [idx, total] = shardArg.split("/").map(Number);
+  cases = cases.filter((_, i) => i % total === idx);
+}
+if (portOffset) {
+  cases = cases.map((c) => ({
+    ...c,
+    port: c.port + portOffset,
+    baseUrl: c.baseUrl.replace(/:(\d+)/, (_, p) => `:${Number(p) + portOffset}`),
+  }));
+}
 if (cases.length === 0) {
   console.error(`No cases matched (suite has ${suite.cases.length}).`);
   process.exit(1);
