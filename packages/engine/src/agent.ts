@@ -230,12 +230,23 @@ const ERROR_PAGE_FORCE_EXIT = 3;
 /** Cross-page loop detection: how many times same URL can be visited before warning */
 const URL_REPEAT_WARN = 4;
 
-type RecentAction = { action: string; x?: number; y?: number; target?: string; element?: number; elementName?: string; value?: string; assertion?: string; url?: string };
+type RecentAction = { action: string; x?: number; y?: number; target?: string; element?: number; elementName?: string; value?: string; assertion?: string; url?: string;
+  /** Whether this action visibly changed the page. Undefined until the next
+   *  iteration compares DOM hashes; only `false` counts toward a stuck loop. */
+  changedPage?: boolean };
 
 const LOOP_EXEMPT_ACTIONS = new Set(["assert", "wait"]);
 
-function detectActionRepetition(recent: RecentAction[]): { stuck: boolean; repeatedKey?: string; repeatCount?: number } {
-  const stateful = recent.filter(r => !LOOP_EXEMPT_ACTIONS.has(r.action));
+export function detectActionRepetition(recent: RecentAction[]): { stuck: boolean; repeatedKey?: string; repeatCount?: number } {
+  // Repeating an action is only evidence of being stuck when the page did NOT
+  // respond. Counting bare repeats treated legitimate interaction as a defect:
+  // pressing a quantity stepper seven times, paging through a list, adding
+  // several attendees. The advisory then told the agent the control was inert
+  // while the count was visibly changing, and four such warnings auto-file a
+  // high-severity "control does nothing" bug — the engine inventing the very
+  // false positive it exists to prevent. Actions whose effect is still unknown
+  // (verdict not yet computed) are not counted either way.
+  const stateful = recent.filter(r => !LOOP_EXEMPT_ACTIONS.has(r.action) && r.changedPage === false);
   if (stateful.length < LOOP_THRESHOLD) return { stuck: false };
   const counts = new Map<string, number>();
   for (const r of stateful) {
@@ -2075,9 +2086,18 @@ export async function runAgent(
       const domHash = simpleDomHash(url, dom);
       const preActionDomHash = domHash;
 
+      // Record whether the action just executed actually moved the page. This
+      // same verdict drives both stagnation and the repetition detector, so a
+      // control that responds every time is never counted as a stuck loop.
+      const markLastAction = (changed: boolean) => {
+        const last = recentActions[recentActions.length - 1];
+        if (last) last.changedPage = changed;
+      };
+
       if (pendingStagnation && snapshot.newTabNote) {
         // The action did have an effect — it tried to open a new tab and was
         // intercepted. Not stagnation, and not an application bug.
+        markLastAction(true);
         pendingStagnation = null;
         stagnantActions = 0;
         lastStagnationContext = null;
@@ -2097,16 +2117,19 @@ export async function runAgent(
             }
           }
           if (stillStagnant) {
+            markLastAction(false);
             stagnantActions++;
             lastStagnationContext = {
               action: pendingStagnation.action,
               elementName: pendingStagnation.elementName,
             };
           } else {
+            markLastAction(true);
             stagnantActions = 0;
             lastStagnationContext = null;
           }
         } else {
+          markLastAction(true);
           stagnantActions = 0;
           lastStagnationContext = null;
         }
@@ -2437,6 +2460,26 @@ export async function runAgent(
       }
 
       let stepExecutionMethod: RunStep["executionMethod"] | undefined;
+      // Native dialogs raised BY THIS ACTION. They were already surfaced to the
+      // navigator in the next observation, but that note lives only in the
+      // conversation — the reviewers grade claims from the STEP RECORD, so an
+      // alert() confirmation was invisible to them. Two hand-verified false
+      // reports came from exactly that: a page whose button genuinely calls
+      // alert("Report sent.") was reported as showing no confirmation, with the
+      // evidence citing an earlier alert from a different button. Stamping the
+      // dialog onto the step puts the app's own feedback in the record.
+      const dialogMark = pendingDialogs.length;
+      const dialogEvidence = (): string | undefined => {
+        const raised = pendingDialogs.slice(dialogMark);
+        return raised.length > 0
+          ? `[harness] the app showed native dialog(s) in response to this action: ${raised.join("; ")}`
+          : undefined;
+      };
+      const withDialogs = (own: string | undefined): string | undefined => {
+        const d = dialogEvidence();
+        if (!d) return own;
+        return own ? `${own} ${d}` : d;
+      };
       networkMonitor?.markActionStart();
       try {
         // Stagehand execution path
@@ -2457,7 +2500,7 @@ export async function runAgent(
             url, status: "ok", fromMemory: false, at: stepTimestamp(),
             domContext: trimDomContext(dom),
             executionMethod: "stagehand",
-            observation: action.observation,
+            observation: withDialogs(action.observation),
             preActionDomHash: preActionDomHash,
           };
           stepsDetail.push(okStep);
@@ -2522,7 +2565,7 @@ export async function runAgent(
                 elementRef: { role: resolvedA11yEl.role, name: resolvedA11yEl.name },
                 domContext: trimDomContext(dom),
                 executionMethod: "playwright",
-                observation: action.observation,
+                observation: withDialogs(action.observation),
                 preActionDomHash: preActionDomHash,
               };
               stepsDetail.push(okStep);
@@ -2569,7 +2612,7 @@ export async function runAgent(
                 elementRef: { role: resolvedA11yEl.role, name: resolvedA11yEl.name },
                 domContext: trimDomContext(dom),
                 executionMethod: "coordinates",
-                observation: action.observation,
+                observation: withDialogs(action.observation),
                 preActionDomHash: preActionDomHash,
               };
               stepsDetail.push(okStep);
@@ -2609,7 +2652,7 @@ export async function runAgent(
           elementRef: resolvedA11yEl ? { role: resolvedA11yEl.role, name: resolvedA11yEl.name } : undefined,
           domContext: trimDomContext(dom),
           executionMethod: stepExecutionMethod,
-          observation: action.observation,
+          observation: withDialogs(action.observation),
           preActionDomHash: preActionDomHash,
         };
         stepsDetail.push(okStep);
@@ -2638,7 +2681,7 @@ export async function runAgent(
           url, status: "failed", error: errMsg, fromMemory: false, at: stepTimestamp(),
           domContext: trimDomContext(dom),
           executionMethod: stepExecutionMethod ?? "playwright",
-          observation: action.observation,
+          observation: withDialogs(action.observation),
           preActionDomHash: preActionDomHash,
         };
         stepsDetail.push(failedStep);

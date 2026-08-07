@@ -203,7 +203,35 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     return "";
   }
 
+  /**
+   * Elements the user cannot see must not be offered to the agent.
+   *
+   * The tree previously walked every node under body, so a closed modal, a
+   * collapsed menu or an inactive tab panel contributed real-looking controls.
+   * The agent would click one, Playwright would time out on a non-visible
+   * target, and the run reported "this control does nothing" — a false bug on
+   * any app that keeps hidden markup around, which is nearly all of them.
+   *
+   * checkVisibility covers display:none, visibility:hidden and opacity:0 while
+   * still returning true for anything merely scrolled out of the viewport,
+   * which IS reachable and must stay in the tree. Older engines fall back to a
+   * client-rect test. Hiding is inherited, so skipping here prunes the subtree.
+   */
+  function isRendered(el) {
+    try {
+      if (typeof el.checkVisibility === "function") {
+        return el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+      }
+      var s = window.getComputedStyle(el);
+      if (s.display === "none" || s.visibility === "hidden" || s.opacity === "0") return false;
+      return el.getClientRects().length > 0;
+    } catch (e) {
+      return true;
+    }
+  }
+
   function buildTree(el) {
+    if (!isRendered(el)) return null;
     var role = getImplicitRole(el);
     var name = getAccessibleName(el);
     var node = { role: role, name: name };
