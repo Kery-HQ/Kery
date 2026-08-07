@@ -95,6 +95,18 @@ export function clearA11yCache(): void {
 const A11Y_EXTRACT_SCRIPT = `(function() {
   function getImplicitRole(el) {
     var tag = el.tagName;
+    // An explicit ARIA role wins over the implicit one (ARIA spec). This matters
+    // most for the combobox pattern — <input role="combobox"> backs nearly every
+    // autocomplete and custom date picker — which was being flattened to a plain
+    // textbox, hiding its expand/collapse semantics from the agent. Only honour
+    // roles that keep the control text-editable; a stray role must never strip a
+    // native checkbox/radio of its toggle semantics.
+    var declared = el.getAttribute("role");
+    if (declared && (tag === "INPUT" || tag === "TEXTAREA")) {
+      var t0 = (el.type || "text").toLowerCase();
+      var textLike = t0 === "text" || t0 === "search" || t0 === "email" || t0 === "url" || t0 === "tel" || t0 === "password" || tag === "TEXTAREA";
+      if (textLike && (declared === "combobox" || declared === "searchbox" || declared === "textbox")) return declared;
+    }
     if (tag === "BUTTON") return "button";
     if (tag === "A") return "link";
     if (tag === "INPUT") {
