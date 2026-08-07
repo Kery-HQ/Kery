@@ -1,0 +1,231 @@
+{
+  "label": "ground2-noise0",
+  "runs": 16,
+  "cleanRuns": 1,
+  "raw": 37,
+  "deduped": 37,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "TEAM15 does not apply: intended promo discount, but Payment still shows Discount −$0.00 and total $120.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 recalculates Payment with the applicable discount and updated total. — After TEAM15 was entered and Apply was clicked (step 7), the subsequent Payment observation recorded an unrecognised-code error, Discount −$0.00, and Total due $120.00 (step 8)."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "On Attendees, after clicking Continue with no attendees shows “Add at least one attendee”; adding Alice as Standard successfully lists “Alice · standard”, but the exact error “Add at least one attende"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Applying promo code TEAM15 displays the exact error “That promo code is not recognised.” The payment summary remains Attendees 2, Subtotal $380.00, Discount −$0.00, and Total due $380.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After the no-attendee Continue validation, adding Alice as Standard clears the “Add at least one attendee” error without leaving Attendees. — The required error was displayed after Continue (step 5), and after Alice was added the trace confirmed Alice · standard was listed while the stale visible error still read “Add at least one attendee” (step 7)."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 produces a promo discount before an invalid replacement code is applied and clears it. — Immediately after Apply, Payment showed promo value “TEAM15” but Discount remained −$0.00 and Total due remained $380.00 (step 15); the underlying listed tickets were Alice standard ($120) and Bob workshop ($260), which reconcile to the unchanged $380.00 subtotal, and INVALID was never attempted."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Navigating directly to http://localhost:4111/bookflow/account.html returns an “Error response” page with “Error code: 404” and “Message: File not found,” rather than the Account settings screen."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Validation feedback remains after its field is corrected: Alice still shows “Full name is required.”"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "A valid alice@example.com email still displays “Enter a valid email address.” after correction."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The required /bookflow/account.html account-settings route opens the settings form and supports saving and reloading all five values. — Step 18 records that /bookflow/account.html is a 404 Error page with no account form controls; although step 23 confirms persistence on /account.html, that does not make the required Bookflow route functional."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Save changes button is misaligned left of the form fields and section content padding."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Place order created two separate receipts (BK-1001 and BK-1002) after two rapid activations with unchanged valid fields; expected exactly one receipt and one confirmation reference."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Billing email markup is rendered as HTML in the receipt: submitting <b>attacker@example.com</b> created BK-1003 with attacker@example.com displayed in bold instead of rejecting the input or rendering "
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Activating Place order twice must create exactly one receipt and one confirmation reference. — Step 3 observed the first confirmation BK-1001 and receipt count changing from zero to one, while step 4 observed a second receipt BK-1002 and a total of two receipts."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A billing email containing HTML markup must be rejected or displayed literally in the receipt rather than rendered as markup. — Steps 5-6 show the literal payload was entered, then submission created BK-1003 and its email was visibly rendered in bold rather than displayed literally."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "An invalid email is visibly rejected without creating an order, so the user can correct it and resubmit successfully. — Step 8 directly clicked Place order after step 7 set Billing email to “a@”, but recorded “no page state change”; no visible rejection, receipt outcome, or correction/resubmission effect was observed."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Header and ticket-row selection checkboxes have no accessible name, so screen readers cannot identify them."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended equal-height summary rows are not enforced; rendered agent rows vary substantially with text length."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows an \"Export queued\" confirmation. — Step 1 records the Export CSV click but records no feedback, DOM change, or confirmation observation immediately afterward."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows a \"Report sent\" confirmation. — Step 2 records the Send to stakeholders click with domChanged=NO and no response or confirmation observed immediately afterward."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows its visible confirmation alert. — Step 2 directly clicked Export CSV but recorded domChanged=NO and no alert observation or dismissal effect."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows its visible confirmation alert. — Step 3 directly clicked Send to stakeholders but recorded domChanged=NO and no corresponding alert observation."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Booking a valid date with an empty Assign to field adds the row “Sat, 15 Jun 2030 —” and shows no visible validation error. This violates required assignee validation and creates a blank-assignee shif"
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Submitting a valid date with an empty assignee shows validation feedback and does not add a blank-assignee shift. — Following the empty-assignee Book shift click in step 12, step 13 observes two booking rows including a blank-assignee row, so the submission added the invalid shift instead of preventing it."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Book shift with 15 March 2027 and Amara Osei creates a shift row showing 15 Mar 2027 and Amara Osei. — After the Book shift click in step 3, the date field showed 15/03/2027 and assignee Amara Osei, but the booking area still displayed \"No shifts booked,\" so no required row was created."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Rapidly replacing directory query a with Otto results only in Otto Brandt, without stale a matches. — Step 10 showed the field still contained a with seven matching rows including Amara Osei and Mira Halden, and step 11 records the repeated Search fill produced no page-state change; no Otto-only result was observed."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Insufficient-stock validation is incorrect: shipment equal to CBL-2M's displayed 19 units was accepted. CBL-2M became 0; Total units changed from 541 to 522; Movements from 3 to 4; and the log added \""
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Attempting to ship all 19 units of CBL-2M shows an insufficient-stock error and leaves inventory, totals, movement count, and log unchanged. — CBL-2M had 19 on hand before submission (steps 28-29), but step 30 records an accepted shipment: CBL-2M became 0, total units fell from 541 to 522, movements rose from 3 to 4, and “Shipped 19 × Cable 2m” appeared at the top of the log, with no insufficient-stock error observed."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Undo last restores Washer quantity and totals but leaves a stale over-shipment validation error (“Only 59 of Washer 11mm on hand.”) visible even though Washer is now 60."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Stale over-shipment error remains after quantity changes to valid 1; it still says only 60 are on hand."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Movement controls lack programmatic labels: both selects expose option text and Quantity is an unnamed spinbutton."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After a rejected second shipment, clicking Undo last reverses the prior valid Washer shipment and leaves Washer at 60 with no remaining movements, empty log, and blank error area. — After the valid shipment, step 26 observes Washer at 59, total 541, and 2 movements; after the rejected 60-unit shipment, step 28 observes the error “Only 59 of Washer 11mm on hand” and unchanged values, then clicking Undo last has domChanged=NO with no observed reversal or clearing."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Submission confirmation dialog does not dismiss when Escape is pressed; it remains listed as dialog “Audit submitted” with a Close button."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Tab traversal from a focused stepper loops back to BLT-04 controls instead of visibly advancing through audit controls."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Every audit stepper can be keyboard-activated to change its row. — WSH-11 minus received a visible focus outline in step 13, but the attempted activation was recorded as a repeated pressKey on el3:− with no page state change in step 14."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The confirmation dialog Close control hides the dialog and reveals the audit table. — Steps 1 and 3 record failed Close clicks, and after navigation step 4 still found the accessibility dialog “Audit submitted” with Close [12] exposed despite the table screenshot being visible."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Each labeled item stepper changes the Counted value for its own row. — Attempts to activate the identified Panel A3 increment instead changed Cable 2m from 18 to 19 and then 20 while Panel A3 stayed 7 (steps 19-20), and a subsequent attempt left Cable at 21 while Panel A3 remained 7 (step 21)."
+    }
+  ]
+}

@@ -1,0 +1,285 @@
+{
+  "label": "ground2-noise2",
+  "runs": 16,
+  "cleanRuns": 1,
+  "raw": 46,
+  "deduped": 46,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Organisation field contains “Acme” while the visible validation message still says “Organisation is required.”"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Seats validation message persists despite valid value 2 being entered."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended: attendee-required error clears on add; actual: it remains after Alice is listed."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended: TEAM15 gives $57 discount; actual: Apply leaves $0 discount/$380 total and shows an error."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 to a Standard ($120) plus Workshop ($260) registration produces the required $380.00 subtotal, $57.00 discount, and $323.00 total, while replacing it with INVALID resets the discount a — The recorded attendee prices reconcile to the observed $380.00 subtotal (steps 32 and 35), but after Apply on Payment the trace records $0.00 discount and $380.00 total plus “That promo code is not recognised” for the prefilled TEAM15 (steps 37-38), rather than the required $57.00/$323.00 TEAM15 res"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "After an attendee-required validation error, adding Alice immediately clears that error. — Step 28's fresh post-add snapshot confirms Alice is listed as the sole attendee while the attendee-required error remains visible."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "On Payment with promo input exactly TEAM15, clicking Apply immediately displayed “That promo code is not recognised.” and the table remained Discount −$0.00 and Total due $120.00. TEAM15 should be acc"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Invalid promo leaves the discount displayed as “−$0.00” instead of a non-negative $0.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Organisation still shows “Organisation is required” after it contains <b>Acme</b>."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Organisation, phone, attendee-name, and seats controls are exposed as unnamed to assistive tech."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 recognizes the valid promo code and applies its 15% discount. — TEAM15 was applied on Payment in step 11, but the following recorded Payment state says TEAM15 had feedback “That promo code is not recognised.” with Discount −$0.00 and Total due $120.00 (step 12)."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "While a save is in progress, Save changes disables to prevent a second save operation. — Immediately after the check-4 Save changes click, step 12 observes that the button is enabled and still labeled \"Save changes,\" rather than disabled."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Submitting a blank Full name visibly increased the Profile card height and pushed the Notifications card downward (Profile bottom approximately y443 to y464; Notifications top approximately y461 to y4"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "“Full name is required” remains visible even though the Full name field visibly contains Alex Rivera."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After a valid submission, Save changes is disabled and displays a Saving state while the delayed save is in progress. — Immediately after the valid submit, the button was observed enabled and still labeled “Save changes,” rather than disabled in a Saving state (step 6)."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Place order immediately shows a Processing message and disables the Place order control during processing. — Both immediate submission attempts recorded no DOM change (steps 2 and 4), and the subsequent observation states that the returned page did not visibly show the transient processing state (step 5)."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Duplicate submission: two rapid clicks on Place order created two receipts (BK-1001 and BK-1002), each for $1002.90 to finance@northwind.test, instead of exactly one confirmation and one receipt."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Valid default checkout does not create confirmation or receipt: Place order clicks leave Orders placed as “No orders yet.”"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Place order twice rapidly creates exactly one confirmation and one receipt. — Step 5's recorded observation states that the duplicate-order test ended with two receipts, rather than the required single receipt."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "With Priority set to Low, the table shows only two Low tickets (Feature request: dark mode and Typo on pricing page), both Open, and the footer says Showing 2 of 8 tickets · 1 selected. The expected t"
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Select-all checkbox stays checked with 0 selected and an unchecked visible row; header selection state is stale."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Filtering away a selected ticket must not represent the hidden ticket as an active visible selection. — After Cannot reset password was selected and Low was applied, step 6 shows only the two Low rows but the footer still reports 1 selected, retaining the hidden High-ticket selection."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Disabling Open only while Low priority is selected restores all three Low tickets, including Typo on pricing page, without losing ticket data. — Step 8 records Open only disabled but only the same two Open Low rows remain and explicitly notes that no third Low row returns."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clearing Open only restores the unfiltered eight-ticket queue. — Step 7 directly clicked Open only to clear it, but recorded domChanged=NO and no restored rows or summary change."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Export CSV and Send to stakeholders each produce a visible response identifying the requested action. — The export controls were clicked (steps 1-2), and the immediate post-click observation recorded that the report stayed on /report.html with no visible toast, dialog, download indicator, or other on-page response; the Send to stakeholders click also had domChanged=NO."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows a visible, dismissible CSV confirmation message. — At step 2, immediately after clicking Export CSV, the recorded observation says no visible confirmation message or dismissible message appeared, with domChanged=NO."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows its corresponding visible confirmation message. — Step 3 directly activated Send to stakeholders but recorded domChanged=NO and no resulting confirmation observation; the trace records no visible effect from the attempted control."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A valid shift date can be entered in the Shift date field. — Step 1 attempted to set a valid Shift date, but the observation at step 2 states that the field still showed its \"dd/mm/yyyy\" placeholder and no entered date was visible."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Rapidly replacing a short query with “amara” leaves only results for “amara”, never stale results for “a”. — The short query “a” displayed seven results at step 5, and subsequent replacement attempts left the field visibly containing “a” with those same seven rows at steps 6–7; step 8 records a repeated fill with no page-state change."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Undo restores stock and clears the log, but leaves the prior overship validation error visible."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After switching to Cable, the validation error still names Washer, leaving a stale error for a different item."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Quantity's visible label is not programmatically associated: the control is exposed as an unnamed spinbutton."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Undoing the valid Cable 2m shipment clears the visible overship validation error. — After Undo last, the final observation in step 17 still shows “Only 17 of Cable 2m on hand.” even though Cable has been restored to 18 and no movements are recorded."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Undo last does not clear the visible insufficient-stock validation error. After undo reverses the 2-unit BLT-04 receipt and changes the on-hand quantity to 8, the form still says “Only 10 of Hex bolt "
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Quantity spinbutton has no accessible name despite the visible Quantity label."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After recording 3 received BLT-04 and 2 shipped Washer 11mm, Undo last removes only the washer shipment and leaves BLT-04 at 143 with one movement and one log entry. — Undo did remove only the washer shipment, but step 28 shows BLT-04 at 148 with 3 movements and three earlier log entries, not the expected 143, one movement, and one log entry."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A 140-unit BLT-04 shipment leaves zero on hand and rejects a following 1-unit shipment; after a rejected 999-unit shipment, Undo clears the error and restores BLT-04 to 140 with zero movements. — Step 43 shows the 140-unit shipment reduced BLT-04 from 148 to 8 rather than 0, and step 45 records that the following 1-unit shipment was not rejected; although step 55 observed the 999-unit insufficient-stock error, step 56 shows Undo left a stale error and BLT-04 at 8 with 6 movements rather than"
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After submitting the unchanged audit, the accessibility tree exposes dialog “Audit submitted” and Close button [12], but the fresh screenshot shows no visible dialog, message, backdrop, or Close butto"
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Stepper buttons lack item-specific accessible names; all 8 are only “−”/“+”, causing Panel actions to alter Cable."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "The confirmation modal is fully readable without clipping and can be completely dismissed by Close, backdrop click, and Escape. — Step 11 records that the dialog message remained truncated, and after Escape step 3 still found “Audit submitted” and Close exposed in accessibility content even though the screenshot no longer showed the dialog; Close-button dismissal was not successfully exercised and the backdrop click occurred a"
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Decreasing Washer 11mm once changes its counted value from 60 to 59 and variance from — to -1. — After the purported Washer decrement, step 5 records Washer still at 60/60/— while Hex bolt M4 had changed to 139/-1, showing the requested Washer control did not update the Washer row."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "With initial counts otherwise unchanged, decreasing Washer 11mm once and increasing Panel A3 once yields Washer 59/-1, Panel A3 8/+1, and leaves all other rows unchanged. — The final sequence began with the Washer decrement in step 11, but the subsequent run reported repeated action with no page state change in step 12 and never reached the Panel A3 increment, so the required combined update did not occur."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "After submitting Washer 11mm at counted 59 with variance -1, closing the confirmation, and reloading /audit.html, Washer 11mm renders as counted 60 with variance —. The submitted count is not persiste"
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Reload reopens the confirmation dialog after it was dismissed, blocking the table instead of returning to the audit."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "All eight stepper controls expose only identical “−”/“+” names, with no item/count context for assistive tech."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A submitted Washer 11mm count of 59 with variance -1 persists after page reload. — Washer was visibly 59 / -1 before and after submission (steps 20-25), but after navigation/reload steps 28-29 show Washer 11mm reset to counted 60 with variance —."
+    }
+  ]
+}

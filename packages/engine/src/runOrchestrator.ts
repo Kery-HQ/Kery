@@ -470,7 +470,7 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
     // that appear nowhere in the run's own observations is describing something
     // the run never saw. No model call, no browser pass — it cannot invent a
     // verdict, and it stays silent on reports that cite nothing specific.
-    if (!isVerificationRun && bugsFound.length > 0 && process.env.KERY_GROUNDING !== "0") {
+    if (!isVerificationRun && bugsFound.length > 0 && process.env.KERY_GROUNDING === "1") {
       const g = dropUngroundedFindings(bugsFound, agentResult.stepsDetail);
       bugsFound = g.kept;
     }

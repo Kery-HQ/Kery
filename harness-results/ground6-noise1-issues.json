@@ -1,0 +1,195 @@
+{
+  "label": "ground6-noise1",
+  "runs": 16,
+  "cleanRuns": 4,
+  "raw": 31,
+  "deduped": 31,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Applying the documented TEAM15 promo code for one Standard attendee and one reserved seat shows “That promo code is not recognised,” leaves discount at −$0.00, and total due $120.00 rather than applyi"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Seats reserved accepted the fractional value 1.5 and Continue navigated from Attendees to Payment instead of showing a validation error and staying on Attendees."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Organisation field is populated but still displays the stale “Organisation is required” validation error."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Payment summary renders a zero discount as “−$0.00”, an unclear and misleading negative-zero amount."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Visible labels are not programmatically associated: Organisation, Phone, attendee, and seats controls are exposed unnamed."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Applying TEAM15 to one Standard attendee with one reserved seat produces a $102.00 charge and confirmation for one attendee. — After TEAM15 was applied, the Payment view showed subtotal $120.00, discount −$0.00, and total $120.00 (step 8); Confirm showed an unrecognised-code error without progressing (step 9), and the displayed confirmation later charged $120.00 for one attendee (step 10), not $102.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "TEAM15 is intended as a valid promo but Apply reports “That promo code is not recognised,” leaving discount at $0.00."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Applying the TEAM15 promo code reduces the payable total by the advertised promo discount. — After TEAM15 was applied, step 12 recorded “That promo code is not recognised,” with the payment summary still showing a $380.00 subtotal, −$0.00 discount, and $380.00 total."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Confirm registration opens a confirmation summary showing the two attendees and the final total. — Step 12 clicked Confirm registration with domChanged=NO and recorded that the payment summary remained visible; no confirmation summary appeared."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Opening http://localhost:4121/bookflow/account.html?test=position-check-20260806a#required-name-check returns an Error response page with \"Error code: 404\", \"Message: File not found.\", and \"Error code"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Save changes immediately disables the control and changes its label to “Saving…”, preventing duplicate submissions. — After the first duplicate-click test submission, step 21 records that Save changes remains enabled and labeled “Save changes”; the immediate second click was accepted with no DOM change, rather than being prevented by a disabled Saving state."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Required-name validation displaces the Notifications card: after submitting an empty Full name with user@example.com, the red \"Full name is required.\" error appears below the field and shifts the Noti"
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Valid Full name still shows “Full name is required.” until a later save."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Saving valid changes provides an immediate visible Saving state before returning to an enabled button with a saved confirmation. — The valid save was clicked in step 6, but the following observation in step 7 says the save had already completed, the button was enabled, and the interim Saving state was not observed; only the final green “Your changes have been saved.” confirmation was seen."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "A first Save changes click disables the button and prevents a second immediate submission while exactly one save is in progress. — Step 17's immediate post-first-click snapshot records an enabled “Save changes” button, a green saved message, and no visible Saving label; a second Save changes click was then accepted in step 17, with step 18 still showing an enabled button and no saving state."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Receipt for BK-1001 displays the supplied '<b>HACK</b>@example.test' as formatted content: HACK is bold and the markup tags are absent, rather than displaying the literal email text."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A markup-like billing email is rendered literally and safely in the order receipt rather than as HTML formatting. — After submitting <b>HACK</b>@example.test, step 3 observes that the BK-1001 receipt shows HACK visibly bold in its email, demonstrating that the markup was rendered rather than displayed literally."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Card number 4242 4242 4242 4240 was accepted: the page displayed “Order BK-1001 confirmed.” and one receipt “BK-1001 — $1002.90 to finance@northwind.test,” rather than card validation feedback."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Submitting card number 4242 4242 4242 4240 with a valid billing email shows card-validation feedback and does not add an order receipt. — After the invalid-card submission in step 9, step 10 records that it created confirmation BK-1001 and one receipt, despite Orders placed being empty before submission."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Header and ticket-selection checkboxes have no accessible names, so screen-reader users cannot identify their purpose."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Intended visible selection state is not scoped to filters: Low shows 0 checked rows but 1 selected and a checked header."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "When a selected ticket is hidden by changing to Low priority, the selected count matches the number of checked visible row checkboxes. — Step 14 records 1 rendered Low row with 0 checked row boxes while the status still reported 1 selected."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "After using header select-all on High and then switching to Low priority, the header checkbox does not remain checked when the visible Low row is unchecked. — Step 17 records the final Low-priority state with the visible “Feature request: dark mode” row unchecked while the header select-all checkbox is checked."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV shows a visible export confirmation alert. — After Export CSV was clicked, the immediately following fresh snapshot showed no native alert or in-page confirmation and the report remained unchanged (steps 2-3)."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders shows a visible stakeholder confirmation alert. — Send to stakeholders was clicked with domChanged=NO and no confirmation alert or other observed effect was recorded (step 3)."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Secondary status text (e.g., “No matches” and “Type to search”) is very low-contrast against white."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "issue",
+      "text": "Booking with Shift date 15/01/2027 and an empty Assign to field adds an incomplete row, \"Fri, 15 Jan 2027 —\", and no visible assignee error appears."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Booking 15 January 2027 for Kai Lindqvist renders the requested row date as Thu 15 Jan 2027 and preserves the assignee name exactly. — The booked row recorded in steps 12 and 15 is `Fri, 15 Jan 2027 — Kai Lindqvist`, so the assignee is preserved but the observed weekday is Fri rather than the expected Thu."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 2,
+      "kind": "failed-check",
+      "text": "Booking with a cleared Assign to field is rejected without creating an incomplete shift. — Step 15's final snapshot shows a second booked row, `Fri, 15 Jan 2027 —`, demonstrating that a shift with no assignee was created."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Stock error still says Cable 2m after the selected item has changed to Panel A3."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Shipping 2 Panel A3 units results in the expected 5 on hand and Low — reorder status. — After the earlier required shipment had already changed Panel A3 from 7 to 6 (step 13), steps 28–29 record another shipment of 2 and observe 4 on hand—not the expected 5—though the row correctly displays Low — reorder and Items low is 2."
+    }
+  ]
+}

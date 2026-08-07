@@ -1,0 +1,667 @@
+{
+  "label": "ground6-det-purchasify-estimate",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 11,
+    "planted": 18,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 2.7405,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "purchasify-estimate",
+      "attempt": 1,
+      "durationMs": 213275,
+      "status": "passed",
+      "steps": 21,
+      "findings": 5,
+      "checks": 6,
+      "contradicted": 4,
+      "costUsd": 0.4612,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 2 and 6 explicitly report that SAVE10 gives $4.80 on a $42.00 subtotal instead of the expected $4.20, consistent with shipping being included in the discount base."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 3, 5, and 8 report exact-threshold cases where the shipping option is labeled FREE but the order summary still charges shipping, which is the specified badge-versus-totals threshold mismatch."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": true,
+          "why": "Findings 1 and 7 state that applying UNKNOWN after SAVE10 shows an invalid-code error while the prior SAVE10 success state, discount, and discounted total remain applied."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Changing delivery tiers at a $42.00 subtotal updates the selected shipping charge and order total for Express and Overnight.",
+          "status": "verified",
+          "evidence": "After Express was selected, step 8 observed Shipping (Express) $12.99 and an updated order total; after Overnight was selected, step 9 observed Shipping (Overnight) $24.99 and Order total $66.99."
+        },
+        {
+          "claim": "Applying SAVE10 discounts the order by exactly 10% of the displayed $42.00 subtotal and produces a total of subtotal minus discount plus shipping.",
+          "status": "contradicted",
+          "evidence": "Steps 12 and 17 show Discount (SAVE10) −$4.80 and Order total $43.19 for a $42.00 subtotal and $5.99 shipping; 10% of $42.00 is $4.20, not $4.80, and the expected total would be $43.79."
+        },
+        {
+          "claim": "Replacing a valid promo with an invalid code removes the prior applied-success state and discounted total while showing the invalid-code error.",
+          "status": "contradicted",
+          "evidence": "After UNKNOWN was applied in step 13, step 14 observed both “That promo code isn't valid.” and the stale “SAVE10 applied — 10% off,” plus Discount (SAVE10) −$4.80 and Order total $43.19."
+        },
+        {
+          "claim": "At the exact $150.00 Express free-shipping threshold, both the Express option and summary shipping are FREE and the helper does not ask for additional spend.",
+          "status": "contradicted",
+          "evidence": "Step 19 observed the Express option as FREE, but the summary still showed Shipping (Express) $12.99 and Order total $162.99, while the helper said “Add $0.00 ...”."
+        },
+        {
+          "claim": "At the exact $50.00 Standard free-shipping threshold, the helper does not display a $0.00 add-more request.",
+          "status": "contradicted",
+          "evidence": "Steps 20 and 21 observed Standard marked FREE while the page still visibly showed “Add $0.00 more for free standard shipping.”"
+        },
+        {
+          "claim": "The estimator's controls are keyboard-focus-visible, identifiable, readable, and unobscured during keyboard traversal.",
+          "status": "not_testable",
+          "evidence": "The Tab attempts in steps 2-5 recorded no concrete focus-state observations; the initial visibility observation supports that the calculator was visible, but does not demonstrate focus visibility or identify every control."
+        }
+      ],
+      "findingTexts": [
+        "After applying UNKNOWN following SAVE10, the page simultaneously displays the invalid-code error and the success message “SAVE10 applied — 10% off”; the rollup still shows Discount (SAVE10) −$4.80 and",
+        "SAVE10 discounts $4.80 from the displayed $42.00 subtotal rather than 10% ($4.20). The page shows Discount (SAVE10) −$4.80 and Order total $43.19 instead of $43.79.",
+        "At subtotal $150.00, Express option displays FREE before and after selection, but after selecting it the summary shows Shipping (Express) $12.99 and Order total $162.99; it also displays “Add $0.00 mo",
+        "After qualifying for free shipping, helper still tells users to “Add $0.00 more,” instead of confirming free shipping.",
+        "At $50 Standard shows FREE, but the summary still charges $5.99 and shows a $55.99 order total."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42.50 and inspect the estimator before interacting.",
+          "action": "Tab through tier radios, promo input, and Apply while scrolling the calculator.",
+          "expect": "Every control must be identifiable, keyboard-focus-visible, readable, and unobscured; no text or totals may be clipped.",
+          "priority": 6
+        },
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the Standard total.",
+          "action": "Select Express, then Overnight, and read each updated shipping line and order total.",
+          "expect": "Each selected tier must update both shipping and total; totals must differ by each tier's displayed shipping charge.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /estimate?subtotal=42.00, apply SAVE10, and note the applied message and discounted total.",
+          "action": "Replace the code with UNKNOWN and click Apply.",
+          "expect": "The invalid error must appear without leaving a contradictory applied-success message or discounted total.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the displayed subtotal, Standard shipping, and order total.",
+          "action": "Enter SAVE10 and click Apply.",
+          "expect": "Discount must equal 10% of the displayed subtotal, and total must equal subtotal minus discount plus shipping.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 with no authentication.",
+          "action": "Select Express shipping and compare its option price with the summary shipping line.",
+          "expect": "At exactly $150.00, both Express displays must show FREE and the helper must not request more.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 with no authentication.",
+          "action": "Select Standard shipping and read its option price, helper text, and Order total shipping line.",
+          "expect": "At exactly $50.00, both the option and summary must show FREE; no $0.00 add-more message may appear.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public estimator, exercise both free-shipping boundaries, apply valid and invalid promos, switch tiers, and inspect the rendered totals and controls.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42.50 and inspect the estimator before interacting. Then Tab through tier radios, promo input, and Apply while scrolling the calculator. — expect: Every control must be identifiable, keyboard-focus-visible, readable, and unobscured; no text or totals may be clipped.\n2. Open /estimate?subtotal=42.00 and note the Standard total. Then Select Express, then Overnight, and read each updated shipping line and order total. — expect: Each selected tier must update both shipping and total; totals must differ by each tier's displayed shipping charge.\n3. Open /estimate?subtotal=42.00, apply SAVE10, and note the applied message and discounted total. Then Replace the code with UNKNOWN and click Apply. — expect: The invalid error must appear without leaving a contradictory applied-success message or discounted total.\n4. Open /estimate?subtotal=42.00 and note the displayed subtotal, Standard shipping, and order total. Then Enter SAVE10 and click Apply. — expect: Discount must equal 10% of the displayed subtotal, and total must equal subtotal minus discount plus shipping.\n5. Open /estimate?subtotal=150.00 with no authentication. Then Select Express shipping and compare its option price with the summary shipping line. — expect: "
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 2,
+      "durationMs": 361021,
+      "status": "failed",
+      "steps": 15,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.4658,
+      "caught": 1,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Finding 1 explicitly shows SAVE10 taking $12.50 off a $100 subtotal with $24.99 Overnight shipping, rather than $10.00. This is consistent with discounting subtotal plus shipping."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": false,
+          "why": "None of the findings test or describe behavior at exactly the free-shipping threshold where the shipping badge and totals disagree."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "why": "Finding 3 mentions an invalid-code error and that a subsequent valid-code Apply action did not change the page, but it does not report that a previously applied discount remained shown or applied after entering an invalid promo code."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At a $40.00 subtotal, Standard, Express, and Overnight shipping selections show their respective prices in the summary and update the order total accordingly.",
+          "status": "verified",
+          "evidence": "Step 2 records initial Standard shipping as $5.99 with a $45.99 total for $40.00; Step 3 records Express as $12.99 with a $52.99 total; Step 4 records Overnight as $24.99 with a $64.99 total, each reconciling with the $40.00 subtotal."
+        },
+        {
+          "claim": "On a narrow mobile viewport, all shipping labels, promo controls, messages, totals, and the Apply button remain readable, reachable, and unclipped.",
+          "status": "not_testable",
+          "evidence": "The trace navigates to the $40.00 estimator but contains no viewport resize or recorded mobile-layout observation."
+        },
+        {
+          "claim": "Applying SAVE10 to a $100.00 order gives exactly a $10.00 discount and the correct resulting total.",
+          "status": "contradicted",
+          "evidence": "Step 8 records that the prior SAVE10 application left a −$10.60 discount and $89.40 total visible on a $100.00 order with free Standard shipping, rather than the expected $10.00 discount and $90.00 total."
+        },
+        {
+          "claim": "Replacing a valid promo code with NOPE and applying it shows an invalid-code error and removes the previous discount from the total.",
+          "status": "not_testable",
+          "evidence": "Step 8 shows the prior SAVE10 success message, −$10.60 discount, and $89.40 total still present before NOPE was applied, but the trace records no post-Apply observation of the error or reset total."
+        },
+        {
+          "claim": "For a $100.00 subtotal with Overnight selected, explicitly entering and applying SAVE10 produces a $10.00 discount, $24.99 shipping, and a $114.99 order total.",
+          "status": "contradicted",
+          "evidence": "Steps 12-14 show that after SAVE10 was explicitly re-entered, the invalid-code error and unchanged Overnight summary remained visible and the subsequent Apply action had no page state change; the required discount and $114.99 total never appeared."
+        },
+        {
+          "claim": "At the $150.00 Express threshold and $50.00 Standard threshold, both the selected option and Shipping summary display FREE and the total remains equal to the subtotal.",
+          "status": "not_testable",
+          "evidence": "The trace never navigates to or exercises the $150.00 or $50.00 threshold scenarios."
+        }
+      ],
+      "findingTexts": [
+        "With $100 subtotal and Overnight, SAVE10 discounts $12.50 and totals $112.49, not $10.00/$114.99."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=40.00 and leave the calculator at its initial state.",
+          "action": "At a narrow mobile viewport, inspect all tier labels, promo controls, messages, and totals.",
+          "expect": "All labels, prices, messages, and the Apply button must remain readable, reachable, and unclipped.",
+          "priority": 6
+        },
+        {
+          "setup": "Open /estimate?subtotal=40.00 and note the Standard shipping amount and order total.",
+          "action": "Select Express, then Overnight, reading the shipping summary after each selection.",
+          "expect": "Each selected tier's summary must match its displayed price and update the order total.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /estimate?subtotal=100.00, apply SAVE10, and note the discount and total.",
+          "action": "Replace the code with NOPE and click Apply.",
+          "expect": "A visible invalid-code error must appear, and the previous discount must no longer affect the total.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=100.00 and note the subtotal.",
+          "action": "Select Overnight, enter SAVE10, and click Apply.",
+          "expect": "Discount must be $10.00, shipping $24.99, and order total $114.99.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 and note the Express shipping option and order total.",
+          "action": "Select Express and read its option price and the Shipping summary.",
+          "expect": "Both Express displays must say FREE, and order total must equal $150.00.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 and note the Standard shipping option and order total.",
+          "action": "Select Standard and read its option price and the Shipping summary.",
+          "expect": "Both Standard displays must say FREE, and order total must equal $50.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public estimator and test each shipping tier, threshold boundary, promo success and failure behavior, totals, and narrow-screen usability.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=40.00 and leave the calculator at its initial state. Then At a narrow mobile viewport, inspect all tier labels, promo controls, messages, and totals. — expect: All labels, prices, messages, and the Apply button must remain readable, reachable, and unclipped.\n2. Open /estimate?subtotal=40.00 and note the Standard shipping amount and order total. Then Select Express, then Overnight, reading the shipping summary after each selection. — expect: Each selected tier's summary must match its displayed price and update the order total.\n3. Open /estimate?subtotal=100.00, apply SAVE10, and note the discount and total. Then Replace the code with NOPE and click Apply. — expect: A visible invalid-code error must appear, and the previous discount must no longer affect the total.\n4. Open /estimate?subtotal=100.00 and note the subtotal. Then Select Overnight, enter SAVE10, and click Apply. — expect: Discount must be $10.00, shipping $24.99, and order total $114.99.\n5. Open /estimate?subtotal=150.00 and note the Express shipping option and order total. Then Select Express and read its option price and the Shipping summary. — expect: Both Express displays must say FREE, and order total must equal $150.00.\n6. Open /estimate?subtotal=50.00 an"
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 3,
+      "durationMs": 784657,
+      "status": "failed",
+      "steps": 15,
+      "findings": 1,
+      "checks": 6,
+      "contradicted": 2,
+      "costUsd": 0.9229,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Finding 2 explicitly reports that a 10% promo on a $100.00 subtotal produces a $10.60 discount rather than $10.00, consistent with shipping being included in the discount base."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": false,
+          "why": "The findings mention FREE shipping but do not report a mismatch between the shipping badge/row and totals at exactly the free-shipping threshold."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": true,
+          "why": "Findings 1 and 3 explicitly state that applying INVALID shows an error while the prior SAVE10 discount and discounted total remain applied."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At a $42.00 subtotal, selecting each delivery tier shows its charge and an order total equal to subtotal plus shipping.",
+          "status": "verified",
+          "evidence": "The trace records Standard at $5.99 with $47.99 total (step 6), Express at $12.99 with $54.99 total (step 7), and Overnight at $24.99 with $66.99 total (step 8); each reconciles against the displayed $42.00 subtotal."
+        },
+        {
+          "claim": "Keyboard Tab navigation reaches every estimator tier radio, promo field, and Apply button with visible focus while the estimator remains readable on mobile.",
+          "status": "not_testable",
+          "evidence": "Steps 4-6 only record visible focus on the Purchasify logo, Shop link, and Cart link; although estimator content was readable, the trace never tabs to or observes focus on the tier radios, promo field, or Apply button."
+        },
+        {
+          "claim": "Applying SAVE10 at a $100.00 subtotal provides the advertised 10% discount.",
+          "status": "contradicted",
+          "evidence": "After applying SAVE10, the page says “SAVE10 applied — 10% off” but displays a −$10.60 discount on a $100.00 subtotal with FREE shipping (step 11), whereas 10% of the recorded subtotal is $10.00."
+        },
+        {
+          "claim": "Replacing a valid promo with INVALID shows an error and removes the prior discount from the totals.",
+          "status": "contradicted",
+          "evidence": "After INVALID is applied, the trace records an invalid-code error alongside the still-present SAVE10 applied message and a still-applied −$10.60 discount (step 13)."
+        },
+        {
+          "claim": "At a $150.00 subtotal, selecting Express shows FREE shipping and an order total of $150.00.",
+          "status": "not_testable",
+          "evidence": "The $150.00 page shows the Express option labeled FREE and the Standard-selected total at $150.00 (step 14), but Express was never selected and its Shipping (Express) line and total were not observed."
+        },
+        {
+          "claim": "At a $50.00 subtotal with Standard selected, both the Standard option and Shipping (Standard) total line show FREE and the order total is $50.00.",
+          "status": "not_testable",
+          "evidence": "The trace never navigates to or observes the requested $50.00 estimator state."
+        }
+      ],
+      "findingTexts": [
+        "Submitting INVALID displays “That promo code isn't valid.” but leaves the prior “SAVE10 applied — 10% off” message, Discount (SAVE10) −$10.60, and Order total $89.40 visible. The prior discount contin"
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42.00 at a narrow mobile viewport.",
+          "action": "Tab through all tier radios, the promo field, and Apply while inspecting the rendered estimator.",
+          "expect": "Every control and all tier, promo, and total text must remain readable, reachable, and visibly focused.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the Subtotal and current Order total.",
+          "action": "Select Express, then Overnight, and reread Shipping and Order total after each selection.",
+          "expect": "Each shipping charge must match the selected tier, and each total must equal subtotal plus shipping.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=100.00, enter SAVE10, apply it, and note the visible discount.",
+          "action": "Replace the code with INVALID, click Apply, and reread the promo and totals.",
+          "expect": "The invalid error must show and the previous applied discount must no longer affect totals.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 and note the subtotal.",
+          "action": "Select Standard, then Express, then Overnight, rereading the shipping line after each selection.",
+          "expect": "At $150.00, Express must say FREE and its total must equal $150.00.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 and leave Standard selected.",
+          "action": "Read the Standard option and the Shipping (Standard) line in the totals.",
+          "expect": "Both must say FREE, and Order total must equal $50.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public estimator, exercise each delivery tier and promo path, and compare displayed labels, charges, discounts, and totals.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42.00 at a narrow mobile viewport. Then Tab through all tier radios, the promo field, and Apply while inspecting the rendered estimator. — expect: Every control and all tier, promo, and total text must remain readable, reachable, and visibly focused.\n2. Open /estimate?subtotal=42.00 and note the Subtotal and current Order total. Then Select Express, then Overnight, and reread Shipping and Order total after each selection. — expect: Each shipping charge must match the selected tier, and each total must equal subtotal plus shipping.\n3. Open /estimate?subtotal=100.00, enter SAVE10, apply it, and note the visible discount. Then Replace the code with INVALID, click Apply, and reread the promo and totals. — expect: The invalid error must show and the previous applied discount must no longer affect totals.\n4. Open /estimate?subtotal=150.00 and note the subtotal. Then Select Standard, then Express, then Overnight, rereading the shipping line after each selection. — expect: At $150.00, Express must say FREE and its total must equal $150.00.\n5. Open /estimate?subtotal=50.00 and leave Standard selected. Then Read the Standard option and the Shipping (Standard) line in the totals. — expect: Both must say FREE, and Order total must equal $50.00."
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 4,
+      "durationMs": 143428,
+      "status": "passed",
+      "steps": 13,
+      "findings": 3,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.3208,
+      "caught": 2,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 1, 3, 4, and 5 explicitly show SAVE10 discounting $5.50 with $12.99 Express shipping and $4.80 with $5.99 Standard shipping, rather than 10% of the $42.00 subtotal ($4.20). This describes shipping being included in the discount bas"
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 2 and 6 explicitly identify the exact $150.00 threshold mismatch: Express is labeled FREE while the order summary still charges $12.99 shipping."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "why": "None of the findings apply an invalid promo code or report that a prior discount remains after an invalid-code error."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "At a narrow mobile viewport, all delivery labels, prices, promo controls, feedback, and totals are legible, reachable, and free of clipping or overlap.",
+          "status": "not_testable",
+          "evidence": "The trace contains no narrow-viewport navigation or recorded visual inspection of the estimator layout."
+        },
+        {
+          "claim": "For a $42.00 subtotal, selecting Overnight displays $24.99 shipping and a $66.99 order total.",
+          "status": "verified",
+          "evidence": "Step 2 records Overnight selected with Subtotal $42.00, Shipping (Overnight) $24.99, and Order total $66.99; $42.00 + $24.99 reconciles to $66.99."
+        },
+        {
+          "claim": "For a $42.00 subtotal with Express selected, SAVE10 gives a $4.20 discount while shipping remains $12.99 and the total is $50.79.",
+          "status": "contradicted",
+          "evidence": "Steps 4-6 show Express at $12.99 shipping and subtotal $42.00, but after SAVE10 the recorded discount is −$5.50 and total is $49.49, rather than the 10% discount of $4.20 and expected $50.79."
+        },
+        {
+          "claim": "For a $42.00 subtotal with Standard selected, SAVE10 gives a $4.20 discount and a $43.79 order total.",
+          "status": "contradicted",
+          "evidence": "Steps 7-9 show Standard shipping of $5.99 and then a SAVE10 result of discount −$4.80 and total $43.19; $42.00 − $4.80 + $5.99 reconciles to the observed $43.19 but not the required $43.79."
+        },
+        {
+          "claim": "At a $150.00 subtotal, Express is free in both the delivery option and summary, producing a $150.00 order total.",
+          "status": "contradicted",
+          "evidence": "Steps 10-11 show the Express option labeled FREE, but the recorded summary instead shows Shipping (Express) $12.99 and Order total $162.99, not $0.00 and $150.00."
+        },
+        {
+          "claim": "At a $50.00 subtotal, Standard is free in both the delivery option and summary, producing a $50.00 order total.",
+          "status": "not_testable",
+          "evidence": "Step 12 selected the Standard option labeled FREE, but no subsequent recorded observation shows the shipping row or order total after that selection."
+        }
+      ],
+      "findingTexts": [
+        "With subtotal $42.00 and Express selected, applying SAVE10 displays a discount of −$5.50 and order total $49.49. The displayed subtotal is $42.00, so 10% should be $4.20; expected total is $50.79. Shi",
+        "At subtotal $150.00, the selected Express option is labeled FREE and the prompt says “Add $0.00 more for free express shipping,” but the summary charges Shipping (Express) $12.99 and shows Order total",
+        "SAVE10 on Standard discounts $47.99 by $4.80 instead of $4.20 from the displayed $42 subtotal."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42 at a narrow mobile viewport.",
+          "action": "Inspect all tier labels, prices, promo controls, feedback, and totals.",
+          "expect": "Every label, price, message, and total must be legible, reachable, and free of clipping or overlap.",
+          "priority": 6
+        },
+        {
+          "setup": "Open /estimate?subtotal=42 with the default Standard tier.",
+          "action": "Select Overnight shipping and read its shipping row and order total.",
+          "expect": "Overnight must show $24.99 shipping and an order total of $66.99.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /estimate?subtotal=42 and select Express shipping.",
+          "action": "Apply SAVE10 and compare the discount with 10% of the displayed subtotal.",
+          "expect": "Discount must remain $4.20; shipping must remain $12.99 and total must be $50.79.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=42, select Standard, and note the displayed subtotal and shipping.",
+          "action": "Enter SAVE10, apply it, and read the discount and order total.",
+          "expect": "Discount must be $4.20 and order total must be $43.79.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150 and select Express shipping.",
+          "action": "Read the Express option, shipping row, and order total.",
+          "expect": "Express must show FREE, shipping must be $0.00, and order total must be $150.00.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50 and select Standard shipping.",
+          "action": "Read the Standard option, shipping row, and order total.",
+          "expect": "Standard must show FREE, shipping must be $0.00, and order total must be $50.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Use exact free-shipping thresholds, promo codes, and each delivery tier to verify that displayed options, discounts, and totals agree.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42 at a narrow mobile viewport. Then Inspect all tier labels, prices, promo controls, feedback, and totals. — expect: Every label, price, message, and total must be legible, reachable, and free of clipping or overlap.\n2. Open /estimate?subtotal=42 with the default Standard tier. Then Select Overnight shipping and read its shipping row and order total. — expect: Overnight must show $24.99 shipping and an order total of $66.99.\n3. Open /estimate?subtotal=42 and select Express shipping. Then Apply SAVE10 and compare the discount with 10% of the displayed subtotal. — expect: Discount must remain $4.20; shipping must remain $12.99 and total must be $50.79.\n4. Open /estimate?subtotal=42, select Standard, and note the displayed subtotal and shipping. Then Enter SAVE10, apply it, and read the discount and order total. — expect: Discount must be $4.20 and order total must be $43.79.\n5. Open /estimate?subtotal=150 and select Express shipping. Then Read the Express option, shipping row, and order total. — expect: Express must show FREE, shipping must be $0.00, and order total must be $150.00.\n6. Open /estimate?subtotal=50 and select Standard shipping. Then Read the Standard option, shipping row, and order total. — expect: Standard must show FREE"
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 5,
+      "durationMs": 80925,
+      "status": "failed",
+      "steps": 10,
+      "findings": 0,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.1446,
+      "caught": 0,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": false,
+          "why": "run produced no findings"
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": false,
+          "why": "run produced no findings"
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": false,
+          "why": "run produced no findings"
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "All shipping radios, promo controls, feedback, and totals are legible and reachable by keyboard with visible focus throughout traversal.",
+          "status": "not_testable",
+          "evidence": "Steps 3-4 observed focus on two header links, step 6 observed focused Express, and step 7 observed focused Promo code input, but traversal never reached all radios or Apply and the run exited stuck at step 10."
+        },
+        {
+          "claim": "Applying SAVE10 shows readable applied-code feedback and an updated discount/total rollup.",
+          "status": "not_testable",
+          "evidence": "Step 7's observation still describes an empty Promo code input, and although Apply was clicked in step 8, no post-click feedback, discount, or total was recorded."
+        },
+        {
+          "claim": "At subtotal $42, selecting Express displays its $12.99 shipping charge and the corresponding tier status.",
+          "status": "verified",
+          "evidence": "After Express was exercised, step 6 observed Express selected with a visible focus border, the message “Add $108.00 more for free express shipping,” and Shipping (Express) of $12.99."
+        },
+        {
+          "claim": "At subtotal $42, selecting Overnight shows $24.99 shipping and an order total of $66.99.",
+          "status": "not_testable",
+          "evidence": "The trace exercised Express only; Overnight was never selected and no Overnight shipping line or total was observed."
+        },
+        {
+          "claim": "At the $150 Express and $50 Standard free-shipping boundaries, the selected tier remains FREE without an “Add $0.00” message, shipping is FREE, and totals reconcile to $150.00 and $50.00 respectively.",
+          "status": "not_testable",
+          "evidence": "The run never opened or observed the /estimate?subtotal=150 or /estimate?subtotal=50 surfaces, so the inclusive-label versus exclusive-total boundary behavior was not exercised."
+        }
+      ],
+      "findingTexts": [],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=42 and inspect all shipping labels, delivery times, promo controls, feedback area and totals.",
+          "action": "Tab through the radios, promo input and Apply button, then enter SAVE10 and read the resulting rollup.",
+          "expect": "Every control and every total must remain legible, reachable and visibly focused; applied-code feedback must be readable.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /estimate?subtotal=42, enter an invalid code such as SAVE11, and keep the promo area visible.",
+          "action": "Click Apply, then replace the code with SAVE10 and click Apply again.",
+          "expect": "Invalid submission must show a visible error; valid submission must show SAVE10 applied and remove that error.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=42 and note the subtotal and Standard total.",
+          "action": "Select Overnight shipping and read its shipping line and order total.",
+          "expect": "Overnight shipping must be $24.99 and total must equal $66.99; state both figures.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150 and note the Express tier label, free-shipping message, shipping line and order total.",
+          "action": "Select Express shipping and reread its displayed price, message, shipping line and order total.",
+          "expect": "Express must be FREE without an Add $0.00 message; shipping must be FREE and total must equal $150.00.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50 and note the Standard tier label, free-shipping message, shipping line and order total.",
+          "action": "Select Standard shipping and reread its displayed price, message, shipping line and order total.",
+          "expect": "Standard must be FREE without an Add $0.00 message; shipping must be FREE and total must equal $50.00.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Open the public estimator with boundary subtotals, operate every shipping tier and promo control, and compare displayed tier status, messages, discounts and totals.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=42 and inspect all shipping labels, delivery times, promo controls, feedback area and totals. Then Tab through the radios, promo input and Apply button, then enter SAVE10 and read the resulting rollup. — expect: Every control and every total must remain legible, reachable and visibly focused; applied-code feedback must be readable.\n2. Open /estimate?subtotal=42, enter an invalid code such as SAVE11, and keep the promo area visible. Then Click Apply, then replace the code with SAVE10 and click Apply again. — expect: Invalid submission must show a visible error; valid submission must show SAVE10 applied and remove that error.\n3. Open /estimate?subtotal=42 and note the subtotal and Standard total. Then Select Overnight shipping and read its shipping line and order total. — expect: Overnight shipping must be $24.99 and total must equal $66.99; state both figures.\n4. Open /estimate?subtotal=150 and note the Express tier label, free-shipping message, shipping line and order total. Then Select Express shipping and reread its displayed price, message, shipping line and order total. — expect: Express must be FREE without an Add $0.00 message; shipping must be FREE and total must equal $150.00.\n5. Open /estimate?su"
+    },
+    {
+      "case": "purchasify-estimate",
+      "attempt": 6,
+      "durationMs": 167583,
+      "status": "passed",
+      "steps": 17,
+      "findings": 5,
+      "checks": 6,
+      "contradicted": 3,
+      "costUsd": 0.4252,
+      "caught": 3,
+      "planted": 3,
+      "scored": [
+        {
+          "id": "discount-base-includes-shipping",
+          "class": "derived-value",
+          "caught": true,
+          "why": "Findings 1, 3, 6, and 8 explicitly show promo discounts larger than the stated percentage of the merchandise subtotal (for example, 10% of $60 shown as $6.60), consistent with shipping being included in the discount base."
+        },
+        {
+          "id": "free-shipping-threshold-off-by-one",
+          "class": "boundary",
+          "caught": true,
+          "why": "Findings 4 and 5 report a shipping option labeled FREE while the order summary still charges shipping, including the $150 Express threshold case."
+        },
+        {
+          "id": "invalid-promo-keeps-discount",
+          "class": "state-reset",
+          "caught": true,
+          "why": "Findings 2 and 7 explicitly state that applying INVALID shows an error but leaves the prior SAVE10 success message, discount, and discounted total active."
+        }
+      ],
+      "verifications": [
+        {
+          "claim": "Applying HALFOFF at a $100.00 subtotal keeps the promo field identifiable and visibly shows a consistent HALFOFF 50%-off success message, discount row, and adjusted total.",
+          "status": "not_testable",
+          "evidence": "Steps 2-3 confirm the labeled Promo code field retained HALFOFF before application, but the trace records no post-Apply success message, discount row, or total for HALFOFF."
+        },
+        {
+          "claim": "At a $42.00 subtotal, switching from Standard to Overnight charges $24.99 for Overnight and increases the order total by exactly $18.00.",
+          "status": "verified",
+          "evidence": "Step 5 records Standard shipping of $5.99, and step 6 records selected Overnight shipping of $24.99 with a $66.99 total versus the $47.99 Standard total, an $18.00 increase."
+        },
+        {
+          "claim": "At a $80.00 subtotal, SAVE10 gives a 10% merchandise discount of $8.00 and a $72.00 total with free Standard shipping.",
+          "status": "contradicted",
+          "evidence": "Step 9 records the message “SAVE10 applied — 10% off” but shows a −$8.60 discount and $71.40 total; with the recorded $80.00 subtotal and free shipping (step 8), a 10% discount should be $8.00 and the total $72.00."
+        },
+        {
+          "claim": "Applying INVALID after SAVE10 shows an invalid-code error and clears the previously active SAVE10 success message, discount, and discounted total.",
+          "status": "contradicted",
+          "evidence": "Step 11 records the error “That promo code isn't valid,” but also records that the prior SAVE10 success message, −$8.60 discount, and $71.40 total remained displayed."
+        },
+        {
+          "claim": "At a $60.00 subtotal with free Standard shipping, SAVE10 discounts exactly $6.00 and produces a $54.00 order total.",
+          "status": "contradicted",
+          "evidence": "Step 12 records subtotal $60.00 and FREE Standard shipping, while step 14 records SAVE10 discount −$6.60 and total $53.40; 10% of the recorded $60.00 merchandise subtotal is $6.00, not $6.60."
+        },
+        {
+          "claim": "At the exact free-shipping thresholds, Express at $150.00 and Standard at $50.00 show free shipping consistently on their cards, helper text, shipping lines, and order totals.",
+          "status": "not_testable",
+          "evidence": "Steps 16-17 record FREE cards and “Add $0.00 more” helper text for Express $150.00 and Standard $50.00, but the recorded observations are truncated before concrete shipping-line and order-total values are provided."
+        }
+      ],
+      "findingTexts": [
+        "At subtotal $100.00 after applying HALFOFF, the Promo code label remains visible, input value is HALFOFF, and success text says “HALFOFF applied — 50% off,” but the displayed discount is -$53.00 and o",
+        "At subtotal $80.00, applying INVALID displays the error “That promo code isn't valid.” but does not clear the previous promotion: “SAVE10 applied — 10% off,” Discount (SAVE10) −$8.60, and $71.40 total",
+        "At subtotal $60.00 with FREE Standard shipping, SAVE10 shows “SAVE10 applied — 10% off” but the displayed discount is −$6.60 and total is $53.40. Ten percent of the $60.00 merchandise subtotal is $6.0",
+        "At subtotal $150.00 with Express selected, the Express card displays FREE and helper text says “Add $0.00 more for free express shipping,” but the shipping line is $12.99 and order total is $162.99. T",
+        "Standard is labeled FREE and helper says $0.00 needed, but summary charges $5.99 shipping."
+      ],
+      "mode": "review",
+      "plan": [
+        {
+          "setup": "Open /estimate?subtotal=100.00 and confirm the Promo code field has its visible label.",
+          "action": "Enter HALFOFF, apply it, then inspect the field, success message, discount row, and total.",
+          "expect": "The field remains identifiable after typing, and all four promo displays must visibly agree on HALFOFF and 50% off.",
+          "priority": 6
+        },
+        {
+          "setup": "Open /estimate?subtotal=42.00 and note the Standard shipping amount and order total.",
+          "action": "Select Overnight, then read its shipping amount and order total.",
+          "expect": "Overnight shipping must show $24.99 and the total must increase by $18.00 from Standard.",
+          "priority": 5
+        },
+        {
+          "setup": "Open /estimate?subtotal=80.00 and apply SAVE10; note the applied message, discount, and total.",
+          "action": "Replace the code with INVALID and click Apply again.",
+          "expect": "An invalid-code error must appear, and the prior applied discount and success message must not remain active.",
+          "priority": 4
+        },
+        {
+          "setup": "Open /estimate?subtotal=60.00 with Standard selected and note the displayed subtotal and shipping.",
+          "action": "Enter SAVE10, click Apply, and read the discount and order total.",
+          "expect": "Discount must equal 10% of the $60.00 merchandise subtotal, with free shipping and a $54.00 total.",
+          "priority": 3
+        },
+        {
+          "setup": "Open /estimate?subtotal=150.00 and select Express.",
+          "action": "Read the Express card, helper text, shipping line, and order total.",
+          "expect": "All Express displays must agree that exactly $150.00 qualifies for free shipping; state each value.",
+          "priority": 2
+        },
+        {
+          "setup": "Open /estimate?subtotal=50.00 with the default Standard tier selected.",
+          "action": "Read the Standard card, helper text, shipping line, and order total.",
+          "expect": "All Standard displays must agree that exactly $50.00 qualifies for free shipping; state each value.",
+          "priority": 1
+        }
+      ],
+      "codeFindings": [],
+      "intentUsed": "Exercise the public estimator at threshold values, switch delivery tiers, and apply valid and invalid promo codes. Report every displayed price, message, and total relation.\n\nWork through these checks in order, and record what you actually observe for each:\n1. Open /estimate?subtotal=100.00 and confirm the Promo code field has its visible label. Then Enter HALFOFF, apply it, then inspect the field, success message, discount row, and total. — expect: The field remains identifiable after typing, and all four promo displays must visibly agree on HALFOFF and 50% off.\n2. Open /estimate?subtotal=42.00 and note the Standard shipping amount and order total. Then Select Overnight, then read its shipping amount and order total. — expect: Overnight shipping must show $24.99 and the total must increase by $18.00 from Standard.\n3. Open /estimate?subtotal=80.00 and apply SAVE10; note the applied message, discount, and total. Then Replace the code with INVALID and click Apply again. — expect: An invalid-code error must appear, and the prior applied discount and success message must not remain active.\n4. Open /estimate?subtotal=60.00 with Standard selected and note the displayed subtotal and shipping. Then Enter SAVE10, click Apply, and read the discount and order total. — expect: Discount must equal 10% of the $60.00 merchandise subtotal, with free shipping and a $54.00 total.\n5. Open /estimate?subtotal=150.00 and select Express. Then Read the Express card, helper text, shipping line, and o"
+    }
+  ]
+}
