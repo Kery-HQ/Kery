@@ -100,8 +100,8 @@ export { runBugTriageAgent } from "./bugTriageAgent.js";
 export type { BugTriageInput, BugTriageResult } from "./bugTriageAgent.js";
 
 // ─── Bug screenshot markup (red box on saved JPEGs) ───────────────────────────
-export { drawRedBoundingBoxOnJpeg } from "./bugScreenshotMarkup.js";
-export type { BugRegion } from "./bugScreenshotMarkup.js";
+export { drawRedBoundingBoxOnJpeg, renderIssueArtifact } from "./bugScreenshotMarkup.js";
+export type { BugRegion, IssueCaption } from "./bugScreenshotMarkup.js";
 
 // ─── Run Events ──────────────────────────────────────────────────────────────
 export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested } from "./runEvents.js";
