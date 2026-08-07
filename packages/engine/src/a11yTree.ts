@@ -320,6 +320,19 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     }
 
     var children = [];
+    // An OPEN shadow root holds the real controls for a web component
+    // (Lightning, Ionic, FAST, shadow-based MUI). A walk over el.children alone
+    // stops at the boundary: a probe saw ONE element on a page of three
+    // shadow-hosted controls. Descend into the shadow tree first, then the
+    // light children. Closed roots (shadowRoot === null) are unreachable by any
+    // script and are an inherent limit, not this one. Playwright already
+    // pierces open roots for resolution, so only perception was blind.
+    if (el.shadowRoot) {
+      for (var s = 0; s < el.shadowRoot.children.length; s++) {
+        var shadowChild = buildTree(el.shadowRoot.children[s]);
+        if (shadowChild) children.push(shadowChild);
+      }
+    }
     for (var i = 0; i < el.children.length; i++) {
       var childNode = buildTree(el.children[i]);
       if (childNode) children.push(childNode);
