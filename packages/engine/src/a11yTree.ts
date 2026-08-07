@@ -573,18 +573,26 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
       try {
         const roleLocator = page.getByRole(element.role as any);
         const count = await roleLocator.count();
+        // Acceptance is per-axis (unchanged); only the CHOICE among accepted
+        // candidates is nearest-first. Judging acceptance by straight-line
+        // distance instead would shrink the region from a square to an
+        // inscribed circle and drop diagonally-offset elements that used to
+        // resolve — which is a coverage regression, not a precision fix.
         let bestIndex = -1;
         let bestDist = Infinity;
         for (let i = 0; i < count; i++) {
           const box = await roleLocator.nth(i).boundingBox({ timeout: 1000 }).catch(() => null);
           if (!box) continue;
-          const dist = Math.hypot(box.x - element.bbox.x, box.y - element.bbox.y);
+          const dx = box.x - element.bbox.x;
+          const dy = box.y - element.bbox.y;
+          if (Math.abs(dx) >= 15 || Math.abs(dy) >= 15) continue;
+          const dist = Math.hypot(dx, dy);
           if (dist < bestDist) {
             bestDist = dist;
             bestIndex = i;
           }
         }
-        if (bestIndex >= 0 && bestDist < 15) {
+        if (bestIndex >= 0) {
           logger.debug({ id: element.id, role: element.role, strategy: "bbox", matchIndex: bestIndex, dist: Math.round(bestDist) }, "Unnamed element resolved via nearest bbox position");
           return roleLocator.nth(bestIndex);
         }
@@ -604,11 +612,15 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
     }
 
     if (count > 1 && element.bbox) {
-      // Pick the NEAREST candidate, not the first within tolerance. In a dense
-      // table of identical "+" / "−" steppers the rows sit closer together than
-      // the tolerance, and first-match clicked an adjacent row's button — the
-      // agent then truthfully reported "Panel A3's control changed Cable 2m"
-      // as an app bug. Nearest-match makes the choice deterministic and right.
+      // Among candidates INSIDE the existing per-axis tolerance, pick the
+      // NEAREST rather than the first. In a dense table of identical "+" / "−"
+      // steppers the rows sit closer together than the tolerance, and
+      // first-match clicked an adjacent row's button — the agent then
+      // truthfully reported "Panel A3's control changed Cable 2m" as an app
+      // bug. The tolerance itself must stay per-axis: replacing it with a
+      // straight-line distance shrinks the accepted region to the inscribed
+      // circle, so an element at dx=40,dy=40 stops resolving and falls back to
+      // .first() — measured as a large detection drop (fixv1).
       let bestIndex = -1;
       let bestDist = Infinity;
       for (let i = 0; i < count; i++) {
@@ -616,13 +628,14 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
         if (!box) continue;
         const dx = box.x - element.bbox.x;
         const dy = box.y - element.bbox.y;
+        if (Math.abs(dx) >= 50 || Math.abs(dy) >= 50) continue;
         const dist = Math.hypot(dx, dy);
         if (dist < bestDist) {
           bestDist = dist;
           bestIndex = i;
         }
       }
-      if (bestIndex >= 0 && bestDist < 50) {
+      if (bestIndex >= 0) {
         logger.debug({ id: element.id, role: element.role, name: element.name, strategy: "role+name+bbox", matchIndex: bestIndex, dist: Math.round(bestDist), totalMatches: count }, "Element resolved via nearest-position disambiguation");
         return locator.nth(bestIndex);
       }

@@ -129,3 +129,75 @@ so its 1/3 is an early abort rather than a fair score.
   larger step budgets both cost money; this needs a decision, not a default.
 - Plan exposure is a proxy. End-to-end validation of v11 is the confirming
   measurement.
+
+## 2026-08-07 — Hand-triage of the 4-label spread (all 80 reports verified in a browser)
+
+Every reported issue from `all-clean-0/1/2` (69) and `all-real` (11) was
+reproduced or refuted by hand against the running apps. This is the first
+measurement of what the noise number actually MEANS.
+
+**Headline: the clean corpus is not clean, and the biggest noise families were
+the engine misinforming the agent — not the agent's judgement.**
+
+| Family | Count | Verdict | Cause |
+|---|---|---|---|
+| TEAM15 promo "rejected" | 6 | NOISE | Empty input rendered as `textbox "TEAM15"` — placeholder used as accessible name, no value shown. Agent clicked Apply without typing. Deterministic across all passes. |
+| "App truncates input to 50 chars" | 2 | NOISE | The TREE truncates displayed values at 50 chars; agent read its own display cap as an app bug. |
+| "No confirmation after Export/Send" | 6 | NOISE | `alert()` auto-accepted silently; agent never told a dialog appeared. |
+| Stepper "miswired" (wrong row changed) | 3 | ENGINE BUG (real, ours) | First-match bbox disambiguation clicked the adjacent row's identical +/− button. |
+| Interaction failures blamed on app (selects, checkboxes, domChanged=NO) | ~10 | NOISE | Engine failed to drive the control, then reported the app unresponsive. Native select/checkbox work by hand. |
+| Plan-invented URLs (…/bookflow/checkout.html 404) | 4 | NOISE | Plan derived a route from a diff file path. |
+| "Two rapid clicks made two orders" | 2 | NOISE | Agent's clicks are seconds apart; the app's rapid-click guard is fine. Second deliberate click after confirmation = second order. |
+| Sync save "lacks Saving… state" | 3 | NOISE (invented requirement) | Save is synchronous; expecting a processing state is invented. |
+| Misread number (310 → "31") | 1 | NOISE | Total units 535 is correct; agent dropped a digit and invented a 279-unit discrepancy. |
+| ToS "unrelated AI text" | 1 | NOISE | The AI-testing warranty clause is Kery's own product domain. |
+| HTML injection in tickets page | 6 | REAL | `status.innerHTML = ... ${name}` — renders user markup. Unplanned real bug in the "clean" corpus. |
+| Stale validation/toast state | 8 | REAL | Errors persist after correction; success toast survives filter changes; "Closed 0" green toast. |
+| A11y naming gaps | 7 | REAL | Unnamed spinbuttons, +/− only names, concatenated select labels, #a1a1aa contrast. |
+| Misc real (−$0.00, phone accepts spaces, select-all state) | ~5 | REAL | Verified in source or by hand. |
+| kery.dev live defects | 8 | REAL | #demo anchor under fixed header (scroll-margin-top:0), blog article title not a link, FAQ item doesn't expand, hero pill flicker. |
+| Transient/debatable | ~4 | DEBATABLE | Search-lag (self-corrects, token-guarded), video-proof link (element absent at rest). |
+
+Roughly: **~35 real, ~40 noise, ~5 debatable.** The raw "noise per run" number
+overstates noise by ~2× because the corpus has real bugs in it.
+
+**Fixes shipped (fixv1), all mechanical, no judgement-prompt changes:**
+1. a11yTree: text controls always render `value="…"` (empty string included);
+   placeholder-derived names render as `placeholder "…"`; truncated values carry
+   `(display truncated; actual length N)`.
+2. agent: auto-accepted dialogs surfaced in the next observation.
+3. a11yTree: bbox disambiguation picks the NEAREST candidate, not first-within-
+   tolerance (both named-dup and unnamed paths).
+4. prReview plan rule: never derive URLs from diff file paths.
+
+Measurement protocol for fixv1: per-family comparison, not totals — the real
+findings (injection, stale state, a11y) SHOULD keep appearing; only the noise
+families above should disappear.
+
+### fixv1 measurement — the resolver "fix" was itself a regression
+
+| Axis | Baseline | fixv1 |
+|---|---|---|
+| Detection (12 cases, tuning) | 129/216 = **60%** (detband, repeat 6) | 29/72 = **40%** (repeat 2) |
+| Noise per run (clean corpus) | 2.55 mean (3 passes) | 2.22 / 2.78 (2 passes) |
+
+Noise was flat and detection fell 20 points. The cause was not the agent: mean
+steps per run collapsed on four cases (notedso 72.5 → 10.0, chatific 21.3 → 4.0,
+gridworks-queue 22.3 → 10.5) with checks marked `not_testable` because the run
+could not get past a control it used to operate.
+
+**The bug was in fix #3.** Acceptance had been per-axis —
+`|dx| < 50 && |dy| < 50`, a 100×100 square. Rewriting it as
+`Math.hypot(dx, dy) < 50` silently replaced that square with its inscribed
+circle, so an element at dx=40, dy=40 (distance 56) stopped resolving and fell
+through to `locator.first()` — the precise mis-click the change was meant to
+prevent, now firing on more elements.
+
+Corrected in fixv2: the per-axis tolerance is restored as the ACCEPTANCE test,
+and nearest-distance only chooses AMONG the candidates that pass it. Both bbox
+paths (unnamed, tolerance 15; named-duplicate, tolerance 50).
+
+**Lesson worth keeping: a change to element resolution is a change to
+detection.** It cannot be validated on the noise axis alone — noise stayed flat
+across a 20-point detection collapse, because a run that dies early reports
+fewer of everything.
