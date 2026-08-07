@@ -1,0 +1,442 @@
+{
+  "label": "realnoise",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 0,
+    "planted": 0,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 1.7793,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "real-purchasify-home",
+      "attempt": 1,
+      "durationMs": 115281,
+      "status": "passed",
+      "steps": 9,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.2655,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Using the landing-page “Browse the catalog” call to action opens the product catalog.",
+          "status": "verified",
+          "evidence": "After clicking “Browse the catalog” in step 1, the subsequent recorded catalog interactions show the /products page with the All filter, search field, and “No products found.”"
+        },
+        {
+          "claim": "The catalog search control accepts user input and updates the visible query without inventing product results.",
+          "status": "verified",
+          "evidence": "Step 4 records that entering “a” changed the searchbox value to “a”; the result area still displayed the exact message “No products found.” and no product cards appeared."
+        },
+        {
+          "claim": "Opening Cart while unauthenticated routes the user to sign in and preserves the intended cart destination.",
+          "status": "verified",
+          "evidence": "Step 6 records that clicking Cart navigated to /login?next=/cart, with Sign in selected and a Sign up tab available."
+        },
+        {
+          "claim": "The Sign up control opens the registration form.",
+          "status": "verified",
+          "evidence": "After the Sign up interaction, step 7 records that “The Sign up form remains visible” before navigating away."
+        },
+        {
+          "claim": "The landing-page Featured-section “View all →” link opens the catalog.",
+          "status": "verified",
+          "evidence": "Step 8 exercised “View all →”, and step 9 confirms the final page was the catalog at http://localhost:4201/products with its content and controls visible."
+        }
+      ],
+      "findingTexts": [
+        "Intended merch storefront has no inventory: All catalog says “No products found” despite promising tees, hoodies, etc."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-home",
+      "attempt": 2,
+      "durationMs": 104403,
+      "status": "passed",
+      "steps": 8,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.22,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Clicking the landing page’s “Browse the catalog” call to action opens the Shop catalog.",
+          "status": "verified",
+          "evidence": "After the CTA click in step 1, step 2 records the fresh page at http://localhost:4201/products with the Shop heading and catalog search controls."
+        },
+        {
+          "claim": "The storefront catalog provides visible product results when viewed unfiltered.",
+          "status": "contradicted",
+          "evidence": "Step 7 records the Shop page with an empty search field and the unfiltered All link, but the only catalog result shown is “No products found.”"
+        },
+        {
+          "claim": "Clicking the visible All catalog control clears the search/filter and restores the full catalog.",
+          "status": "contradicted",
+          "evidence": "After clicking All in step 4, the page still showed “No products found,” and step 5 confirms the search value remained “Tee” rather than being cleared."
+        },
+        {
+          "claim": "The landing page’s Featured section retains and displays featured product information.",
+          "status": "contradicted",
+          "evidence": "Step 6 observes the landing page’s Featured section as empty, containing only the “View all →” link and no product content."
+        }
+      ],
+      "findingTexts": [
+        "Intended storefront catalog is empty: the unfiltered Shop page says “No products found.”"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-products",
+      "attempt": 1,
+      "durationMs": 74545,
+      "status": "failed",
+      "steps": 7,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 3,
+      "costUsd": 0.1347,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The unfiltered product listing displays available products.",
+          "status": "contradicted",
+          "evidence": "After the search was cleared, the input showed its placeholder but the results area still said \"No products found.\" (step 4); directly navigating to /products likewise left the empty search and the same message (step 5)."
+        },
+        {
+          "claim": "Clearing a product search restores the full catalog.",
+          "status": "contradicted",
+          "evidence": "Clearing the search left the results area showing \"No products found.\" rather than restoring any products (step 4)."
+        },
+        {
+          "claim": "Clicking the visible All filter restores the unfiltered product catalog.",
+          "status": "contradicted",
+          "evidence": "The All link was active, and clicking it left the empty search box and \"No products found.\" message unchanged (step 5)."
+        },
+        {
+          "claim": "Users can enter a search query in the product search field.",
+          "status": "verified",
+          "evidence": "After entry, the search input visibly contained the value \"A\" (step 3)."
+        }
+      ],
+      "findingTexts": [
+        "Intended product listing shows a catalog; /products shows “No products found” with empty search, and All cannot restore it."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-products",
+      "attempt": 2,
+      "durationMs": 91956,
+      "status": "passed",
+      "steps": 7,
+      "findings": 1,
+      "checks": 3,
+      "contradicted": 2,
+      "costUsd": 0.2119,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Selecting the All filter resets an active product search and restores the full listing.",
+          "status": "contradicted",
+          "evidence": "After searching for \"A\", the recorded observation for the All control says the click had no visible effect: the search box still contained \"A\" and the page still showed \"No products found\" (steps 3-4)."
+        },
+        {
+          "claim": "Clearing the product search shows the unfiltered product catalog rather than an empty result state.",
+          "status": "contradicted",
+          "evidence": "After the search was cleared, the input showed the \"Search products…\" placeholder but the page still displayed \"No products found\"; the final fresh /products state showed the same empty result (steps 5 and 7)."
+        },
+        {
+          "claim": "Clicking Cart takes an unauthenticated user to sign in.",
+          "status": "verified",
+          "evidence": "Clicking Cart opened the visible \"Welcome back\" login form and the trace states the Cart route required sign-in (step 6)."
+        }
+      ],
+      "findingTexts": [
+        "On /products, after searching for \"A\" and seeing \"No products found.\", clicking the visible \"All\" link leaves the searchbox value as \"A\" and the page still reads \"No products found.\" A fresh observati"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-login",
+      "attempt": 1,
+      "durationMs": 102851,
+      "status": "passed",
+      "steps": 10,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.2525,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The Sign up form prevents submission when required fields are blank.",
+          "status": "verified",
+          "evidence": "After clicking Create account with both fields empty, step 3 records the native validation popup: \"Please fill out this field.\" beside a blank field."
+        },
+        {
+          "claim": "Clicking the Sign in tab returns the user to the primary sign-in form.",
+          "status": "verified",
+          "evidence": "Step 4 records that after switching back the page showed \"Welcome back,\" the Sign in tab active, blank required Email and Password fields, and the Sign in button."
+        },
+        {
+          "claim": "The sign-in form enforces both required fields and email-format validation before submission.",
+          "status": "verified",
+          "evidence": "Step 5 records the native required-email popup on the blank form, step 6 records a malformed-email validation popup with Email set to \"not-an-email,\" and step 8 records the Password-required popup after a valid email was supplied."
+        },
+        {
+          "claim": "Submitting a completed sign-in form produces a usable authentication result rather than a visible request failure.",
+          "status": "contradicted",
+          "evidence": "After entering test@example.com and a password and submitting, the final snapshot in step 10 still showed the login page with the red error message \"fetch failed\" and blanked fields."
+        }
+      ],
+      "findingTexts": [
+        "Submitting the populated Sign in form leaves the user on /login and displays the error message \"fetch failed\". The Email and Password fields are cleared."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-login",
+      "attempt": 2,
+      "durationMs": 83228,
+      "status": "passed",
+      "steps": 10,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.2047,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Users can switch from Sign in to Sign up and see the account-creation form.",
+          "status": "verified",
+          "evidence": "Step 2 observed the page switch to the selected Sign up tab with the “Create your account” heading and required Email and Password fields."
+        },
+        {
+          "claim": "The Sign in form displays the expected primary controls and blocks empty submissions with immediate required-field validation.",
+          "status": "verified",
+          "evidence": "Step 4 observed the selected Sign in tab with “Welcome back,” required Email and Password fields, and a Sign in button; step 5 observed that an empty submission stayed on the form and immediately showed “Please fill out this field.”"
+        },
+        {
+          "claim": "The email field rejects malformed email addresses before submission.",
+          "status": "verified",
+          "evidence": "Step 6 recorded “not-an-email” in the Email field and the immediate browser prompt “Please include an '@' in the email address,” while step 7 showed that prompt cleared after replacing it with “test@example.com.”"
+        },
+        {
+          "claim": "The Sign in form blocks submission when the password is empty after a valid email is entered.",
+          "status": "verified",
+          "evidence": "Step 8 observed that submitting with “test@example.com” and an empty Password kept the user on the sign-in form and immediately displayed “Please fill out this field.”"
+        },
+        {
+          "claim": "Submitting completed credentials provides an invalid-credential response.",
+          "status": "not_testable",
+          "evidence": "The trace shows a non-empty masked password in step 9, but no subsequent completed-form submission or observed authentication response was recorded."
+        }
+      ],
+      "findingTexts": [
+        "Submitting the completed Sign in form does not authenticate or show an invalid-credentials response; it remains on “Welcome back” and displays the visible error “fetch failed” beneath the fields."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-notedso-home",
+      "attempt": 1,
+      "durationMs": 22680,
+      "status": "failed",
+      "steps": 1,
+      "findings": 1,
+      "checks": 3,
+      "contradicted": 1,
+      "costUsd": 0.0463,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The noted.so production landing page loads and presents its landing-page content and interactive controls to users.",
+          "status": "contradicted",
+          "evidence": "Step 1 observed that the final page remained on a client-side application-error page and that no landing-page content or interactive controls were visible."
+        },
+        {
+          "claim": "Users can explore and operate the landing page controls.",
+          "status": "not_testable",
+          "evidence": "Step 1 shows the application-error page prevented access to any landing-page controls, so no control could be exercised."
+        },
+        {
+          "claim": "The landing page displays complete and internally consistent user-facing content.",
+          "status": "not_testable",
+          "evidence": "Step 1 found no landing-page content because the client-side application error blocked the page from loading."
+        }
+      ],
+      "findingTexts": [
+        "The noted.so landing page fails to load. On a fresh observation at http://localhost:4202/, the only visible page text is: \"Application error: a client-side exception has occurred while loading localho"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-notedso-home",
+      "attempt": 2,
+      "durationMs": 17799,
+      "status": "failed",
+      "steps": 1,
+      "findings": 1,
+      "checks": 2,
+      "contradicted": 1,
+      "costUsd": 0.0412,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The noted.so landing page loads and is available for users to explore.",
+          "status": "contradicted",
+          "evidence": "Step 1 records a confirmed load failure, which blocked all further user-flow exploration."
+        },
+        {
+          "claim": "Visible landing-page content and controls can be read and operated successfully.",
+          "status": "not_testable",
+          "evidence": "The page failed to load at Step 1, so no content or controls were available to inspect or exercise."
+        }
+      ],
+      "findingTexts": [
+        "The noted.so landing page fails to load. At http://localhost:4202/ the only visible page content is: \"Application error: a client-side exception has occurred while loading localhost (see the browser c"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-chatific-home",
+      "attempt": 1,
+      "durationMs": 85448,
+      "status": "passed",
+      "steps": 6,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.1935,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The landing page displays its public headline and the visible entry controls for signing in, starting a chat, and OpenRouter.",
+          "status": "verified",
+          "evidence": "After returning to the page, step 3 records the headline “Every model. One conversation away.” plus “Sign in” and “Start chat,” and step 5 records the visible controls “Sign in,” “Start chatting — it’s free,” and “Powered by OpenRouter.”"
+        },
+        {
+          "claim": "Clicking “Start chatting — it’s free” opens the chat experience.",
+          "status": "contradicted",
+          "evidence": "Step 1 directly attempted the primary landing-page call to action, but the click failed and no destination, navigation, or resulting chat state was observed."
+        },
+        {
+          "claim": "Clicking “Sign in” successfully initiates login.",
+          "status": "contradicted",
+          "evidence": "Following the attempted authentication entry point in step 3, step 4 records the page at /auth/login displaying “An error occurred while trying to initiate the login request.”"
+        },
+        {
+          "claim": "Clicking “Powered by OpenRouter” opens the OpenRouter destination.",
+          "status": "verified",
+          "evidence": "Step 5 clicked “Powered by OpenRouter” with domChanged=yes, and step 6 records that the final state was the successfully loaded OpenRouter destination page."
+        }
+      ],
+      "findingTexts": [
+        "The landing-page primary signup CTA leads to an authentication error instead of an operable signup/login flow. The destination visibly states: “An error occurred while trying to initiate the login req"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-chatific-home",
+      "attempt": 2,
+      "durationMs": 89769,
+      "status": "passed",
+      "steps": 7,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.209,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The landing page renders its main headline and all three visible interactive links.",
+          "status": "verified",
+          "evidence": "Step 7 recorded a fresh landing-page view showing “Every model. One conversation away.” and three interactive links."
+        },
+        {
+          "claim": "Clicking “Start chatting — it's free” successfully starts the sign-up/login flow.",
+          "status": "contradicted",
+          "evidence": "The primary CTA click failed in step 1, and step 2 observed its destination displaying only “An error occurred while trying to initiate the login request.”"
+        },
+        {
+          "claim": "Clicking “Sign in” successfully opens a usable login flow.",
+          "status": "contradicted",
+          "evidence": "The Sign in interaction failed in step 3, and the subsequent /auth/login view in step 4 showed only “An error occurred while trying to initiate the login request.”"
+        },
+        {
+          "claim": "Clicking “Powered by OpenRouter” opens the OpenRouter website.",
+          "status": "verified",
+          "evidence": "Step 6 observed that clicking the footer link opened https://openrouter.ai/ with title “OpenRouter” and heading “The Unified Interface For LLMs.”"
+        }
+      ],
+      "findingTexts": [
+        "The primary landing-page CTA navigates to /auth/login?screen_hint=signup, but the destination displays only: “An error occurred while trying to initiate the login request.”"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    }
+  ]
+}

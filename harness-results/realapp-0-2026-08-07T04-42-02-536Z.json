@@ -1,0 +1,77 @@
+{
+  "label": "realapp-0",
+  "mode": "review",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 0,
+    "planted": 0,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0,
+    "errors": 5
+  },
+  "results": [
+    {
+      "case": "real-purchasify-home",
+      "attempt": 1,
+      "error": "Error: case real-purchasify-home has no diffFile for review mode",
+      "durationMs": 0,
+      "scored": [],
+      "checks": 0,
+      "contradicted": 0,
+      "findings": 0,
+      "costUsd": 0
+    },
+    {
+      "case": "real-purchasify-products",
+      "attempt": 1,
+      "error": "Error: case real-purchasify-products has no diffFile for review mode",
+      "durationMs": 0,
+      "scored": [],
+      "checks": 0,
+      "contradicted": 0,
+      "findings": 0,
+      "costUsd": 0
+    },
+    {
+      "case": "real-purchasify-login",
+      "attempt": 1,
+      "error": "Error: case real-purchasify-login has no diffFile for review mode",
+      "durationMs": 0,
+      "scored": [],
+      "checks": 0,
+      "contradicted": 0,
+      "findings": 0,
+      "costUsd": 0
+    },
+    {
+      "case": "real-notedso-home",
+      "attempt": 1,
+      "error": "Error: case real-notedso-home has no diffFile for review mode",
+      "durationMs": 0,
+      "scored": [],
+      "checks": 0,
+      "contradicted": 0,
+      "findings": 0,
+      "costUsd": 0
+    },
+    {
+      "case": "real-chatific-home",
+      "attempt": 1,
+      "error": "Error: case real-chatific-home has no diffFile for review mode",
+      "durationMs": 0,
+      "scored": [],
+      "checks": 0,
+      "contradicted": 0,
+      "findings": 0,
+      "costUsd": 0
+    }
+  ]
+}

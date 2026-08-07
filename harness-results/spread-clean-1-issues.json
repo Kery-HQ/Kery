@@ -1,0 +1,123 @@
+{
+  "label": "spread-clean-1",
+  "runs": 8,
+  "cleanRuns": 0,
+  "raw": 19,
+  "deduped": 19,
+  "issues": [
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Attendee row does not wrap or otherwise contain a long uninterrupted name; the visible text extends horizontally past the wizard card and is clipped by the viewport at normal width."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Applying BADCODE displays the red error “That promo code is not recognised.” but leaves the yellow “Promo EARLY applied — 10% off.” note, −$16.50 discount, and $148.50 total visible while the promo in"
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Contact form retains prior organisation “Acme” while the saved Northstar email is shown, creating mismatched contact data."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Intended 150-character attendee names are truncated to 50 characters before they can be added."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Ticket selector can display Standard, but Add attendee creates a Workshop attendee, using stale ticket state."
+    },
+    {
+      "case": "clean-bookflow-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A 150-character uninterrupted attendee name is retained in full and remains readable without clipping or covering controls at normal and narrow viewport widths. — After supplying the 150-character name, step 5 records that the attendee input value was only 50 \"A\" characters; step 6 further records that the resulting long-name row visibly overflowed at normal width, so the full supplied name was lost and readability failed."
+    },
+    {
+      "case": "clean-bookflow-account",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Valid email ada@example.com still shows “Enter a valid email address.” instead of clearing validation."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Receipt renders the injected <b> markup as HTML: the receipt reads “BK-1001 — $1002.90 to buyer@example.comINJECTED” with INJECTED visibly bold, rather than displaying the literal <b>INJECTED</b> text"
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Card-number validation error remains after the card is restored; it is shown while the email field is the invalid one."
+    },
+    {
+      "case": "clean-bookflow-checkout",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "A receipt preserves billing-email text as plain text and does not interpret markup entered by the buyer. — After submitting `buyer@example.com<b>INJECTED</b>`, the final observation reports receipt BK-1001 as “buyer@example.comINJECTED” with “INJECTED bold,” showing that the `<b>` markup was rendered rather than preserved literally (steps 2 and 10)."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Success toast “Closed 1 ticket(s).” remains visible after the later Priority=High filter action, so stale close feedback is still presented while viewing a different filtered result."
+    },
+    {
+      "case": "clean-gridworks-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Header and row selection checkboxes have no accessible names; the trace exposes each as “(unnamed checkbox)”."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Export CSV displays the visible confirmation “Export queued.” — Step 2 clicked Export CSV with domChanged=NO, and step 3's immediate post-click inspection and fresh re-check explicitly found no visible alert or inline confirmation to dismiss."
+    },
+    {
+      "case": "clean-gridworks-report",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Send to stakeholders displays the visible confirmation “Report sent.” — Step 3 directly clicked Send to stakeholders with domChanged=NO, and the trace records no resulting confirmation, alert, inline state change, or navigation."
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "Booking a shift with Assign to set to \"<b>Rhea</b>\" renders the booking row as bold \"Rhea\" and omits the literal angle-bracket markup, demonstrating unsafe HTML rendering of a user-entered booking nam"
+    },
+    {
+      "case": "clean-gridworks-schedule",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "Clicking Book shift with an empty Shift date and a populated assignee shows visible date validation feedback and does not add a booking. — Step 3 clicked Book shift with the Shift date empty, but the recorded observation only says the date remained empty; subsequent steps 5 and 6 observed \"No shifts booked\" but record no visible date-validation message after the submission."
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "issue",
+      "text": "After recording Received 3 × Washer 11mm, then Received 2 × Washer 11mm, attempting invalid Shipped 100, and clicking Undo last, the screen clears the validation error but undoes only the latest valid"
+    },
+    {
+      "case": "clean-stockroom-index",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "After the invalid 100-unit Washer shipment and Undo last, the screen returns Washer to 60 with zero movements, an empty log, and no validation error. — The invalid shipment was correctly refused in step 15, leaving Washer 65 and Movements 2; the final snapshot in step 16 reports Washer 11mm at 63 rather than the required 60, so the requested fully reset state was not reached."
+    },
+    {
+      "case": "clean-stockroom-audit",
+      "attempt": 1,
+      "kind": "failed-check",
+      "text": "PNL-A3's minus stepper decrements PNL-A3 without allowing a negative count, producing Counted 0 and Variance -7 after eight clicks from System 7. — Steps 10-13 show attempted PNL-A3 minus interactions instead changing CBL-2M from 18/— to 15/-3 while PNL-A3 remained 7/—, so the required PNL-A3 result was not produced."
+    }
+  ]
+}

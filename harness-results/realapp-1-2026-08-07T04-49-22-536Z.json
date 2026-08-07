@@ -1,0 +1,227 @@
+{
+  "label": "realapp-1",
+  "mode": "scripted",
+  "models": {
+    "agentModel": "openai/gpt-5.6-terra",
+    "auxiliaryModel": "openai/gpt-5.6-luna",
+    "reviewAgentModel": "openai/gpt-5.6-terra",
+    "stagehandModel": "openai/gpt-5.6-luna"
+  },
+  "totals": {
+    "caught": 0,
+    "planted": 0,
+    "heldOut": {
+      "caught": 0,
+      "planted": 0
+    },
+    "costUsd": 0.8813,
+    "errors": 0
+  },
+  "results": [
+    {
+      "case": "real-purchasify-home",
+      "attempt": 1,
+      "durationMs": 128914,
+      "status": "passed",
+      "steps": 13,
+      "findings": 1,
+      "checks": 5,
+      "contradicted": 0,
+      "costUsd": 0.3092,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Clicking “Browse the catalog” from the landing page opens the Shop catalog.",
+          "status": "verified",
+          "evidence": "After the CTA click in step 1, step 2 records the page at http://localhost:4201/products with the “Shop” heading."
+        },
+        {
+          "claim": "Clicking “View all →” from the landing page opens the catalog with an empty search field.",
+          "status": "verified",
+          "evidence": "Following the View all click in step 6, step 7 records navigation to http://localhost:4201/products with the search empty and the catalog visible."
+        },
+        {
+          "claim": "The landing-page header Shop link opens the product catalog.",
+          "status": "verified",
+          "evidence": "After clicking Shop in step 9, step 10 records http://localhost:4201/products with the catalog search, All filter, and catalog empty-state message."
+        },
+        {
+          "claim": "Clicking Cart while signed out redirects the user to sign in before showing cart contents.",
+          "status": "verified",
+          "evidence": "Step 8 records that the Cart click redirected to http://localhost:4201/login?next=/cart and displayed the required Email and Password sign-in fields."
+        },
+        {
+          "claim": "The authentication page lets users switch from Sign in to Sign up.",
+          "status": "verified",
+          "evidence": "After the Sign up tab click in step 11, step 12 records the view changing from “Welcome back” to “Create your account,” with a “Create account” submit button."
+        }
+      ],
+      "findingTexts": [
+        "Production storefront promises merch, but Featured is empty and unfiltered Shop says “No products found.”"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-products",
+      "attempt": 1,
+      "durationMs": 102779,
+      "status": "passed",
+      "steps": 7,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 2,
+      "costUsd": 0.2276,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Clicking the visible All control while a search is active clears the search/filter and shows the full product listing.",
+          "status": "contradicted",
+          "evidence": "After entering a shirt search, step 2 clicked All and observed that the search box still contained \"shirt\" and the results area still said \"No products found.\""
+        },
+        {
+          "claim": "Clearing the search field directly restores the unfiltered product list.",
+          "status": "contradicted",
+          "evidence": "Step 3 attempted to clear the Search products field, but recorded domChanged=NO, with no observed update to the listing."
+        },
+        {
+          "claim": "Using the Shop navigation returns the user to the product listing page.",
+          "status": "verified",
+          "evidence": "Step 6 records that clicking Shop returned to /products, where the Shop heading and product-search field were visible."
+        },
+        {
+          "claim": "The product search field accepts a typed query.",
+          "status": "verified",
+          "evidence": "The final observation in step 7 shows the Search products field value as \"SHIRT\"."
+        }
+      ],
+      "findingTexts": [
+        "The Shop product listing remains empty after clearing the search: the search field shows its \"Search products…\" placeholder, but the page still displays \"No products found.\" instead of any products."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-purchasify-login",
+      "attempt": 1,
+      "durationMs": 52154,
+      "status": "passed",
+      "steps": 5,
+      "findings": 1,
+      "checks": 3,
+      "contradicted": 0,
+      "costUsd": 0.1117,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The Sign up form prevents submission when required fields are empty and shows required-field feedback.",
+          "status": "verified",
+          "evidence": "Step 3 records that after clicking Create account with both fields empty, the page remained at /login and immediately showed the native message \"Please fill out this field.\" for Email."
+        },
+        {
+          "claim": "Clicking the Sign in tab opens the sign-in form with the appropriate sign-in content and required fields.",
+          "status": "verified",
+          "evidence": "Step 4 records that switching to Sign in changed the heading to \"Welcome back,\" made the Sign in tab active, and showed empty required Email and Password fields."
+        },
+        {
+          "claim": "The Sign in form prevents submission when required fields are empty and shows required-field feedback.",
+          "status": "not_testable",
+          "evidence": "The trace switched to the Sign in form in step 4, but contains no recorded click submitting its empty form or observation of its validation result."
+        }
+      ],
+      "findingTexts": [
+        "Email and Password inputs are exposed as unnamed textboxes despite visible labels."
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-notedso-home",
+      "attempt": 1,
+      "durationMs": 21398,
+      "status": "failed",
+      "steps": 1,
+      "findings": 1,
+      "checks": 2,
+      "contradicted": 1,
+      "costUsd": 0.0452,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "The noted.so landing page loads as a usable page rather than an application error.",
+          "status": "contradicted",
+          "evidence": "Step 1 records that the page rendered only a confirmed application error."
+        },
+        {
+          "claim": "Users can access and operate the landing-page controls.",
+          "status": "not_testable",
+          "evidence": "Step 1 states that no interactive landing-page controls were available because the application error occupied the page."
+        }
+      ],
+      "findingTexts": [
+        "The noted.so landing page fails to render. At http://localhost:4202/ the only visible page content is: \"Application error: a client-side exception has occurred while loading localhost (see the browser"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    },
+    {
+      "case": "real-chatific-home",
+      "attempt": 1,
+      "durationMs": 84951,
+      "status": "passed",
+      "steps": 6,
+      "findings": 1,
+      "checks": 4,
+      "contradicted": 1,
+      "costUsd": 0.1876,
+      "caught": 0,
+      "planted": 0,
+      "scored": [],
+      "verifications": [
+        {
+          "claim": "Clicking “Start chatting — it’s free” initiates the chat/signup flow.",
+          "status": "contradicted",
+          "evidence": "Step 1 clicked the primary CTA successfully but recorded no navigation, DOM change, or resulting chat/authentication state."
+        },
+        {
+          "claim": "Clicking “Sign in” opens the sign-in experience.",
+          "status": "not_testable",
+          "evidence": "Step 3 recorded domChanged=yes after clicking “Sign in,” but the only recorded observation was the landing page content; no sign-in page, dialog, URL, or authentication state was observed."
+        },
+        {
+          "claim": "Clicking “Powered by OpenRouter” opens its destination.",
+          "status": "not_testable",
+          "evidence": "Step 5 recorded domChanged=yes, but the observation only identified the footer link on the landing page and did not record the destination page, URL, or provider content."
+        },
+        {
+          "claim": "The landing page visibly provides the Sign in link, the free-start CTA, and the Powered by OpenRouter footer link.",
+          "status": "verified",
+          "evidence": "Step 3 observed the header “Sign in” link, “Start chatting — it’s free” CTA, and “Powered by OpenRouter” footer link on the landing page."
+        }
+      ],
+      "findingTexts": [
+        "The landing-page CTA “Start chatting — it's free” routes to /auth/login?screen_hint=signup, but the resulting page shows “An error occurred while trying to initiate the login request.” instead of init"
+      ],
+      "mode": "scripted",
+      "plan": null,
+      "codeFindings": null,
+      "intentUsed": "Explore this page as a user would and report only defects you can prove from what you observe. Read the visible content, operate the controls that are present, and check that what is shown is consistent. Report a problem only if you can quote what you saw."
+    }
+  ]
+}
