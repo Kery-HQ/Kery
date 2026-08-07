@@ -616,6 +616,10 @@ function buildObservation(params: {
   planState?: string;
   bugTrackerState?: string;
   newTabNote?: string;
+  /** Native dialogs auto-accepted since the last observation. Surfaced so the
+   *  agent counts them as the app's visible feedback instead of reporting
+   *  "no confirmation appeared" for an alert it never got to see. */
+  dialogNote?: string;
   stuckHint?: string;
   domStagnationAdvisory?: { action: string; elementName?: string };
   repetitionLoopAdvisory?: boolean;
@@ -646,6 +650,7 @@ function buildObservation(params: {
   }
 
   if (params.newTabNote) parts.push(params.newTabNote);
+  if (params.dialogNote) parts.push(params.dialogNote);
 
   if (params.planState) parts.push(params.planState);
   if (params.bugTrackerState) parts.push(params.bugTrackerState);
@@ -1890,8 +1895,13 @@ export async function runAgent(
 
   // Auto-accept native browser dialogs (alert, confirm, prompt, beforeunload).
   // Without this the agent hangs indefinitely waiting for a dialog it cannot see.
+  // The accepted dialog is RECORDED and surfaced in the next observation: a
+  // silently-dismissed alert("Export queued.") left the agent truthfully
+  // reporting "no confirmation appeared" — a false bug against the app.
+  const pendingDialogs: string[] = [];
   const onDialog = (dialog: import("playwright").Dialog) => {
     logger.debug({ type: dialog.type(), message: dialog.message() }, "Auto-accepting native dialog");
+    pendingDialogs.push(`${dialog.type()} "${dialog.message().slice(0, 200)}"`);
     dialog.accept().catch(() => {});
   };
   page.on("dialog", onDialog);
@@ -2113,6 +2123,11 @@ export async function runAgent(
       const planState = formatAgentPlanState(agentPlan);
       const bugTrackerState = formatBugTrackerState(agentBugTracker);
 
+      const dialogNote = pendingDialogs.length > 0
+        ? `Native dialog(s) appeared and were auto-accepted by the harness (the app DID show them; count this as visible feedback): ${pendingDialogs.join("; ")}`
+        : undefined;
+      pendingDialogs.length = 0;
+
       const observation = buildObservation({
         url, title, dom, screenshot, pageText,
         failedTargets: Array.from(failedTargets),
@@ -2122,6 +2137,7 @@ export async function runAgent(
         planState: planState || undefined,
         bugTrackerState,
         newTabNote: snapshot.newTabNote,
+        dialogNote,
         domStagnationAdvisory: stagnantActions >= 1 && lastStagnationContext ? lastStagnationContext : undefined,
         repetitionLoopAdvisory: repetitionStuck,
         repeatedKey: loopResult.repeatedKey,

@@ -19,6 +19,14 @@ export type A11yElement = {
   label?: string;
   state: string[];
   value?: string;
+  /** True when the accessible name fell back to the placeholder attribute.
+   *  Rendered distinctly: an empty promo input whose placeholder is "TEAM15"
+   *  was read by the model as already containing TEAM15, producing false bug
+   *  reports about the code being rejected. */
+  nameFromPlaceholder?: boolean;
+  /** Full length of the value when it was truncated for display, so the model
+   *  never mistakes the display cap for the app truncating its input. */
+  valueLen?: number;
   bbox?: { x: number; y: number; width: number; height: number };
 };
 
@@ -26,6 +34,8 @@ type A11yNode = {
   role: string;
   name: string;
   value?: string;
+  namefrom?: string;
+  valuelen?: number;
   description?: string;
   focused?: boolean;
   disabled?: boolean;
@@ -210,8 +220,34 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
     if (el.getAttribute("aria-expanded") === "false") node.expanded = false;
     if (el.getAttribute("aria-selected") === "true") node.selected = true;
     if (el.getAttribute("aria-pressed") === "true") node.pressed = true;
-    if (el.value && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
-      node.value = el.value.slice(0, 50);
+
+    // Text-entry state must be truthful. Two verified false-bug classes came
+    // from omissions here: (1) an EMPTY input whose accessible name fell back
+    // to its placeholder read as if it already contained that text, so the
+    // agent applied a promo code without typing it; (2) the 50-char display
+    // cap read as the APP truncating input. Always emit value (even empty)
+    // for text controls, flag placeholder-derived names, and carry the full
+    // length when the display is truncated.
+    var tagV = el.tagName;
+    if (tagV === "TEXTAREA") {
+      var tv = String(el.value);
+      node.value = tv.slice(0, 50);
+      if (tv.length > 50) node.valuelen = tv.length;
+    } else if (tagV === "SELECT") {
+      try {
+        var opt = el.options[el.selectedIndex];
+        node.value = opt ? (opt.textContent || "").trim().slice(0, 50) : "";
+      } catch (e) {}
+    } else if (tagV === "INPUT") {
+      var it = el.type || "text";
+      if (it !== "checkbox" && it !== "radio" && it !== "submit" && it !== "button" && it !== "hidden" && it !== "file") {
+        var iv = String(el.value);
+        node.value = it === "password" ? (iv ? "(hidden)" : "") : iv.slice(0, 50);
+        if (it !== "password" && iv.length > 50) node.valuelen = iv.length;
+      }
+    }
+    if ((tagV === "INPUT" || tagV === "TEXTAREA") && el.placeholder && name === el.placeholder.slice(0, 60)) {
+      node.namefrom = "placeholder";
     }
 
     if (role) {
@@ -322,7 +358,11 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
           name: name || `(unnamed ${role})`,
           label: typeof node.label === "string" && node.label ? node.label : undefined,
           state,
+          // Empty string is meaningful here — it tells the model the field is
+          // empty — so it must survive to the formatter, not collapse to undefined.
           value: node.valuetext ?? node.valuestring ?? node.value ?? undefined,
+          nameFromPlaceholder: node.namefrom === "placeholder" || undefined,
+          valueLen: typeof node.valuelen === "number" ? node.valuelen : undefined,
           bbox: node.bbox ?? undefined,
         };
         elements.push(el);
@@ -458,10 +498,21 @@ export function formatA11yForLLM(elements: A11yElement[], textNodes?: A11yTextNo
 
   if (elements.length > 0) {
     const lines = elements.map(el => {
-      const parts = [`[${el.id}] ${el.role} "${sanitizeForPrompt(el.name)}"`];
+      // A placeholder-derived name is hint text, not content — say so, or an
+      // empty field reads as already filled with its placeholder.
+      const nameStr = el.nameFromPlaceholder
+        ? `placeholder "${sanitizeForPrompt(el.name)}"`
+        : `"${sanitizeForPrompt(el.name)}"`;
+      const parts = [`[${el.id}] ${el.role} ${nameStr}`];
       if (el.label && el.name.startsWith("(unnamed ")) parts.push(`labelled "${sanitizeForPrompt(el.label)}"`);
       if (el.state.length > 0) parts.push(`- ${el.state.join(", ")}`);
-      if (el.value) parts.push(`value="${sanitizeForPrompt(el.value)}"`);
+      if (el.value !== undefined) {
+        // value="" is load-bearing: it is the only signal that a field is empty.
+        const truncNote = el.valueLen && el.valueLen > el.value.length
+          ? ` (display truncated; actual length ${el.valueLen})`
+          : "";
+        parts.push(`value="${sanitizeForPrompt(el.value)}"${truncNote}`);
+      }
       const hint = getInteractionHint(el);
       if (hint) parts.push(hint);
       return parts.join(" ");
@@ -522,12 +573,20 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
       try {
         const roleLocator = page.getByRole(element.role as any);
         const count = await roleLocator.count();
+        let bestIndex = -1;
+        let bestDist = Infinity;
         for (let i = 0; i < count; i++) {
           const box = await roleLocator.nth(i).boundingBox({ timeout: 1000 }).catch(() => null);
-          if (box && Math.abs(box.x - element.bbox.x) < 15 && Math.abs(box.y - element.bbox.y) < 15) {
-            logger.debug({ id: element.id, role: element.role, strategy: "bbox", matchIndex: i }, "Unnamed element resolved via bbox position match");
-            return roleLocator.nth(i);
+          if (!box) continue;
+          const dist = Math.hypot(box.x - element.bbox.x, box.y - element.bbox.y);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIndex = i;
           }
+        }
+        if (bestIndex >= 0 && bestDist < 15) {
+          logger.debug({ id: element.id, role: element.role, strategy: "bbox", matchIndex: bestIndex, dist: Math.round(bestDist) }, "Unnamed element resolved via nearest bbox position");
+          return roleLocator.nth(bestIndex);
         }
       } catch { /* role not supported by Playwright — fall through */ }
     }
@@ -545,12 +604,27 @@ export async function resolveElement(page: Page, element: A11yElement): Promise<
     }
 
     if (count > 1 && element.bbox) {
+      // Pick the NEAREST candidate, not the first within tolerance. In a dense
+      // table of identical "+" / "−" steppers the rows sit closer together than
+      // the tolerance, and first-match clicked an adjacent row's button — the
+      // agent then truthfully reported "Panel A3's control changed Cable 2m"
+      // as an app bug. Nearest-match makes the choice deterministic and right.
+      let bestIndex = -1;
+      let bestDist = Infinity;
       for (let i = 0; i < count; i++) {
         const box = await locator.nth(i).boundingBox({ timeout: 1000 });
-        if (box && Math.abs(box.x - element.bbox.x) < 50 && Math.abs(box.y - element.bbox.y) < 50) {
-          logger.debug({ id: element.id, role: element.role, name: element.name, strategy: "role+name+bbox", matchIndex: i, totalMatches: count }, "Element resolved via position disambiguation");
-          return locator.nth(i);
+        if (!box) continue;
+        const dx = box.x - element.bbox.x;
+        const dy = box.y - element.bbox.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIndex = i;
         }
+      }
+      if (bestIndex >= 0 && bestDist < 50) {
+        logger.debug({ id: element.id, role: element.role, name: element.name, strategy: "role+name+bbox", matchIndex: bestIndex, dist: Math.round(bestDist), totalMatches: count }, "Element resolved via nearest-position disambiguation");
+        return locator.nth(bestIndex);
       }
       logger.debug({ id: element.id, role: element.role, name: element.name, strategy: "role+name(first)", totalMatches: count }, "Multiple matches, using first");
       return locator.first();
