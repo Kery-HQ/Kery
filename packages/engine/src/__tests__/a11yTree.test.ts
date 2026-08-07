@@ -61,6 +61,23 @@ describe("formatA11yForLLM", () => {
     assert.ok(result.includes("# Settings"), "Should include heading");
     assert.ok(result.includes('[1] button "Save"'), "Should include button");
   });
+
+  // A capability probe found the agent could not read whether a native
+  // checkbox/radio was on, because only aria-checked was consulted. The off
+  // state must be stated explicitly — silence is not "unchecked".
+  it("renders both on and off toggle states", () => {
+    const elements: A11yElement[] = [
+      { id: 1, role: "checkbox", name: "Updates", state: ["checked"], checked: true },
+      { id: 2, role: "checkbox", name: "Newsletter", state: ["unchecked"], checked: false },
+      { id: 3, role: "button", name: "Yearly", state: ["not pressed"], pressed: false },
+      { id: 4, role: "button", name: "Monthly", state: ["pressed"], pressed: true },
+    ];
+    const result = formatA11yForLLM(elements);
+    assert.ok(result.includes('"Updates" - checked'), "checked state must show");
+    assert.ok(result.includes('"Newsletter" - unchecked'), "off state must be explicit, not implied by silence");
+    assert.ok(result.includes('"Yearly" - not pressed'), "inactive segment must be distinguishable");
+    assert.ok(result.includes('"Monthly" - pressed'), "active segment must show");
+  });
 });
 
 describe("sanitizeForPrompt", () => {

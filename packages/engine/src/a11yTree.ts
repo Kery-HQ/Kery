@@ -27,6 +27,13 @@ export type A11yElement = {
   /** Full length of the value when it was truncated for display, so the model
    *  never mistakes the display cap for the app truncating its input. */
   valueLen?: number;
+  /** Structured toggle state, mirrored from the node so callers other than the
+   *  prompt formatter (verification, regression, tests) can read it directly.
+   *  Undefined means the control has no such concept; false is a real off. */
+  checked?: boolean | "mixed";
+  pressed?: boolean;
+  selected?: boolean;
+  expanded?: boolean;
   bbox?: { x: number; y: number; width: number; height: number };
 };
 
@@ -242,12 +249,37 @@ const A11Y_EXTRACT_SCRIPT = `(function() {
 
     if (el.disabled || el.getAttribute("aria-disabled") === "true") node.disabled = true;
     if (el.required || el.getAttribute("aria-required") === "true") node.required = true;
-    if (el.getAttribute("aria-checked") === "true") node.checked = true;
-    if (el.getAttribute("aria-checked") === "mixed") node.checked = "mixed";
+
+    // Checked state — the property is authoritative, the attribute is not.
+    // A capability probe across plain/React/Vue/Bootstrap found the agent could
+    // NOT read whether any native checkbox or radio was on: the extractor only
+    // consulted aria-checked, but a native checkbox/radio carries no
+    // aria-checked, and its checked ATTRIBUTE reflects only the default, never
+    // the live state. So a ticked box read as unchecked — a first-class source
+    // of both missed toggles and "the checkbox does nothing" false bugs. Read
+    // the checked PROPERTY for native controls; fall back to the ARIA attribute
+    // for custom widgets. "false" is emitted explicitly so the agent can tell a
+    // genuine off-state from a control that has no checked concept.
+    var tag0 = el.tagName;
+    var isNativeToggle = tag0 === "INPUT" && (el.type === "checkbox" || el.type === "radio");
+    if (isNativeToggle) {
+      node.checked = el.indeterminate ? "mixed" : !!el.checked;
+    } else if (el.getAttribute("aria-checked") === "true") {
+      node.checked = true;
+    } else if (el.getAttribute("aria-checked") === "mixed") {
+      node.checked = "mixed";
+    } else if (el.getAttribute("aria-checked") === "false") {
+      node.checked = false;
+    }
+
     if (el.getAttribute("aria-expanded") === "true") node.expanded = true;
     if (el.getAttribute("aria-expanded") === "false") node.expanded = false;
     if (el.getAttribute("aria-selected") === "true") node.selected = true;
+    else if (el.getAttribute("aria-selected") === "false") node.selected = false;
+    // aria-pressed is a toggle button's on/off; emit both so a segmented
+    // control's inactive segments are distinguishable from plain buttons.
     if (el.getAttribute("aria-pressed") === "true") node.pressed = true;
+    else if (el.getAttribute("aria-pressed") === "false") node.pressed = false;
 
     // Text-entry state must be truthful. Two verified false-bug classes came
     // from omissions here: (1) an EMPTY input whose accessible name fell back
@@ -372,12 +404,20 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
         const state: string[] = [];
         if (node.disabled) state.push("disabled");
         if (node.required) state.push("required");
+        // A checkable control's off-state must be stated, not implied by
+        // silence: the model cannot infer "unchecked" from a missing flag, and
+        // that ambiguity produced both missed toggles and "checkbox does
+        // nothing" false reports. Emit the concrete state whenever the control
+        // has one.
         if (node.checked === true) state.push("checked");
-        if (node.checked === "mixed") state.push("mixed");
+        else if (node.checked === "mixed") state.push("mixed");
+        else if (node.checked === false) state.push("unchecked");
         if (node.expanded === true) state.push("expanded");
-        if (node.expanded === false) state.push("collapsed");
-        if (node.selected) state.push("selected");
+        else if (node.expanded === false) state.push("collapsed");
+        if (node.selected === true) state.push("selected");
+        else if (node.selected === false) state.push("not selected");
         if (node.pressed === true) state.push("pressed");
+        else if (node.pressed === false) state.push("not pressed");
         if (node.focused) state.push("focused");
 
         const el: A11yElement = {
@@ -391,6 +431,10 @@ export async function extractA11yTree(page: Page, domHash?: string): Promise<{ e
           value: node.valuetext ?? node.valuestring ?? node.value ?? undefined,
           nameFromPlaceholder: node.namefrom === "placeholder" || undefined,
           valueLen: typeof node.valuelen === "number" ? node.valuelen : undefined,
+          checked: node.checked,
+          pressed: typeof node.pressed === "boolean" ? node.pressed : undefined,
+          selected: typeof node.selected === "boolean" ? node.selected : undefined,
+          expanded: typeof node.expanded === "boolean" ? node.expanded : undefined,
           bbox: node.bbox ?? undefined,
         };
         elements.push(el);
