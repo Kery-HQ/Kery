@@ -1132,6 +1132,58 @@ function toPixel(x: number, y: number): { px: number; py: number } {
   };
 }
 
+/**
+ * Choose an option on a native <select> by whatever the model called it.
+ *
+ * Playwright's `selectOption({ label })` demands an EXACT match, but options
+ * carry decoration the model reasonably drops: the option reads
+ * "Premium — $75" or "WSH-11 — Washer 11mm" and the model asks for "Premium"
+ * or "Washer 11mm". The exact match failed, the 5s timeout elapsed, and the
+ * fallback clicked the select and hunted for the text — which cannot work,
+ * because a native option list is rendered by the OS and is not in the DOM.
+ * The run then reported the control as broken: roughly ten false findings
+ * across the spread, on two different apps.
+ *
+ * Matching widens in precision order, and the winner is applied by its `value`
+ * attribute so the choice is unambiguous. Returns the chosen option's text, or
+ * null if nothing matched — a genuine "this option does not exist", which the
+ * caller may report honestly.
+ */
+async function selectOptionFlexible(
+  locator: import("playwright").Locator,
+  wanted: string,
+): Promise<string | null> {
+  const options = await locator.evaluate((el) => {
+    if (!(el instanceof HTMLSelectElement)) return null;
+    return Array.from(el.options).map((o) => ({ value: o.value, text: (o.textContent ?? "").trim() }));
+  }).catch(() => null);
+
+  // Not a native <select> (custom listbox): leave it to the caller's own path.
+  if (!options) {
+    await locator.selectOption({ label: wanted }, { timeout: 5000 });
+    return wanted;
+  }
+
+  const want = wanted.trim();
+  const lower = want.toLowerCase();
+  const norm = (s: string) => s.toLowerCase().replace(/[\s ]+/g, " ").trim();
+
+  const match =
+    options.find((o) => o.text === want) ??
+    options.find((o) => o.value === want) ??
+    options.find((o) => norm(o.text) === norm(want)) ??
+    options.find((o) => norm(o.value) === norm(want)) ??
+    // "Premium" against "Premium — $75", or "Washer 11mm" against
+    // "WSH-11 — Washer 11mm". Require the query to be a real token run, not a
+    // single stray letter, so "a" cannot select an arbitrary option.
+    (lower.length >= 2 ? options.find((o) => norm(o.text).includes(norm(want))) : undefined) ??
+    (lower.length >= 2 ? options.find((o) => norm(want).includes(norm(o.text)) && o.text.trim().length >= 2) : undefined);
+
+  if (!match) return null;
+  await locator.selectOption({ value: match.value }, { timeout: 5000 });
+  return match.text || match.value;
+}
+
 async function describeElementAtPoint(page: Page, px: number, py: number): Promise<string> {
   try {
     return await page.evaluate(([cx, cy]: number[]) => {
@@ -1424,7 +1476,8 @@ export async function executeAction(page: Page, action: AgentAction): Promise<Ex
         }
       } else if (action.target && action.value) {
         const loc = page.getByLabel(action.target);
-        await loc.first().selectOption({ label: action.value }, { timeout: 5000 });
+        const chosen = await selectOptionFlexible(loc.first(), action.value);
+        if (chosen === null) throw new Error(`No option matching "${action.value}" exists in this control`);
       }
       break;
     }
@@ -2438,10 +2491,14 @@ export async function runAgent(
                   el instanceof HTMLInputElement ? (el.type || "") : "").catch(() => "");
                 await locator.fill(normalizeDateValue(inputType, action.value), { timeout: 5000 });
               } else if (action.action === "selectOption" && action.value) {
-                await locator.selectOption({ label: action.value }, { timeout: 5000 }).catch(async () => {
+                const chosen = await selectOptionFlexible(locator, action.value).catch(async (err) => {
+                  // Custom (non-native) listboxes still need the click-then-pick
+                  // path; a real <select> never reaches here.
                   await locator.click({ timeout: 3000 });
                   await page.getByText(action.value!, { exact: false }).first().click({ timeout: 3000 });
+                  return action.value!;
                 });
+                if (chosen === null) throw new Error(`No option matching "${action.value}" exists in this control`);
               } else if (action.action === "dragAndDrop" && action.toX != null && action.toY != null) {
                 const bbox = await locator.boundingBox();
                 const src = bbox
