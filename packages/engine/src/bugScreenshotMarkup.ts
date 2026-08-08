@@ -65,18 +65,40 @@ function wrap(text: string, perLine: number, maxLines: number): string[] {
   return lines;
 }
 
-/**
- * Build the caption bar as an SVG the width of the image. Returns the SVG
- * string and its pixel height, or null when there's nothing worth printing.
- */
 const ERR_RED = "#dc2626";
 
 /**
- * Error banner: white on red so it reads as an annotation, never as part of the
- * app under test. A bold headline, then Expected / Found. Rendered as a solid
- * red band the width of the image.
+ * Banner colour follows severity: high/critical is an alarming red with white
+ * text; medium/low (and anything unknown) is a yellow warning band with black
+ * text. The same accent drives the box stroke and the callout pill so the whole
+ * annotation reads as one severity.
  */
-function captionBar(caption: IssueCaption, width: number): { svg: string; height: number } | null {
+type BannerStyle = { accent: string; fg: string };
+function bannerStyle(severity?: string): BannerStyle {
+  const s = (severity ?? "").toLowerCase();
+  if (s === "high" || s === "critical") return { accent: ERR_RED, fg: "#ffffff" };
+  return { accent: "#facc15", fg: "#111111" };
+}
+
+/** Small "Kery" wordmark (mark + text) right-aligned at a baseline. */
+function keryBrand(width: number, baseline: number, fg: string, fs: number): string {
+  const mark = Math.round(fs * 0.95);
+  const gap = Math.round(fs * 0.4);
+  const textW = Math.round(fs * 2.2); // ~"Kery"
+  const startX = width - Math.round(fs * 0.9) - (mark + gap + textW);
+  const markY = baseline - mark + Math.round(fs * 0.12);
+  return (
+    `<rect x="${startX}" y="${markY}" width="${mark}" height="${mark}" rx="${Math.round(mark * 0.28)}" fill="${fg}" fill-opacity="0.92"/>` +
+    `<text x="${startX + mark + gap}" y="${baseline}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="${fg}" fill-opacity="0.92" letter-spacing="0.2">Kery</text>`
+  );
+}
+
+/**
+ * Caption band: an annotation, never part of the app under test. Colour keyed to
+ * severity (red for high/critical, yellow for medium/low), a bold headline then
+ * Expected / Found, and a Kery wordmark in the bottom-right corner.
+ */
+function captionBar(caption: IssueCaption, width: number, style: BannerStyle): { svg: string; height: number } | null {
   const rows: Array<{ label: string; text: string; strong: boolean }> = [];
   if (caption.headline?.trim()) rows.push({ label: "", text: caption.headline.trim(), strong: true });
   if (caption.expected?.trim()) rows.push({ label: "Expected", text: caption.expected.trim(), strong: false });
@@ -92,26 +114,28 @@ function captionBar(caption: IssueCaption, width: number): { svg: string; height
   const lineEls: string[] = [];
   let y = pad + fontSize;
   for (const row of rows) {
-    // Expected/Found: white bold label + regular white text. On red, white reads
-    // cleanly; green/red text would clash, so the label carries the meaning.
     const wrapped = wrap((row.label ? `${row.label}: ` : "") + row.text, perLine, soloHeadline ? 3 : 2);
     for (const ln of wrapped) {
-      lineEls.push(`<text x="${pad}" y="${y}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fontSize}" font-weight="${row.strong ? 700 : 400}" fill="#ffffff">${esc(ln)}</text>`);
+      lineEls.push(`<text x="${pad}" y="${y}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fontSize}" font-weight="${row.strong ? 700 : 400}" fill="${style.fg}">${esc(ln)}</text>`);
       y += lineH;
     }
   }
-  const height = y - fontSize + pad;
-  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${ERR_RED}"/>${lineEls.join("")}</svg>`;
+  // Reserve a footer row for the Kery wordmark so it never collides with copy.
+  const brandFs = Math.max(11, Math.round(fontSize * 0.82));
+  const brandRowH = brandFs + Math.round(pad * 0.9);
+  const contentH = y - fontSize + Math.round(pad * 0.4);
+  const height = contentH + brandRowH;
+  const brand = keryBrand(width, height - Math.round(pad * 0.7), style.fg, brandFs);
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${style.accent}"/>${lineEls.join("")}${brand}</svg>`;
   return { svg, height };
 }
 
 /**
- * A compact white-on-red pill anchored to the red box, so the error is flagged
- * exactly where it is — like the reference "still present after reload" badge.
+ * A compact pill anchored to the box, coloured by severity, flagging the error
+ * right where it is — like the reference "still present after reload" badge.
  * Placed above the box, or just inside its top when there's no room above.
- * Returns SVG fragments to fold into the overlay (coordinates are already scaled).
  */
-function calloutPill(label: string, boxX: number, boxY: number, boxW: number, outW: number, fontSize: number): string {
+function calloutPill(label: string, boxX: number, boxY: number, outW: number, fontSize: number, style: BannerStyle): string {
   const text = label.length > 46 ? label.slice(0, 45).replace(/\s\S*$/, "") + "…" : label;
   const fs = Math.max(13, Math.round(fontSize * 0.9));
   const padX = Math.round(fs * 0.6);
@@ -122,8 +146,8 @@ function calloutPill(label: string, boxX: number, boxY: number, boxW: number, ou
   if (px + pillW > outW - 2) px = Math.max(2, outW - 2 - pillW);
   let py = boxY - pillH - Math.round(fs * 0.4);
   if (py < 2) py = boxY + 2; // no room above → tuck inside the box top
-  return `<rect x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${Math.round(pillH / 5)}" fill="${ERR_RED}"/>` +
-    `<text x="${px + padX}" y="${py + padY + fs - Math.round(fs * 0.18)}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="#ffffff">${esc(text)}</text>`;
+  return `<rect x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${Math.round(pillH / 5)}" fill="${style.accent}"/>` +
+    `<text x="${px + padX}" y="${py + padY + fs - Math.round(fs * 0.18)}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="${style.fg}">${esc(text)}</text>`;
 }
 
 /** Legacy: red stroke rect on the full JPEG. Kept as a fallback rung. */
@@ -164,9 +188,10 @@ const TARGET_MIN_W = 640;  // upscale small crops to at least this wide, for leg
  */
 export async function renderIssueArtifact(
   jpegBuffer: Buffer,
-  input: { region?: BugRegion; caption?: IssueCaption },
+  input: { region?: BugRegion; caption?: IssueCaption; severity?: string },
 ): Promise<Buffer> {
-  const { region, caption } = input;
+  const { region, caption, severity } = input;
+  const style = bannerStyle(severity);
   try {
     const meta = await sharp(jpegBuffer).metadata();
     const iw = meta.width ?? 0;
@@ -177,7 +202,7 @@ export async function renderIssueArtifact(
 
     // No usable region: caption the full shot if we have text, else return as-is.
     if (!rect) {
-      if (caption) return await captionOnly(jpegBuffer, iw, caption);
+      if (caption) return await captionOnly(jpegBuffer, iw, caption, style);
       return jpegBuffer;
     }
 
@@ -186,7 +211,7 @@ export async function renderIssueArtifact(
     // Region already dominates the frame → box the full shot, add caption.
     if (regionFrac >= NO_ZOOM_FRAC) {
       const boxed = await drawRedBoundingBoxOnJpeg(jpegBuffer, region!);
-      return caption ? await captionOnly(boxed, iw, caption) : boxed;
+      return caption ? await captionOnly(boxed, iw, caption, style) : boxed;
     }
 
     // Compute a padded crop around the region, clamped to the image and to a
@@ -221,8 +246,8 @@ export async function renderIssueArtifact(
     const pillFs = Math.max(13, Math.round(outW / 45));
     // The pill flags the error right at the box; short label from the caption.
     const pillLabel = caption?.headline?.trim() || caption?.found?.trim() || "";
-    const pill = pillLabel ? calloutPill(pillLabel, bx, by, bw, outW, pillFs) : "";
-    const boxSvg = `<svg width="${outW}" height="${outH}" xmlns="http://www.w3.org/2000/svg"><rect x="${bx}" y="${by}" width="${bw}" height="${Math.round(rect.height * scale)}" fill="none" stroke="${ERR_RED}" stroke-width="${stroke}"/>${pill}</svg>`;
+    const pill = pillLabel ? calloutPill(pillLabel, bx, by, outW, pillFs, style) : "";
+    const boxSvg = `<svg width="${outW}" height="${outH}" xmlns="http://www.w3.org/2000/svg"><rect x="${bx}" y="${by}" width="${bw}" height="${Math.round(rect.height * scale)}" fill="none" stroke="${style.accent}" stroke-width="${stroke}"/>${pill}</svg>`;
 
     let img = sharp(jpegBuffer)
       .extract({ left: cropL, top: cropT, width: cropW, height: cropH })
@@ -233,7 +258,7 @@ export async function renderIssueArtifact(
 
     // Stack the caption bar under the zoomed crop.
     if (caption) {
-      const bar = captionBar(caption, outW);
+      const bar = captionBar(caption, outW, style);
       if (bar) {
         composed = await sharp({
           create: { width: outW, height: outH + bar.height, channels: 3, background: "#18181b" },
@@ -256,9 +281,9 @@ export async function renderIssueArtifact(
 }
 
 /** Append a caption bar to the bottom of an image at its native width. */
-async function captionOnly(jpegBuffer: Buffer, width: number, caption: IssueCaption): Promise<Buffer> {
+async function captionOnly(jpegBuffer: Buffer, width: number, caption: IssueCaption, style: BannerStyle): Promise<Buffer> {
   try {
-    const bar = captionBar(caption, width);
+    const bar = captionBar(caption, width, style);
     if (!bar) return jpegBuffer;
     const meta = await sharp(jpegBuffer).metadata();
     const h = meta.height ?? 0;
