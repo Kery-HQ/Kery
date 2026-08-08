@@ -17,6 +17,9 @@
 import sharp from "sharp";
 import { logger } from "./logger.js";
 
+/** Kery mango logo (48px), embedded so the engine stays self-contained. */
+const KERY_LOGO = "data:image/png;base64,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";
+
 export type BugRegion = { x: number; y: number; w: number; h: number };
 
 export type IssueCaption = {
@@ -80,17 +83,12 @@ function bannerStyle(severity?: string): BannerStyle {
   return { accent: "#facc15", fg: "#111111" };
 }
 
-/** Small "Kery" wordmark (mark + text) right-aligned at a baseline. */
-function keryBrand(width: number, baseline: number, fg: string, fs: number): string {
-  const mark = Math.round(fs * 0.95);
-  const gap = Math.round(fs * 0.4);
-  const textW = Math.round(fs * 2.2); // ~"Kery"
-  const startX = width - Math.round(fs * 0.9) - (mark + gap + textW);
-  const markY = baseline - mark + Math.round(fs * 0.12);
-  return (
-    `<rect x="${startX}" y="${markY}" width="${mark}" height="${mark}" rx="${Math.round(mark * 0.28)}" fill="${fg}" fill-opacity="0.92"/>` +
-    `<text x="${startX + mark + gap}" y="${baseline}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="${fg}" fill-opacity="0.92" letter-spacing="0.2">Kery</text>`
-  );
+/** Kery mango logo, icon only, right-aligned at a baseline. */
+function keryBrand(width: number, baseline: number, fs: number): string {
+  const mark = Math.round(fs * 1.6);
+  const x = width - Math.round(fs * 0.9) - mark;
+  const y = baseline - mark + Math.round(fs * 0.28);
+  return `<image x="${x}" y="${y}" width="${mark}" height="${mark}" href="${KERY_LOGO}" preserveAspectRatio="xMidYMid meet"/>`;
 }
 
 /**
@@ -125,27 +123,32 @@ function captionBar(caption: IssueCaption, width: number, style: BannerStyle): {
   const brandRowH = brandFs + Math.round(pad * 0.9);
   const contentH = y - fontSize + Math.round(pad * 0.4);
   const height = contentH + brandRowH;
-  const brand = keryBrand(width, height - Math.round(pad * 0.7), style.fg, brandFs);
+  const brand = keryBrand(width, height - Math.round(pad * 0.7), brandFs);
   const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${style.accent}"/>${lineEls.join("")}${brand}</svg>`;
   return { svg, height };
 }
 
 /**
  * A compact pill anchored to the box, coloured by severity, flagging the error
- * right where it is — like the reference "still present after reload" badge.
- * Placed above the box, or just inside its top when there's no room above.
+ * right where it is. Placed ABOVE the box by preference; if there's no room
+ * above, placed just BELOW it — never inside, which would cover the very content
+ * the box is pointing at.
  */
-function calloutPill(label: string, boxX: number, boxY: number, outW: number, fontSize: number, style: BannerStyle): string {
+function calloutPill(label: string, boxX: number, boxY: number, boxBottom: number, outW: number, outH: number, fontSize: number, style: BannerStyle): string {
   const text = label.length > 46 ? label.slice(0, 45).replace(/\s\S*$/, "") + "…" : label;
   const fs = Math.max(13, Math.round(fontSize * 0.9));
   const padX = Math.round(fs * 0.6);
   const padY = Math.round(fs * 0.4);
   const pillW = Math.min(outW - 4, Math.round(text.length * fs * 0.56) + padX * 2);
   const pillH = fs + padY * 2;
+  const gap = Math.round(fs * 0.4);
   let px = boxX;
   if (px + pillW > outW - 2) px = Math.max(2, outW - 2 - pillW);
-  let py = boxY - pillH - Math.round(fs * 0.4);
-  if (py < 2) py = boxY + 2; // no room above → tuck inside the box top
+  const above = boxY - pillH - gap;
+  const below = boxBottom + gap;
+  // Above if it fits; else below if it fits; else clamp above the top edge —
+  // but never overlay the boxed content.
+  let py = above >= 2 ? above : (below + pillH <= outH - 2 ? below : 2);
   return `<rect x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${Math.round(pillH / 5)}" fill="${style.accent}"/>` +
     `<text x="${px + padX}" y="${py + padY + fs - Math.round(fs * 0.18)}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="${style.fg}">${esc(text)}</text>`;
 }
@@ -246,7 +249,7 @@ export async function renderIssueArtifact(
     const pillFs = Math.max(13, Math.round(outW / 45));
     // The pill flags the error right at the box; short label from the caption.
     const pillLabel = caption?.headline?.trim() || caption?.found?.trim() || "";
-    const pill = pillLabel ? calloutPill(pillLabel, bx, by, outW, pillFs, style) : "";
+    const pill = pillLabel ? calloutPill(pillLabel, bx, by, by + Math.round(rect.height * scale), outW, outH, pillFs, style) : "";
     const boxSvg = `<svg width="${outW}" height="${outH}" xmlns="http://www.w3.org/2000/svg"><rect x="${bx}" y="${by}" width="${bw}" height="${Math.round(rect.height * scale)}" fill="none" stroke="${style.accent}" stroke-width="${stroke}"/>${pill}</svg>`;
 
     let img = sharp(jpegBuffer)
