@@ -119,11 +119,15 @@ const LINK_KEYWORDS = /verify|magic|token|auth|confirm|login|sign-?in|callback|a
 /** Extract the most likely magic link, preferring the app's own origin. */
 export function extractMagicLink(message: InboxMessage, appOrigin?: string): string | null {
   const candidates = new Set<string>();
-  const hrefRe = /href="(https?:\/\/[^"]+)"/gi;
+  // Match href with single OR double quotes (Firebase and others single-quote).
+  const hrefRe = /href\s*=\s*["'](https?:\/\/[^"']+)["']/gi;
   let match: RegExpExecArray | null;
   while ((match = hrefRe.exec(message.html)) !== null) candidates.add(match[1]);
+  // Also scan raw URLs across html + text + subject — catches links the href
+  // regex misses (unusual quoting/attributes) and text-only emails. The text
+  // body sometimes drops the URL entirely, so html must be scanned too.
   const rawRe = /https?:\/\/[^\s<>"')\]]+/gi;
-  for (const source of [message.text, message.subject]) {
+  for (const source of [message.html, message.text, message.subject]) {
     if (!source) continue;
     while ((match = rawRe.exec(source)) !== null) candidates.add(match[0]);
   }
