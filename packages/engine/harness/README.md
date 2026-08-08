@@ -23,7 +23,7 @@ cd packages/engine
 OPENAI_API_KEY=… node harness/run-benchmark.mjs \
   --suite ~/Documents/repo/harness-suite.json \
   --mode review \        # review = real pipeline (diff → plan → run); scripted = hand-written plan (ceiling)
-  --repeat 2 \           # ALWAYS repeat: gpt-5.6 runs at temperature 1.0, single runs are noisy
+  --repeat 2 \           # ALWAYS repeat: the benchmark models run at temperature 1.0, single runs are noisy
   --label my-change
 ```
 

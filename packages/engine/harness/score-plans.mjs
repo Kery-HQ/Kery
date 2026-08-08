@@ -41,7 +41,7 @@ const { reviewPullRequest, intentWithPlan } = await import(reviewPath);
 
 const repeat = Number(arg("repeat", "3"));
 const label = arg("label", "plans");
-const JUDGE_MODEL = process.env.KERY_JUDGE_MODEL || "gpt-5.6-terra";
+const JUDGE_MODEL = process.env.KERY_JUDGE_MODEL || "terra";
 
 const SYSTEM = `You decide whether a browser test plan would EXPOSE a specific known defect.
 

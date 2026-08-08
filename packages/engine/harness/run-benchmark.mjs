@@ -58,10 +58,10 @@ const PR_REVIEW_PATH = process.env.KERY_PR_REVIEW_PATH ?? "";
 fs.mkdirSync(outDir, { recursive: true });
 
 const MODELS = {
-  agentModel: process.env.KERY_AGENT_MODEL || "openai/gpt-5.6-terra",
-  auxiliaryModel: process.env.KERY_AUXILIARY_MODEL || "openai/gpt-5.6-luna",
-  reviewAgentModel: process.env.KERY_REVIEW_MODEL || "openai/gpt-5.6-terra",
-  stagehandModel: process.env.KERY_STAGEHAND_MODEL || "openai/gpt-5.6-luna",
+  agentModel: process.env.KERY_AGENT_MODEL || "terra",
+  auxiliaryModel: process.env.KERY_AUXILIARY_MODEL || "luna",
+  reviewAgentModel: process.env.KERY_REVIEW_MODEL || "terra",
+  stagehandModel: process.env.KERY_STAGEHAND_MODEL || "luna",
 };
 
 initEngineConfig({

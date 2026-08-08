@@ -23,7 +23,7 @@ const arg = (n, d = null) => {
 };
 const apiKey = process.env.OPENAI_API_KEY;
 const dir = arg("diffs", "/tmp/diffs");
-const MODEL = process.env.KERY_JUDGE_MODEL || "gpt-5.6-terra";
+const MODEL = process.env.KERY_JUDGE_MODEL || "terra";
 
 const { reviewPullRequest, intentWithPlan } = await import(process.env.KERY_PR_REVIEW_PATH);
 const oldCfg = JSON.parse(fs.readFileSync(arg("oldcfg", "/tmp/oldcfg.json"), "utf8"));
@@ -50,7 +50,7 @@ async function oldPlan(files, title, body) {
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
-      model: process.env.KERY_AUXILIARY_MODEL?.replace(/^openai\//, "") || "gpt-5.6-luna",
+      model: process.env.KERY_AUXILIARY_MODEL?.replace(/^openai\//, "") || "luna",
       messages: [{ role: "system", content: oldCfg.system }, { role: "user", content: user }],
       max_completion_tokens: 4000,
       response_format: { type: "json_object" },

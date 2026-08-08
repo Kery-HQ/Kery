@@ -13,3 +13,6 @@ data/
 
 # Generated local install output from the Kery CLI
 packages/kery/kery/
+
+# Internal benchmark run outputs — regenerable, never committed.
+harness-results/

@@ -10,7 +10,7 @@
  * The judge is deliberately strict: describing the feature working, or flagging
  * an unrelated problem in the same area, does not count.
  */
-const JUDGE_MODEL = process.env.KERY_JUDGE_MODEL || "gpt-5.6-terra";
+const JUDGE_MODEL = process.env.KERY_JUDGE_MODEL || "terra";
 
 const SYSTEM = `You score an automated browser test run against a KNOWN planted bug.
 

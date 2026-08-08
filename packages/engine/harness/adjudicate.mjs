@@ -27,7 +27,7 @@ const arg = (n, d = null) => {
 };
 const label = arg("label", "noise-v15");
 const apiKey = process.env.OPENAI_API_KEY;
-const MODEL = process.env.KERY_JUDGE_MODEL || "gpt-5.6-terra";
+const MODEL = process.env.KERY_JUDGE_MODEL || "terra";
 
 const doc = JSON.parse(fs.readFileSync(path.join(dir, `${label}-issues.json`), "utf8"));
 

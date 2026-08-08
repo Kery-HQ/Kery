@@ -119,7 +119,7 @@ Return JSON only: {"verdicts":[{"index": number, "verdict": "supported"|"refuted
       method: "POST",
       headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`, "content-type": "application/json" },
       body: JSON.stringify({
-        model: (process.env.KERY_AUXILIARY_MODEL || "gpt-5.6-luna").replace(/^openai\//, ""),
+        model: (process.env.KERY_AUXILIARY_MODEL || "luna").replace(/^openai\//, ""),
         messages: [
           { role: "system", content: JUDGE },
           { role: "user", content: `OBSERVATIONS:\n${observed || "(none recorded)"}\n\nCLAIMS:\n${allClaims.map((c, i) => `${i}. ${c}`).join("\n")}` },
