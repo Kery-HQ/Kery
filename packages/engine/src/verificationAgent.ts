@@ -18,6 +18,9 @@ export type RunVerification = {
   /** A 2–5 word label for the check, e.g. "Deleting a task". Used as the
    *  scannable row in the PR comment; the full claim stays as the detail. */
   title?: string;
+  /** For a contradicted check: the [n] step whose observation shows the
+   *  failure. Lets a spawned evidence bug reuse that step's screenshot. */
+  stepIndex?: number;
 };
 
 const VERIFICATION_SYSTEM = `You are a verification reviewer for an AI browser-testing run.
@@ -44,8 +47,9 @@ Rules:
 - 2-6 claims. Prefer the claims a reviewer would need before merging.
 - "evidence" is one sentence citing the step(s) or observation that decides the grade.
 - "title" is a 2-5 word label naming the behavior as a feature, not a sentence: "Deleting a task", "Promo code discount", "Checkout validation". No trailing punctuation. It is the scannable row a reviewer reads first; the claim carries the full assertion.
+- For a "contradicted" check ONLY, add "stepIndex": the [n] index of the step whose observation shows the failure (the screen where the wrong value / missing effect is visible). Omit it for verified/not_testable checks and whenever no single step pinpoints it.
 
-Return JSON only: {"verifications": [{"title": string, "claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string}]}
+Return JSON only: {"verifications": [{"title": string, "claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string, "stepIndex"?: number}]}
 Output MUST be raw JSON only — no markdown fences, no prose.`;
 
 function stripFence(raw: string): string {
@@ -119,6 +123,7 @@ export async function runVerificationReview(input: {
             : "not_testable") as RunVerification["status"],
           evidence: String(v.evidence ?? "").slice(0, 300),
           title: v.title ? String(v.title).slice(0, 60) : undefined,
+          stepIndex: typeof v.stepIndex === "number" && Number.isFinite(v.stepIndex) ? v.stepIndex : undefined,
         }))
         .filter((v) => v.claim)
         .slice(0, 6);

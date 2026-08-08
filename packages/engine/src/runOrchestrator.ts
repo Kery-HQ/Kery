@@ -32,6 +32,7 @@ import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonito
 import { dedupeRunStepBugs } from "./bugDedup.js";
 import { runBugTriageAgent } from "./bugTriageAgent.js";
 import { localizeBugRegions } from "./bugLocalizer.js";
+import { bugsFromContradictedChecks } from "./verifierBugs.js";
 import { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
 import type { StorageAdapter } from "./storage.js";
 import { dockerHostResolverArgs } from "./dockerHost.js";
@@ -474,6 +475,25 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
     if (!isVerificationRun && bugsFound.length > 0 && process.env.KERY_GROUNDING === "1") {
       const g = dropUngroundedFindings(bugsFound, agentResult.stepsDetail);
       bugsFound = g.kept;
+    }
+
+    // Recover evidence for contradicted checks the navigator never filed as a
+    // bug this run (navigator report_bug is variable — same defect, image one
+    // run and none the next). Spawn a bug from each contradicted check no
+    // existing bug covers, reusing the cited step's screenshot, then re-dedupe.
+    // Flows into triage + localizer like any navigator bug. OFF by default
+    // (changes what's filed) — enable with KERY_VERIFIER_BUGS=1.
+    if (!isVerificationRun) {
+      const spawned = bugsFromContradictedChecks(
+        verifications,
+        bugsFound,
+        screenshotsByStep,
+        latestCleanScreenshot,
+      );
+      if (spawned.length > 0) {
+        bugsFound = dedupeRunStepBugs([...bugsFound, ...spawned]);
+        logger.info({ spawned: spawned.length }, "Spawned evidence bugs from contradicted verification checks");
+      }
     }
 
     const triageCalls: LLMCallRecord[] = [];
