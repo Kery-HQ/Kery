@@ -1963,6 +1963,7 @@ export async function runAgent(
 
   const runTimeoutMs = config.runTimeoutMinutes * 60 * 1000;
   const runDeadline = Date.now() + runTimeoutMs;
+  const runStartedAt = Date.now(); // for mid-run email-OTP completion (emails must post-date this)
 
   const stagehandPage = stagehandSession?.page ?? null;
 
@@ -2062,6 +2063,15 @@ export async function runAgent(
       );
       // Refresh token if expiring soon (Clerk ~60s, Supabase ~3600s)
       await refreshIfNeeded(page);
+
+      // Magic-link/OTP completion in the main loop: if an inbox is configured and
+      // we've landed on a "check your email" screen — e.g. the navigator itself
+      // requested the link, which the auth-phase completion doesn't cover — open
+      // the link from the inbox in-session so the run continues authenticated.
+      if (auth?.emailOtp?.address && (await detectEmailOtpScreen(page).catch(() => false))) {
+        const completed = await maybeCompleteEmailOtp(page, auth, runStartedAt, baseUrl, true).catch(() => false);
+        if (completed) logger.info("Email OTP completed mid-run (main loop)");
+      }
 
       const currentUrl = page.url();
 
