@@ -69,34 +69,61 @@ function wrap(text: string, perLine: number, maxLines: number): string[] {
  * Build the caption bar as an SVG the width of the image. Returns the SVG
  * string and its pixel height, or null when there's nothing worth printing.
  */
+const ERR_RED = "#dc2626";
+
+/**
+ * Error banner: white on red so it reads as an annotation, never as part of the
+ * app under test. A bold headline, then Expected / Found. Rendered as a solid
+ * red band the width of the image.
+ */
 function captionBar(caption: IssueCaption, width: number): { svg: string; height: number } | null {
-  const rows: Array<{ label: string; text: string; color: string }> = [];
-  if (caption.headline?.trim()) rows.push({ label: "", text: caption.headline.trim(), color: "#f4f4f5" });
-  if (caption.expected?.trim()) rows.push({ label: "Expected", text: caption.expected.trim(), color: "#86efac" });
-  if (caption.found?.trim()) rows.push({ label: "Found", text: caption.found.trim(), color: "#fca5a5" });
+  const rows: Array<{ label: string; text: string; strong: boolean }> = [];
+  if (caption.headline?.trim()) rows.push({ label: "", text: caption.headline.trim(), strong: true });
+  if (caption.expected?.trim()) rows.push({ label: "Expected", text: caption.expected.trim(), strong: false });
+  if (caption.found?.trim()) rows.push({ label: "Found", text: caption.found.trim(), strong: false });
   if (rows.length === 0) return null;
 
-  const pad = Math.round(width * 0.02);
+  const pad = Math.round(width * 0.022);
   const fontSize = Math.max(13, Math.round(width / 45));
-  const lineH = Math.round(fontSize * 1.35);
+  const lineH = Math.round(fontSize * 1.4);
   const perLine = Math.max(24, Math.floor((width - pad * 2) / (fontSize * 0.56)));
 
-  // A lone description gets more room (3 lines) so it isn't clipped; when it
-  // shares the bar with Expected/Found, each row stays tight at 2.
   const soloHeadline = rows.length === 1 && !rows[0].label;
   const lineEls: string[] = [];
   let y = pad + fontSize;
   for (const row of rows) {
-    const prefix = row.label ? `${row.label}: ` : "";
-    const wrapped = wrap(prefix + row.text, perLine, soloHeadline ? 3 : 2);
+    // Expected/Found: white bold label + regular white text. On red, white reads
+    // cleanly; green/red text would clash, so the label carries the meaning.
+    const wrapped = wrap((row.label ? `${row.label}: ` : "") + row.text, perLine, soloHeadline ? 3 : 2);
     for (const ln of wrapped) {
-      lineEls.push(`<text x="${pad}" y="${y}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fontSize}" font-weight="${row.label ? 500 : 600}" fill="${row.color}">${esc(ln)}</text>`);
+      lineEls.push(`<text x="${pad}" y="${y}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fontSize}" font-weight="${row.strong ? 700 : 400}" fill="#ffffff">${esc(ln)}</text>`);
       y += lineH;
     }
   }
   const height = y - fontSize + pad;
-  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="#18181b"/>${lineEls.join("")}</svg>`;
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="${ERR_RED}"/>${lineEls.join("")}</svg>`;
   return { svg, height };
+}
+
+/**
+ * A compact white-on-red pill anchored to the red box, so the error is flagged
+ * exactly where it is — like the reference "still present after reload" badge.
+ * Placed above the box, or just inside its top when there's no room above.
+ * Returns SVG fragments to fold into the overlay (coordinates are already scaled).
+ */
+function calloutPill(label: string, boxX: number, boxY: number, boxW: number, outW: number, fontSize: number): string {
+  const text = label.length > 46 ? label.slice(0, 45).replace(/\s\S*$/, "") + "…" : label;
+  const fs = Math.max(13, Math.round(fontSize * 0.9));
+  const padX = Math.round(fs * 0.6);
+  const padY = Math.round(fs * 0.4);
+  const pillW = Math.min(outW - 4, Math.round(text.length * fs * 0.56) + padX * 2);
+  const pillH = fs + padY * 2;
+  let px = boxX;
+  if (px + pillW > outW - 2) px = Math.max(2, outW - 2 - pillW);
+  let py = boxY - pillH - Math.round(fs * 0.4);
+  if (py < 2) py = boxY + 2; // no room above → tuck inside the box top
+  return `<rect x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="${Math.round(pillH / 5)}" fill="${ERR_RED}"/>` +
+    `<text x="${px + padX}" y="${py + padY + fs - Math.round(fs * 0.18)}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="#ffffff">${esc(text)}</text>`;
 }
 
 /** Legacy: red stroke rect on the full JPEG. Kept as a fallback rung. */
@@ -188,7 +215,14 @@ export async function renderIssueArtifact(
     const outH = Math.round(cropH * scale);
 
     const stroke = Math.max(3, Math.round(Math.min(outW, outH) / 120));
-    const boxSvg = `<svg width="${outW}" height="${outH}" xmlns="http://www.w3.org/2000/svg"><rect x="${Math.round(boxL * scale)}" y="${Math.round(boxT * scale)}" width="${Math.round(rect.width * scale)}" height="${Math.round(rect.height * scale)}" fill="none" stroke="rgb(255,0,0)" stroke-width="${stroke}"/></svg>`;
+    const bx = Math.round(boxL * scale);
+    const by = Math.round(boxT * scale);
+    const bw = Math.round(rect.width * scale);
+    const pillFs = Math.max(13, Math.round(outW / 45));
+    // The pill flags the error right at the box; short label from the caption.
+    const pillLabel = caption?.headline?.trim() || caption?.found?.trim() || "";
+    const pill = pillLabel ? calloutPill(pillLabel, bx, by, bw, outW, pillFs) : "";
+    const boxSvg = `<svg width="${outW}" height="${outH}" xmlns="http://www.w3.org/2000/svg"><rect x="${bx}" y="${by}" width="${bw}" height="${Math.round(rect.height * scale)}" fill="none" stroke="${ERR_RED}" stroke-width="${stroke}"/>${pill}</svg>`;
 
     let img = sharp(jpegBuffer)
       .extract({ left: cropL, top: cropT, width: cropW, height: cropH })

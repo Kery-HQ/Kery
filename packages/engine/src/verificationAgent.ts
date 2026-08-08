@@ -15,6 +15,9 @@ export type RunVerification = {
   claim: string;
   status: "verified" | "contradicted" | "not_testable";
   evidence: string;
+  /** A 2–5 word label for the check, e.g. "Deleting a task". Used as the
+   *  scannable row in the PR comment; the full claim stays as the detail. */
+  title?: string;
 };
 
 const VERIFICATION_SYSTEM = `You are a verification reviewer for an AI browser-testing run.
@@ -40,8 +43,9 @@ Rules:
 - ATTEMPTED-BUT-SILENT IS CONTRADICTED: if the claim's action was directly performed and the trace shows no observed effect (domChanged=NO, no observation, no navigation), grade "contradicted" — silent controls are failures, not unknowns. Reserve "not_testable" for claims whose actions were never attempted (blocked or unreached).
 - 2-6 claims. Prefer the claims a reviewer would need before merging.
 - "evidence" is one sentence citing the step(s) or observation that decides the grade.
+- "title" is a 2-5 word label naming the behavior as a feature, not a sentence: "Deleting a task", "Promo code discount", "Checkout validation". No trailing punctuation. It is the scannable row a reviewer reads first; the claim carries the full assertion.
 
-Return JSON only: {"verifications": [{"claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string}]}
+Return JSON only: {"verifications": [{"title": string, "claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string}]}
 Output MUST be raw JSON only — no markdown fences, no prose.`;
 
 function stripFence(raw: string): string {
@@ -114,6 +118,7 @@ export async function runVerificationReview(input: {
             ? String(v.status)
             : "not_testable") as RunVerification["status"],
           evidence: String(v.evidence ?? "").slice(0, 300),
+          title: v.title ? String(v.title).slice(0, 60) : undefined,
         }))
         .filter((v) => v.claim)
         .slice(0, 6);
