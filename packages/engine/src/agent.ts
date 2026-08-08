@@ -1683,7 +1683,11 @@ export async function handleAuth(
     );
     allLlmCalls.push(...navigatorResult.llmCalls);
     if (auth.emailOtp?.address) {
-      const handled = await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl);
+      // Email-only flows (username, no password) just submitted an email to get a
+      // link — poll the inbox regardless of whether the post-submit screen matched
+      // our detector (many products word it in ways the heuristic misses).
+      const emailOnly = !auth.credentials?.password;
+      const handled = await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl, emailOnly);
       if (handled) return { ok: true, llmCalls: allLlmCalls };
     }
     if (navigatorResult.ok) return { ok: true, llmCalls: allLlmCalls };
@@ -1716,9 +1720,13 @@ async function maybeCompleteEmailOtp(
   auth: AuthConfig,
   sinceMs: number,
   baseUrl?: string,
+  /** Poll the inbox even if the page isn't a recognized "check your email"
+   *  screen — for email-only flows where we know a link was just requested and
+   *  the post-submit copy may not match our detector heuristics. */
+  force = false,
 ): Promise<boolean> {
   if (!auth.emailOtp?.address) return false;
-  if (!(await detectEmailOtpScreen(page))) return false;
+  if (!force && !(await detectEmailOtpScreen(page))) return false;
   const handled = await handleEmailOtp(page, auth.emailOtp, sinceMs, baseUrl);
   if (!handled) return false;
   return !(await isLikelyLoginScreen(page));
