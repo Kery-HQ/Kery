@@ -31,6 +31,7 @@ import { initStagehandSession, destroyStagehandSession, type StagehandSession } 
 import { attachNetworkMonitor, type NetworkMonitorResult } from "./networkMonitor.js";
 import { dedupeRunStepBugs } from "./bugDedup.js";
 import { runBugTriageAgent } from "./bugTriageAgent.js";
+import { localizeBugRegions } from "./bugLocalizer.js";
 import { runFlowDiscoveryAgent, deduplicateFlowsWithLLM } from "./flowDiscoveryAgent.js";
 import type { StorageAdapter } from "./storage.js";
 import { dockerHostResolverArgs } from "./dockerHost.js";
@@ -502,6 +503,24 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
         "Bug triage: filtered run bug candidates",
       );
     }
+
+    // Second look: localize the reported problem within each surviving bug's
+    // already-captured screenshot so navigator/failed-step bugs (which carry no
+    // region) also zoom. Enrichment only — never adds/removes/re-grades a bug,
+    // so detection is unchanged; a null/invalid region just leaves the bug on
+    // its full-frame fallback. On by default; disable with KERY_LOCALIZE=0.
+    const localizerCalls: LLMCallRecord[] = [];
+    if (!isVerificationRun && bugsFound.length > 0) {
+      emitActivity("Localizing issue evidence...");
+      const { localized } = await localizeBugRegions(bugsFound, {
+        onLLMCall: (call) => localizerCalls.push({ ...call, seq: 0 }),
+      }).catch((err) => {
+        logger.warn({ err: String(err).slice(0, 200) }, "Bug localizer errored — bugs left as-is");
+        return { localized: 0 };
+      });
+      if (localized > 0) emitActivity(`Localized ${localized} issue${localized === 1 ? "" : "s"}.`);
+    }
+
     const memoryCuratorCalls: LLMCallRecord[] = [];
     let memoryProposed = 0;
 
@@ -531,6 +550,7 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
       holisticCalls,
       filmstripCalls,
       triageCalls,
+      localizerCalls,
       memoryCuratorCalls,
     );
 
@@ -646,6 +666,7 @@ function mergeLLMCalls(
   holistic: LLMCallRecord[],
   filmstrip: LLMCallRecord[] = [],
   triage: LLMCallRecord[] = [],
+  localizer: LLMCallRecord[] = [],
   memoryCurator: LLMCallRecord[] = [],
 ): LLMCallRecord[] {
   const merged: LLMCallRecord[] = [
@@ -653,6 +674,7 @@ function mergeLLMCalls(
     ...holistic.map((c) => ({ ...c, agent: (c.agent ?? "holistic") as LLMAgentType })),
     ...filmstrip.map((c) => ({ ...c, agent: (c.agent ?? "filmstrip") as LLMAgentType })),
     ...triage.map((c) => ({ ...c, agent: (c.agent ?? "bug_triage") as LLMAgentType })),
+    ...localizer.map((c) => ({ ...c, agent: (c.agent ?? "localizer") as LLMAgentType })),
     ...memoryCurator.map((c) => ({ ...c, agent: (c.agent ?? "memory_curator") as LLMAgentType })),
   ];
   merged.forEach((c, i) => { c.seq = i + 1; });

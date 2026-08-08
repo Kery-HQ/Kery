@@ -98,6 +98,7 @@ export type {
 export { enrichBugsForRun } from "./bugEnrichment.js";
 export { runBugTriageAgent } from "./bugTriageAgent.js";
 export type { BugTriageInput, BugTriageResult } from "./bugTriageAgent.js";
+export { localizeBugRegions } from "./bugLocalizer.js";
 
 // ─── Bug screenshot markup (red box on saved JPEGs) ───────────────────────────
 export { drawRedBoundingBoxOnJpeg, renderIssueArtifact } from "./bugScreenshotMarkup.js";

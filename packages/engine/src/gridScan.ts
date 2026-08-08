@@ -20,8 +20,22 @@ const DIVISIONS = 1000 / GRID_STEP; // 10 intervals → 11 lines
  * exact normalized coordinate at any point on the page.
  */
 export async function drawGridOnScreenshot(screenshot: Buffer): Promise<Buffer> {
-  const W = VIEWPORT_W;
-  const H = VIEWPORT_H;
+  // Grid to the ACTUAL screenshot size, not a fixed viewport. The labels encode
+  // a 0-1000 scale, so the pixel position of each labeled line must be derived
+  // from this image's real dimensions — otherwise a non-1920x1080 capture
+  // (device emulation, a resized or full-page shot) gets labels that sit at the
+  // wrong place and any coordinate read off them is skewed by the size ratio.
+  let W = VIEWPORT_W;
+  let H = VIEWPORT_H;
+  try {
+    const meta = await sharp(screenshot).metadata();
+    if (meta.width && meta.height) {
+      W = meta.width;
+      H = meta.height;
+    }
+  } catch {
+    /* fall back to default viewport dimensions */
+  }
 
   const parts: string[] = [];
 
