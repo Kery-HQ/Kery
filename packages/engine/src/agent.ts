@@ -490,10 +490,10 @@ async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSig
 
   // Try Stagehand observe first
   let observedElements: ObservedElement[] | undefined;
-  if (stagehand && isObserveCircuitOpen()) {
+  if (stagehand && isObserveCircuitOpen(stagehand)) {
     logger.info({ url }, "Snapshot: Stagehand observe skipped (circuit open), will use a11y or DOM fallback");
   }
-  if (stagehand && !isObserveCircuitOpen() && !signal?.aborted) {
+  if (stagehand && !isObserveCircuitOpen(stagehand) && !signal?.aborted) {
     observedElements = await stagehandObserve(stagehand);
     if (hasSufficientObserve(observedElements)) {
       const dom = formatObserveForLLM(observedElements);
@@ -1649,9 +1649,10 @@ export async function handleAuth(
       await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
     }
 
+    const emailOnlyAuth = !!auth.emailOtp?.address && !auth.credentials?.password;
     const selectorOverrides = normalizeSelectorOverrides(auth.selectors);
     const shouldAutoDetectSelectors = auth.autoDetectSelectors !== false;
-    const selectors = selectorOverrides ?? (shouldAutoDetectSelectors ? await detectLoginSelectors(page) : null);
+    const selectors = selectorOverrides ?? (shouldAutoDetectSelectors ? await detectLoginSelectors(page, emailOnlyAuth) : null);
     if (selectors) {
       const ok = await trySelectorsAuth(page, selectors, auth, authStartUrl);
       if (ok) {
@@ -1660,9 +1661,10 @@ export async function handleAuth(
         logger.info({ url: page.url() }, "Auth complete (selectors)");
         return { ok: true, llmCalls: allLlmCalls };
       }
-      // Passwordless forms (email-only) count as "failed" selector auth but may
-      // already have sent the code — try to complete before escalating.
-      if (await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl)) {
+      // Passwordless forms (email-only) count as "failed" selector auth but the
+      // email was just submitted — force the inbox poll rather than requiring the
+      // post-submit screen to match the OTP-screen heuristic.
+      if (await maybeCompleteEmailOtp(page, auth, authStartedAt, baseAuthUrl, emailOnlyAuth)) {
         logger.info({ url: page.url() }, "Auth complete (selectors + email OTP)");
         return { ok: true, llmCalls: allLlmCalls };
       }
@@ -1743,7 +1745,10 @@ function normalizeSelectorOverrides(selectors: AuthConfig["selectors"] | undefin
   return normalized.usernameField || normalized.passwordField || normalized.submitButton ? normalized : null;
 }
 
-async function detectLoginSelectors(page: Page): Promise<{ usernameField?: string; passwordField?: string; submitButton?: string } | null> {
+async function detectLoginSelectors(
+  page: Page,
+  emailOnly = false,
+): Promise<{ usernameField?: string; passwordField?: string; submitButton?: string } | null> {
   try {
     const detected = await page.evaluate(() => {
       function isVisible(el: Element | null): el is HTMLElement {
@@ -1753,12 +1758,43 @@ async function detectLoginSelectors(page: Page): Promise<{ usernameField?: strin
         const rect = el.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
       }
+      // A unique selector: #id, else a :nth-of-type chain up to a stable ancestor.
+      // A coarse tag path ("button") matches the FIRST such element on the page —
+      // fatal when the first button is a social-login CTA ("Continue with Google").
+      function uniqueSelector(el: Element): string {
+        const parts: string[] = [];
+        let cur: Element | null = el;
+        while (cur && cur !== document.body && parts.length < 6) {
+          const node: Element = cur;
+          if ((node as HTMLElement).id) {
+            parts.unshift(`#${CSS.escape((node as HTMLElement).id)}`);
+            break;
+          }
+          const tag = node.tagName.toLowerCase();
+          const parent: Element | null = node.parentElement;
+          if (!parent) {
+            parts.unshift(tag);
+            break;
+          }
+          const sameTag = Array.from(parent.children).filter((c) => c.tagName === node.tagName);
+          const idx = sameTag.indexOf(node) + 1;
+          parts.unshift(sameTag.length > 1 ? `${tag}:nth-of-type(${idx})` : tag);
+          cur = parent;
+        }
+        return parts.join(" > ");
+      }
       function cssPath(el: Element): string {
         if ((el as HTMLElement).id) return `#${CSS.escape((el as HTMLElement).id)}`;
         const tag = el.tagName.toLowerCase();
         const name = el.getAttribute("name");
         if (name) return `${tag}[name="${CSS.escape(name)}"]`;
-        return tag;
+        return uniqueSelector(el);
+      }
+      // Never treat a federated/social-login button as the form's submit — on
+      // passwordless flows it hijacks the email path and redirects to the IdP.
+      const SOCIAL = /google|apple|microsoft|github|facebook|\bsso\b|saml|okta|continue with/i;
+      function isSocial(el: Element): boolean {
+        return SOCIAL.test(`${el.textContent || ""} ${el.getAttribute("aria-label") || ""}`);
       }
 
       const usernameCandidate = document.querySelector(
@@ -1767,18 +1803,35 @@ async function detectLoginSelectors(page: Page): Promise<{ usernameField?: strin
       const passwordCandidate = document.querySelector(
         'input[type="password"], input[name*="password" i], input[autocomplete="current-password"]'
       );
-      const submitCandidate = document.querySelector(
-        'button[type="submit"], input[type="submit"], button[name*="login" i], button[id*="login" i], button[aria-label*="sign in" i], button'
+
+      // Prefer a real submit inside the same form as the username field, then a
+      // non-social button within that form/page — never the first button blindly.
+      const form = usernameCandidate ? usernameCandidate.closest("form") : null;
+      const scope: ParentNode = form ?? document;
+      let submitCandidate: Element | null = scope.querySelector(
+        'button[type="submit"], input[type="submit"], button[name*="login" i], button[id*="login" i], button[aria-label*="sign in" i]'
       );
+      if (!submitCandidate || !isVisible(submitCandidate) || isSocial(submitCandidate)) {
+        submitCandidate =
+          Array.from(scope.querySelectorAll('button, input[type="submit"]')).find(
+            (b) => isVisible(b) && !isSocial(b),
+          ) ?? null;
+      }
 
       const usernameField = isVisible(usernameCandidate) ? cssPath(usernameCandidate) : undefined;
       const passwordField = isVisible(passwordCandidate) ? cssPath(passwordCandidate) : undefined;
-      const submitButton = isVisible(submitCandidate) ? cssPath(submitCandidate) : undefined;
+      const submitButton = submitCandidate && isVisible(submitCandidate) ? cssPath(submitCandidate) : undefined;
       return { usernameField, passwordField, submitButton };
     });
 
-    if (!detected.passwordField) return null;
-    logger.info({ detected }, "Auth: auto-detected selectors");
+    // Password logins: wait until a password field exists before acting. Email-only
+    // / magic-link flows legitimately have none — require a username + submit instead.
+    if (emailOnly) {
+      if (!detected.usernameField || !detected.submitButton) return null;
+    } else if (!detected.passwordField) {
+      return null;
+    }
+    logger.info({ detected, emailOnly }, "Auth: auto-detected selectors");
     return detected;
   } catch (err) {
     logger.warn({ err: String(err).split("\n")[0] }, "Auth: selector auto-detection failed");
@@ -1837,6 +1890,9 @@ async function trySelectorsAuth(
     }
   } else if (passwordField) {
     await page.locator(passwordField).first().press("Enter").catch(() => {});
+  } else if (usernameField) {
+    // Email-only form with no detectable button — many submit on Enter.
+    await page.locator(usernameField).first().press("Enter").catch(() => {});
   }
 
   await page.waitForURL(url => url.href !== authStartUrl, { timeout: 15000 }).catch(() => {});

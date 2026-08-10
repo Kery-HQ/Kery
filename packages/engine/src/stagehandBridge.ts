@@ -31,45 +31,60 @@ export type StagehandSession = {
 
 const CIRCUIT_BREAKER_THRESHOLD = 2;
 const HALF_OPEN_DELAY_MS = 30_000; // 30s before allowing a probe request
-let _observeFailures = 0;
-let _circuitState: "closed" | "open" | "half-open" = "closed";
-let _circuitOpenedAt = 0;
 
-function recordObserveSuccess(): void {
-  _observeFailures = 0;
-  if (_circuitState !== "closed") {
+// Circuit-breaker state is PER browser page, not per process. Workers run several
+// runs concurrently in one process; a shared module-global breaker let one run's
+// flaky target trip (or, via reset-on-init, wipe) the breaker for unrelated runs.
+// Keying on the page object gives each run's Stagehand session its own breaker,
+// garbage-collected with the page.
+type BreakerState = {
+  observeFailures: number;
+  circuitState: "closed" | "open" | "half-open";
+  circuitOpenedAt: number;
+};
+const _breakers = new WeakMap<object, BreakerState>();
+
+function breakerFor(page: object): BreakerState {
+  let b = _breakers.get(page);
+  if (!b) {
+    b = { observeFailures: 0, circuitState: "closed", circuitOpenedAt: 0 };
+    _breakers.set(page, b);
+  }
+  return b;
+}
+
+function recordObserveSuccess(page: object): void {
+  const b = breakerFor(page);
+  b.observeFailures = 0;
+  if (b.circuitState !== "closed") {
     logger.info("Stagehand circuit breaker CLOSED (recovered)");
   }
-  _circuitState = "closed";
+  b.circuitState = "closed";
 }
 
-function recordObserveFailure(): void {
-  _observeFailures++;
-  if (_circuitState === "half-open") {
+function recordObserveFailure(page: object): void {
+  const b = breakerFor(page);
+  b.observeFailures++;
+  if (b.circuitState === "half-open") {
     // Probe failed — back to open, reset timer
-    _circuitState = "open";
-    _circuitOpenedAt = Date.now();
+    b.circuitState = "open";
+    b.circuitOpenedAt = Date.now();
     logger.warn("Stagehand half-open probe failed, circuit OPEN again");
-  } else if (_observeFailures >= CIRCUIT_BREAKER_THRESHOLD) {
-    _circuitState = "open";
-    _circuitOpenedAt = Date.now();
-    logger.warn({ failures: _observeFailures }, "Stagehand observe circuit breaker OPEN");
+  } else if (b.observeFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+    b.circuitState = "open";
+    b.circuitOpenedAt = Date.now();
+    logger.warn({ failures: b.observeFailures }, "Stagehand observe circuit breaker OPEN");
   }
 }
 
-export function isObserveCircuitOpen(): boolean {
-  if (_circuitState === "open" && Date.now() - _circuitOpenedAt >= HALF_OPEN_DELAY_MS) {
-    _circuitState = "half-open";
+export function isObserveCircuitOpen(page: object): boolean {
+  const b = breakerFor(page);
+  if (b.circuitState === "open" && Date.now() - b.circuitOpenedAt >= HALF_OPEN_DELAY_MS) {
+    b.circuitState = "half-open";
     logger.info("Stagehand circuit breaker HALF-OPEN (allowing probe)");
     return false; // Allow one probe request
   }
-  return _circuitState === "open";
-}
-
-function resetCircuitBreaker(): void {
-  _observeFailures = 0;
-  _circuitState = "closed";
-  _circuitOpenedAt = 0;
+  return b.circuitState === "open";
 }
 
 // ─── Init / Teardown ────────────────────────────────────────────────────────
@@ -104,7 +119,6 @@ export async function initStagehandSession(opts?: {
 
   const page = stagehand.page;
 
-  resetCircuitBreaker();
   logger.info("Stagehand session ready");
   return { stagehand, page };
 }
@@ -115,7 +129,6 @@ export async function destroyStagehandSession(session: StagehandSession): Promis
   } catch (err) {
     logger.warn({ err: String(err).slice(0, 200) }, "Stagehand close error (non-fatal)");
   }
-  resetCircuitBreaker();
 }
 
 // ─── Observe ────────────────────────────────────────────────────────────────
@@ -123,14 +136,14 @@ export async function destroyStagehandSession(session: StagehandSession): Promis
 export async function stagehandObserve(
   page: StagehandPage,
 ): Promise<ObservedElement[]> {
-  if (isObserveCircuitOpen()) return [];
+  if (isObserveCircuitOpen(page)) return [];
 
   try {
     const results: ObserveResult[] = await page.observe(
       "List all interactive elements on the page: buttons, links, text inputs, checkboxes, radio buttons, select dropdowns, tabs, and any other clickable or fillable elements. Include their current state (disabled, checked, expanded, selected) and current values for form fields.",
     );
 
-    recordObserveSuccess();
+    recordObserveSuccess(page);
     return results.map((result, i) => ({
       id: i + 1,
       selector: result.selector,
@@ -139,9 +152,10 @@ export async function stagehandObserve(
       arguments: result.arguments,
     }));
   } catch (err) {
-    recordObserveFailure();
+    recordObserveFailure(page);
+    const b = breakerFor(page);
     logger.warn(
-      { err: String(err).slice(0, 200), failures: _observeFailures, circuitState: _circuitState },
+      { err: String(err).slice(0, 200), failures: b.observeFailures, circuitState: b.circuitState },
       "Stagehand observe failed",
     );
     return [];

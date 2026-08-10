@@ -22,6 +22,45 @@ function requireApiUrl(provider: TokenProviderConfig): string {
   return /^https?:\/\//i.test(provider.apiUrl) ? provider.apiUrl : `https://${provider.apiUrl}`;
 }
 
+// @clerk/testing's signIn() reads the secret key from the process-global
+// CLERK_SECRET_KEY env var — there is no per-call secret parameter. Workers
+// process several runs concurrently in one process, so two Clerk logins to
+// different apps could race on that global (run B overwrites the key between
+// run A's set and use). This mutex serializes just the set→signIn critical
+// section and restores the prior value afterwards.
+let _clerkAuthChain: Promise<unknown> = Promise.resolve();
+
+// Bound how long one login can hold the critical section, so a hung Clerk
+// sign-in can't stall every other run's Clerk auth behind it indefinitely.
+const CLERK_SIGNIN_TIMEOUT_MS = 90_000;
+
+function withClerkSecret<T>(apiKey: string, fn: () => Promise<T>): Promise<T> {
+  const run = _clerkAuthChain.then(async () => {
+    const prev = process.env.CLERK_SECRET_KEY;
+    process.env.CLERK_SECRET_KEY = apiKey;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        fn(),
+        new Promise<T>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Clerk sign-in timed out after 90s")),
+            CLERK_SIGNIN_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      if (prev === undefined) delete process.env.CLERK_SECRET_KEY;
+      else process.env.CLERK_SECRET_KEY = prev;
+    }
+  });
+  // Keep the chain alive whether this link resolves or rejects, without leaking
+  // the value or the error into the next waiter.
+  _clerkAuthChain = run.then(() => {}, () => {});
+  return run;
+}
+
 // ─── Clerk ──────────────────────────────────────────────────────────────────
 
 /**
@@ -45,9 +84,6 @@ export async function authenticateWithClerk(
     throw new Error("Clerk auth requires credentials.email");
   }
 
-  // clerk.signIn() reads the secret key from this env var
-  process.env.CLERK_SECRET_KEY = apiKey;
-
   // frontendApiUrl must be the host only, without protocol
   const frontendApiUrl = new URL(apiUrl).host;
 
@@ -56,11 +92,15 @@ export async function authenticateWithClerk(
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
 
   logger.info({ email: credentials.email, frontendApiUrl }, "Clerk: signing in via @clerk/testing");
-  await clerk.signIn({
-    page,
-    emailAddress: credentials.email,
-    setupClerkTestingTokenOptions: { frontendApiUrl },
-  });
+  // Serialize the set→signIn window: the SDK reads the secret from a process-global
+  // env var, so concurrent runs must not interleave here (see withClerkSecret).
+  await withClerkSecret(apiKey, () =>
+    clerk.signIn({
+      page,
+      emailAddress: credentials.email,
+      setupClerkTestingTokenOptions: { frontendApiUrl },
+    }),
+  );
 
   logger.info("Clerk: sign-in complete");
 }
