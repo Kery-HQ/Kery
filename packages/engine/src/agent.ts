@@ -1919,8 +1919,14 @@ async function tryAgentAuthViaRunAgent(
   shouldStop?: () => boolean,
 ): Promise<AuthHandleResult> {
   const { username, password } = auth.credentials!;
+  // With email-OTP configured, steer the navigator to reach the emailed-code
+  // screen (many hosted flows, e.g. Clerk, put it behind a "Use another method"
+  // link after the password step) so the OTP completion below can take over.
+  const otpNote = auth.emailOtp?.address
+    ? ` If a two-factor step appears — a "verification code" screen, or a "Use another method" / "Email code" option — choose the emailed-code method and reach the code-entry screen, then stop; the code is fetched from the inbox and entered automatically.`
+    : "";
   const loginIntent = password
-    ? `Log in with username "${username}" and password "${password}", then submit the login form.`
+    ? `Log in with username "${username}" and password "${password}", then submit the login form.${otpNote}`
     : `Log in with the email "${username}". Enter the email and submit the form. If the page then asks for a verification code sent by email, stop — the code is handled separately.`;
   const authBase = preferredStartUrl || auth.loginUrl || baseUrl || page.url();
 
@@ -1936,7 +1942,9 @@ async function tryAgentAuthViaRunAgent(
     onLLMCall,
     undefined,
     undefined,
-    10,
+    // Multi-step hosted logins (email → password → email-code 2FA) need headroom
+    // to reach the code screen before the budget runs out.
+    16,
     undefined,
     undefined,
     shouldStop,

@@ -227,7 +227,13 @@ async function fillCode(page: Page, code: string): Promise<boolean> {
   } else {
     const input = inputs.first();
     if (!(await input.isVisible({ timeout: 3000 }).catch(() => false))) return false;
-    await input.fill(code);
+    // Type per-character rather than fill(): React OTP fields (Clerk's input-otp,
+    // react-otp-input) read the `input` event stream and ignore a one-shot value
+    // set, so fill() leaves the visible boxes empty. pressSequentially fires a
+    // keystroke per digit, which they honor.
+    await input.click({ timeout: 3000 }).catch(() => {});
+    await input.fill("").catch(() => {});
+    await input.pressSequentially(code, { delay: 60 });
   }
   await submitAfterCode(page);
   await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
