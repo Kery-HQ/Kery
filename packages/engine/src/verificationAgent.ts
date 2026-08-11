@@ -18,9 +18,15 @@ export type RunVerification = {
   /** A 2–5 word label for the check, e.g. "Deleting a task". Used as the
    *  scannable row in the PR comment; the full claim stays as the detail. */
   title?: string;
-  /** For a contradicted check: the [n] step whose observation shows the
-   *  failure. Lets a spawned evidence bug reuse that step's screenshot. */
+  /** The [n] step whose observation decides this check. For verified checks,
+   *  use the after-state that proves the claim; for contradicted checks, use
+   *  the screen where the wrong value or missing effect is visible. */
   stepIndex?: number;
+  /** Evidence carriers are attached after review; the LLM only sets stepIndex. */
+  screenshotBase64?: string;
+  screenshotPath?: string;
+  region?: { x: number; y: number; w: number; h: number };
+  artifactKey?: string;
 };
 
 const VERIFICATION_SYSTEM = `You are a verification reviewer for an AI browser-testing run.
@@ -47,7 +53,9 @@ Rules:
 - 2-6 claims. Prefer the claims a reviewer would need before merging.
 - "evidence" is one sentence citing the step(s) or observation that decides the grade.
 - "title" is a 2-5 word label naming the behavior as a feature, not a sentence: "Deleting a task", "Promo code discount", "Checkout validation". No trailing punctuation. It is the scannable row a reviewer reads first; the claim carries the full assertion.
-- For a "contradicted" check ONLY, add "stepIndex": the [n] index of the step whose observation shows the failure (the screen where the wrong value / missing effect is visible). Omit it for verified/not_testable checks and whenever no single step pinpoints it.
+- For every "verified" check, add "stepIndex": the [n] index of the step whose observation shows the claim holding. Choose the AFTER-STATE screen that proves the effect, not the step that merely performed the action.
+- For every "contradicted" check, add "stepIndex": the [n] index of the step whose observation shows the failure (the screen where the wrong value / missing effect is visible).
+- Omit "stepIndex" for "not_testable" checks and whenever no single step pinpoints the evidence.
 
 Return JSON only: {"verifications": [{"title": string, "claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string, "stepIndex"?: number}]}
 Output MUST be raw JSON only — no markdown fences, no prose.`;
@@ -112,24 +120,28 @@ export async function runVerificationReview(input: {
         response: raw,
         agent: "verification",
       } as never);
-      const parsed = JSON.parse(stripFence(raw ?? "")) as { verifications?: unknown };
-      const list = Array.isArray(parsed.verifications) ? parsed.verifications : [];
-      return list
-        .filter((v): v is Record<string, unknown> => !!v && typeof v === "object")
-        .map((v) => ({
-          claim: String(v.claim ?? "").slice(0, 200),
-          status: (["verified", "contradicted", "not_testable"].includes(String(v.status))
-            ? String(v.status)
-            : "not_testable") as RunVerification["status"],
-          evidence: String(v.evidence ?? "").slice(0, 300),
-          title: v.title ? String(v.title).slice(0, 60) : undefined,
-          stepIndex: typeof v.stepIndex === "number" && Number.isFinite(v.stepIndex) ? v.stepIndex : undefined,
-        }))
-        .filter((v) => v.claim)
-        .slice(0, 6);
+      return parseVerificationReview(raw ?? "");
     } catch (err) {
       logger.warn({ err: String(err).split("\n")[0], attempt }, "Verification review parse failed");
     }
   }
   return [];
+}
+
+export function parseVerificationReview(raw: string): RunVerification[] {
+  const parsed = JSON.parse(stripFence(raw ?? "")) as { verifications?: unknown };
+  const list = Array.isArray(parsed.verifications) ? parsed.verifications : [];
+  return list
+    .filter((v): v is Record<string, unknown> => !!v && typeof v === "object")
+    .map((v) => ({
+      claim: String(v.claim ?? "").slice(0, 200),
+      status: (["verified", "contradicted", "not_testable"].includes(String(v.status))
+        ? String(v.status)
+        : "not_testable") as RunVerification["status"],
+      evidence: String(v.evidence ?? "").slice(0, 300),
+      title: v.title ? String(v.title).slice(0, 60) : undefined,
+      stepIndex: typeof v.stepIndex === "number" && Number.isFinite(v.stepIndex) ? v.stepIndex : undefined,
+    }))
+    .filter((v) => v.claim)
+    .slice(0, 6);
 }

@@ -496,6 +496,11 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
       }
     }
 
+    const attachedChecks = attachVerificationScreenshots(verifications, screenshotsByStep, latestCleanScreenshot);
+    if (attachedChecks > 0) {
+      logger.info({ attached: attachedChecks }, "Attached screenshot frames to verification checks");
+    }
+
     const triageCalls: LLMCallRecord[] = [];
     let triageResult: Awaited<ReturnType<typeof runBugTriageAgent>>;
     if (isVerificationRun) {
@@ -524,21 +529,24 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
       );
     }
 
-    // Second look: localize the reported problem within each surviving bug's
-    // already-captured screenshot so navigator/failed-step bugs (which carry no
-    // region) also zoom. Enrichment only — never adds/removes/re-grades a bug,
-    // so detection is unchanged; a null/invalid region just leaves the bug on
-    // its full-frame fallback. On by default; disable with KERY_LOCALIZE=0.
+    // Second look: localize reported problems and verification evidence within
+    // already-captured screenshots. Enrichment only — never adds/removes/re-grades
+    // anything, so a null/invalid region just leaves the renderer on its
+    // full-frame fallback. On by default; disable with KERY_LOCALIZE=0.
     const localizerCalls: LLMCallRecord[] = [];
-    if (!isVerificationRun && bugsFound.length > 0) {
-      emitActivity("Localizing issue evidence...");
+    const hasCheckEvidence = verifications.some(
+      (v) => (v.status === "verified" || v.status === "contradicted") && !!v.screenshotBase64,
+    );
+    if (!isVerificationRun && (bugsFound.length > 0 || hasCheckEvidence)) {
+      emitActivity("Localizing evidence...");
       const { localized } = await localizeBugRegions(bugsFound, {
+        verifications,
         onLLMCall: (call) => localizerCalls.push({ ...call, seq: 0 }),
       }).catch((err) => {
-        logger.warn({ err: String(err).slice(0, 200) }, "Bug localizer errored — bugs left as-is");
+        logger.warn({ err: String(err).slice(0, 200) }, "Evidence localizer errored — records left as-is");
         return { localized: 0 };
       });
-      if (localized > 0) emitActivity(`Localized ${localized} issue${localized === 1 ? "" : "s"}.`);
+      if (localized > 0) emitActivity(`Localized ${localized} evidence region${localized === 1 ? "" : "s"}.`);
     }
 
     const memoryCuratorCalls: LLMCallRecord[] = [];
@@ -699,6 +707,35 @@ function mergeLLMCalls(
   ];
   merged.forEach((c, i) => { c.seq = i + 1; });
   return merged;
+}
+
+function checkEvidenceEnabled(): boolean {
+  return process.env.KERY_CHECK_EVIDENCE !== "0";
+}
+
+function attachVerificationScreenshots(
+  verifications: RunVerification[],
+  screenshotsByStep: Map<number, string> | undefined,
+  fallbackScreenshot: string | undefined,
+): number {
+  if (!checkEvidenceEnabled()) return 0;
+
+  let attached = 0;
+  for (const v of verifications) {
+    if (v.status !== "verified" && v.status !== "contradicted") {
+      delete v.screenshotBase64;
+      delete v.screenshotPath;
+      delete v.region;
+      continue;
+    }
+    const frame =
+      (typeof v.stepIndex === "number" ? screenshotsByStep?.get(v.stepIndex) : undefined) ??
+      fallbackScreenshot;
+    if (!frame) continue;
+    v.screenshotBase64 = frame;
+    attached++;
+  }
+  return attached;
 }
 
 /** RunStep.bugType is a coarser UI taxonomy than ReviewBug.type */

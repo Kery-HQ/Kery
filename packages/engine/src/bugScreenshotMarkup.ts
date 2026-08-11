@@ -27,9 +27,11 @@ export type IssueCaption = {
   headline?: string;
   /** What the app should have done. */
   expected?: string;
-  /** What it actually did. */
+  /** What it actually did, or what confirmed the expected behavior for pass artifacts. */
   found?: string;
 };
+
+export type IssueArtifactVariant = "issue" | "pass";
 
 function regionToPixelRect(
   region: BugRegion,
@@ -71,13 +73,14 @@ function wrap(text: string, perLine: number, maxLines: number): string[] {
 const ERR_RED = "#dc2626";
 
 /**
- * Banner colour follows severity: high/critical is an alarming red with white
- * text; medium/low (and anything unknown) is a yellow warning band with black
- * text. The same accent drives the box stroke and the callout pill so the whole
- * annotation reads as one severity.
+ * Banner colour follows the artifact outcome: pass evidence is green; issue
+ * evidence uses red for high/critical and yellow for medium/low. The same
+ * accent drives the box stroke and the callout pill so the annotation reads as
+ * one outcome.
  */
 type BannerStyle = { accent: string; fg: string };
-function bannerStyle(severity?: string): BannerStyle {
+function bannerStyle(severity?: string, variant: IssueArtifactVariant = "issue"): BannerStyle {
+  if (variant === "pass") return { accent: "#16a34a", fg: "#ffffff" };
   const s = (severity ?? "").toLowerCase();
   if (s === "high" || s === "critical") return { accent: ERR_RED, fg: "#ffffff" };
   return { accent: "#facc15", fg: "#111111" };
@@ -93,14 +96,19 @@ function keryBrand(width: number, baseline: number, fs: number): string {
 
 /**
  * Caption band: an annotation, never part of the app under test. Colour keyed to
- * severity (red for high/critical, yellow for medium/low), a bold headline then
- * Expected / Found, and a Kery wordmark in the bottom-right corner.
+ * outcome, a bold headline then Expected / Found or Expected / Confirmed, and a
+ * Kery wordmark in the bottom-right corner.
  */
-function captionBar(caption: IssueCaption, width: number, style: BannerStyle): { svg: string; height: number } | null {
+function captionBar(
+  caption: IssueCaption,
+  width: number,
+  style: BannerStyle,
+  variant: IssueArtifactVariant,
+): { svg: string; height: number } | null {
   const rows: Array<{ label: string; text: string; strong: boolean }> = [];
   if (caption.headline?.trim()) rows.push({ label: "", text: caption.headline.trim(), strong: true });
   if (caption.expected?.trim()) rows.push({ label: "Expected", text: caption.expected.trim(), strong: false });
-  if (caption.found?.trim()) rows.push({ label: "Found", text: caption.found.trim(), strong: false });
+  if (caption.found?.trim()) rows.push({ label: variant === "pass" ? "Confirmed" : "Found", text: caption.found.trim(), strong: false });
   if (rows.length === 0) return null;
 
   const pad = Math.round(width * 0.022);
@@ -153,8 +161,7 @@ function calloutPill(label: string, boxX: number, boxY: number, boxBottom: numbe
     `<text x="${px + padX}" y="${py + padY + fs - Math.round(fs * 0.18)}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="${fs}" font-weight="700" fill="${style.fg}">${esc(text)}</text>`;
 }
 
-/** Legacy: red stroke rect on the full JPEG. Kept as a fallback rung. */
-export async function drawRedBoundingBoxOnJpeg(jpegBuffer: Buffer, region: BugRegion): Promise<Buffer> {
+async function drawBoundingBoxOnJpeg(jpegBuffer: Buffer, region: BugRegion, style: BannerStyle): Promise<Buffer> {
   try {
     const meta = await sharp(jpegBuffer).metadata();
     const iw = meta.width ?? 0;
@@ -171,12 +178,17 @@ export async function drawRedBoundingBoxOnJpeg(jpegBuffer: Buffer, region: BugRe
     width = Math.max(1, Math.min(width, iw - left));
     height = Math.max(1, Math.min(height, ih - top));
     const stroke = Math.max(2, Math.round(Math.min(iw, ih) / 400));
-    const svg = `<svg width="${iw}" height="${ih}" xmlns="http://www.w3.org/2000/svg"><rect x="${left}" y="${top}" width="${width}" height="${height}" fill="none" stroke="rgb(255,0,0)" stroke-width="${stroke}"/></svg>`;
+    const svg = `<svg width="${iw}" height="${ih}" xmlns="http://www.w3.org/2000/svg"><rect x="${left}" y="${top}" width="${width}" height="${height}" fill="none" stroke="${style.accent}" stroke-width="${stroke}"/></svg>`;
     return sharp(jpegBuffer).composite([{ input: Buffer.from(svg), blend: "over" }]).jpeg({ quality: 80 }).toBuffer();
   } catch (err) {
-    logger.warn({ err: String(err) }, "drawRedBoundingBoxOnJpeg: failed, using original JPEG");
+    logger.warn({ err: String(err) }, "drawBoundingBoxOnJpeg: failed, using original JPEG");
     return jpegBuffer;
   }
+}
+
+/** Legacy: red stroke rect on the full JPEG. Kept as a fallback rung. */
+export async function drawRedBoundingBoxOnJpeg(jpegBuffer: Buffer, region: BugRegion): Promise<Buffer> {
+  return drawBoundingBoxOnJpeg(jpegBuffer, region, bannerStyle("high"));
 }
 
 // Zoom guardrails.
@@ -191,10 +203,11 @@ const TARGET_MIN_W = 640;  // upscale small crops to at least this wide, for leg
  */
 export async function renderIssueArtifact(
   jpegBuffer: Buffer,
-  input: { region?: BugRegion; caption?: IssueCaption; severity?: string },
+  input: { region?: BugRegion; caption?: IssueCaption; severity?: string; variant?: IssueArtifactVariant },
 ): Promise<Buffer> {
   const { region, caption, severity } = input;
-  const style = bannerStyle(severity);
+  const variant = input.variant ?? "issue";
+  const style = bannerStyle(severity, variant);
   try {
     const meta = await sharp(jpegBuffer).metadata();
     const iw = meta.width ?? 0;
@@ -205,7 +218,7 @@ export async function renderIssueArtifact(
 
     // No usable region: caption the full shot if we have text, else return as-is.
     if (!rect) {
-      if (caption) return await captionOnly(jpegBuffer, iw, caption, style);
+      if (caption) return await captionOnly(jpegBuffer, iw, caption, style, variant);
       return jpegBuffer;
     }
 
@@ -213,8 +226,8 @@ export async function renderIssueArtifact(
 
     // Region already dominates the frame → box the full shot, add caption.
     if (regionFrac >= NO_ZOOM_FRAC) {
-      const boxed = await drawRedBoundingBoxOnJpeg(jpegBuffer, region!);
-      return caption ? await captionOnly(boxed, iw, caption, style) : boxed;
+      const boxed = await drawBoundingBoxOnJpeg(jpegBuffer, region!, style);
+      return caption ? await captionOnly(boxed, iw, caption, style, variant) : boxed;
     }
 
     // Compute a padded crop around the region, clamped to the image and to a
@@ -247,8 +260,8 @@ export async function renderIssueArtifact(
     const by = Math.round(boxT * scale);
     const bw = Math.round(rect.width * scale);
     const pillFs = Math.max(13, Math.round(outW / 45));
-    // The pill flags the error right at the box; short label from the caption.
-    const pillLabel = caption?.headline?.trim() || caption?.found?.trim() || "";
+    // The pill flags the evidence right at the box; short label from the caption.
+    const pillLabel = variant === "pass" ? "Verified" : (caption?.headline?.trim() || caption?.found?.trim() || "");
     const pill = pillLabel ? calloutPill(pillLabel, bx, by, by + Math.round(rect.height * scale), outW, outH, pillFs, style) : "";
     const boxSvg = `<svg width="${outW}" height="${outH}" xmlns="http://www.w3.org/2000/svg"><rect x="${bx}" y="${by}" width="${bw}" height="${Math.round(rect.height * scale)}" fill="none" stroke="${style.accent}" stroke-width="${stroke}"/>${pill}</svg>`;
 
@@ -261,7 +274,7 @@ export async function renderIssueArtifact(
 
     // Stack the caption bar under the zoomed crop.
     if (caption) {
-      const bar = captionBar(caption, outW, style);
+      const bar = captionBar(caption, outW, style, variant);
       if (bar) {
         composed = await sharp({
           create: { width: outW, height: outH + bar.height, channels: 3, background: "#18181b" },
@@ -278,15 +291,21 @@ export async function renderIssueArtifact(
   } catch (err) {
     logger.warn({ err: String(err) }, "renderIssueArtifact: zoom path failed, falling back");
     // Fallback rung: boxed full shot, else the original.
-    if (region) return await drawRedBoundingBoxOnJpeg(jpegBuffer, region).catch(() => jpegBuffer);
+    if (region) return await drawBoundingBoxOnJpeg(jpegBuffer, region, style).catch(() => jpegBuffer);
     return jpegBuffer;
   }
 }
 
 /** Append a caption bar to the bottom of an image at its native width. */
-async function captionOnly(jpegBuffer: Buffer, width: number, caption: IssueCaption, style: BannerStyle): Promise<Buffer> {
+async function captionOnly(
+  jpegBuffer: Buffer,
+  width: number,
+  caption: IssueCaption,
+  style: BannerStyle,
+  variant: IssueArtifactVariant,
+): Promise<Buffer> {
   try {
-    const bar = captionBar(caption, width, style);
+    const bar = captionBar(caption, width, style, variant);
     if (!bar) return jpegBuffer;
     const meta = await sharp(jpegBuffer).metadata();
     const h = meta.height ?? 0;

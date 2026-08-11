@@ -98,11 +98,11 @@ export type {
 export { enrichBugsForRun } from "./bugEnrichment.js";
 export { runBugTriageAgent } from "./bugTriageAgent.js";
 export type { BugTriageInput, BugTriageResult } from "./bugTriageAgent.js";
-export { localizeBugRegions } from "./bugLocalizer.js";
+export { localizeBugRegions, localizeCheckRegions } from "./bugLocalizer.js";
 
 // ─── Bug screenshot markup (red box on saved JPEGs) ───────────────────────────
 export { drawRedBoundingBoxOnJpeg, renderIssueArtifact } from "./bugScreenshotMarkup.js";
-export type { BugRegion, IssueCaption } from "./bugScreenshotMarkup.js";
+export type { BugRegion, IssueCaption, IssueArtifactVariant } from "./bugScreenshotMarkup.js";
 
 // ─── Run Events ──────────────────────────────────────────────────────────────
 export { createEmitter, getEmitter, destroyEmitter, requestStop, isStopRequested } from "./runEvents.js";
