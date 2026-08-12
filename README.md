@@ -9,6 +9,11 @@
 </p>
 
 <p align="center">
+  <strong>Kery Web is live at <a href="https://app.kery.dev">app.kery.dev</a>.</strong><br />
+  Skip the local stack when you want hosted runs, shared evidence, and a dashboard your team can use right away.
+</p>
+
+<p align="center">
   <a href="https://github.com/keryai/kery/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
   <a href="https://www.npmjs.com/package/keryai"><img src="https://img.shields.io/npm/v/keryai.svg" alt="npm version" /></a>
   <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
