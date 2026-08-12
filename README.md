@@ -5,7 +5,7 @@
 <h1 align="center">Kery</h1>
 
 <p align="center">
-  <strong>AI agents that test your web app and find bugs — no test scripts required.</strong>
+  <strong>AI agents that test your web app and prove what works — with annotated screenshot evidence.</strong>
 </p>
 
 <p align="center">
@@ -18,7 +18,24 @@
 
 <br />
 
-Point Kery at your web app, pick an LLM provider, and let it loose. It crawls every route, runs intent-driven tests, and hands you a report of visual, functional, and UX bugs — with screenshots and bounding boxes. No selectors to write. No scripts to maintain.
+Point Kery at your web app, pick an LLM provider, and let it loose. It drives a real browser through your flows, grades every claim about the change — **verified** or **contradicted** — and backs each verdict with an annotated screenshot: the proving element boxed, the expected-vs-observed caption burned in. Bugs come with the same evidence. No selectors to write. No scripts to maintain, no "trust me" test output.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/assets/evidence-verified.jpg" alt="Verified check — the estimate page renders with items and summary, boxed in green with the confirming evidence caption" />
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/assets/evidence-contradicted.jpg" alt="Contradicted check — quantity drops below 1, zoomed and boxed in red with the expected-vs-found caption" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>✅ Verified</strong> — proof it works</td>
+    <td align="center"><strong>❌ Contradicted</strong> — proof it doesn't</td>
+  </tr>
+</table>
+
+<sub>Real output from a single run: Kery read the PR, generated these checks itself, drove the preview, and rendered the evidence.</sub>
 
 <p align="center">
   <strong><a href="https://discord.gg/8npJXGWREM">👾 Join the Discord</a> — get help, share what you find, follow development.</strong>
@@ -69,11 +86,19 @@ npm run dev:api   # API + Dashboard → http://localhost:11111
 
 **3. Run** — A Navigator agent drives a real Playwright browser, observing the page via accessibility tree and screenshots. A Review Agent and Filmstrip Reviewer run in parallel, watching for visual and UX regressions.
 
-**4. Report** — A Triage Agent deduplicates findings, filters false positives using memory from past runs, and outputs bugs categorized by type (visual / functional / UX) and severity — each with a screenshot and bounding box.
+**4. Verify** — A Verification Agent grades every claim against the recorded trace: **verified** needs an observed effect (navigator say-so doesn't count), **contradicted** needs the failure on screen. A vision pass localizes the proving element, and each verdict is rendered as evidence — zoomed crop, bounding box, expected-vs-observed caption.
+
+**5. Report** — A Triage Agent deduplicates findings, filters false positives using memory from past runs, and outputs bugs categorized by type (visual / functional / UX) and severity — each with the same annotated-screenshot treatment.
 
 ---
 
 ## Features
+
+**Verified Evidence**
+- Every run grades its checks: verified / contradicted / not testable — with the reasoning
+- Annotated screenshot per verdict: the proving element localized and boxed, caption bar with expected vs. observed
+- Zoom crops keep small targets (a button, a price) legible; captures run at 2x scale for retina-sharp evidence
+- Full-run video recording, scoped clips per finding
 
 **App Discovery**
 - BFS crawler maps all routes, links, forms, and modals
