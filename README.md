@@ -41,12 +41,6 @@ Point Kery at your web app, pick an LLM provider, and let it loose. It drives a 
   <strong><a href="https://discord.gg/8npJXGWREM">👾 Join the Discord</a> — get help, share what you find, follow development.</strong>
 </p>
 
-<div align="center">
-  <a href="https://youtu.be/XlHBvW5y2cI">
-    <img src="https://img.youtube.com/vi/XlHBvW5y2cI/maxresdefault.jpg" width="800" alt="Watch the Kery demo" />
-  </a>
-</div>
-
 ---
 
 ## Quick Start
