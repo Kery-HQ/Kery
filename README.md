@@ -1,11 +1,4 @@
-<table>
-  <tr>
-    <td align="center">
-      🚀 <strong>Kery Web is live:</strong> run Kery in the cloud at <a href="https://app.kery.dev"><strong>app.kery.dev</strong></a><br />
-      ✨ Hosted runs · shared evidence · team dashboard · no local stack
-    </td>
-  </tr>
-</table>
+<p align="center">🚀 <strong>Kery Web is live:</strong> run Kery in the cloud at <a href="https://app.kery.dev"><strong>app.kery.dev</strong></a></p>
 
 <p align="center">
   <img src="apps/web/public/logo/kery.png" width="80" alt="Kery" />
