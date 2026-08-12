@@ -5,6 +5,7 @@ import { Stagehand, type ObserveResult, type ActResult, type Page as StagehandPa
 import { getConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { dockerHostResolverArgs } from "./dockerHost.js";
+import { screenshotDpr } from "./screenshotConfig.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ export async function initStagehandSession(opts?: {
     domSettleTimeoutMs: 2000,
     localBrowserLaunchOptions: {
       headless: true,
+      deviceScaleFactor: screenshotDpr(),
       executablePath: process.env.CHROMIUM_PATH || undefined,
       args: ["--no-sandbox", "--disable-setuid-sandbox", ...dockerHostResolverArgs()],
       recordVideo: opts?.recordVideo,

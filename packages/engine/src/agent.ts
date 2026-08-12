@@ -18,6 +18,8 @@ import { formatMemoryForPrompt } from "./agentMemory.js";
 import { llmAgentChat, calcCostUsd } from "./llmClient.js";
 import { extractA11yTree, formatA11yForLLM, hasSufficientA11y, resolveElement, injectElementMarkers, removeElementMarkers, extractVisibleText, type A11yElement, type A11yTextNode } from "./a11yTree.js";
 import { drawGridOnScreenshot } from "./gridScan.js";
+import sharp from "sharp";
+import { LLM_IMAGE_MAX_WIDTH } from "./screenshotConfig.js";
 import { handleTokenAuth, refreshIfNeeded } from "./tokenAuth.js";
 import { detectEmailOtpScreen, handleEmailOtp } from "./emailOtp.js";
 import {
@@ -467,6 +469,23 @@ function executionUsesCoordinates(action: AgentAction): boolean {
 
 // ─── Stable snapshot (a11y + stagehand + DOM fallback) ───────────────────────
 
+/**
+ * Downscale prompt-bound screenshots back to 1x scale. Captures run at DPR 2
+ * for evidence fidelity; sending 4K frames to the model buys nothing (providers
+ * retile to a fixed budget) and slows every request's upload. Evidence buffers
+ * (cleanScreenshot and the proof shots) are never passed through this.
+ */
+async function resizeForLLM(buf: Buffer): Promise<Buffer> {
+  if (buf.length === 0) return buf;
+  try {
+    const meta = await sharp(buf).metadata();
+    if ((meta.width ?? 0) <= LLM_IMAGE_MAX_WIDTH) return buf;
+    return await sharp(buf).resize({ width: LLM_IMAGE_MAX_WIDTH }).jpeg({ quality: 75 }).toBuffer();
+  } catch {
+    return buf;
+  }
+}
+
 async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSignal): Promise<{
   screenshot: Buffer;
   cleanScreenshot: Buffer;
@@ -502,7 +521,7 @@ async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSig
         { url, domSource: "stagehand", observeCount: observedElements.length, screenshotBytes: cleanScreenshot.length },
         "Snapshot complete",
       );
-      return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, observedElements, newTabNote };
+      return { screenshot: await resizeForLLM(cleanScreenshot), cleanScreenshot, dom, url, title, pageText, observedElements, newTabNote };
     }
     logger.info({ url, observeCount: observedElements?.length ?? 0 }, "Snapshot: Stagehand observe insufficient, falling back to a11y");
   }
@@ -524,14 +543,14 @@ async function takeStableSnapshot(page: Page, stagehand?: any, signal?: AbortSig
       },
       "Snapshot complete",
     );
-    return { screenshot: markedScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes, newTabNote };
+    return { screenshot: await resizeForLLM(markedScreenshot), cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes, newTabNote };
   }
 
   // Fallback to DOM extraction
   const { text: dom } = await extractDOM(page);
   const pageText = await extractVisibleText(page);
   logger.info({ url, domSource: "dom_extract", screenshotBytes: cleanScreenshot.length }, "Snapshot complete");
-  return { screenshot: cleanScreenshot, cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes, newTabNote };
+  return { screenshot: await resizeForLLM(cleanScreenshot), cleanScreenshot, dom, url, title, pageText, a11yElements, a11yTextNodes, newTabNote };
 }
 
 // ─── System prompt builder ────────────────────────────────────────────────────

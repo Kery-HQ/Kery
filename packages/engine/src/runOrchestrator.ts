@@ -18,6 +18,7 @@ import { runFilmstripReview, type FilmstripFrame } from "./filmstripReview.js";
 import { runHolisticFlowReview } from "./holisticReviewAgent.js";
 import { runVerificationReview, type RunVerification } from "./verificationAgent.js";
 import { confirmFindings } from "./findingConfirmer.js";
+import { screenshotDpr } from "./screenshotConfig.js";
 import { dropUngroundedFindings } from "./claimGrounding.js";
 import { isStopRequested } from "./runEvents.js";
 import type { ReviewBug } from "./types.js";
@@ -168,7 +169,8 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
         executablePath: process.env.CHROMIUM_PATH || undefined,
         args: ["--no-sandbox", "--disable-setuid-sandbox", ...DOCKER_BROWSER_ARGS],
       });
-      const contextOpts: any = { viewport: { width: recordW, height: recordH } };
+      // DPR 2: same CSS layout, 4x the pixels behind evidence crops (see screenshotConfig).
+      const contextOpts: any = { viewport: { width: recordW, height: recordH }, deviceScaleFactor: screenshotDpr() };
       if (videoTmpDir) {
         contextOpts.recordVideo = { dir: videoTmpDir, size: { width: recordW, height: recordH } };
       }
@@ -351,7 +353,7 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
     // already has clean coverage from the run and the final raw frame may have overlays).
     let holisticFinalFrames = [...filmstripFrames];
     try {
-      const finalSS = await page.screenshot({ type: "jpeg", quality: 70 }).catch(() => Buffer.alloc(0));
+      const finalSS = await page.screenshot({ type: "jpeg", quality: 85 }).catch(() => Buffer.alloc(0));
       if (finalSS.length > 0) {
         const finalB64 = finalSS.toString("base64");
         const finalUrl = page.url();

@@ -6,6 +6,7 @@
  * other coordinate-based actions without needing multiple poke attempts.
  */
 import sharp from "sharp";
+import { LLM_IMAGE_MAX_WIDTH } from "./screenshotConfig.js";
 
 const VIEWPORT_W = 1920;
 const VIEWPORT_H = 1080;
@@ -27,11 +28,22 @@ export async function drawGridOnScreenshot(screenshot: Buffer): Promise<Buffer> 
   // wrong place and any coordinate read off them is skewed by the size ratio.
   let W = VIEWPORT_W;
   let H = VIEWPORT_H;
+  let src = screenshot;
   try {
     const meta = await sharp(screenshot).metadata();
     if (meta.width && meta.height) {
       W = meta.width;
       H = meta.height;
+      // Gridded images exist only as LLM input; captures run at DPR 2 for
+      // evidence fidelity, but past ~1x scale extra pixels buy the model
+      // nothing (providers retile to a fixed budget) and bloat every request.
+      // Downscale before gridding — labels use a 0-1000 scale, so coordinates
+      // read off the smaller image stay exact.
+      if (W > LLM_IMAGE_MAX_WIDTH) {
+        H = Math.round(H * (LLM_IMAGE_MAX_WIDTH / W));
+        W = LLM_IMAGE_MAX_WIDTH;
+        src = await sharp(screenshot).resize({ width: LLM_IMAGE_MAX_WIDTH }).toBuffer();
+      }
     }
   } catch {
     /* fall back to default viewport dimensions */
@@ -72,7 +84,7 @@ export async function drawGridOnScreenshot(screenshot: Buffer): Promise<Buffer> 
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">\n${parts.join("\n")}\n</svg>`;
 
-  return sharp(screenshot)
+  return sharp(src)
     .composite([{ input: Buffer.from(svg), blend: "over" }])
     .jpeg({ quality: 75 })
     .toBuffer();

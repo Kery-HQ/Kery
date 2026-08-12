@@ -195,7 +195,7 @@ export async function drawRedBoundingBoxOnJpeg(jpegBuffer: Buffer, region: BugRe
 const CONTEXT_PAD = 0.6;   // grow the crop by 60% of the region on each side
 const MIN_CROP_FRAC = 0.22; // never crop tighter than this fraction of the image
 const NO_ZOOM_FRAC = 0.7;  // region already covers most of the shot → don't crop
-const TARGET_MIN_W = 640;  // upscale small crops to at least this wide, for legibility
+const TARGET_MIN_W = 800;  // upscale small crops to at least this wide, for legibility (DPR-2 sources have the pixels for it)
 
 /**
  * Best-effort rich evidence image. Tries zoom+box+caption, then falls back to a
