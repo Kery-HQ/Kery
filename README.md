@@ -8,10 +8,17 @@
   <strong>AI agents that test your web app and prove what works — with annotated screenshot evidence.</strong>
 </p>
 
-<p align="center">
-  <strong>Kery Web is live at <a href="https://app.kery.dev">app.kery.dev</a>.</strong><br />
-  Skip the local stack when you want hosted runs, shared evidence, and a dashboard your team can use right away.
-</p>
+<table align="center">
+  <tr>
+    <td align="center">
+      <strong>Kery Web is available now</strong><br />
+      Hosted runs, shared evidence, and a team-ready dashboard without maintaining a local stack.<br /><br />
+      <a href="https://app.kery.dev">
+        <img src="https://img.shields.io/badge/Open_Kery_Web-app.kery.dev-ffb000?style=for-the-badge" alt="Open Kery Web at app.kery.dev" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 <p align="center">
   <a href="https://github.com/keryai/kery/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
