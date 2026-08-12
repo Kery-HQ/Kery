@@ -635,92 +635,59 @@ function ApiKeyCard({
 type ModelOption = { value: string; label: string; price?: string };
 
 const AGENT_OPTIONS: ModelOption[] = [
-  // GPT-5.4 family (current flagship)
-  { value: "openai/gpt-5.4", label: "GPT-5.4", price: "$2.50 / $15.00" },
-  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", price: "$0.75 / $4.50" },
-  { value: "openai/gpt-5.4-nano", label: "GPT-5.4 Nano", price: "$0.20 / $1.25" },
-  // GPT-5 family
-  { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
-  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", price: "$0.05 / $0.40" },
-  // GPT-4.1 family
-  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
-  { value: "openai/gpt-4.1", label: "GPT-4.1", price: "$2.00 / $8.00" },
-  { value: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano", price: "$0.10 / $0.40" },
-  { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
-  { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
-  // Anthropic
-  { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
-  { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
+  { value: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5", price: "$2.00 / $10.00" },
+  { value: "anthropic/claude-opus-5", label: "Claude Opus 5", price: "$5.00 / $25.00" },
+  { value: "anthropic/claude-fable-5", label: "Claude Fable 5", price: "$10.00 / $50.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$5.00 / $25.00" },
-  // Gemini (direct API)
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+  { value: "openai/gpt-5.6-sol", label: "GPT-5.6 Sol", price: "$5.00 / $30.00" },
+  { value: "openai/gpt-5.6-terra", label: "GPT-5.6 Terra", price: "$2.00 / $12.00" },
+  { value: "openai/gpt-5.6-luna", label: "GPT-5.6 Luna", price: "$0.20 / $1.20" },
+  { value: "google/gemini-3.5-flash", label: "Gemini 3.5 Flash", price: "$1.50 / $9.00" },
+  { value: "google/gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite", price: "$0.30 / $2.50" },
+  { value: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite", price: "$0.25 / $1.50" },
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
-  // Gemini 3 series
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
-  { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", price: "$0.10 / $0.40" },
 ];
 
 const REASONING_VISION_OPTIONS: ModelOption[] = [
-  // Anthropic
-  { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
-  { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
-  { value: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", price: "$5.00 / $25.00" },
+  { value: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5", price: "$2.00 / $10.00" },
+  { value: "anthropic/claude-opus-5", label: "Claude Opus 5", price: "$5.00 / $25.00" },
+  { value: "anthropic/claude-fable-5", label: "Claude Fable 5", price: "$10.00 / $50.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  // Gemini 3
-  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", price: "$2.00 / $12.00" },
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
-  // Gemini 2.5 (direct API)
+  { value: "openai/gpt-5.6-sol", label: "GPT-5.6 Sol", price: "$5.00 / $30.00" },
+  { value: "openai/gpt-5.6-terra", label: "GPT-5.6 Terra", price: "$2.00 / $12.00" },
+  { value: "openai/gpt-5.6-luna", label: "GPT-5.6 Luna", price: "$0.20 / $1.20" },
+  { value: "google/gemini-3.5-flash", label: "Gemini 3.5 Flash", price: "$1.50 / $9.00" },
+  { value: "google/gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite", price: "$0.30 / $2.50" },
+  { value: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite", price: "$0.25 / $1.50" },
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  // OpenAI
-  { value: "openai/gpt-5.4", label: "GPT-5.4", price: "$2.50 / $15.00" },
-  { value: "openai/o4-mini", label: "o4-mini", price: "$1.10 / $4.40" },
-  { value: "openai/o3", label: "o3", price: "$2.00 / $8.00" },
-  { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", price: "$0.10 / $0.40" },
 ];
 
 const CODE_OPTIONS: ModelOption[] = [
-  // GPT-5.4 family
-  { value: "openai/gpt-5.4", label: "GPT-5.4", price: "$2.50 / $15.00" },
-  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", price: "$0.75 / $4.50" },
-  // Anthropic
-  { value: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", price: "$5.00 / $25.00" },
-  { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", price: "$3.00 / $15.00" },
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  // Gemini 3
-  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", price: "$2.00 / $12.00" },
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
-  { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
-  // Gemini 2.5 (direct API)
+  { value: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5", price: "$2.00 / $10.00" },
+  { value: "anthropic/claude-opus-5", label: "Claude Opus 5", price: "$5.00 / $25.00" },
+  { value: "anthropic/claude-fable-5", label: "Claude Fable 5", price: "$10.00 / $50.00" },
+  { value: "openai/gpt-5.6-luna", label: "GPT-5.6 Luna", price: "$0.20 / $1.20" },
+  { value: "openai/gpt-5.6-terra", label: "GPT-5.6 Terra", price: "$2.00 / $12.00" },
+  { value: "openai/gpt-5.6-sol", label: "GPT-5.6 Sol", price: "$5.00 / $30.00" },
+  { value: "google/gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite", price: "$0.30 / $2.50" },
+  { value: "google/gemini-3.5-flash", label: "Gemini 3.5 Flash", price: "$1.50 / $9.00" },
+  { value: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite", price: "$0.25 / $1.50" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", price: "$0.10 / $0.40" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.30 / $2.50" },
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  // GPT-4.1 / GPT-5
-  { value: "openai/gpt-4.1", label: "GPT-4.1", price: "$2.00 / $8.00" },
-  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
-  { value: "openai/gpt-5", label: "GPT-5", price: "$1.25 / $10.00" },
-  { value: "openai/o4-mini", label: "o4-mini", price: "$1.10 / $4.40" },
-  { value: "openai/o3-mini", label: "o3-mini", price: "$1.10 / $4.40" },
-  // OpenRouter-only
-  { value: "deepseek/deepseek-v3.2", label: "DeepSeek V3.2", price: "$0.26 / $0.38" },
-  { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", price: "varies" },
 ];
 
 const STAGEHAND_OPTIONS: ModelOption[] = [
-  // Gemini 3 — best for visual element targeting
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
-  { value: "google/gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", price: "$0.25 / $1.50" },
-  // Gemini 2.5 (direct API)
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (short id)", price: "$0.15 / $0.60" },
-  { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", price: "$0.10 / $0.40" },
-  // Anthropic
   { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5", price: "$1.00 / $5.00" },
-  // OpenAI
-  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini", price: "$0.75 / $4.50" },
-  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", price: "$0.40 / $1.60" },
-  { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", price: "$0.15 / $0.60" },
-  { value: "openai/gpt-4o", label: "GPT-4o", price: "$2.50 / $10.00" },
+  { value: "openai/gpt-5.6-luna", label: "GPT-5.6 Luna", price: "$0.20 / $1.20" },
+  { value: "google/gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite", price: "$0.30 / $2.50" },
+  { value: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite", price: "$0.25 / $1.50" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", price: "$0.10 / $0.40" },
 ];
 
 const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [
@@ -758,13 +725,20 @@ const MODEL_CONFIG: {
     Icon: Eye,
     options: REASONING_VISION_OPTIONS,
   },
+  {
+    key: "stagehandModel",
+    label: "Element finder",
+    hint: "Selector repair and page element lookup",
+    Icon: CursorClick,
+    options: STAGEHAND_OPTIONS,
+  },
 ];
 
 function customModelPlaceholder(provider: CustomProviderId): string {
   switch (provider) {
-    case "openai":     return "e.g. gpt-4o-mini";
-    case "anthropic":  return "e.g. claude-3-5-haiku-20241022";
-    case "gemini":     return "e.g. gemini-2.0-flash";
+    case "openai":     return "e.g. gpt-5.6-luna";
+    case "anthropic":  return "e.g. claude-sonnet-5";
+    case "gemini":     return "e.g. gemini-3.5-flash-lite";
     case "openrouter": return "e.g. mistralai/mistral-small-3.1-24b-instruct";
   }
 }
@@ -1051,4 +1025,3 @@ function ModelSlotCard({
     </div>
   );
 }
-

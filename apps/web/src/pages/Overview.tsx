@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  SquaresFour,
+  House,
   Pulse,
   WarningCircle,
   CaretRight,
@@ -433,7 +433,7 @@ function Dashboard({
 
 export const Overview: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
 
   const [loading, setLoading] = React.useState(true);
   const [overview, setOverview] = React.useState<any>(null);
@@ -514,9 +514,9 @@ export const Overview: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<SquaresFour className="h-4 w-4" />} title="Overview" />
+        <PageHeader icon={<House className="h-4 w-4" />} title="Dashboard" />
         <EmptyState
-          icon={<SquaresFour className="h-8 w-8" />}
+          icon={<House className="h-8 w-8" />}
           title="No project selected"
           description="Create or select a project to get started."
           className="flex-1"
@@ -529,7 +529,12 @@ export const Overview: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<SquaresFour className="h-4 w-4" />} title="Overview">
+      <PageHeader
+        eyebrow={currentProject?.name}
+        icon={<House className="h-4 w-4" />}
+        title="Dashboard"
+        description="Project setup, recent activity, and issue health."
+      >
         {!loading && !setupDone && setupDismissed && (
           <Button
             type="button"
@@ -545,7 +550,7 @@ export const Overview: React.FC = () => {
         )}
       </PageHeader>
 
-      <div className="p-4 md:p-6 animate-page-enter">
+      <div className="px-6 pb-6 animate-page-enter">
         {loading ? (
           <div className="glass-stage flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full">
             <div className="flex-1 min-w-0 space-y-6 w-full">

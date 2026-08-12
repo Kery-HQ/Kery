@@ -6,6 +6,18 @@ import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 /** Models observed to reject an explicit temperature; populated on first 400. */
 const MODELS_REJECTING_TEMPERATURE = new Set<string>();
 
+/** Completion-token ceilings discovered from 400s ("supports at most N completion tokens"). */
+const MODEL_COMPLETION_TOKEN_CAPS = new Map<string, number>();
+
+const KNOWN_COMPLETION_TOKEN_CAPS: Record<string, number> = {
+  "gpt-4.1": 32768,
+  "gpt-4.1-mini": 32768,
+  "gpt-4.1-nano": 32768,
+  "openai/gpt-4.1": 32768,
+  "openai/gpt-4.1-mini": 32768,
+  "openai/gpt-4.1-nano": 32768,
+};
+
 export type OpenAIStyleChatExtra = {
   /** Merged into the chat-completions body (e.g. OpenRouter `reasoning` for Gemini). */
   bodyExtensions?: Record<string, unknown>;
@@ -31,10 +43,12 @@ export async function openAIStyleChat(
     timeout: timeoutMs,
   });
 
+  const requestedMaxTokens = opts.maxTokens ?? MAX_OUTPUT_TOKENS;
+  const knownCap = MODEL_COMPLETION_TOKEN_CAPS.get(wireModel) ?? KNOWN_COMPLETION_TOKEN_CAPS[wireModel];
   const body: Record<string, unknown> = {
     model: wireModel,
     messages,
-    max_completion_tokens: opts.maxTokens ?? MAX_OUTPUT_TOKENS,
+    max_completion_tokens: knownCap ? Math.min(requestedMaxTokens, knownCap) : requestedMaxTokens,
   };
   // Only send a temperature to models that have not already rejected one.
   // Without this the retry below fires on EVERY call to such a model: a run was
@@ -46,25 +60,38 @@ export async function openAIStyleChat(
   if (extra?.bodyExtensions) Object.assign(body, extra.bodyExtensions);
 
   // Newer model families (gpt-5.6, reasoning models) accept only the default
-  // temperature and 400 on anything else. Discover that once per model at
-  // runtime and remember it, rather than maintaining a hand-written capability
-  // list that rots as models change.
+  // temperature and 400 on anything else; models also differ in the largest
+  // completion length they accept. Discover both once per model at runtime and
+  // remember them, rather than maintaining a hand-written capability list that
+  // rots as models change.
   let completion;
-  try {
-    completion = await client.chat.completions.create(
-      body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
-      opts.signal ? { signal: opts.signal } : undefined
-    );
-  } catch (err) {
-    const message = String((err as Error)?.message ?? err);
-    if (!/temperature/i.test(message) || !("temperature" in body)) throw err;
-    logger.info({ model: wireModel }, "Model rejects custom temperature — retrying without it and remembering for this model");
-    MODELS_REJECTING_TEMPERATURE.add(wireModel);
-    delete body.temperature;
-    completion = await client.chat.completions.create(
-      body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
-      opts.signal ? { signal: opts.signal } : undefined
-    );
+  for (let attempt = 0; ; attempt++) {
+    try {
+      completion = await client.chat.completions.create(
+        body as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+        opts.signal ? { signal: opts.signal } : undefined
+      );
+      break;
+    } catch (err) {
+      const message = String((err as Error)?.message ?? err);
+      if (attempt >= 2) throw err;
+      if (/temperature/i.test(message) && "temperature" in body) {
+        logger.info({ model: wireModel }, "Model rejects custom temperature — retrying without it and remembering for this model");
+        MODELS_REJECTING_TEMPERATURE.add(wireModel);
+        delete body.temperature;
+        continue;
+      }
+      const capMatch = message.match(/supports at most (\d+) completion tokens/i);
+      const sentMax = body.max_completion_tokens;
+      if (capMatch && typeof sentMax === "number" && Number(capMatch[1]) < sentMax) {
+        const cap = Number(capMatch[1]);
+        logger.info({ model: wireModel, cap }, "Model caps completion tokens below requested — retrying at the cap and remembering for this model");
+        MODEL_COMPLETION_TOKEN_CAPS.set(wireModel, cap);
+        body.max_completion_tokens = cap;
+        continue;
+      }
+      throw err;
+    }
   }
 
   const choice = completion.choices?.[0];

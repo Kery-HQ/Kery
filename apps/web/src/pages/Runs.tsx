@@ -53,7 +53,7 @@ type ActiveRunTile = {
 
 export const Runs: React.FC = () => {
   const navigate = useNavigate();
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
 
   const [runs, setRuns] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -210,7 +210,11 @@ export const Runs: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Play className="h-4 w-4" />} title="Runs" />
+        <PageHeader
+          icon={<Play className="h-4 w-4" />}
+          title="Runs"
+          description="Browse browser test history and run results."
+        />
         <EmptyState
           icon={<Play className="h-8 w-8" />}
           title="No project selected"
@@ -223,7 +227,12 @@ export const Runs: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Play className="h-4 w-4" />} title="Runs">
+      <PageHeader
+        eyebrow={currentProject?.name}
+        icon={<Play className="h-4 w-4" />}
+        title="Runs"
+        description="Browse browser test history and run results for this project."
+      >
         {!loading && runs.length > 0 && (
           <span className="text-[11px] font-mono text-muted-foreground">{total} runs</span>
         )}
@@ -264,7 +273,7 @@ export const Runs: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6 animate-fade-in">
+      <div className="flex-1 overflow-y-auto px-6 pb-6 animate-fade-in">
         {loading ? (
           <Card>
             <CardContent className="p-0">

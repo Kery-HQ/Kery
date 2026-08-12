@@ -4,9 +4,14 @@ import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
 
 const ANTHROPIC_MODEL_IDS: Record<string, string> = {
   // Current generation
+  "anthropic/claude-fable-5":   "claude-fable-5",
+  "anthropic/claude-opus-5":    "claude-opus-5",
+  "anthropic/claude-sonnet-5":  "claude-sonnet-5",
+  "anthropic/claude-haiku-4.5": "claude-haiku-4-5-20251001",
+  "anthropic/claude-haiku-4-5": "claude-haiku-4-5-20251001",
+  // Legacy/current compatibility
   "anthropic/claude-opus-4.7":  "claude-opus-4-7",
   "anthropic/claude-sonnet-4.6": "claude-sonnet-4-6",
-  "anthropic/claude-haiku-4.5":  "claude-haiku-4-5-20251001",
   "anthropic/claude-opus-4.6":   "claude-opus-4-6",
   "anthropic/claude-sonnet-4.5": "claude-sonnet-4-5-20250929",
   "anthropic/claude-opus-4.5":   "claude-opus-4-5-20251101",

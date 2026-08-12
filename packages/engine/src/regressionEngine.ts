@@ -258,7 +258,9 @@ export function generateRegressionPlan(stepsDetail: RunStep[]): RegressionStep[]
       url: stepUrl,
     };
 
-    if (step.elementRef) {
+    if (step.action === "navigate") {
+      regStep.value = step.value ?? step.target ?? step.url;
+    } else if (step.elementRef) {
       regStep.role = step.elementRef.role;
       const rawName = sanitizeComboboxName(step.elementRef.role, step.elementRef.name);
       regStep.name = step.elementRef.role === "link" ? sanitizeLinkName(rawName) : rawName;

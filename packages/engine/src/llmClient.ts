@@ -240,6 +240,9 @@ const ANTHROPIC_AGENT_SCHEMA = {
  * Source: https://openrouter.ai/docs/guides/features/structured-outputs
  */
 const OPENROUTER_ANTHROPIC_STRUCTURED_MODELS = new Set([
+  "anthropic/claude-fable-5",
+  "anthropic/claude-opus-5",
+  "anthropic/claude-sonnet-5",
   "anthropic/claude-sonnet-4-5",
   "anthropic/claude-sonnet-4.5",
   "anthropic/claude-sonnet-4.6",
@@ -464,12 +467,24 @@ export function getTriageResponseFormat(model: string): any | undefined {
 // ─── Usage / pricing ─────────────────────────────────────────────────────────
 
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  "gemini-2.5-flash-lite":       { input: 0.075, output: 0.30 },
-  "gemini-2.5-flash":            { input: 0.15,  output: 0.60 },
-  "gemini-2.5-pro":              { input: 1.25,  output: 10.00 },
+  "google/gemini-3.5-flash-lite": { input: 0.30,  output: 2.50 },
+  "gemini-3.5-flash-lite":        { input: 0.30,  output: 2.50 },
+  "google/gemini-3.5-flash":      { input: 1.50,  output: 9.00 },
+  "gemini-3.5-flash":             { input: 1.50,  output: 9.00 },
+  "google/gemini-3.1-flash-lite": { input: 0.25,  output: 1.50 },
+  "gemini-3.1-flash-lite":        { input: 0.25,  output: 1.50 },
+  "google/gemini-2.5-flash-lite": { input: 0.10,  output: 0.40 },
+  "gemini-2.5-flash-lite":        { input: 0.10,  output: 0.40 },
+  "google/gemini-2.5-flash":      { input: 0.30,  output: 2.50 },
+  "gemini-2.5-flash":             { input: 0.30,  output: 2.50 },
+  "google/gemini-2.5-pro":        { input: 1.25,  output: 10.00 },
+  "gemini-2.5-pro":               { input: 1.25,  output: 10.00 },
   "gemini-2.0-flash":            { input: 0.10,  output: 0.40 },
   "gemini-1.5-flash":            { input: 0.075, output: 0.30 },
   "gemini-1.5-pro":              { input: 1.25,  output: 5.00 },
+  "openai/gpt-5.6-sol":          { input: 5.00,  output: 30.00 },
+  "openai/gpt-5.6-terra":        { input: 2.00,  output: 12.00 },
+  "openai/gpt-5.6-luna":         { input: 0.20,  output: 1.20 },
   "openai/gpt-4o-mini":          { input: 0.15,  output: 0.60 },
   "openai/gpt-4o":               { input: 2.50,  output: 10.00 },
   "openai/gpt-4.1-mini":         { input: 0.40,  output: 1.60 },
@@ -479,8 +494,13 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "openai/gpt-5":                { input: 1.25,  output: 10.00 },
   "openai/o3-mini":              { input: 1.10,  output: 4.40 },
   "openai/o3":                   { input: 2.00,  output: 8.00 },
+  "openai/anthropic/claude-haiku-4.5": { input: 1.00, output: 5.00 },
+  "anthropic/claude-fable-5":    { input: 10.00, output: 50.00 },
+  "anthropic/claude-opus-5":     { input: 5.00,  output: 25.00 },
+  "anthropic/claude-sonnet-5":   { input: 2.00,  output: 10.00 },
   "anthropic/claude-sonnet-4.6": { input: 3.00,  output: 15.00 },
   "anthropic/claude-haiku-4.5":  { input: 1.00,  output: 5.00 },
+  "anthropic/claude-haiku-4-5":  { input: 1.00,  output: 5.00 },
   "anthropic/claude-opus-4.6":   { input: 15.00, output: 75.00 },
   "anthropic/claude-3-5-sonnet": { input: 3.00,  output: 15.00 },
   "anthropic/claude-3-5-haiku":  { input: 0.80,  output: 4.00 },
@@ -502,7 +522,7 @@ export function calcCostUsd(
   }
   const key = Object.keys(MODEL_PRICING)
     .filter((k) => model.startsWith(k) || model === k)
-    .sort((a, b) => b.length - a.length)[0] ?? "openai/gpt-4o-mini";
+    .sort((a, b) => b.length - a.length)[0] ?? "anthropic/claude-haiku-4.5";
   const p = MODEL_PRICING[key];
   return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
 }

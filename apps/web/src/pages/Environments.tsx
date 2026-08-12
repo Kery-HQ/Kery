@@ -2,7 +2,6 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Globe,
-  Code,
   Plus,
   Trash,
   ShieldCheck,
@@ -814,7 +813,7 @@ function CredentialsOnboarding({
 type Env = { id: string; name: string; base_url: string; is_default: boolean };
 
 export const Environments: React.FC = () => {
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
   const navigate = useNavigate();
 
   const [envs, setEnvs] = React.useState<Env[]>([]);
@@ -1053,7 +1052,11 @@ export const Environments: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Code className="h-4 w-4" />} title="Credentials" />
+        <PageHeader
+          icon={<Key className="h-4 w-4" />}
+          title="Credentials"
+          description="Targets and reusable login credentials for browser runs."
+        />
         <EmptyState
           icon={<Globe className="h-8 w-8" />}
           title="No project selected"
@@ -1068,7 +1071,12 @@ export const Environments: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<Code className="h-4 w-4" />} title="Credentials">
+      <PageHeader
+        eyebrow={currentProject?.name}
+        icon={<Key className="h-4 w-4" />}
+        title="Credentials"
+        description="Targets and reusable login credentials for browser runs."
+      >
         {envs.length > 0 && (
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>

@@ -391,7 +391,8 @@ export type ModelPriceUsd = { input: number; output: number };
 export type ModelSlotKey =
   | "agentModel"
   | "auxiliaryModel"
-  | "reviewAgentModel";
+  | "reviewAgentModel"
+  | "stagehandModel";
 
 export type ModelSettingsResponse = {
   models: Record<string, { current: string; default: string; customized: boolean }>;

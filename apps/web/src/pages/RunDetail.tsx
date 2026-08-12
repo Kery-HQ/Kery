@@ -53,6 +53,7 @@ import {
   Stack,
   GitBranch,
   Circle,
+  Clock,
   Image as ImageIcon,
   Globe,
   ArrowSquareOut,
@@ -169,6 +170,37 @@ type MemoryEntryBrief = {
   confidence?: number;
 };
 
+type RunVerification = {
+  claim?: string;
+  status: "verified" | "contradicted" | "not_testable" | string;
+  evidence?: string;
+  title?: string;
+  stepIndex?: number;
+  step_index?: number;
+  screenshotBase64?: string | null;
+  screenshot_base64?: string | null;
+  screenshotPath?: string | null;
+  screenshot_path?: string | null;
+  artifactKey?: string | null;
+  artifact_key?: string | null;
+  region?: { x: number; y: number; w: number; h: number };
+};
+
+type RunBugRecord = {
+  id?: string;
+  name: string;
+  description: string;
+  url?: string | null;
+  step_index?: number | null;
+  status?: string;
+  reported_at?: string;
+  screenshot_path?: string | null;
+  screenshotPath?: string | null;
+  screenshot_base64?: string | null;
+  screenshotBase64?: string | null;
+  source?: "navigator" | "review" | "network" | "filmstrip";
+};
+
 type Run = {
   id: string;
   status: string;
@@ -190,6 +222,8 @@ type Run = {
   agent_plan_json?: AgentPlanItem[];
   memory_loaded?: MemoryEntryBrief[];
   bugs_json?: (RunStep & { source?: "navigator" | "review" | "network" | "filmstrip" })[];
+  verifications_json?: RunVerification[] | null;
+  verifications?: RunVerification[] | null;
   llm_calls_json?: LLMCallRecord[];
   /** Present while `status === "running"` when Redis live snapshot exists (see `@kery/engine` `LiveRunSnapshot`). */
   live_snapshot?: {
@@ -613,22 +647,7 @@ export const RunDetail: React.FC = () => {
   const [run, setRun] = React.useState<Run | null>(null);
   const [steps, setSteps] = React.useState<RunStep[]>([]);
   const [llmCalls, setLlmCalls] = React.useState<LLMCallRecord[]>([]);
-  const [runBugs, setRunBugs] = React.useState<
-    {
-      id?: string;
-      name: string;
-      description: string;
-      url?: string | null;
-      step_index?: number | null;
-      status?: string;
-      reported_at?: string;
-      screenshot_path?: string | null;
-      screenshotPath?: string | null;
-      screenshot_base64?: string | null;
-      screenshotBase64?: string | null;
-      source?: "navigator" | "review" | "network" | "filmstrip";
-    }[]
-  >([]);
+  const [runBugs, setRunBugs] = React.useState<RunBugRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [liveScreenshot, setLiveScreenshot] = React.useState<string | null>(null);
   const [livePreviewDisk, setLivePreviewDisk] = React.useState<{
@@ -956,11 +975,15 @@ export const RunDetail: React.FC = () => {
               steps={steps}
               llmCalls={llmCalls}
               bugsFound={bugsFound}
+              runBugs={runBugs}
               liveScreenshot={liveScreenshot}
               livePreviewDiskUrl={livePreviewDiskUrl}
               totalCost={totalCost}
               agentPlan={agentPlan}
               activityFeed={activityFeed}
+              galleryCount={galleryCount}
+              canOpenGallery={devMode}
+              onOpenTab={(next) => setTab(next)}
             />
           </TabsContent>
 
@@ -1410,25 +1433,258 @@ function BrowserPreviewStage({
         {!empty && (
           <div className="pointer-events-none absolute inset-0 rounded-xl bg-muted/20 dark:bg-surface-2/40" aria-hidden />
         )}
-        <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">{children}</div>
+        <div className={cn(
+          "relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]",
+          empty && "items-center justify-center",
+        )}>
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
+function verificationTitle(v: RunVerification): string {
+  const title = v.title?.trim();
+  if (title) return title;
+  const clean = (v.claim ?? v.evidence ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return "Verification check";
+  const stop = clean.search(/,| that | which |;| instead /i);
+  const head = stop > 16 ? clean.slice(0, stop) : clean;
+  return head.length > 68 ? head.slice(0, 66).replace(/\s\S*$/, "") + "..." : head;
+}
+
+function verificationStepIndex(v: RunVerification): number | null {
+  if (typeof v.stepIndex === "number" && Number.isFinite(v.stepIndex)) return v.stepIndex;
+  if (typeof v.step_index === "number" && Number.isFinite(v.step_index)) return v.step_index;
+  const fromEvidence = Number(/steps?\s+(\d+)/i.exec(v.evidence ?? "")?.[1]);
+  return Number.isFinite(fromEvidence) ? fromEvidence : null;
+}
+
+function verificationScreenshotSrc(runId: string, v: RunVerification): string | null {
+  const fileName = v.screenshotPath ?? v.screenshot_path ?? v.artifactKey ?? v.artifact_key;
+  if (fileName?.startsWith("http://") || fileName?.startsWith("https://") || fileName?.startsWith("data:") || fileName?.startsWith("/api/")) {
+    return screenshotRefToSrc(fileName) ?? null;
+  }
+  const fileUrl = runScreenshotFileUrl(runId, fileName);
+  const legacyRef =
+    v.screenshotBase64 ??
+    v.screenshot_base64 ??
+    (fileUrl ? undefined : fileName);
+  return fileUrl ?? screenshotRefToSrc(legacyRef ?? undefined) ?? null;
+}
+
+function buildOverviewEvidenceRecords(
+  run: Run,
+  steps: RunStep[],
+  bugsFound: RunStep[],
+  runBugs: RunBugRecord[],
+): RunVerification[] {
+  const explicit = run.verifications_json ?? run.verifications ?? [];
+  if (explicit.length > 0) return explicit;
+
+  const issueRecords: RunVerification[] = [];
+  for (const bug of bugsFound) {
+    const dbBug = resolveRunDbBug(bug, runBugs);
+    const title = runJsonBugDisplayName(bug);
+    const detail = runJsonBugDetailDescription(bug, title);
+    const stepIndex = dbBug?.step_index ?? (typeof bug.index === "number" ? bug.index : undefined);
+    const location = bug.url ? ` on ${bug.url}` : "";
+    issueRecords.push({
+      title,
+      claim: detail || bug.reasoning || "The run reported a browser issue.",
+      status: "contradicted",
+      evidence: stepIndex != null ? `Step ${stepIndex} reported an issue${location}.` : `The run reported an issue${location}.`,
+      stepIndex,
+      screenshotPath: dbBug?.screenshot_path ?? dbBug?.screenshotPath ?? bug.screenshotPath ?? bug.screenshot_path ?? null,
+      screenshotBase64: dbBug?.screenshot_base64 ?? dbBug?.screenshotBase64 ?? bug.screenshotBase64 ?? bug.screenshot_base64 ?? bug.screenshot ?? null,
+    });
+  }
+
+  for (const bug of runBugs) {
+    const alreadyShown = issueRecords.some(
+      (r) =>
+        r.title === bug.name ||
+        (bug.step_index != null && verificationStepIndex(r) === bug.step_index),
+    );
+    if (alreadyShown) continue;
+    issueRecords.push({
+      title: bug.name,
+      claim: bug.description,
+      status: "contradicted",
+      evidence: bug.step_index != null ? `Step ${bug.step_index} reported an issue${bug.url ? ` on ${bug.url}` : ""}.` : "The run reported an issue.",
+      stepIndex: bug.step_index ?? undefined,
+      screenshotPath: bug.screenshot_path ?? bug.screenshotPath ?? null,
+      screenshotBase64: bug.screenshot_base64 ?? bug.screenshotBase64 ?? null,
+    });
+  }
+  if (issueRecords.length > 0) return issueRecords;
+
+  const successfulStatus = ["passed", "completed", "success", "succeeded"].includes(run.status);
+  const failedSteps = steps.filter((s) => s.status === "failed").length;
+  if (successfulStatus && failedSteps === 0) {
+    const okSteps = steps.filter((s) => s.status === "ok" && s.action !== "bug").length;
+    return [{
+      title: "Run completed without reported issues",
+      claim: run.summary?.trim() || "Kery completed the browser run and did not report a blocking issue.",
+      status: "verified",
+      evidence: okSteps > 0
+        ? `${okSteps} browser step${okSteps === 1 ? "" : "s"} completed and no issues were reported.`
+        : "The run completed and no issues were reported.",
+    }];
+  }
+
+  return [];
+}
+
+function VerificationChecklistCard({
+  runId,
+  verifications,
+  steps,
+  recordingStartedAt,
+  galleryCount,
+  canOpenGallery,
+  onOpenGallery,
+  onSeek,
+}: {
+  runId: string;
+  verifications: RunVerification[];
+  steps: RunStep[];
+  recordingStartedAt?: number | null;
+  galleryCount: number;
+  canOpenGallery: boolean;
+  onOpenGallery: () => void;
+  onSeek?: (sec: number) => void;
+}) {
+  const verified = verifications.filter((v) => v.status === "verified").length;
+  const contradicted = verifications.filter((v) => v.status === "contradicted").length;
+
+  const seekSecondsFor = React.useCallback((v: RunVerification): number | null => {
+    if (!onSeek || !recordingStartedAt) return null;
+    const idx = verificationStepIndex(v);
+    if (idx == null) return null;
+    const step = steps.find((s) => s.index === idx && typeof s.at === "number");
+    if (!step || typeof step.at !== "number") return null;
+    return Math.max(0, (step.at - recordingStartedAt) / 1000 - 1.5);
+  }, [onSeek, recordingStartedAt, steps]);
+
+  return (
+    <Card className="overflow-hidden border-border bg-card">
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-foreground">Verification</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Evidence from the browser run</p>
+          </div>
+          {verifications.length > 0 ? (
+            <span className={cn(
+              "shrink-0 text-[12px] font-medium",
+              contradicted > 0 ? "text-destructive" : verified === verifications.length ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
+            )}>
+              {verified}/{verifications.length} verified{contradicted > 0 ? ` · ${contradicted} failed` : ""}
+            </span>
+          ) : (
+            <span className="shrink-0 text-[11px] text-muted-foreground">Waiting</span>
+          )}
+        </div>
+
+        {verifications.length === 0 ? (
+          <div className="px-3 py-4">
+            <p className="text-[12px] leading-5 text-muted-foreground">
+              Kery has not produced verification evidence yet. Plan and progress are shown below while the run is still active.
+            </p>
+          </div>
+        ) : (
+          <ul className="max-h-[48vh] divide-y divide-border/50 overflow-y-auto">
+            {verifications.map((v, i) => {
+              const seekSec = seekSecondsFor(v);
+              const title = verificationTitle(v);
+              const screenshotSrc = verificationScreenshotSrc(runId, v);
+              return (
+                <li key={`${title}-${i}`} className="px-3 py-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                      {v.status === "verified" ? (
+                        <CheckCircle weight="fill" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                      ) : v.status === "contradicted" ? (
+                        <XCircle weight="fill" className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                      ) : (
+                        <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/55" />
+                      )}
+                      <div className="min-w-0">
+                        <p className={cn(
+                          "text-[13px] leading-5",
+                          v.status === "contradicted" ? "font-medium text-foreground" : "text-foreground/90",
+                        )}>
+                          {title}
+                        </p>
+                        {v.title && v.claim && (
+                          <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">{v.claim}</p>
+                        )}
+                        {v.evidence && (
+                          <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">{v.evidence}</p>
+                        )}
+                        {seekSec != null && (
+                          <button
+                            type="button"
+                            onClick={() => onSeek?.(seekSec)}
+                            className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-primary/85 transition hover:text-primary"
+                          >
+                            <Play className="h-3 w-3" />
+                            Watch this moment
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {screenshotSrc && (
+                      <BugScreenshotZoomDialog
+                        src={screenshotSrc}
+                        alt={`${title} evidence`}
+                        triggerClassName="w-full rounded-md sm:w-32"
+                        thumbnailClassName="h-24 w-full object-cover sm:w-32"
+                      />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {canOpenGallery && galleryCount > 0 && (
+          <div className="border-t border-border px-3 py-2">
+            <button
+              type="button"
+              onClick={onOpenGallery}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ImagesSquare className="h-3.5 w-3.5" />
+              View {galleryCount} screenshot{galleryCount === 1 ? "" : "s"}
+            </button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function OverviewTab({
-  run, steps, llmCalls, bugsFound, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed,
+  run, steps, llmCalls, bugsFound, runBugs, liveScreenshot, livePreviewDiskUrl, totalCost, agentPlan, activityFeed, galleryCount, canOpenGallery, onOpenTab,
 }: {
   run: Run;
   steps: RunStep[];
   llmCalls: LLMCallRecord[];
   bugsFound: RunStep[];
+  runBugs: RunBugRecord[];
   liveScreenshot: string | null;
   /** Throttled on-disk live frame from Redis rehydrate (`/api/bugs/:runId/live-preview.jpg?t=…`). */
   livePreviewDiskUrl: string | null;
   totalCost: number;
   agentPlan: AgentPlanItem[];
   activityFeed: ActivityEntry[];
+  galleryCount: number;
+  canOpenGallery: boolean;
+  onOpenTab: (next: Tab) => void;
 }) {
   const okCount = steps.filter((s) => s.status === "ok" && s.action !== "bug").length;
   const failCount = steps.filter((s) => s.status === "failed").length;
@@ -1483,6 +1739,10 @@ function OverviewTab({
     }
     return null;
   }, [steps, llmCalls, run.id]);
+  const verificationRecords = React.useMemo(
+    () => buildOverviewEvidenceRecords(run, steps, bugsFound, runBugs),
+    [run, steps, bugsFound, runBugs],
+  );
 
   const showLive = run.status === "running" && !!liveScreenshot;
   const showLiveDisk = run.status === "running" && !liveScreenshot && !!livePreviewDiskUrl;
@@ -1494,10 +1754,21 @@ function OverviewTab({
   const [liveFrameOpenAnim, setLiveFrameOpenAnim] = React.useState(false);
   const seenLivePreviewRef = React.useRef(false);
   const recordingVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const seekRecordingTo = React.useCallback((sec: number) => {
+    const node = recordingVideoRef.current;
+    if (!node) return;
+    try {
+      node.currentTime = Math.max(0, sec);
+      void node.play().catch(() => {});
+    } catch {
+      // Video metadata may not be loaded yet.
+    }
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
   const [playbackMs, setPlaybackMs] = React.useState(0);
   const [videoDurationMs, setVideoDurationMs] = React.useState(0);
   const replayActiveStepRef = React.useRef<HTMLDivElement | null>(null);
-  const [panelWidth, setPanelWidth] = React.useState(288);
+  const [panelWidth, setPanelWidth] = React.useState(420);
   const isDragging = React.useRef(false);
   const dragStartX = React.useRef(0);
   const dragStartWidth = React.useRef(0);
@@ -1511,7 +1782,7 @@ function OverviewTab({
     const onMouseMove = (ev: MouseEvent) => {
       if (!isDragging.current) return;
       const delta = dragStartX.current - ev.clientX;
-      const next = Math.max(180, Math.min(520, dragStartWidth.current + delta));
+      const next = Math.max(320, Math.min(680, dragStartWidth.current + delta));
       setPanelWidth(next);
     };
     const onMouseUp = () => {
@@ -1651,7 +1922,7 @@ function OverviewTab({
     <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
 
       {/* ── Video column — fills all remaining width ── */}
-      <div className="relative flex-1 min-w-0 min-h-0 overflow-hidden">
+      <div className="relative flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
         <BrowserPreviewStage
           empty={previewEmpty}
           liveFrameOpenAnim={liveFrameOpenAnim}
@@ -1722,8 +1993,24 @@ function OverviewTab({
         style={{ width: panelWidth }}
       >
         <>
+          <div className="flex-shrink-0 border-b border-border bg-surface-2/80 p-3 dark:bg-surface-3/80">
+            <VerificationChecklistCard
+              runId={run.id}
+              verifications={verificationRecords}
+              steps={steps}
+              recordingStartedAt={run.recording_started_at}
+              galleryCount={galleryCount}
+              canOpenGallery={canOpenGallery}
+              onOpenGallery={() => onOpenTab("gallery")}
+              onSeek={showRecording ? seekRecordingTo : undefined}
+            />
+          </div>
+
           {/* Header */}
           <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-surface-2 dark:bg-surface-3 flex-shrink-0">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/65">
+              Run details
+            </span>
             <div className="flex items-center gap-1 rounded-md border border-border bg-surface-1 dark:bg-surface-2 p-0.5">
               {hasPlan && (
                 <button

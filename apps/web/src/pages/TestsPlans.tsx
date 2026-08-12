@@ -49,7 +49,7 @@ type SavedTest = {
 export const TestsPlans: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
 
   const [environments, setEnvironments] = React.useState<Env[]>([]);
   const [quickEnvId, setQuickEnvId] = React.useState<string | null>(null);
@@ -360,7 +360,11 @@ export const TestsPlans: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<ListChecks className="h-4 w-4" />} title="Tests" />
+        <PageHeader
+          icon={<ListChecks className="h-4 w-4" />}
+          title="Tests"
+          description="Create, group, and run repeatable browser tests."
+        />
         <EmptyState
           icon={<ListChecks className="h-8 w-8" />}
           title="No project selected"
@@ -375,10 +379,15 @@ export const TestsPlans: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader icon={<ListChecks className="h-4 w-4" />} title="Tests" />
+      <PageHeader
+        eyebrow={currentProject?.name}
+        icon={<ListChecks className="h-4 w-4" />}
+        title="Tests"
+        description="Create, group, and run repeatable browser tests for this project."
+      />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-6 space-y-6 animate-page-enter">
+        <div className="mx-auto w-full max-w-5xl px-6 pb-6 space-y-6 animate-page-enter">
 
           {/* ── #1 Quick Test ─────────────────────────────────────────── */}
           <div>

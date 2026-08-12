@@ -550,7 +550,11 @@ export const Bugs: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Bug className="h-4 w-4" />} title="Issues" />
+        <PageHeader
+          icon={<Bug className="h-4 w-4" />}
+          title="Issues"
+          description="Review, filter, and triage issues found during browser runs."
+        />
         <EmptyState
           icon={<Bug className="h-8 w-8" />}
           title="No project selected"
@@ -563,7 +567,12 @@ export const Bugs: React.FC = () => {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full">
-      <PageHeader icon={<Bug className="h-4 w-4" />} title="Issues">
+      <PageHeader
+        eyebrow={currentProject?.name}
+        icon={<Bug className="h-4 w-4" />}
+        title="Issues"
+        description="Review, filter, and triage issues found during browser runs."
+      >
         {!loading && bugs.length > 0 && (
           <Badge variant="neutral" className="font-mono">{bugs.length}</Badge>
         )}

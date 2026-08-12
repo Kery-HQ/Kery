@@ -2,10 +2,12 @@
  * Stagehand Bridge — thin wrapper around Stagehand's observe/act/extract APIs.
  */
 import { Stagehand, type ObserveResult, type ActResult, type Page as StagehandPage } from "@browserbasehq/stagehand";
-import { getConfig } from "./config.js";
+import { getConfig, type EngineConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { dockerHostResolverArgs } from "./dockerHost.js";
 import { screenshotDpr } from "./screenshotConfig.js";
+import { OPENROUTER_BASE } from "./llmOpenRouter.js";
+import { hasDirectProviderKey, inferModelProviderRequirement } from "./llmProviders.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +29,80 @@ export type StagehandSession = {
   stagehand: InstanceType<typeof Stagehand>;
   page: StagehandPage;
 };
+
+type StagehandModelConfig = {
+  modelName: string;
+  modelClientOptions?: Record<string, unknown>;
+  routedViaOpenRouter: boolean;
+};
+
+function directStagehandApiKey(cfg: EngineConfig, model: string): string | null {
+  const req = inferModelProviderRequirement(model);
+  if (req.kind === "openrouter_only") return null;
+  if (!hasDirectProviderKey(cfg, req.provider)) return null;
+  switch (req.provider) {
+    case "openai":
+      return cfg.openaiApiKey;
+    case "anthropic":
+      return cfg.anthropicApiKey;
+    case "gemini":
+      return cfg.geminiApiKey;
+  }
+}
+
+function normalizeDirectStagehandModel(model: string): string {
+  const m = model.trim();
+  if (m === "anthropic/claude-haiku-4.5") return "anthropic/claude-haiku-4-5";
+  if (m === "claude-haiku-4.5") return "claude-haiku-4-5";
+  return m;
+}
+
+function toOpenRouterModelId(model: string): string {
+  const m = model.trim();
+  if (m === "claude-haiku-4-5" || m === "anthropic/claude-haiku-4-5") {
+    return "anthropic/claude-haiku-4.5";
+  }
+  if (m.startsWith("openai/") || m.startsWith("anthropic/") || m.startsWith("google/")) return m;
+  if (m.startsWith("gpt-")) return `openai/${m}`;
+  if (m.startsWith("claude-")) return `anthropic/${m}`;
+  if (m.startsWith("gemini-")) return `google/${m}`;
+  return m;
+}
+
+function resolveStagehandModelConfig(cfg: EngineConfig, configuredModel: string): StagehandModelConfig {
+  const apiKey = directStagehandApiKey(cfg, configuredModel);
+  if (apiKey) {
+    return {
+      modelName: normalizeDirectStagehandModel(configuredModel),
+      modelClientOptions: { apiKey },
+      routedViaOpenRouter: false,
+    };
+  }
+
+  if (cfg.openrouterApiKey) {
+    return {
+      // Stagehand's AI SDK route uses the first path segment as the provider.
+      // Prefix with `openai/` so OpenRouter is called through its OpenAI-compatible API
+      // while preserving the actual OpenRouter model id after that first slash.
+      modelName: `openai/${toOpenRouterModelId(configuredModel)}`,
+      modelClientOptions: {
+        apiKey: cfg.openrouterApiKey,
+        baseURL: OPENROUTER_BASE,
+        compatibility: "compatible",
+        headers: {
+          "HTTP-Referer": "https://kery.so",
+          "X-Title": "Kery Agent",
+        },
+      },
+      routedViaOpenRouter: true,
+    };
+  }
+
+  return {
+    modelName: normalizeDirectStagehandModel(configuredModel),
+    routedViaOpenRouter: false,
+  };
+}
 
 // ─── Circuit Breaker (with half-open recovery) ──────────────────────────────
 
@@ -93,13 +169,17 @@ export function isObserveCircuitOpen(page: object): boolean {
 export async function initStagehandSession(opts?: {
   recordVideo?: { dir: string; size?: { width: number; height: number } };
 }): Promise<StagehandSession> {
-  const model = getConfig().stagehandModel || "google/gemini-2.0-flash";
+  const cfg = getConfig();
+  const configuredModel = cfg.stagehandModel || "anthropic/claude-haiku-4.5";
+  const { modelName, modelClientOptions, routedViaOpenRouter } =
+    resolveStagehandModelConfig(cfg, configuredModel);
 
-  logger.info({ model, env: "LOCAL" }, "Initializing Stagehand");
+  logger.info({ model: configuredModel, stagehandModelName: modelName, routedViaOpenRouter, env: "LOCAL" }, "Initializing Stagehand");
 
   const stagehand = new Stagehand({
     env: "LOCAL",
-    modelName: model,
+    modelName,
+    modelClientOptions: modelClientOptions as any,
     verbose: 0,
     selfHeal: true,
     domSettleTimeoutMs: 2000,

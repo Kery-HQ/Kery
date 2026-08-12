@@ -46,7 +46,7 @@ Returns:
                 : "All required API keys are configured.",
               "To change a model, call kery_update_settings with the model slot and new model name.",
             ],
-            tip: "Kery uses OpenRouter by default (routes to all models). Set OPENROUTER_API_KEY for the broadest model support.",
+            tip: "Kery uses Anthropic by default. Set OPENROUTER_API_KEY if you want one key that can route to all engine model families.",
           }),
         }],
       };
@@ -58,25 +58,25 @@ Returns:
     `Update Kery's LLM model configuration or API keys.
 
 WHEN TO USE:
-  • User says "change the model", "use gpt-4o instead", "add my OpenAI key", "switch to Claude"
+  • User says "change the model", "use Claude Sonnet instead", "add my OpenAI key", "switch to Claude"
   • Configuring API keys for the first time
   • Rotating API keys
   • Customizing which models Kery uses for different tasks
 
 MODEL SLOTS:
-  'agentModel'       — makes browser automation decisions. Default: openai/gpt-4.1-mini
-  'auxiliaryModel'   — test plans, summaries, memory curation. Default: gemini-2.5-flash
-  'reviewAgentModel' — post-run holistic screenshot analysis. Default: gemini-2.5-flash
-  'stagehandModel'   — element finding when selectors break. Default: gpt-4o-mini
+  'agentModel'       — makes browser automation decisions. Default: anthropic/claude-sonnet-5
+  'auxiliaryModel'   — test plans, summaries, memory curation. Default: anthropic/claude-haiku-4.5
+  'reviewAgentModel' — post-run holistic screenshot analysis. Default: anthropic/claude-sonnet-5
+  'stagehandModel'   — element finding when selectors break. Default: anthropic/claude-haiku-4.5
 
 API KEY PROVIDERS (at least one required):
-  'openrouter'  — routes to all models (recommended; set OPENROUTER_API_KEY)
+  'openrouter'  — routes to all engine models (set OPENROUTER_API_KEY)
   'openai'      — direct OpenAI access
   'anthropic'   — direct Anthropic access
   'gemini'      — direct Google Gemini access
 
 VALIDATION:
-  • Model names must be valid for an available provider (e.g. 'openai/gpt-4o', 'anthropic/claude-3-5-sonnet', 'gemini-2.5-flash')
+  • Model names must be valid for an available provider (e.g. 'anthropic/claude-sonnet-5', 'openai/gpt-5.6-terra', 'google/gemini-3.5-flash')
   • Passing empty string ('') for a model resets it to the default
   • API key values are encrypted at rest; pass empty string to clear a DB override (reverts to env var)`,
     {
@@ -86,28 +86,28 @@ VALIDATION:
             .string()
             .optional()
             .describe(
-              "Browser automation model (e.g. 'openai/gpt-4o', 'openai/gpt-4.1-mini'). " +
+              "Browser automation model (e.g. 'anthropic/claude-sonnet-5', 'openai/gpt-5.6-terra'). " +
               "Empty string resets to default.",
             ),
           auxiliaryModel: z
             .string()
             .optional()
             .describe(
-              "Crawl + planning model (e.g. 'gemini-2.5-flash', 'openai/gpt-4o-mini'). " +
+              "Crawl + planning model (e.g. 'anthropic/claude-haiku-4.5', 'google/gemini-3.5-flash-lite'). " +
               "Empty string resets to default.",
             ),
           reviewAgentModel: z
             .string()
             .optional()
             .describe(
-              "Screenshot analysis model (e.g. 'gemini-2.5-flash', 'anthropic/claude-3-5-sonnet'). " +
+              "Screenshot analysis model (e.g. 'anthropic/claude-sonnet-5', 'google/gemini-3.5-flash'). " +
               "Empty string resets to default.",
             ),
           stagehandModel: z
             .string()
             .optional()
             .describe(
-              "Element-finding model (e.g. 'gpt-4o-mini', 'openai/gpt-4o'). " +
+              "Element-finding model (e.g. 'anthropic/claude-haiku-4.5', 'openai/gpt-5.6-luna'). " +
               "Empty string resets to default.",
             ),
         })

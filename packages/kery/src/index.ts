@@ -11,17 +11,52 @@ import { Listr } from "listr2";
 import gradient from "gradient-string";
 import boxen from "boxen";
 
-// ─── ASCII banner ─────────────────────────────────────────────────────────────
+// ─── 8-bit logo banner ────────────────────────────────────────────────────────
+// Pixel data derived from apps/web/public/logo/kery.png (32x32 grid, quantized
+// to 48 colors). Rendered two pixels per terminal row using half blocks (▀).
 
-const BANNER_ART = [
-  "+------------------------+",
-  "|    _                   |",
-  "|   | |_____ _ _ _  _    |",
-  "|   | / / -_| '_| || |   |",
-  "|   |_\\_\\___|_|  \\_, |   |",
-  "|                |__/    |",
-  "+------------------------+",
-];
+const LOGO_PALETTE: [number, number, number][] = [[72,48,24],[144,72,24],[24,24,48],[72,72,96],[48,48,72],[48,120,48],[96,168,48],[192,144,24],[240,168,24],[240,144,24],[240,120,48],[120,72,24],[48,120,24],[120,168,48],[240,192,48],[240,192,24],[24,120,24],[24,120,48],[72,144,48],[240,216,144],[216,96,48],[0,24,48],[240,216,96],[240,216,120],[240,120,24],[216,120,48],[144,72,48],[24,72,48],[240,192,72],[216,72,24],[24,24,24],[240,96,48],[240,96,24],[240,72,24],[24,48,48],[192,192,24],[144,192,24],[192,72,24],[144,168,24],[168,168,24],[120,144,24],[120,168,24],[144,144,24],[72,72,48],[48,72,48],[96,48,48],[96,48,24],[72,48,48]];
+const LOGO_ROWS = ["....................a.....","...................bccc...","........dcccccc..ecacfgcc.","......cchiiiijkcclac.cmgnc",".....cooooopiijkac...cqrsc","....cootttoooiijkkuv..ccrc","....cowxxtoooiijykzA....B.","....coxxxtoooiijjkkkc...c.","...cootxCooopiijjkkkc.....","...coxxxCoooiiijjkkkDc....","...cotxoooopiijjykkDDc....","..EootoooopiiijyyyyDDc....","..coooooppiiijjyyFGDDc....","..coooopiiiijjyyyHDDDc....",".coooopiiiijjjyyDDDDDc....",".coooppiiiijjjyyDDDDDI....",".cppiiiiiijjjyyFDDDDc.....",".cJiiiiijjjjjyyDDDDDc.....","cKJJiiijjjjjyyGDDDLc......","cKMJJjjjjjjyyGHDDI........","cMMKJJjjjjyyHHHDc.........",".cKKMNNyyyGHHHHc..........","..ccOPOQDHDDccc...........","....RSSSTUTV..............","....cccccccc..............",".........................."];
+const LOGO_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/";
+
+const supportsTruecolor =
+  process.env.COLORTERM === "truecolor" || process.env.COLORTERM === "24bit";
+
+/** Map RGB to the nearest xterm-256 color (6x6x6 cube) for terminals without truecolor. */
+function rgbTo256(r: number, g: number, b: number): number {
+  const level = (v: number) => (v < 48 ? 0 : v < 115 ? 1 : Math.min(5, Math.round((v - 35) / 40)));
+  return 16 + 36 * level(r) + 6 * level(g) + level(b);
+}
+
+function ansiColor(rgb: [number, number, number], layer: "fg" | "bg"): string {
+  const code = layer === "fg" ? 38 : 48;
+  return supportsTruecolor
+    ? `\x1b[${code};2;${rgb[0]};${rgb[1]};${rgb[2]}m`
+    : `\x1b[${code};5;${rgbTo256(rgb[0], rgb[1], rgb[2])}m`;
+}
+
+function renderLogoLines(): string[] {
+  const RESET = "\x1b[0m";
+  const pixel = (row: number, col: number): [number, number, number] | null => {
+    const ch = LOGO_ROWS[row]?.[col];
+    if (!ch || ch === ".") return null;
+    return LOGO_PALETTE[LOGO_CHARS.indexOf(ch)] ?? null;
+  };
+  const lines: string[] = [];
+  for (let y = 0; y < LOGO_ROWS.length; y += 2) {
+    let line = "";
+    for (let x = 0; x < LOGO_ROWS[0].length; x++) {
+      const top = pixel(y, x);
+      const bottom = pixel(y + 1, x);
+      if (!top && !bottom) line += RESET + " ";
+      else if (top && bottom) line += ansiColor(top, "fg") + ansiColor(bottom, "bg") + "▀";
+      else if (top) line += RESET + ansiColor(top, "fg") + "▀";
+      else line += RESET + ansiColor(bottom!, "fg") + "▄";
+    }
+    lines.push(line + RESET);
+  }
+  return lines;
+}
 
 // ─── Provider defaults ────────────────────────────────────────────────────────
 
@@ -38,41 +73,41 @@ type ProviderConfig = {
 };
 
 const PROVIDER_CONFIG: Record<Provider, ProviderConfig> = {
+  anthropic: {
+    label: "Anthropic",
+    hint: "Navigator: claude-sonnet-5  ·  Review: claude-sonnet-5  ·  Support: claude-haiku-4.5",
+    envKey: "ANTHROPIC_API_KEY",
+    agentModel: "anthropic/claude-sonnet-5",
+    reviewAgentModel: "anthropic/claude-sonnet-5",
+    auxiliaryModel: "anthropic/claude-haiku-4.5",
+    stagehandModel: "anthropic/claude-haiku-4.5",
+  },
   openrouter: {
     label: "OpenRouter",
-    hint: "Navigator: openai/gpt-4.1-mini  ·  Review: gemini-2.5-flash  ·  Support: gemini-2.5-flash",
+    hint: "Navigator: claude-sonnet-5  ·  Review: claude-sonnet-5  ·  Support: claude-haiku-4.5",
     envKey: "OPENROUTER_API_KEY",
-    agentModel: "openai/gpt-4.1-mini",
-    reviewAgentModel: "gemini-2.5-flash",
-    auxiliaryModel: "gemini-2.5-flash",
-    stagehandModel: "google/gemini-2.0-flash",
+    agentModel: "anthropic/claude-sonnet-5",
+    reviewAgentModel: "anthropic/claude-sonnet-5",
+    auxiliaryModel: "anthropic/claude-haiku-4.5",
+    stagehandModel: "anthropic/claude-haiku-4.5",
   },
   openai: {
     label: "OpenAI",
-    hint: "Navigator: gpt-4.1-mini  ·  Review: gpt-4o  ·  Support: gpt-4.1-mini",
+    hint: "Navigator: gpt-5.6-terra  ·  Review: gpt-5.6-terra  ·  Support: gpt-5.6-luna",
     envKey: "OPENAI_API_KEY",
-    agentModel: "openai/gpt-4.1-mini",
-    reviewAgentModel: "openai/gpt-4o",
-    auxiliaryModel: "openai/gpt-4.1-mini",
-    stagehandModel: "openai/gpt-4o-mini",
-  },
-  anthropic: {
-    label: "Anthropic",
-    hint: "Navigator: claude-haiku-4-5  ·  Review: claude-sonnet-4-6  ·  Support: claude-haiku-4-5",
-    envKey: "ANTHROPIC_API_KEY",
-    agentModel: "anthropic/claude-haiku-4-5",
-    reviewAgentModel: "anthropic/claude-sonnet-4-6",
-    auxiliaryModel: "anthropic/claude-haiku-4-5",
-    stagehandModel: "anthropic/claude-haiku-4-5",
+    agentModel: "openai/gpt-5.6-terra",
+    reviewAgentModel: "openai/gpt-5.6-terra",
+    auxiliaryModel: "openai/gpt-5.6-luna",
+    stagehandModel: "openai/gpt-5.6-luna",
   },
   gemini: {
     label: "Google Gemini",
-    hint: "Navigator: gemini-2.5-flash  ·  Review: gemini-2.5-pro  ·  Support: gemini-2.5-flash",
+    hint: "Navigator: gemini-3.5-flash  ·  Review: gemini-3.5-flash  ·  Support: gemini-3.5-flash-lite",
     envKey: "GEMINI_API_KEY",
-    agentModel: "gemini-2.5-flash",
-    reviewAgentModel: "google/gemini-2.5-pro",
-    auxiliaryModel: "gemini-2.5-flash",
-    stagehandModel: "google/gemini-2.0-flash",
+    agentModel: "google/gemini-3.5-flash",
+    reviewAgentModel: "google/gemini-3.5-flash",
+    auxiliaryModel: "google/gemini-3.5-flash-lite",
+    stagehandModel: "google/gemini-3.5-flash-lite",
   },
 };
 
@@ -506,14 +541,20 @@ function formatDockerStatus(state: DockerPullState): string {
 // ─── Banner + success box ─────────────────────────────────────────────────────
 
 function printBanner(): void {
-  const logo = gradient(["#F5A623", "#E8520A"]);
+  const brand = gradient(["#F5A623", "#E8520A"]);
+  const logoLines = renderLogoLines();
+
+  // Text block placed to the right of the logo, vertically centered
+  const text: (string | undefined)[] = [];
+  const mid = Math.floor(logoLines.length / 2);
+  text[mid - 2] = pc.bold(brand("Kery"));
+  text[mid] = pc.bold("Video proof on every pull request.");
+  text[mid + 1] = pc.dim("See it work, before you merge.");
 
   console.log();
-  for (const line of BANNER_ART) {
-    console.log("  " + logo(line));
-  }
-  console.log();
-  console.log("  " + pc.bold(logo("Ship Fast, Break Nothing.")));
+  logoLines.forEach((line, i) => {
+    console.log("  " + line + (text[i] ? "   " + text[i] : ""));
+  });
   console.log();
 }
 
@@ -574,7 +615,7 @@ async function main() {
       choices: (Object.entries(PROVIDER_CONFIG) as [Provider, ProviderConfig][]).map(
         ([name, cfg]) => ({
           name,
-          message: name === "openrouter" ? cfg.label + "  (recommended)" : cfg.label,
+          message: name === "anthropic" ? cfg.label + "  (recommended)" : cfg.label,
         }),
       ),
     } as never);
@@ -582,11 +623,14 @@ async function main() {
     const providerCfg = PROVIDER_CONFIG[provider];
 
     // ── 2. API key ────────────────────────────────────────────────────────────
+    console.log(
+      pc.dim("  Your key is stored only on this machine in kery/.env.\n") +
+      pc.dim("  This is optional now — press Enter to skip and add or update keys later in Settings > API Keys."),
+    );
     const { apiKey } = await enquirer.prompt<{ apiKey: string }>({
       type: "password",
       name: "apiKey",
-      message: `${providerCfg.label} API key`,
-      validate: (v: string) => v.trim() ? true : "API key is required",
+      message: `${providerCfg.label} API key (optional)`,
     } as never);
 
     // ── 3. MCP install ────────────────────────────────────────────────────────

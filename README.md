@@ -122,7 +122,7 @@ npm run dev:api   # API + Dashboard → http://localhost:11111
 - REST API + SSE streaming for real-time run progress
 
 **LLM Flexibility**
-- OpenRouter (recommended), OpenAI, Anthropic, Google Gemini
+- Anthropic (recommended default), OpenRouter, OpenAI, Google Gemini
 - Each agent role (Navigator, Review, Auxiliary, Stagehand) configurable independently
 - Per-run token and cost tracking
 
@@ -195,10 +195,11 @@ Once connected, your AI assistant can scan your app, run tests, and triage bugs 
 | `OPENAI_API_KEY` | — | Direct OpenAI key |
 | `ANTHROPIC_API_KEY` | — | Direct Anthropic key |
 | `GEMINI_API_KEY` | — | Direct Google Gemini key |
-| `AGENT_MODEL` | `claude-haiku-4-5` | Model for browser navigation decisions |
-| `AUXILIARY_MODEL` | `gemini-2.5-pro` | Crawl, path planning, memory curation, summarization |
-| `REVIEW_AGENT_MODEL` | `claude-sonnet-4-6` | Post-run holistic and filmstrip screenshot analysis |
+| `AGENT_MODEL` | `anthropic/claude-sonnet-5` | Model for browser navigation decisions |
+| `AUXILIARY_MODEL` | `anthropic/claude-haiku-4.5` | Crawl, path planning, memory curation, summarization |
+| `REVIEW_AGENT_MODEL` | `anthropic/claude-sonnet-5` | Post-run holistic and filmstrip screenshot analysis |
 | `STAGEHAND_ENABLED` | `true` | Enable Stagehand for semantic element finding |
+| `STAGEHAND_MODEL` | `anthropic/claude-haiku-4.5` | Model for Stagehand element finding |
 | `RUN_TIMEOUT_MINUTES` | `15` | Max wall-clock time per test run |
 
 All model settings are also configurable via the dashboard under **Settings**.

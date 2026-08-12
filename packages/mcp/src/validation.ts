@@ -295,8 +295,8 @@ export const ModelKeyField = z
   .enum(["agentModel", "auxiliaryModel", "reviewAgentModel", "stagehandModel"])
   .describe(
     "Model slot:\n" +
-    "  'agentModel'       — browser automation decisions (default: gpt-4.1-mini)\n" +
-    "  'auxiliaryModel'   — test plans, summaries, memory (default: gemini-2.5-flash)\n" +
-    "  'reviewAgentModel' — post-run screenshot analysis (default: gemini-2.5-flash)\n" +
-    "  'stagehandModel'   — Stagehand element finding (default: gpt-4o-mini)",
+    "  'agentModel'       — browser automation decisions (default: anthropic/claude-sonnet-5)\n" +
+    "  'auxiliaryModel'   — test plans, summaries, memory (default: anthropic/claude-haiku-4.5)\n" +
+    "  'reviewAgentModel' — post-run screenshot analysis (default: anthropic/claude-sonnet-5)\n" +
+    "  'stagehandModel'   — Stagehand element finding (default: anthropic/claude-haiku-4.5)",
   );

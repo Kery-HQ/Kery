@@ -47,7 +47,7 @@ function getType(v: MemoryEntryType): TypeDef {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const Memory: React.FC = () => {
-  const { currentProjectId } = useProject();
+  const { currentProjectId, currentProject } = useProject();
   const [entries, setEntries]   = React.useState<MemoryEntry[]>([]);
   const [loading, setLoading]   = React.useState(false);
 
@@ -168,7 +168,11 @@ export const Memory: React.FC = () => {
   if (!currentProjectId) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Brain className="h-4 w-4" />} title="Memory" />
+        <PageHeader
+          icon={<Brain className="h-4 w-4" />}
+          title="Memory"
+          description="Learned paths, tips, ignore regions, and bug patterns."
+        />
         <EmptyState icon={<Brain className="h-8 w-8" />} title="No project selected"
           description="Select a project to view memory." className="flex-1" />
       </div>
@@ -182,9 +186,10 @@ export const Memory: React.FC = () => {
     <div className="flex flex-col min-h-full">
       {/* Header */}
       <PageHeader
+        eyebrow={currentProject?.name}
         icon={<Brain className="h-4 w-4" />}
         title="Memory"
-        description={entries.length > 0 ? `${entries.length} entries` : undefined}
+        description={entries.length > 0 ? `${entries.length} entries learned for this project.` : "Learned paths, tips, ignore regions, and bug patterns for this project."}
       >
         <Button size="sm" className="gap-1.5" onClick={() => openAddDialog()}>
           <Plus className="h-3.5 w-3.5" />Add Entry

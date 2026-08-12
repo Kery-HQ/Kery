@@ -68,24 +68,25 @@
   }
 
   .dark {
-    --background: oklch(0.1822 0 0);
+    /* Warm dark neutrals aligned with Kery Cloud's workbench surfaces. */
+    --background: oklch(0.2210 0.0030 106.42);
     --foreground: oklch(0.9288 0.0126 255.5078);
-    --card: oklch(0.2046 0 0);
+    --card: oklch(0.2440 0.0030 106.42);
     --card-foreground: oklch(0.9288 0.0126 255.5078);
-    --popover: oklch(0.2603 0 0);
+    --popover: oklch(0.2900 0.0030 106.42);
     --popover-foreground: oklch(0.7348 0 0);
     --primary: oklch(0.7918 0.1588 79.0118);
-    --primary-foreground: oklch(0.9213 0.0135 167.1556);
-    --secondary: oklch(0.2603 0 0);
+    --primary-foreground: oklch(0.2626 0.0147 166.4589);
+    --secondary: oklch(0.2900 0.0030 106.42);
     --secondary-foreground: oklch(0.9851 0 0);
-    --muted: oklch(0.2393 0 0);
+    --muted: oklch(0.2700 0.0030 106.42);
     --muted-foreground: oklch(0.7122 0 0);
-    --accent: oklch(0.3132 0 0);
+    --accent: oklch(0.3400 0.0030 106.42);
     --accent-foreground: oklch(0.9851 0 0);
     --destructive: oklch(0.65 0.20 27);
     --destructive-foreground: oklch(0.9368 0.0045 34.3092);
-    --border: oklch(0.2809 0 0);
-    --input: oklch(0.2603 0 0);
+    --border: oklch(0.3150 0.0030 106.42);
+    --input: oklch(0.2900 0.0030 106.42);
     --ring: oklch(0.7918 0.1588 79.0118);
 
     --chart-1: oklch(0.8003 0.1821 151.7110);
@@ -94,19 +95,19 @@
     --chart-4: oklch(0.8369 0.1644 84.4286);
     --chart-5: oklch(0.7845 0.1325 181.9120);
 
-    --sidebar: oklch(0.1822 0 0);
+    --sidebar: oklch(0.2210 0.0030 106.42);
     --sidebar-foreground: oklch(0.6301 0 0);
     --sidebar-primary: oklch(0.4365 0.1044 156.7556);
     --sidebar-primary-foreground: oklch(0.9213 0.0135 167.1556);
-    --sidebar-accent: oklch(0.3132 0 0);
+    --sidebar-accent: oklch(0.3400 0.0030 106.42);
     --sidebar-accent-foreground: oklch(0.9851 0 0);
-    --sidebar-border: oklch(0.2809 0 0);
+    --sidebar-border: oklch(0.3150 0.0030 106.42);
     --sidebar-ring: oklch(0.8003 0.1821 151.7110);
 
     /* Stepped surfaces */
-    --surface-1: oklch(0.2046 0 0);
-    --surface-2: oklch(0.2393 0 0);
-    --surface-3: oklch(0.2809 0 0);
+    --surface-1: oklch(0.2440 0.0030 106.42);
+    --surface-2: oklch(0.2700 0.0030 106.42);
+    --surface-3: oklch(0.3150 0.0030 106.42);
 
     /* Status */
     --status-pass: oklch(0.72 0.18 145);
@@ -131,6 +132,8 @@
   *, *::before, *::after {
     --tw-ring-color: hsl(var(--ring) / 0.35);
     --tw-ring-offset-color: hsl(var(--background));
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
 
   html { height: 100%; }
@@ -138,6 +141,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
+    font-size: 13px;
     font-feature-settings: 'rlig' 1, 'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -333,6 +337,12 @@
     border: 1px solid var(--sidebar-border);
   }
 
+  .surface-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
   .liquid-glass::before,
   .liquid-glass-strong::before,
   .liquid-glass-rgb::after {
@@ -360,6 +370,10 @@
     border-color: var(--border) !important;
   }
 
+  .liquid-glass-strong .glass-divider {
+    border-color: var(--sidebar-border) !important;
+  }
+
   .glass-row {
     border-radius: var(--radius);
     transition: background 100ms ease-out;
@@ -379,9 +393,28 @@
     border-color: color-mix(in oklch, var(--ring) 35%, var(--border));
   }
 
+  .icon-tile {
+    display: inline-flex;
+    height: 2rem;
+    width: 2rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--foreground);
+  }
+
   /* ── Focus ring ─────────────────────────────────────────────── */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
+    outline: none;
+  }
+
+  .focus-ring:focus-visible {
+    box-shadow:
+      0 0 0 1px var(--background),
+      0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent);
   }
 
   /* ── Misc ───────────────────────────────────────────────────── */

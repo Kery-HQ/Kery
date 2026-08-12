@@ -69,7 +69,11 @@ export const ProjectSettings: React.FC = () => {
   if (!currentProjectId || !currentProject) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader icon={<Gear className="h-4 w-4" />} title="Project Settings" />
+        <PageHeader
+          icon={<Gear className="h-4 w-4" />}
+          title="Project Settings"
+          description="Project identity, base URL, and destructive actions."
+        />
         <EmptyState
           icon={<Gear className="h-8 w-8" />}
           title="No project selected"
@@ -83,12 +87,13 @@ export const ProjectSettings: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
+        eyebrow={currentProject.name}
         icon={<Gear className="h-4 w-4" />}
         title="Project Settings"
         description="Project identity, base URL, and destructive actions."
       />
 
-      <div className="px-6 py-5 animate-fade-in max-w-3xl space-y-6 mx-auto w-full">
+      <div className="mx-auto w-full max-w-3xl px-6 pb-6 animate-fade-in space-y-6">
         <section>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Project settings</p>
           <Card>
@@ -196,4 +201,3 @@ export const ProjectSettings: React.FC = () => {
     </div>
   );
 };
-
