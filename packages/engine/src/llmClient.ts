@@ -2,10 +2,12 @@ import { getConfig, type ModelConfigKey } from "./config.js";
 import { logger } from "./logger.js";
 import { anthropicMessagesChat } from "./llmAnthropic.js";
 import { llmGeminiChat } from "./llmGemini.js";
+import { llmCustomChat } from "./llmCustom.js";
 import { llmOpenAIChat, OPENAI_API_BASE } from "./llmOpenAI.js";
 import { llmOpenRouterChat } from "./llmOpenRouter.js";
 import {
   inferModelProviderRequirement,
+  hasCustomEndpoint,
   hasDirectProviderKey,
   modelUnavailableReason,
 } from "./llmProviders.js";
@@ -20,19 +22,29 @@ type LlmRoute =
   | { kind: "anthropic" }
   | { kind: "gemini" }
   | { kind: "openrouter" }
+  | { kind: "custom" }
   | { kind: "none"; reason: string };
 
-/** Prefer the matching direct provider when its key is set; otherwise OpenRouter if configured. */
+/**
+ * Prefer the matching direct provider when its key is set; otherwise OpenRouter, then the
+ * custom OpenAI-compatible endpoint. `custom/`-prefixed models always use the custom endpoint.
+ */
 function pickLlmRoute(model: string, cfg: ReturnType<typeof getConfig>): LlmRoute {
   const req = inferModelProviderRequirement(model);
+  if (req.kind === "custom") {
+    if (hasCustomEndpoint(cfg)) return { kind: "custom" };
+    return { kind: "none", reason: `Model "${model}" requires a custom endpoint — set CUSTOM_LLM_BASE_URL.` };
+  }
   if (req.kind === "openrouter_only") {
     if (cfg.openrouterApiKey) return { kind: "openrouter" };
+    if (hasCustomEndpoint(cfg)) return { kind: "custom" };
     return { kind: "none", reason: req.hint ?? `Model "${model}" requires OPENROUTER_API_KEY.` };
   }
   if (hasDirectProviderKey(cfg, req.provider)) {
     return { kind: req.provider };
   }
   if (cfg.openrouterApiKey) return { kind: "openrouter" };
+  if (hasCustomEndpoint(cfg)) return { kind: "custom" };
   return {
     kind: "none",
     reason:
@@ -260,9 +272,11 @@ const OPENROUTER_ANTHROPIC_STRUCTURED_MODELS = new Set([
  *   (OpenRouter translates this to Anthropic tool calls internally)
  * - Anthropic via OpenRouter, unsupported models (e.g. haiku-4.5) → no schema
  *   (prompt-based JSON enforcement handles format correctness)
+ * - Custom endpoint → OpenAI json_schema (dropped at runtime if the endpoint rejects it)
  * - Gemini → Gemini json_schema
  */
 function getAgentSchema(model: string, routeKind: LlmRoute["kind"]): any | undefined {
+  if (routeKind === "custom") return OPENAI_AGENT_SCHEMA;
   if (isAnthropicModel(model)) {
     if (routeKind === "anthropic") return ANTHROPIC_AGENT_SCHEMA;
     if (routeKind === "openrouter" && OPENROUTER_ANTHROPIC_STRUCTURED_MODELS.has(model)) return OPENAI_AGENT_SCHEMA;
@@ -434,6 +448,7 @@ export function getReviewBugsResponseFormat(model: string, bugTypeEnum: string[]
   const cfg = getConfig();
   const route = pickLlmRoute(model, cfg);
   if (route.kind === "none") return undefined;
+  if (route.kind === "custom") return makeBugsResponseFormat(bugTypeEnum, "oai");
   if (isAnthropicModel(model)) {
     if (route.kind === "anthropic") return makeBugsResponseFormat(bugTypeEnum, "oai");
     if (route.kind === "openrouter" && OPENROUTER_ANTHROPIC_STRUCTURED_MODELS.has(model)) {
@@ -453,6 +468,7 @@ export function getTriageResponseFormat(model: string): any | undefined {
   const cfg = getConfig();
   const route = pickLlmRoute(model, cfg);
   if (route.kind === "none") return undefined;
+  if (route.kind === "custom") return TRIAGE_RESPONSE_FORMAT_OAI;
   if (isAnthropicModel(model)) {
     if (route.kind === "anthropic") return TRIAGE_RESPONSE_FORMAT_OAI;
     if (route.kind === "openrouter" && OPENROUTER_ANTHROPIC_STRUCTURED_MODELS.has(model)) {
@@ -520,6 +536,8 @@ export function calcCostUsd(
     const p = cfg.modelPriceUsdPerMillion[slot]!;
     return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
   }
+  // Custom-endpoint models have unknown pricing — report $0 unless the user set custom rates.
+  if (model.startsWith("custom/")) return 0;
   const key = Object.keys(MODEL_PRICING)
     .filter((k) => model.startsWith(k) || model === k)
     .sort((a, b) => b.length - a.length)[0] ?? "anthropic/claude-haiku-4.5";
@@ -563,6 +581,9 @@ export async function llmChat(
         break;
       case "openrouter":
         result = await llmOpenRouterChat(messages, model, config.openrouterApiKey!, { ...opts, timeoutMs });
+        break;
+      case "custom":
+        result = await llmCustomChat(messages, model, { ...opts, timeoutMs });
         break;
     }
 

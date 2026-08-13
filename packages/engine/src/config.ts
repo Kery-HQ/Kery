@@ -13,6 +13,10 @@ export type EngineConfig = {
   openrouterApiKey: string;
   anthropicApiKey: string;
   geminiApiKey: string;
+  /** Base URL of a custom OpenAI-compatible endpoint (Azure, DashScope, Ollama, LiteLLM, …). Serves `custom/`-prefixed models and acts as fallback when no other provider can. */
+  customLlmBaseUrl?: string;
+  /** API key for the custom endpoint. Optional — some local endpoints don't require one. */
+  customLlmApiKey?: string;
   agentModel: string;
   /** Text/JSON auxiliary work: crawl, path plans, memory curation, intents, summarization — not the main browser agent. */
   auxiliaryModel: string;

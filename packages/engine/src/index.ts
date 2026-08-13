@@ -50,6 +50,8 @@ export {
   isModelRunnableWithConfig,
   modelUnavailableReason,
   getLlmKeyPresence,
+  hasCustomEndpoint,
+  CUSTOM_MODEL_PREFIX,
 } from "./llmProviders.js";
 export type { DirectModelProvider, ModelProviderRequirement } from "./llmProviders.js";
 

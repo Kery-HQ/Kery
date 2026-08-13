@@ -383,6 +383,8 @@ export type LlmKeyPresence = {
   hasOpenAI: boolean;
   hasAnthropic: boolean;
   hasGemini: boolean;
+  /** Custom OpenAI-compatible endpoint configured (base URL present). */
+  hasCustom: boolean;
 };
 
 /** USD per 1M tokens — used for run cost estimates when using a custom model id. */
@@ -440,7 +442,7 @@ export async function savePlatformSettings(settings: { maxConcurrency: number })
 
 // --- API Key settings ---
 
-export type ApiKeyProvider = "openai" | "anthropic" | "gemini" | "openrouter";
+export type ApiKeyProvider = "openai" | "anthropic" | "gemini" | "openrouter" | "custom";
 
 export type ApiKeyInfo = {
   hasKey: boolean;
@@ -448,6 +450,10 @@ export type ApiKeyInfo = {
   source: "env" | "db" | "none";
   /** Masked hint for DB-stored keys, e.g. "••••••••••••abcd". Not present for env keys. */
   maskedKey?: string;
+  /** Custom provider only: effective base URL of the OpenAI-compatible endpoint. */
+  baseUrl?: string;
+  /** Custom provider only: where the base URL comes from. */
+  baseUrlSource?: "env" | "db" | "none";
 };
 
 export type ApiKeySettingsResponse = Record<ApiKeyProvider, ApiKeyInfo>;
@@ -456,7 +462,7 @@ export async function fetchApiKeySettings(): Promise<ApiKeySettingsResponse> {
   return apiFetch(`${API_BASE}/api/settings/api-keys`);
 }
 
-export async function saveApiKeys(keys: Partial<Record<ApiKeyProvider, string>>) {
+export async function saveApiKeys(keys: Partial<Record<ApiKeyProvider, string>> & { customBaseUrl?: string }) {
   return apiFetch(`${API_BASE}/api/settings/api-keys`, {
     method: "PUT",
     body: JSON.stringify(keys),

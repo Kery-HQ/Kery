@@ -197,6 +197,8 @@ Once connected, your AI assistant can scan your app, run tests, and triage bugs 
 | `OPENAI_API_KEY` | — | Direct OpenAI key |
 | `ANTHROPIC_API_KEY` | — | Direct Anthropic key |
 | `GEMINI_API_KEY` | — | Direct Google Gemini key |
+| `CUSTOM_LLM_BASE_URL` | — | Any OpenAI-compatible endpoint (Azure, DashScope, Ollama, LiteLLM…). Use model ids prefixed `custom/`, e.g. `AGENT_MODEL=custom/qwen3-coder-plus` |
+| `CUSTOM_LLM_API_KEY` | — | API key for the custom endpoint (optional — local endpoints often need none) |
 | `AGENT_MODEL` | `anthropic/claude-sonnet-5` | Model for browser navigation decisions |
 | `AUXILIARY_MODEL` | `anthropic/claude-haiku-4.5` | Crawl, path planning, memory curation, summarization |
 | `REVIEW_AGENT_MODEL` | `anthropic/claude-sonnet-5` | Post-run holistic and filmstrip screenshot analysis |

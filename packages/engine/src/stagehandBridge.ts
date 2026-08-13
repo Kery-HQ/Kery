@@ -7,7 +7,12 @@ import { logger } from "./logger.js";
 import { dockerHostResolverArgs } from "./dockerHost.js";
 import { screenshotDpr } from "./screenshotConfig.js";
 import { OPENROUTER_BASE } from "./llmOpenRouter.js";
-import { hasDirectProviderKey, inferModelProviderRequirement } from "./llmProviders.js";
+import {
+  CUSTOM_MODEL_PREFIX,
+  hasDirectProviderKey,
+  inferModelProviderRequirement,
+  wireModelForCustomEndpoint,
+} from "./llmProviders.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -38,7 +43,7 @@ type StagehandModelConfig = {
 
 function directStagehandApiKey(cfg: EngineConfig, model: string): string | null {
   const req = inferModelProviderRequirement(model);
-  if (req.kind === "openrouter_only") return null;
+  if (req.kind !== "direct") return null;
   if (!hasDirectProviderKey(cfg, req.provider)) return null;
   switch (req.provider) {
     case "openai":
@@ -69,7 +74,25 @@ function toOpenRouterModelId(model: string): string {
   return m;
 }
 
+function customEndpointStagehandConfig(cfg: EngineConfig, model: string): StagehandModelConfig {
+  return {
+    // Stagehand's AI SDK route uses the first path segment as the provider; `openai/`
+    // sends the call through its OpenAI-compatible client against the custom base URL.
+    modelName: `openai/${wireModelForCustomEndpoint(model)}`,
+    modelClientOptions: {
+      apiKey: cfg.customLlmApiKey || "sk-no-key",
+      baseURL: cfg.customLlmBaseUrl,
+      compatibility: "compatible",
+    },
+    routedViaOpenRouter: false,
+  };
+}
+
 function resolveStagehandModelConfig(cfg: EngineConfig, configuredModel: string): StagehandModelConfig {
+  if (configuredModel.trim().startsWith(CUSTOM_MODEL_PREFIX) && cfg.customLlmBaseUrl) {
+    return customEndpointStagehandConfig(cfg, configuredModel.trim());
+  }
+
   const apiKey = directStagehandApiKey(cfg, configuredModel);
   if (apiKey) {
     return {
@@ -96,6 +119,10 @@ function resolveStagehandModelConfig(cfg: EngineConfig, configuredModel: string)
       },
       routedViaOpenRouter: true,
     };
+  }
+
+  if (cfg.customLlmBaseUrl) {
+    return customEndpointStagehandConfig(cfg, configuredModel.trim());
   }
 
   return {

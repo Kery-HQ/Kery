@@ -1,21 +1,27 @@
 /**
  * Mirrors packages/engine/src/llmProviders.ts — keep rules in sync when changing providers.
  */
-export type CustomProviderId = "openai" | "anthropic" | "gemini" | "openrouter";
+export type CustomProviderId = "openai" | "anthropic" | "gemini" | "openrouter" | "custom";
 
 export type LlmKeyPresence = {
   hasOpenRouter: boolean;
   hasOpenAI: boolean;
   hasAnthropic: boolean;
   hasGemini: boolean;
+  /** Custom OpenAI-compatible endpoint configured (base URL present). */
+  hasCustom: boolean;
 };
 
 const OPENROUTER_ONLY_PREFIXES = ["deepseek/", "meta/", "mistral/", "cohere/", "perplexity/", "qwen/"];
 
+/** Model ids with this prefix always route to the custom OpenAI-compatible endpoint. */
+export const CUSTOM_MODEL_PREFIX = "custom/";
+
 function inferDirectProvider(
   model: string
-): "openai" | "anthropic" | "gemini" | "openrouter_only" {
+): "openai" | "anthropic" | "gemini" | "custom" | "openrouter_only" {
   const m = model.trim();
+  if (m.startsWith(CUSTOM_MODEL_PREFIX)) return "custom";
   if (m.startsWith("openai/") || m.startsWith("gpt-")) return "openai";
   if (m.startsWith("anthropic/") || m.startsWith("claude")) return "anthropic";
   if (m.startsWith("google/") || m.startsWith("gemini-")) return "gemini";
@@ -27,8 +33,9 @@ function inferDirectProvider(
 
 /** Whether the user can select this model id given which API keys exist (mirrors engine `isModelRunnableWithConfig`). */
 export function isModelSelectable(modelId: string, keys: LlmKeyPresence): boolean {
-  if (keys.hasOpenRouter) return true;
   const p = inferDirectProvider(modelId);
+  if (p === "custom") return keys.hasCustom;
+  if (keys.hasOpenRouter || keys.hasCustom) return true;
   if (p === "openrouter_only") return false;
   if (p === "openai") return keys.hasOpenAI;
   if (p === "anthropic") return keys.hasAnthropic;
@@ -36,8 +43,9 @@ export function isModelSelectable(modelId: string, keys: LlmKeyPresence): boolea
 }
 
 export function modelMissingKeyLabel(modelId: string, keys: LlmKeyPresence): string | null {
-  if (keys.hasOpenRouter) return null;
   const p = inferDirectProvider(modelId);
+  if (p === "custom") return keys.hasCustom ? null : "Requires a custom endpoint (Settings → API Keys)";
+  if (keys.hasOpenRouter || keys.hasCustom) return null;
   if (p === "openrouter_only") return "Requires OpenRouter";
   if (p === "openai" && !keys.hasOpenAI) return "Missing OPENAI_API_KEY or OPENROUTER_API_KEY";
   if (p === "anthropic" && !keys.hasAnthropic) return "Missing ANTHROPIC_API_KEY or OPENROUTER_API_KEY";
@@ -59,6 +67,9 @@ export function composeCustomModel(provider: CustomProviderId, raw: string): str
     case "gemini":
       if (t.startsWith("google/") || t.startsWith("gemini-")) return t;
       return `google/${t}`;
+    case "custom":
+      if (t.startsWith(CUSTOM_MODEL_PREFIX)) return t;
+      return `${CUSTOM_MODEL_PREFIX}${t}`;
     case "openrouter":
       return t;
   }
@@ -68,6 +79,7 @@ export function composeCustomModel(provider: CustomProviderId, raw: string): str
 export function parseStoredModelForCustomUi(model: string): { provider: CustomProviderId; raw: string } {
   const m = model.trim();
   if (!m) return { provider: "openrouter", raw: "" };
+  if (m.startsWith(CUSTOM_MODEL_PREFIX)) return { provider: "custom", raw: m.slice(CUSTOM_MODEL_PREFIX.length) };
   if (m.startsWith("openai/")) return { provider: "openai", raw: m.slice("openai/".length) };
   if (m.startsWith("gpt-")) return { provider: "openai", raw: m };
   if (m.startsWith("anthropic/")) return { provider: "anthropic", raw: m.slice("anthropic/".length) };

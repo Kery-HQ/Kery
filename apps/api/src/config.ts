@@ -14,6 +14,8 @@ export const config = {
   openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
+  customLlmBaseUrl: process.env.CUSTOM_LLM_BASE_URL || "",
+  customLlmApiKey: process.env.CUSTOM_LLM_API_KEY || "",
   agentModel: process.env.AGENT_MODEL || "anthropic/claude-sonnet-5",
   /** Crawl, path plans, memory curation, intents, summarization — text/JSON auxiliary stack. `CRAWL_MODEL` is a deprecated alias. */
   auxiliaryModel:

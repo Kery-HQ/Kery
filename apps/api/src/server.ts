@@ -24,6 +24,8 @@ initEngineConfig({
   openrouterApiKey: config.openrouterApiKey,
   anthropicApiKey: config.anthropicApiKey,
   geminiApiKey: config.geminiApiKey,
+  customLlmBaseUrl: config.customLlmBaseUrl,
+  customLlmApiKey: config.customLlmApiKey,
   agentModel: config.agentModel,
   auxiliaryModel: config.auxiliaryModel,
   reviewAgentModel: config.reviewAgentModel,
