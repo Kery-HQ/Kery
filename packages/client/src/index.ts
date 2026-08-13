@@ -391,7 +391,7 @@ export class KeryClient {
   }
 
   async updateApiKeys(
-    keys: Partial<Record<"openai" | "anthropic" | "gemini" | "openrouter", string>>,
+    keys: Partial<Record<"openai" | "anthropic" | "gemini" | "openrouter" | "custom" | "customBaseUrl", string>>,
   ): Promise<void> {
     await this.fetch("/api/settings/api-keys", { method: "PUT", body: JSON.stringify(keys) });
   }

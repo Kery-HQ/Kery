@@ -169,6 +169,22 @@ export const Settings: React.FC = () => {
                   </div>
                 );
               })}
+              <div
+                className="glass-card-flat card-stagger"
+                style={{ animationDelay: `${API_KEY_CONFIG.length * 50}ms` }}
+              >
+                <CustomEndpointCard
+                  info={apiKeySettings?.custom ?? null}
+                  onSave={async (baseUrl, key) => {
+                    await saveApiKeys({ customBaseUrl: baseUrl, ...(key !== null ? { custom: key } : {}) });
+                    await refreshAll();
+                  }}
+                  onRemove={async () => {
+                    await deleteApiKey("custom");
+                    await refreshAll();
+                  }}
+                />
+              </div>
             </div>
           </div>
 
@@ -630,6 +646,250 @@ function ApiKeyCard({
   );
 }
 
+/**
+ * Card for the custom OpenAI-compatible endpoint (Azure, DashScope, Ollama, LiteLLM, …).
+ * Unlike the provider cards it has two fields: a base URL (required, not secret) and an
+ * API key (optional — local endpoints often don't need one).
+ */
+function CustomEndpointCard({
+  info,
+  onSave,
+  onRemove,
+}: {
+  info: ApiKeyInfo | null;
+  /** key === null means "leave the stored key unchanged". */
+  onSave: (baseUrl: string, key: string | null) => Promise<void>;
+  onRemove: () => Promise<void>;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [urlValue, setUrlValue] = React.useState("");
+  const [keyValue, setKeyValue] = React.useState("");
+  const [showKey, setShowKey] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  React.useEffect(() => {
+    if (editing) {
+      setUrlValue(info?.baseUrl ?? "");
+    } else {
+      setUrlValue(""); setKeyValue(""); setShowKey(false); setError("");
+    }
+  }, [editing, info?.baseUrl]);
+
+  async function handleSave() {
+    const url = urlValue.trim();
+    if (!url) { setError("Enter the endpoint base URL."); return; }
+    if (!/^https?:\/\//i.test(url)) { setError("Base URL must start with http:// or https://."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(url, keyValue.trim() ? keyValue.trim() : null);
+      setEditing(false);
+    } catch {
+      setError("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setSaving(true);
+    try {
+      await onRemove();
+      setConfirmDelete(false);
+    } catch {
+      setError("Failed to remove endpoint.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isLoading = info === null;
+  const urlSource = info?.baseUrlSource ?? "none";
+  const configured = urlSource !== "none";
+  const hasDbUrl = urlSource === "db";
+  const keyHint =
+    info?.source === "db" && info.maskedKey
+      ? `Key ${info.maskedKey}`
+      : info?.source === "env"
+        ? "Key from .env"
+        : "No key (optional)";
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={cn(
+            "h-8 w-8 rounded-xl flex items-center justify-center shrink-0",
+            configured ? "bg-primary/10 text-primary" : "bg-foreground/6 text-muted-foreground",
+          )}>
+            <Code className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-foreground truncate">Custom endpoint</p>
+            <p className="text-[11px] text-muted-foreground truncate">Any OpenAI-compatible API — Azure, DashScope, Ollama, LiteLLM…</p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="h-5 w-16 rounded bg-foreground/6 animate-pulse shrink-0" />
+        ) : (
+          <div className="shrink-0">
+            {hasDbUrl && <Badge variant="success" className="text-[10px] px-1.5 h-4 font-medium">DB override</Badge>}
+            {urlSource === "env" && <Badge variant="neutral" className="text-[10px] px-1.5 h-4 font-medium">From .env</Badge>}
+            {!configured && <Badge variant="warning" className="text-[10px] px-1.5 h-4 font-medium">Not configured</Badge>}
+          </div>
+        )}
+      </div>
+
+      {!editing && (
+        <div className="space-y-2">
+          {isLoading ? (
+            <div className="h-8 w-full rounded-lg bg-foreground/4 animate-pulse" />
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 flex items-center justify-between gap-2 min-h-[34px]">
+              <div className="min-w-0">
+                {configured ? (
+                  <>
+                    <p className="font-mono text-[11px] text-foreground/70 truncate">{info?.baseUrl}</p>
+                    <p className="text-[10px] text-muted-foreground/60 truncate">{keyHint}</p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground/60 truncate italic">
+                    No endpoint configured — use models like <span className="font-mono not-italic">custom/&lt;model-id&gt;</span> once set
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {hasDbUrl && (
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmDelete(false); handleDelete(); }}
+                    disabled={saving}
+                    title="Remove DB override"
+                    className="text-muted-foreground/50 hover:text-destructive transition-colors disabled:opacity-40 p-0.5"
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              disabled={isLoading || saving}
+              className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-foreground/4 flex items-center gap-1 disabled:opacity-40"
+            >
+              <PencilSimple className="h-3 w-3" />
+              {configured ? "Update endpoint" : "Add endpoint"}
+            </button>
+          </div>
+
+          {confirmDelete && (
+            <div className="flex items-center gap-2 text-[11px] text-destructive animate-fade-in">
+              <Warning className="h-3.5 w-3.5 shrink-0" />
+              <span>Remove endpoint and key? (falls back to .env)</span>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving}
+                className="underline underline-offset-2 hover:opacity-80 disabled:opacity-40"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <div className="space-y-2.5 rounded-lg border border-border/70 bg-background/30 p-3 animate-fade-in">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[11px] font-medium text-foreground">
+              {configured ? "Update custom endpoint" : "Add custom endpoint"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-muted-foreground block mb-0.5">Base URL</label>
+            <Input
+              value={urlValue}
+              onChange={(e) => { setUrlValue(e.target.value); setError(""); }}
+              placeholder="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+              className="mono-ui text-[11px]"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] text-muted-foreground block mb-0.5">
+              API key <span className="text-muted-foreground/60">(optional — leave blank to keep the stored key)</span>
+            </label>
+            <div className="relative">
+              <Input
+                type={showKey ? "text" : "password"}
+                value={keyValue}
+                onChange={(e) => { setKeyValue(e.target.value); setError(""); }}
+                placeholder="sk-…"
+                className="mono-ui text-[11px] pr-9"
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((s) => !s)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showKey ? <EyeSlash className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+            Then pick models with the <span className="font-mono">custom/</span> prefix (e.g. <span className="font-mono">custom/qwen3-coder-plus</span>) via "Use custom model" below.
+          </p>
+
+          {error && <p className="text-[11px] text-destructive">{error}</p>}
+
+          <div className="flex gap-2 pt-0.5">
+            <Button type="button" size="sm" onClick={handleSave} disabled={saving} loading={saving}>
+              Save endpoint
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Model configuration ────────────────────────────────────────────────────
 
 type ModelOption = { value: string; label: string; price?: string };
@@ -695,6 +955,7 @@ const CUSTOM_PROVIDER_OPTIONS: { value: CustomProviderId; label: string }[] = [
   { value: "anthropic", label: "Anthropic" },
   { value: "gemini", label: "Google Gemini" },
   { value: "openrouter", label: "OpenRouter (any id)" },
+  { value: "custom", label: "Custom endpoint" },
 ];
 
 const MODEL_CONFIG: {
@@ -740,6 +1001,7 @@ function customModelPlaceholder(provider: CustomProviderId): string {
     case "anthropic":  return "e.g. claude-sonnet-5";
     case "gemini":     return "e.g. gemini-3.5-flash-lite";
     case "openrouter": return "e.g. mistralai/mistral-small-3.1-24b-instruct";
+    case "custom":     return "e.g. qwen3-coder-plus";
   }
 }
 
@@ -974,6 +1236,9 @@ function ModelSlotCard({
 
           {customProvider === "openrouter" && (
             <p className="text-[10px] text-muted-foreground/60">Use full slug: vendor/model</p>
+          )}
+          {customProvider === "custom" && (
+            <p className="text-[10px] text-muted-foreground/60">Sent to your custom endpoint (Settings → API Keys) exactly as typed</p>
           )}
 
           <div className="grid grid-cols-2 gap-2">

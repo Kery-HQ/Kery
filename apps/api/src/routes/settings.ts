@@ -13,7 +13,7 @@ import { config as envConfig } from "../config.js";
 
 // ─── API Key provider constants ────────────────────────────────────────────────
 
-const API_KEY_PROVIDERS = ["openai", "anthropic", "gemini", "openrouter"] as const;
+const API_KEY_PROVIDERS = ["openai", "anthropic", "gemini", "openrouter", "custom"] as const;
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
 
 const PROVIDER_DB_KEY: Record<ApiKeyProvider, string> = {
@@ -21,31 +21,40 @@ const PROVIDER_DB_KEY: Record<ApiKeyProvider, string> = {
   anthropic: "apiKey.anthropic",
   gemini: "apiKey.gemini",
   openrouter: "apiKey.openrouter",
+  custom: "apiKey.custom",
 };
+
+/** The custom endpoint's base URL — not a secret, stored in plain text (keys are encrypted). */
+const CUSTOM_BASE_URL_DB_KEY = "llm.customBaseUrl";
 
 const PROVIDER_ENV_KEY: Record<ApiKeyProvider, string> = {
   openai: envConfig.openaiApiKey,
   anthropic: envConfig.anthropicApiKey,
   gemini: envConfig.geminiApiKey,
   openrouter: envConfig.openrouterApiKey,
+  custom: envConfig.customLlmApiKey,
 };
 
-const PROVIDER_CONFIG_KEY: Record<ApiKeyProvider, "openaiApiKey" | "anthropicApiKey" | "geminiApiKey" | "openrouterApiKey"> = {
+type ProviderConfigKey = "openaiApiKey" | "anthropicApiKey" | "geminiApiKey" | "openrouterApiKey" | "customLlmApiKey";
+
+const PROVIDER_CONFIG_KEY: Record<ApiKeyProvider, ProviderConfigKey> = {
   openai: "openaiApiKey",
   anthropic: "anthropicApiKey",
   gemini: "geminiApiKey",
   openrouter: "openrouterApiKey",
+  custom: "customLlmApiKey",
 };
 
 /** Read DB API key overrides and merge into the running engine config (DB wins over .env). */
 export async function applyDbApiKeySettings(storage: StorageAdapter): Promise<void> {
   try {
     const all = await storage.getSettings();
-    const overrides: Partial<Record<"openaiApiKey" | "anthropicApiKey" | "geminiApiKey" | "openrouterApiKey", string>> = {};
+    const overrides: Partial<Record<ProviderConfigKey | "customLlmBaseUrl", string>> = {};
     for (const provider of API_KEY_PROVIDERS) {
       const raw = all[PROVIDER_DB_KEY[provider]];
       if (raw) overrides[PROVIDER_CONFIG_KEY[provider]] = decryptValue(raw);
     }
+    if (all[CUSTOM_BASE_URL_DB_KEY]) overrides.customLlmBaseUrl = all[CUSTOM_BASE_URL_DB_KEY];
     if (Object.keys(overrides).length > 0) updateEngineConfig(overrides);
   } catch {
     // settings table may not exist yet — skip silently
@@ -332,7 +341,10 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       dbKeys = await storage.getSettings();
     } catch {}
 
-    const result: Record<ApiKeyProvider, { hasKey: boolean; source: "env" | "db" | "none"; maskedKey?: string }> = {} as any;
+    const result: Record<
+      ApiKeyProvider,
+      { hasKey: boolean; source: "env" | "db" | "none"; maskedKey?: string; baseUrl?: string; baseUrlSource?: "env" | "db" | "none" }
+    > = {} as any;
     for (const provider of API_KEY_PROVIDERS) {
       const dbRaw = dbKeys[PROVIDER_DB_KEY[provider]];
       if (dbRaw) {
@@ -345,6 +357,11 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       }
     }
 
+    // The custom provider is defined by its base URL (the key is optional — local endpoints).
+    const dbBaseUrl = dbKeys[CUSTOM_BASE_URL_DB_KEY];
+    result.custom.baseUrl = dbBaseUrl || envConfig.customLlmBaseUrl || undefined;
+    result.custom.baseUrlSource = dbBaseUrl ? "db" : envConfig.customLlmBaseUrl ? "env" : "none";
+
     reply.send(result);
   });
 
@@ -353,6 +370,9 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
     anthropic: z.string().optional(),
     gemini: z.string().optional(),
     openrouter: z.string().optional(),
+    custom: z.string().optional(),
+    /** Base URL of the custom OpenAI-compatible endpoint. Empty string clears the DB override. */
+    customBaseUrl: z.string().optional(),
   });
 
   /**
@@ -373,8 +393,24 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       const dbKey = PROVIDER_DB_KEY[provider];
       if (value.trim() === "") {
         await storage.deleteSettings([dbKey]);
+        updateEngineConfig({ [PROVIDER_CONFIG_KEY[provider]]: PROVIDER_ENV_KEY[provider] });
       } else {
         await storage.saveSetting(dbKey, encryptValue(value.trim()));
+      }
+    }
+
+    const customBaseUrl = parsed.data.customBaseUrl;
+    if (customBaseUrl !== undefined) {
+      const trimmed = customBaseUrl.trim();
+      if (trimmed === "") {
+        await storage.deleteSettings([CUSTOM_BASE_URL_DB_KEY]);
+        updateEngineConfig({ customLlmBaseUrl: envConfig.customLlmBaseUrl });
+      } else {
+        if (!/^https?:\/\//i.test(trimmed)) {
+          reply.code(400).send({ error: "invalid_base_url", message: "Base URL must start with http:// or https://" });
+          return;
+        }
+        await storage.saveSetting(CUSTOM_BASE_URL_DB_KEY, trimmed);
       }
     }
 
@@ -394,11 +430,14 @@ export function registerSettingsRoutes(app: FastifyInstance, storage: StorageAda
       reply.code(400).send({ error: "unknown provider" });
       return;
     }
-    await storage.deleteSettings([PROVIDER_DB_KEY[provider as ApiKeyProvider]]);
+    const dbKeys = [PROVIDER_DB_KEY[provider as ApiKeyProvider]];
+    if (provider === "custom") dbKeys.push(CUSTOM_BASE_URL_DB_KEY);
+    await storage.deleteSettings(dbKeys);
 
     // Revert in-memory config to env value for this provider
     const envValue = PROVIDER_ENV_KEY[provider as ApiKeyProvider];
     updateEngineConfig({ [PROVIDER_CONFIG_KEY[provider as ApiKeyProvider]]: envValue });
+    if (provider === "custom") updateEngineConfig({ customLlmBaseUrl: envConfig.customLlmBaseUrl });
 
     reply.send({ ok: true });
   });

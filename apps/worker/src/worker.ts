@@ -9,6 +9,8 @@ initEngineConfig({
   openrouterApiKey: config.openrouterApiKey,
   anthropicApiKey: config.anthropicApiKey,
   geminiApiKey: config.geminiApiKey,
+  customLlmBaseUrl: config.customLlmBaseUrl,
+  customLlmApiKey: config.customLlmApiKey,
   agentModel: config.agentModel,
   auxiliaryModel: config.auxiliaryModel,
   reviewAgentModel: config.reviewAgentModel,
@@ -32,10 +34,13 @@ try {
     "apiKey.anthropic": "anthropicApiKey",
     "apiKey.gemini": "geminiApiKey",
     "apiKey.openrouter": "openrouterApiKey",
+    "apiKey.custom": "customLlmApiKey",
   };
   for (const [dbKey, cfgKey] of Object.entries(keyMap)) {
     if (all[dbKey]) keyOverrides[cfgKey] = decryptValue(all[dbKey]);
   }
+  // Base URL is not a secret — stored in plain text, unlike the encrypted keys above.
+  if (all["llm.customBaseUrl"]) keyOverrides.customLlmBaseUrl = all["llm.customBaseUrl"];
   const modelOverrides: Record<string, string> = {};
   const modelMap: Record<string, string> = {
     "model.agentModel": "agentModel",

@@ -42,6 +42,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      CUSTOM_LLM_BASE_URL: ${CUSTOM_LLM_BASE_URL:-}
+      CUSTOM_LLM_API_KEY: ${CUSTOM_LLM_API_KEY:-}
       AGENT_MODEL: ${AGENT_MODEL:-anthropic/claude-sonnet-5}
       REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-5}
       AUXILIARY_MODEL: ${AUXILIARY_MODEL:-${CRAWL_MODEL:-anthropic/claude-haiku-4.5}}
@@ -77,6 +79,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      CUSTOM_LLM_BASE_URL: ${CUSTOM_LLM_BASE_URL:-}
+      CUSTOM_LLM_API_KEY: ${CUSTOM_LLM_API_KEY:-}
       AGENT_MODEL: ${AGENT_MODEL:-anthropic/claude-sonnet-5}
       REVIEW_AGENT_MODEL: ${REVIEW_AGENT_MODEL:-anthropic/claude-sonnet-5}
       AUXILIARY_MODEL: ${AUXILIARY_MODEL:-${CRAWL_MODEL:-anthropic/claude-haiku-4.5}}

@@ -14,7 +14,7 @@ WHEN TO USE:
 
 Returns:
   • Model slots (agentModel, auxiliaryModel, reviewAgentModel, stagehandModel) — current values and whether they are customized
-  • API key status for each provider (openai, anthropic, gemini, openrouter) — whether a key is set and its source (env var or DB override). Key values are never returned, only a masked hint.
+  • API key status for each provider (openai, anthropic, gemini, openrouter, custom) — whether a key is set and its source (env var or DB override). Key values are never returned, only a masked hint. The custom provider is an OpenAI-compatible endpoint (base URL + optional key).
   • Whether each model can run with the current key configuration`,
     {},
     async () => {
@@ -30,7 +30,8 @@ Returns:
       const apiKeys = await client.getApiKeys();
 
       const missingKeys = Object.entries(apiKeys)
-        .filter(([, v]) => !(v as any).hasKey)
+        // The custom endpoint is optional and defined by its base URL, not a key.
+        .filter(([k, v]) => k !== "custom" && !(v as any).hasKey)
         .map(([k]) => k);
 
       return {
@@ -74,6 +75,7 @@ API KEY PROVIDERS (at least one required):
   'openai'      — direct OpenAI access
   'anthropic'   — direct Anthropic access
   'gemini'      — direct Google Gemini access
+  'custom'      — any OpenAI-compatible endpoint (Azure, DashScope, Ollama, LiteLLM…). Set customBaseUrl (required) and optionally a key. Use model ids prefixed 'custom/', e.g. 'custom/qwen3-coder-plus'.
 
 VALIDATION:
   • Model names must be valid for an available provider (e.g. 'anthropic/claude-sonnet-5', 'openai/gpt-5.6-terra', 'google/gemini-3.5-flash')
@@ -131,6 +133,14 @@ VALIDATION:
             .string()
             .optional()
             .describe("OpenRouter API key (starts with 'sk-or-'). Pass empty string to clear."),
+          custom: z
+            .string()
+            .optional()
+            .describe("API key for the custom OpenAI-compatible endpoint (optional — some local endpoints need none). Pass empty string to clear."),
+          customBaseUrl: z
+            .string()
+            .optional()
+            .describe("Base URL of the custom OpenAI-compatible endpoint, e.g. 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1'. Pass empty string to clear."),
         })
         .optional()
         .describe("API keys to save. Values are encrypted at rest and never returned in API responses."),

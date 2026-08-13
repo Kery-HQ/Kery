@@ -9,6 +9,9 @@ const MODELS_REJECTING_TEMPERATURE = new Set<string>();
 /** Completion-token ceilings discovered from 400s ("supports at most N completion tokens"). */
 const MODEL_COMPLETION_TOKEN_CAPS = new Map<string, number>();
 
+/** Models observed to reject response_format (many custom OpenAI-compatible endpoints lack json_schema support). */
+const MODELS_REJECTING_RESPONSE_FORMAT = new Set<string>();
+
 const KNOWN_COMPLETION_TOKEN_CAPS: Record<string, number> = {
   "gpt-4.1": 32768,
   "gpt-4.1-mini": 32768,
@@ -56,7 +59,9 @@ export async function openAIStyleChat(
   if (!MODELS_REJECTING_TEMPERATURE.has(wireModel)) {
     body.temperature = opts.temperature ?? 0.1;
   }
-  if (opts.responseFormat) body.response_format = opts.responseFormat;
+  if (opts.responseFormat && !MODELS_REJECTING_RESPONSE_FORMAT.has(wireModel)) {
+    body.response_format = opts.responseFormat;
+  }
   if (extra?.bodyExtensions) Object.assign(body, extra.bodyExtensions);
 
   // Newer model families (gpt-5.6, reasoning models) accept only the default
@@ -79,6 +84,12 @@ export async function openAIStyleChat(
         logger.info({ model: wireModel }, "Model rejects custom temperature — retrying without it and remembering for this model");
         MODELS_REJECTING_TEMPERATURE.add(wireModel);
         delete body.temperature;
+        continue;
+      }
+      if (/response_format|json_schema|structured output/i.test(message) && "response_format" in body) {
+        logger.info({ model: wireModel }, "Model rejects response_format — retrying without it and remembering for this model (prompt-based JSON enforcement takes over)");
+        MODELS_REJECTING_RESPONSE_FORMAT.add(wireModel);
+        delete body.response_format;
         continue;
       }
       const capMatch = message.match(/supports at most (\d+) completion tokens/i);
