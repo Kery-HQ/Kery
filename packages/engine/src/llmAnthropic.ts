@@ -1,6 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { LLMUsage, LlmChatOpts } from "./llmTypes.js";
 import { MAX_OUTPUT_TOKENS } from "./llmTypes.js";
+import { logger } from "./logger.js";
+
+/** Models that 400 on `temperature`; learned at runtime, remembered per process. */
+const MODELS_REJECTING_TEMPERATURE = new Set<string>();
 
 const ANTHROPIC_MODEL_IDS: Record<string, string> = {
   // Current generation
@@ -155,7 +159,7 @@ export async function anthropicMessagesChat(
   const params: Anthropic.MessageCreateParams = {
     model: wireModel,
     max_tokens: maxOut,
-    temperature: opts.temperature ?? 0.1,
+    ...(MODELS_REJECTING_TEMPERATURE.has(wireModel) ? {} : { temperature: opts.temperature ?? 0.1 }),
     messages: anthropicMessages,
     ...(system ? { system } : {}),
     ...(tools && toolName
@@ -167,13 +171,27 @@ export async function anthropicMessagesChat(
   };
 
   let data: Anthropic.Message;
-  try {
-    data = await client.messages.create(params, opts.signal ? { signal: opts.signal } : undefined);
-  } catch (err: any) {
-    if (err?.name === "AbortError" || err?.message?.includes("timeout")) {
-      throw new Error(`Anthropic call timed out after ${timeoutMs}ms`);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      data = await client.messages.create(params, opts.signal ? { signal: opts.signal } : undefined);
+      break;
+    } catch (err: any) {
+      if (err?.name === "AbortError" || err?.message?.includes("timeout")) {
+        throw new Error(`Anthropic call timed out after ${timeoutMs}ms`);
+      }
+      // Newer Claude models reject `temperature` outright ("`temperature` is
+      // deprecated for this model"), and every call 400s until it is dropped.
+      // Discover that once per model at runtime, mirroring the OpenAI-compatible
+      // path, rather than maintaining a list that rots as models change.
+      const message = String(err?.message ?? err);
+      if (attempt < 1 && /temperature/i.test(message) && "temperature" in params) {
+        logger.info({ model: wireModel }, "Model rejects temperature — retrying without it and remembering for this model");
+        MODELS_REJECTING_TEMPERATURE.add(wireModel);
+        delete (params as { temperature?: number }).temperature;
+        continue;
+      }
+      throw err;
     }
-    throw err;
   }
 
   let contentStr = "";
