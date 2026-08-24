@@ -27,6 +27,14 @@ export type RunVerification = {
   screenshotPath?: string;
   region?: { x: number; y: number; w: number; h: number };
   artifactKey?: string;
+  /** For contradicted checks: the shortest sequence a human can follow to see
+   *  the failure themselves. A reviewer cannot act on "expected X, got Y"
+   *  alone; they can act on three numbered steps. */
+  reproSteps?: string[];
+  /** For contradicted checks: paths from the change under test that most
+   *  likely cause this failure. Only ever a subset of the files supplied to
+   *  the reviewer — never invented — and always a hint, not a diagnosis. */
+  suspectFiles?: string[];
 };
 
 const VERIFICATION_SYSTEM = `You are a verification reviewer for an AI browser-testing run.
@@ -56,8 +64,10 @@ Rules:
 - For every "verified" check, add "stepIndex": the [n] index of the step whose observation shows the claim holding. Choose the AFTER-STATE screen that proves the effect, not the step that merely performed the action.
 - For every "contradicted" check, add "stepIndex": the [n] index of the step whose observation shows the failure (the screen where the wrong value / missing effect is visible).
 - Omit "stepIndex" for "not_testable" checks and whenever no single step pinpoints the evidence.
+- For every "contradicted" check, add "reproSteps": 2-4 imperative steps a human can follow to see the failure, derived ONLY from what the trace actually did. Start from a stated entry point ("Open the editor"), name controls as they appear on screen, and make the last step the observation ("Look at the canvas — the image appears twice"). No preamble, no explanation, one action per step. Omit for verified and not_testable checks.
+- When a CHANGED FILES list is supplied, add "suspectFiles" to every "contradicted" check: 1-3 paths COPIED EXACTLY from that list which most plausibly cause this specific failure, most likely first. Match on what the file evidently governs versus what broke. If nothing in the list plausibly relates, omit "suspectFiles" — a wrong pointer is worse than none. NEVER invent a path that is not in the supplied list.
 
-Return JSON only: {"verifications": [{"title": string, "claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string, "stepIndex"?: number}]}
+Return JSON only: {"verifications": [{"title": string, "claim": string, "status": "verified"|"contradicted"|"not_testable", "evidence": string, "stepIndex"?: number, "reproSteps"?: string[], "suspectFiles"?: string[]}]}
 Output MUST be raw JSON only — no markdown fences, no prose.`;
 
 function stripFence(raw: string): string {
@@ -69,6 +79,10 @@ export async function runVerificationReview(input: {
   context?: string;
   stepsDetail: RunStep[];
   navigatorStatus: "passed" | "failed";
+  /** Paths touched by the change under test. Supplied by callers that know the
+   *  diff (CI); when present the reviewer may point a failing check at the
+   *  file most likely responsible. */
+  changedFiles?: string[];
   onLLMCall?: (call: Omit<LLMCallRecord, "seq">) => void;
 }): Promise<RunVerification[]> {
   let prevHash: string | undefined;
@@ -90,9 +104,13 @@ export async function runVerificationReview(input: {
 
   const config = getConfig();
   const model = config.reviewAgentModel;
+  // Cap the file list: long diffs would crowd out the trace, and the reviewer
+  // only needs enough candidates to point at the likely one.
+  const changed = (input.changedFiles ?? []).filter((f) => typeof f === "string" && f.trim()).slice(0, 40);
   const user =
     `Test intent: "${input.intent}"\n` +
     (input.context?.trim() ? `Change under test (background): ${input.context.trim()}\n` : "") +
+    (changed.length ? `Changed files in this change:\n${changed.map((f) => `- ${f}`).join("\n")}\n` : "") +
     `Navigator finished with status: ${input.navigatorStatus}.\n\nStep trace:\n${trace}`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -120,7 +138,7 @@ export async function runVerificationReview(input: {
         response: raw,
         agent: "verification",
       } as never);
-      return parseVerificationReview(raw ?? "");
+      return parseVerificationReview(raw ?? "", changed);
     } catch (err) {
       logger.warn({ err: String(err).split("\n")[0], attempt }, "Verification review parse failed");
     }
@@ -128,20 +146,56 @@ export async function runVerificationReview(input: {
   return [];
 }
 
-export function parseVerificationReview(raw: string): RunVerification[] {
+function parseStringList(value: unknown, max: number, maxLen: number): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim().replace(/\s+/g, " ").slice(0, maxLen))
+    .slice(0, max);
+  return out.length ? out : undefined;
+}
+
+/**
+ * @param allowedFiles when supplied, `suspectFiles` is filtered to this set.
+ * The model is told to copy paths verbatim, but a hallucinated path in a PR
+ * comment sends a maintainer to a file that does not exist, so it is enforced
+ * here rather than trusted. Matching is exact, then by basename, so a model
+ * that shortens `a/b/Foo.tsx` to `Foo.tsx` still resolves.
+ */
+export function parseVerificationReview(raw: string, allowedFiles?: string[]): RunVerification[] {
   const parsed = JSON.parse(stripFence(raw ?? "")) as { verifications?: unknown };
   const list = Array.isArray(parsed.verifications) ? parsed.verifications : [];
+  const allowed = allowedFiles?.length ? allowedFiles : null;
+  const byBasename = new Map<string, string>();
+  for (const f of allowed ?? []) byBasename.set(f.split("/").pop() ?? f, f);
+  const resolveFile = (candidate: string): string | null => {
+    if (!allowed) return null;
+    if (allowed.includes(candidate)) return candidate;
+    return byBasename.get(candidate.split("/").pop() ?? candidate) ?? null;
+  };
+
   return list
     .filter((v): v is Record<string, unknown> => !!v && typeof v === "object")
-    .map((v) => ({
-      claim: String(v.claim ?? "").slice(0, 200),
-      status: (["verified", "contradicted", "not_testable"].includes(String(v.status))
+    .map((v) => {
+      const status = (["verified", "contradicted", "not_testable"].includes(String(v.status))
         ? String(v.status)
-        : "not_testable") as RunVerification["status"],
-      evidence: String(v.evidence ?? "").slice(0, 300),
-      title: v.title ? String(v.title).slice(0, 60) : undefined,
-      stepIndex: typeof v.stepIndex === "number" && Number.isFinite(v.stepIndex) ? v.stepIndex : undefined,
-    }))
+        : "not_testable") as RunVerification["status"];
+      // Repro steps and file pointers only mean anything for a failure.
+      const repro = status === "contradicted" ? parseStringList(v.reproSteps, 4, 160) : undefined;
+      const suspectRaw = status === "contradicted" ? parseStringList(v.suspectFiles, 3, 200) : undefined;
+      const suspect = suspectRaw
+        ? Array.from(new Set(suspectRaw.map(resolveFile).filter((f): f is string => !!f)))
+        : undefined;
+      return {
+        claim: String(v.claim ?? "").slice(0, 200),
+        status,
+        evidence: String(v.evidence ?? "").slice(0, 300),
+        title: v.title ? String(v.title).slice(0, 60) : undefined,
+        stepIndex: typeof v.stepIndex === "number" && Number.isFinite(v.stepIndex) ? v.stepIndex : undefined,
+        reproSteps: repro,
+        suspectFiles: suspect?.length ? suspect : undefined,
+      };
+    })
     .filter((v) => v.claim)
     .slice(0, 6);
 }

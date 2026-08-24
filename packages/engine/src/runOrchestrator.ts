@@ -55,6 +55,10 @@ export type RunJob = {
   extraHTTPHeaders?: Record<string, string>;
   testId?: string;
   context?: string;
+  /** Paths touched by the change under test, when the caller knows the diff
+   *  (CI). Lets the verification reviewer point a failing check at the file
+   *  most likely responsible. */
+  changedFiles?: string[];
   saveScreenshots?: boolean;
   maxSteps?: number;
   recordVideo?: boolean;
@@ -394,6 +398,7 @@ async function runOrchestratedJobInner(storage: StorageAdapter, job: RunJob): Pr
           runVerificationReview({
             intent: job.intent,
             context,
+            changedFiles: job.changedFiles,
             stepsDetail: agentResult.stepsDetail,
             navigatorStatus,
             onLLMCall: (call) => holisticCalls.push({ ...call, seq: 0 } as never),
