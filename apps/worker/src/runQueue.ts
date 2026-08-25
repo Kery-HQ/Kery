@@ -3,7 +3,7 @@ import * as path from "path";
 import type { StorageAdapter } from "@kery/engine";
 import {
   runOrchestratedJob, enrichBugsForRun,
-  createEmitter, destroyEmitter, logger, drawRedBoundingBoxOnJpeg,
+  createEmitter, destroyEmitter, logger, renderIssueArtifact,
   isStopRequested, updateEngineConfig, serializeError, withRunCorrelation, auditConnection,
   type RunResult,
 } from "@kery/engine";
@@ -528,6 +528,13 @@ async function moveBugScreenshotsToOwnDir(
   }
 }
 
+/** The one-line headline stamped on a bug's evidence image; the full text lives
+ *  next to the image in the UI, so this stays short on purpose. */
+function bugCaption(step: any): { headline?: string } {
+  const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  return { headline: pick(step.name) ?? pick(step.bugDescription) ?? pick(step.reasoning) };
+}
+
 /** Write vision/bug JPEGs to SCREENSHOTS_DIR; replace inline base64 with filename-only refs. */
 async function materializeRunScreenshotFiles(runId: string, llmCalls: any[], bugSteps: any[]): Promise<void> {
   const dir = path.join(SCREENSHOTS_DIR, runId);
@@ -555,9 +562,16 @@ async function materializeRunScreenshotFiles(runId: string, llmCalls: any[], bug
       const filename = `bug-${bugFileIdx++}.jpg`;
       let buf: Uint8Array = Buffer.from(raw, "base64");
       const reg = step.region;
-      if (reg && typeof reg === "object" && typeof reg.x === "number" && typeof reg.y === "number" && typeof reg.w === "number" && typeof reg.h === "number") {
-        buf = await drawRedBoundingBoxOnJpeg(Buffer.from(buf), { x: reg.x, y: reg.y, w: reg.w, h: reg.h });
-      }
+      const region = reg && typeof reg === "object" && typeof reg.x === "number" && typeof reg.y === "number" && typeof reg.w === "number" && typeof reg.h === "number"
+        ? { x: reg.x, y: reg.y, w: reg.w, h: reg.h }
+        : undefined;
+      // Zoom to the affected area, box it, and stamp a short headline card.
+      // Falls back to a boxed full shot and then the plain screenshot on its own.
+      buf = await renderIssueArtifact(Buffer.from(buf), {
+        region,
+        caption: bugCaption(step),
+        severity: typeof step.severity === "string" ? step.severity : undefined,
+      });
       fs.writeFileSync(path.join(dir, filename), buf);
       step.screenshotPath = filename;
       delete step.screenshotBase64;
